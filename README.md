@@ -43,3 +43,4 @@ person, a first submission waits for one. A version is withdrawn with
 | --- | --- | --- | --- | --- | --- | --- |
 | [Camera](https://github.com/ymote/camera-card) | 1.0.0 |  |  | ymote | draw its screen only | offered |
 | [Camera](https://github.com/ymote/camera-card) | 1.0.1 | photo-video | macos, android, linux | ymote | draw its screen only | offered |
+| [Camera](https://github.com/ymote/camera-card) | 1.0.2 | photo-video | macos, android, linux | ymote | draw its screen only | offered |

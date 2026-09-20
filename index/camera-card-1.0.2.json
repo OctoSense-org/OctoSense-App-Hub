@@ -1,0 +1,67 @@
+{
+  "admitted": "2026-09-20",
+  "artifact": "artifacts/camera-card-1.0.2.bundle",
+  "listing": {
+    "age_rating": "all",
+    "category": "photo-video",
+    "description": "A faithful card rendering of the camera's photo mode: the viewfinder with the zoom steps W, 1x, 2x, 3x and 5x, the mode row (night, snapshot, portrait, photo, video, pro, more), the shutter, the gallery thumbnail and the camera switch. It draws its screen and nothing else: no capabilities, no network, no assistant. Built with the OctoSense image-to-appcard flow from the camera storyboard as a first published card app.",
+    "icon": "assets/icon.svg",
+    "keywords": [
+      "camera",
+      "viewfinder",
+      "replica",
+      "mate 70"
+    ],
+    "license": "Apache-2.0",
+    "platforms": [
+      "macos",
+      "android",
+      "linux"
+    ],
+    "publisher": {
+      "name": "ymote",
+      "privacy_policy_url": "https://github.com/ymote/camera-card/blob/main/PRIVACY.md",
+      "support": "https://github.com/ymote/camera-card/issues"
+    },
+    "release_notes": "Adds the app icon.",
+    "schema": 1,
+    "screenshots": [
+      "screenshots/01-photo-mode.png"
+    ],
+    "subtitle": "The photo-mode screen of the Mate 70 Air camera replica"
+  },
+  "manifest": {
+    "agent": null,
+    "capabilities": [],
+    "compute": {
+      "instruction_budget": 5000000,
+      "memory_bytes": 33554432
+    },
+    "id": "camera-card",
+    "integrity": {
+      "bundle_blake3": "086b3cb2f4d06f66b9930825f3761f3c98d0bcd92565e558e5ec9f01683cde7d",
+      "signature": {
+        "key_id": "ymote",
+        "value": "cefa82d4460e666f45ead67e75d0f84d930a275599468c2437816acce02dcfa13a7a03552e01fcfcd229d77853627daa6b4a13be349ea257a73a59f59a6ec60b"
+      }
+    },
+    "name": "Camera",
+    "network": {
+      "hosts": []
+    },
+    "schema": 1,
+    "storage": {
+      "max_bytes": 262144
+    },
+    "version": "1.0.2"
+  },
+  "publisher": "ymote",
+  "publisher_key": "3de0c558ed6c73944cbf021d40100fde989d3700f513a85a8bf8c0edca58aa3e",
+  "source": {
+    "commit": "42b498c20f2deba0d657e6ea15a055d1440248c0",
+    "repository": "https://github.com/ymote/camera-card"
+  },
+  "status": {
+    "state": "offered"
+  }
+}

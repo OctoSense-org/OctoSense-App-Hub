@@ -1,0 +1,25 @@
+{
+  "agent": null,
+  "capabilities": [],
+  "compute": {
+    "instruction_budget": 5000000,
+    "memory_bytes": 33554432
+  },
+  "id": "camera-card",
+  "integrity": {
+    "bundle_blake3": "086b3cb2f4d06f66b9930825f3761f3c98d0bcd92565e558e5ec9f01683cde7d",
+    "signature": {
+      "key_id": "ymote",
+      "value": "cefa82d4460e666f45ead67e75d0f84d930a275599468c2437816acce02dcfa13a7a03552e01fcfcd229d77853627daa6b4a13be349ea257a73a59f59a6ec60b"
+    }
+  },
+  "name": "Camera",
+  "network": {
+    "hosts": []
+  },
+  "schema": 1,
+  "storage": {
+    "max_bytes": 262144
+  },
+  "version": "1.0.2"
+}
