@@ -18,10 +18,12 @@ cannot be installed after the build on any OctoSense device, so do not propose i
 ```
 my-app/
   manifest.json      what the app is and what it may do   (required)
+  listing.json       what the store shows about it         (required)
   page.card          the L0 card, the app's screen          (required)
   page.data.json     the data bound into the card           (optional)
   kit/               the kit the card is lowered with       (required)
   assets/            every image and icon the card uses     (as needed)
+  screenshots/       PNGs the listing names                 (recommended)
 ```
 
 Produce the card, data and kit with the image-to-appcard flow in the
@@ -41,6 +43,7 @@ L0 unless asked.
 | Hosts are bare | A host with a scheme, path, port, wildcard or credentials. `api.example.com` is right; `https://api.example.com/v1` and `*.example.com` are refused. |
 | Hosts need `net` | Listing hosts without requesting the `net` capability. |
 | Version is new | Re-publishing a version already in the catalog. |
+| Listing present and valid | No `listing.json`, an unknown category, platform or age rating, a non-https privacy policy, or a screenshot the listing names that is not in the bundle. |
 | Publisher continuity | An update signed by a different key than the one on record for this app. |
 
 ## The manifest
@@ -86,6 +89,54 @@ offers contained apps: `ledger.read`, `ledger.write`, `net.fetch`,
 `storage.read`, `storage.write`, `card.render`. Iterations clamp to 8, tokens
 to 200 000. The agent's workspace is the app's own storage jail and its hosts are
 the app's hosts; it cannot be given more than the app.
+
+## The listing
+
+`listing.json` is what a person sees in the store before installing. It is
+reviewed with the bundle and travels in the signed catalog, so what a
+reviewer read is what the store shows. The permissions shown beside it come
+from the manifest, never from here: a listing cannot understate what the app
+does.
+
+```json
+{
+  "schema": 1,
+  "subtitle": "One line under the name (80 characters)",
+  "description": "What the app does, for a person deciding whether to install it (4000 characters).",
+  "category": "photo-video",
+  "keywords": ["camera", "viewfinder"],
+  "screenshots": ["screenshots/01-photo-mode.png"],
+  "icon": "assets/icon.svg",
+  "platforms": ["macos", "android", "linux"],
+  "publisher": {
+    "name": "Your name or organisation",
+    "support": "https://github.com/you/my-app/issues",
+    "privacy_policy_url": "https://github.com/you/my-app/blob/main/PRIVACY.md"
+  },
+  "release_notes": "What changed in this version.",
+  "age_rating": "all",
+  "license": "Apache-2.0"
+}
+```
+
+Rules the gate enforces: `category` is one of `productivity utilities
+photo-video news weather travel finance health education entertainment games
+social shopping lifestyle developer`; `platforms` names at least one of
+`android ios macos windows linux openharmony web` (list what you tested; a
+card app runs wherever the OctoSense shell does); `age_rating` is one of
+`all 12+ 16+ 18+`; `privacy_policy_url` is an https URL; every screenshot
+and the icon is a PNG or SVG inside the bundle; at most 10 keywords and 8
+screenshots; unknown fields are refused. Screenshots are recommended, not
+required, but a listing without one is shown without a picture.
+
+To produce a screenshot, run the bundle in the reference host headless and
+grab a frame: `card-host --bundle my-app --allow-unsigned --remote`, then
+`curl localhost:<port>/g`, and crop the 812×1552 artboard.
+
+The store also shows a **privacy summary derived from the manifest**: what
+the app stores, which hosts it contacts, which device features it uses,
+whether it runs an assistant. Do not restate it in the description; make
+the manifest right instead.
 
 ## Commands
 

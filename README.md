@@ -39,6 +39,7 @@ person, a first submission waits for one. A version is withdrawn with
 
 ## Apps
 
-| App | Version | Publisher | Allowed to | Status |
-| --- | --- | --- | --- | --- |
-| [Camera](https://github.com/ymote/camera-card) | 1.0.0 | ymote | draw its screen only | offered |
+| App | Version | Category | Runs on | Publisher | Allowed to | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| [Camera](https://github.com/ymote/camera-card) | 1.0.0 |  |  | ymote | draw its screen only | offered |
+| [Camera](https://github.com/ymote/camera-card) | 1.0.1 | photo-video | macos, android, linux | ymote | draw its screen only | offered |

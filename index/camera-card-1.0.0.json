@@ -1,6 +1,7 @@
 {
   "admitted": "2026-09-20",
   "artifact": "artifacts/camera-card-1.0.0.bundle",
+  "listing": null,
   "manifest": {
     "agent": null,
     "capabilities": [],
