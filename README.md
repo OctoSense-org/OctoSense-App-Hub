@@ -24,7 +24,7 @@ signs the catalog. Rotating the working key needs no store release.
 ## Pointing a store here
 
 ```sh
-OCTOSENSE_HUB=https://raw.githubusercontent.com/ymote/octosense-app-hub/main/ \
+OCTOSENSE_HUB=https://raw.githubusercontent.com/OctoSense-org/octosense-app-hub/main/ \
 OCTOSENSE_HUB_ANCHOR=6000284a069ba7cada2925094074e8e0baae07e25d1b7fc31f396c993f363e11 \
 appstore
 ```
