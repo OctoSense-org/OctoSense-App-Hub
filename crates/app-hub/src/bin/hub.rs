@@ -163,6 +163,42 @@ fn run() -> Result<(), String> {
             println!("withdrew {app_id} {version}: {reason} (catalog sequence {})", catalog.sequence);
             Ok(())
         }
+        // Withdrawal is the normal end of a version: the entry stays, marked,
+        // so a device can say why it stopped running. Removal is for an entry
+        // that should never have been offered (a test publish, a mistaken
+        // id): it leaves the catalog and its copies leave the store, and the
+        // version number becomes free again.
+        "remove" => {
+            let app_id = positional.ok_or("usage: hub remove <app id> [--version <v>] --catalog <f> --key <f> --anchor-cert <hex> [--out <dir>]")?;
+            let version = flag("version");
+            let catalog_path = PathBuf::from(flag("catalog").ok_or("--catalog <file>")?);
+            let working = load_key(&flag("key").ok_or("--key <working key file>")?)?;
+            let anchor_certificate = flag("anchor-cert").ok_or("--anchor-cert <hex>")?;
+            let out = PathBuf::from(flag("out").unwrap_or_else(|| ".".into()));
+            let mut catalog = read_catalog(&catalog_path)?;
+            let before = catalog.entries.len();
+            let (removed, kept): (Vec<_>, Vec<_>) = catalog
+                .entries
+                .drain(..)
+                .partition(|e| e.app_id() == app_id && version.as_deref().map_or(true, |v| e.version() == v));
+            catalog.entries = kept;
+            if removed.is_empty() {
+                return Err(format!("{app_id}{} is not in the catalog", version.map(|v| format!(" {v}")).unwrap_or_default()));
+            }
+            for entry in &removed {
+                let artifact = out.join(&entry.artifact);
+                let _ = std::fs::remove_dir_all(&artifact);
+                let _ = std::fs::remove_file(out.join(format!("{}.pack.json", entry.artifact)));
+                let _ = std::fs::remove_file(out.join("index").join(format!("{}-{}.json", entry.app_id(), entry.version())));
+                println!("removed {} {}", entry.app_id(), entry.version());
+            }
+            catalog.sequence += 1;
+            catalog.published = today();
+            working.sign_catalog(&mut catalog, &anchor_certificate)?;
+            write_json(&catalog_path, &serde_json::to_value(&catalog).map_err(|e| e.to_string())?)?;
+            println!("{} of {} entries remain (catalog sequence {})", catalog.entries.len(), before, catalog.sequence);
+            Ok(())
+        }
         "scan" => {
             let bundle = PathBuf::from(positional.ok_or("usage: hub scan <bundle> [--reviewer <cmd>] [--packet <out.json>]")?);
             let report = gate_for(&bundle, &argv, true, flag("catalog"))?;

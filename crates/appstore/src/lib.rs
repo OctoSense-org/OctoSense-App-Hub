@@ -107,7 +107,7 @@ pub const DEFAULT_ANCHOR: &str = "6000284a069ba7cada2925094074e8e0baae07e25d1b7f
 /// The hub this build reads by default: the OctoSense organisation's hub,
 /// served from its repository. `OCTOSENSE_HUB` overrides it (a mirror
 /// directory or another base URL).
-pub const DEFAULT_HUB: &str = "https://raw.githubusercontent.com/OctoSense-org/octosense-app-hub/main/";
+pub const DEFAULT_HUB: &str = "https://raw.githubusercontent.com/OctoSense-org/OctoSense-App-Hub/main/";
 
 script_mod! {
     use mod.prelude.widgets.*
