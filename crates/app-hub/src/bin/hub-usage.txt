@@ -9,6 +9,9 @@ hub — the OctoSense app hub command (ADR 0003)
   hub publish <bundle> --catalog <f> --key <f> --anchor-cert <hex>
               --publisher <id> [--repo <url>] [--commit <sha>] [--out <dir>]
   hub withdraw <app> --version <v> --reason <text> --catalog <f> --key <f> --anchor-cert <hex>
+  hub remove <app> [--version <v>] --catalog <f> --key <f> --anchor-cert <hex> [--out <dir>]
+              (drops the entry, its index file and its artifacts; for a
+              publish that should never have been offered — withdraw otherwise)
   hub scan <bundle> [--reviewer <cmd>] [--packet <out.json>]
   hub verify <catalog> --anchor <hex>
 

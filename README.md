@@ -37,7 +37,7 @@ signs the catalog. Rotating the working key needs no store release.
 ## Pointing a store here
 
 ```sh
-OCTOSENSE_HUB=https://raw.githubusercontent.com/OctoSense-org/octosense-app-hub/main/ \
+OCTOSENSE_HUB=https://raw.githubusercontent.com/OctoSense-org/OctoSense-App-Hub/main/ \
 OCTOSENSE_HUB_ANCHOR=6000284a069ba7cada2925094074e8e0baae07e25d1b7fc31f396c993f363e11 \
 appstore
 ```
@@ -54,6 +54,10 @@ person, a first submission waits for one. A version is withdrawn with
 
 | App | Version | Category | Runs on | Publisher | Allowed to | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| [Camera](https://github.com/ymote/camera-card) | 1.0.0 |  |  | ymote | draw its screen only | offered |
-| [Camera](https://github.com/ymote/camera-card) | 1.0.1 | photo-video | macos, android, linux | ymote | draw its screen only | offered |
-| [Camera](https://github.com/ymote/camera-card) | 1.0.2 | photo-video | macos, android, linux | ymote | draw its screen only | offered |
+| _none yet_ | | | | | | |
+
+The camera card that exercised the pipeline was removed on 20 Sep 2026:
+Camera is a system app that ships with the ROM (like Calendar, News and
+Photos), not a store app. Its repository stays at
+[ymote/camera-card](https://github.com/ymote/camera-card) as a worked
+example of a publishable bundle.
