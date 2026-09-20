@@ -23,7 +23,7 @@ my-app/
   page.data.json     the data bound into the card           (optional)
   kit/               the kit the card is lowered with       (required)
   assets/            every image and icon the card uses     (as needed)
-  screenshots/       PNGs the listing names                 (recommended)
+  screenshots/       at least one PNG the listing names     (required)
 ```
 
 Produce the card, data and kit with the image-to-appcard flow in the
@@ -43,7 +43,7 @@ L0 unless asked.
 | Hosts are bare | A host with a scheme, path, port, wildcard or credentials. `api.example.com` is right; `https://api.example.com/v1` and `*.example.com` are refused. |
 | Hosts need `net` | Listing hosts without requesting the `net` capability. |
 | Version is new | Re-publishing a version already in the catalog. |
-| Listing present and valid | No `listing.json`, an unknown category, platform or age rating, a non-https privacy policy, or a screenshot the listing names that is not in the bundle. |
+| Listing present and complete | No `listing.json`; no icon or no screenshot; an unknown category, platform or age rating; a non-https privacy policy; or an icon or screenshot the listing names that is not in the bundle. |
 | Publisher continuity | An update signed by a different key than the one on record for this app. |
 
 ## The manifest
@@ -126,8 +126,9 @@ social shopping lifestyle developer`; `platforms` names at least one of
 card app runs wherever the OctoSense shell does); `age_rating` is one of
 `all 12+ 16+ 18+`; `privacy_policy_url` is an https URL; every screenshot
 and the icon is a PNG or SVG inside the bundle; at most 10 keywords and 8
-screenshots; unknown fields are refused. Screenshots are recommended, not
-required, but a listing without one is shown without a picture.
+screenshots; unknown fields are refused. An icon and at least one screenshot
+are required: the icon is what the launcher shows once the app is installed,
+and a screenshot is the one claim a reviewer can check against the card.
 
 To produce a screenshot, run the bundle in the reference host headless and
 grab a frame: `card-host --bundle my-app --allow-unsigned --remote`, then
