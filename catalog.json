@@ -1,0 +1,50 @@
+{
+  "entries": [
+    {
+      "admitted": "2026-09-20",
+      "artifact": "artifacts/camera-card-1.0.0.bundle",
+      "manifest": {
+        "agent": null,
+        "capabilities": [],
+        "compute": {
+          "instruction_budget": 5000000,
+          "memory_bytes": 33554432
+        },
+        "id": "camera-card",
+        "integrity": {
+          "bundle_blake3": "7c3ea0c9576a0fc897281df48faa9c9e43733b5609d899ab72a18b39ec4c7ac9",
+          "signature": {
+            "key_id": "ymote",
+            "value": "084c033c1eb9760b9fe563ec0fb2c2e6ad5aa3e94b7b11457dc0b1a45233e07e142d235d16c282c9f6124a34eb0746b6f324d07a2c78983b5344b4ee284a8905"
+          }
+        },
+        "name": "Camera",
+        "network": {
+          "hosts": []
+        },
+        "schema": 1,
+        "storage": {
+          "max_bytes": 262144
+        },
+        "version": "1.0.0"
+      },
+      "publisher": "ymote",
+      "publisher_key": "3de0c558ed6c73944cbf021d40100fde989d3700f513a85a8bf8c0edca58aa3e",
+      "source": {
+        "commit": "ec6f32d4c67a2128beb537b760f6889f337cfb67",
+        "repository": "https://github.com/ymote/camera-card"
+      },
+      "status": {
+        "state": "offered"
+      }
+    }
+  ],
+  "key": {
+    "anchor_certificate": "9a584c6e324fcd5b5f7056c16fa2f5012d05063598529de82858b5ad2090db121cbdfcaedf799793444c8032a175a1bae40ccba04354eb3bfa4acb00af68ce07",
+    "public": "587f846cc63369881edfc5cb958ed54c5d014b476fc437037a49df3e7f43c9cd"
+  },
+  "published": "2026-09-20",
+  "schema": 1,
+  "sequence": 1,
+  "signature": "df10207a4e49b109a5e69a5246eb256ecf6cdf75c32595809ea535066d5d385510695457130cbced85d91711e856fe1b3c2ad8f982a7a6c81bc6401bd6bd9709"
+}
