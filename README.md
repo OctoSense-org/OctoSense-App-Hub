@@ -1,8 +1,9 @@
 # OctoSense app hub
 
 The index of apps published for OctoSense, the signed catalog every OctoSense
-store reads, and the hub's own copy of each admitted bundle. No app code
-lives here; each app stays in its publisher's repository.
+store reads, the hub's own copy of each admitted bundle, and the code that
+runs the hub and the store. No app code lives here; each app stays in its
+publisher's repository.
 
 | Path | What it is |
 | --- | --- |
@@ -11,6 +12,18 @@ lives here; each app stays in its publisher's repository.
 | `artifacts/<app>-<version>.bundle/` | The hub's copy of the bundle, exactly the bytes that were reviewed. |
 | `artifacts/<app>-<version>.bundle.pack.json` | The same bundle as one file, which stores download. |
 | `docs/PUBLISHING.md` | How to publish; also the `AGENTS.md` a developer copies into their repository. |
+| `crates/app-policy` | The signed manifest and listing, admission, and resolution into an isolate's settings and an agent session profile (ADR 0002). |
+| `crates/app-hub` | The index, the signed catalog, the gate, the agent scan, the device client and the `hub` command (ADR 0003). |
+| `crates/appstore` | The store as an OctoSense module, and the `card` module that runs an installed app as its own client. |
+| `crates/appstore-app` | The store as a standalone app (`appstore`). |
+| `crates/card-host` | The reference contained host for one card bundle (`card-host`). |
+| `crates/app-host` | A one-window host that runs any OctoSense AppModule as a standalone app. |
+
+The crates build against the pinned OctoSense forks of Makepad and Octoscript,
+resolved from sibling checkouts (`../makepad`, `../octoscript-makepad`,
+`../octoscript`) as the launcher workspace does. `cargo test --workspace`
+runs the policy, gate, signing and store tests headless; `cargo run -p
+octosense-app-hub --bin hub` is the publishing tool.
 
 ## Trust anchor
 
