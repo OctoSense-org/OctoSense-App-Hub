@@ -1,19 +1,26 @@
 # Publishing an app to the OctoSense app hub
 
-This file is for the AI coding tool working in an app developer's repository.
-Copy it to the repository root as `AGENTS.md` (or into `CLAUDE.md`, `.cursorrules`,
-or whatever your tool reads). It states what a publishable app is, what the hub
-refuses, and the exact commands, so the tool can prepare and submit an app
-without guessing.
+This is the shared publication contract for app authors and their coding tools.
+Start with [Build your first Hub app](FIRST-APP.md), follow the
+[icon guidelines](ICONS.md), and use the [development guide map](DEVELOPMENT.md)
+for UI, state, runtime setup and native testing.
 
-Everything below is enforced by code, not by convention. A bundle that breaks a
-rule is refused with a report naming the rule; nothing is silently narrowed.
+The [app starter](../templates/app/README.md) includes a short
+[`AGENTS.md`](../templates/app/AGENTS.md) that links to these guides. Merge it
+into an existing repository's instructions. Keep any offline copy versioned
+against a known Hub revision instead of maintaining independent rules.
+
+The admission rules below are enforced by code and reported as refusals or
+warnings. Authoring and visual-review recommendations are separate: a gate
+pass does not prove the UI renders, the icon is readable, or the listing is
+truthful. See [current icon enforcement](ICONS.md#technical-requirements-and-current-enforcement).
 
 ## What an app is
 
 A **card app**: a directory of text and artwork that OctoSense renders in its own
-sandboxed isolate. It is not compiled and contains no native code. Native code
-cannot be installed after the build on any OctoSense device, so do not propose it.
+sandboxed isolate. The Hub's Card bundle format contains no native code. An app
+that needs new native runtime code must be integrated into a shell release;
+see the [delivery paths](DEVELOPMENT.md#choose-the-appropriate-delivery-path).
 
 ```
 my-app/
@@ -22,13 +29,15 @@ my-app/
   page.card          the L0 card, the app's screen          (required)
   page.data.json     the data bound into the card           (optional)
   kit/               the kit the card is lowered with       (required)
-  assets/            every image and icon the card uses     (as needed)
+  assets/            icon and other local runtime artwork   (icon required)
   screenshots/       at least one PNG the listing names     (required)
 ```
 
-Produce the card, data and kit with the image-to-appcard flow in the
-Octoscript-AppCard repository (`tools/image-to-appcard-flow.sh`). Do not hand-write
-L0 unless asked.
+Produce the card, data and kit with the
+[image-to-appcard flow](https://github.com/OctoSense-org/Octoscript-AppCard/blob/main/lab/image-to-appcard-flow/README.md)
+in the Octoscript-AppCard repository (`tools/image-to-appcard-flow.sh`). Do not
+hand-write L0 unless asked. Keep developer instructions, source tools, keys,
+test data directories and review packets outside the submitted bundle.
 
 ## Rules the gate enforces
 
@@ -129,10 +138,19 @@ and the icon is a PNG or SVG inside the bundle; at most 10 keywords and 8
 screenshots; unknown fields are refused. An icon and at least one screenshot
 are required: the icon is what the launcher shows once the app is installed,
 and a screenshot is the one claim a reviewer can check against the card.
+Use one app-owned canonical icon across store and launcher surfaces; see
+[ICONS.md](ICONS.md) for export limits, native rendering and small-size review.
+The two-field icon declaration used by a built-in native app is not a complete
+publishable listing.
 
-To produce a screenshot, run the bundle in the reference host headless and
-grab a frame: `card-host --bundle my-app --allow-unsigned --remote`, then
-`curl localhost:<port>/g`, and crop the 812×1552 artboard.
+To produce a screenshot, run an unsigned development bundle in the reference
+host: `card-host --bundle my-app --allow-unsigned --remote`. Read its logged
+endpoint; `/g` returns capture metadata and `/g?raw=1` returns PNG bytes.
+Capture the actual app content at the host's current dimensions; do not assume
+a fixed crop. The current reference host has no publisher-key option, so use
+an unsigned development copy before final signing. See the
+[first-app walkthrough](FIRST-APP.md#4-run-the-unsigned-development-bundle-and-capture-it)
+and [native testing guide](https://github.com/OctoSense-org/Octoscript-AppCard/blob/main/lab/core/NATIVE-INSTRUMENT.md).
 
 The store also shows a **privacy summary derived from the manifest**: what
 the app stores, which hosts it contacts, which device features it uses,
@@ -146,12 +164,15 @@ locally is the report the hub acts on.
 
 ```sh
 hub stamp my-app                       # write the bundle digest into manifest.json; rerun after every change
-hub check my-app --allow-unsigned      # the gate; exit 0 means it would be admitted
+hub check my-app --allow-unsigned      # current local gate; not a runtime or visual test
 hub scan  my-app --packet review.json  # the agent-scan packet, to answer yourself or hand to a reviewer
 ```
 
 `hub check` prints what the app will be granted. Read it back against the
 manifest: if the grants are wider than the app visibly needs, reduce the manifest.
+Use `--catalog <catalog.json>` when checking version and publisher continuity
+against an existing catalog. Keep `review.json` outside `my-app/`; it is a
+review artifact, not app content.
 
 `hub scan` writes the questions a reviewer answers: does the app do what its
 name claims, do its grants match what it draws, is anything deceptive, does any
@@ -161,14 +182,17 @@ submitting; the hub's reviewer will ask the same ones.
 ## Signing
 
 Signing is optional for a first submission and required for updates once a
-key is on record. Prefer publishing from a GitHub release workflow (below):
-the build signs as itself and no key is stored anywhere. For a manual
-submission:
+key is on record. The example GitHub release workflow below is planned; use
+manual signing until that action and submission route are available:
 
 ```sh
-hub keygen me.key                                    # once; keep me.key private
-hub sign-manifest my-app --key me.key --key-id <your publisher id>
-hub check my-app --publisher-key <id>=$(hub pubkey me.key)
+export APP_PUBLISHER_ID="your-publisher-id"
+export APP_SIGNING_KEY="/absolute/private/path/publisher.key"
+# Create the key once, outside the bundle; reuse it for future versions.
+test ! -e "$APP_SIGNING_KEY" && hub keygen "$APP_SIGNING_KEY"
+hub sign-manifest my-app --key "$APP_SIGNING_KEY" --key-id "$APP_PUBLISHER_ID"
+APP_PUBLISHER_PUBLIC_KEY="$(hub pubkey "$APP_SIGNING_KEY")"
+hub check my-app --publisher-key "$APP_PUBLISHER_ID=$APP_PUBLISHER_PUBLIC_KEY"
 ```
 
 Sign after `hub stamp`, since the signature covers the digest. Once a bundle
@@ -182,7 +206,8 @@ entry: your manifest, the bundle digest, your publisher id, the source
 repository and commit, and a link to the bundle attached to your release. You
 never fork the hub, and the app's code never enters it.
 
-The recommended route is the release workflow. Add to your repository:
+The planned release workflow has the following shape. Add it only after
+confirming that the action and submission route are available:
 
 ```yaml
 name: Publish to the OctoSense hub

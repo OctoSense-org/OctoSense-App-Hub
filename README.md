@@ -11,7 +11,11 @@ publisher's repository.
 | `index/<app>-<version>.json` | One admitted entry per app version: its manifest, publisher, source and status. |
 | `artifacts/<app>-<version>.bundle/` | The hub's copy of the bundle, exactly the bytes that were reviewed. |
 | `artifacts/<app>-<version>.bundle.pack.json` | The same bundle as one file, which stores download. |
-| `docs/PUBLISHING.md` | How to publish; also the `AGENTS.md` a developer copies into their repository. |
+| `docs/FIRST-APP.md` | First-app walkthrough: author, package, run, capture, validate and submit. |
+| `docs/PUBLISHING.md` | Shared bundle, listing, permissions and publication contract. |
+| `docs/ICONS.md` | Canonical icon ownership, export constraints and visual review. |
+| `docs/DEVELOPMENT.md` | Guide map for UI, data/state, runtime setup and testing. |
+| `templates/app/` | App repository scaffold with metadata, example icon and linked agent instructions. |
 | `crates/app-policy` | The signed manifest and listing, admission, and resolution into an isolate's settings and an agent session profile (ADR 0002). |
 | `crates/app-hub` | The index, the signed catalog, the gate, the agent scan, the device client and the `hub` command (ADR 0003). |
 | `crates/appstore` | The store as an OctoSense module, and the `card` module that runs an installed app as its own client. |
@@ -44,8 +48,12 @@ appstore
 
 ## Publishing an app
 
-Read `docs/PUBLISHING.md`. In short: build the bundle, run `hub check`, sign
-the manifest, and open an entry here. The gate and the agent scan run on the
+Start with [Build your first Hub app](docs/FIRST-APP.md) and the
+[app starter](templates/app/README.md). Follow [Publishing](docs/PUBLISHING.md)
+for the complete contract and [Icons](docs/ICONS.md) for artwork. The
+[development guide map](docs/DEVELOPMENT.md) links the existing authoring and
+testing guides. Build the bundle, run `hub check`, sign the manifest, and open
+an entry here. The gate and the agent scan run on the
 exact bytes; a passing submission from a publisher on record merges without a
 person, a first submission waits for one. A version is withdrawn with
 `hub withdraw`, and every store honours it on its next fetch.
