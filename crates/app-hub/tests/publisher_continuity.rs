@@ -76,11 +76,11 @@ fn public_publish_rejects_unsigned_first_release() {
     let key = HubKey::generate();
     fs::write(&key_path, hex::encode(key.to_bytes())).unwrap();
     let cert = HubKey::generate().certify(&key.public_hex()).unwrap();
-    let catalog_path = f.root.join("catalog.json");
+    let catalog_path = f.root.join("public/catalog.json");
     let result = Command::new(env!("CARGO_BIN_EXE_hub")).args([
         "publish", f.bundle.to_str().unwrap(), "--allow-unsigned", "--publisher", "publisher-one",
         "--catalog", catalog_path.to_str().unwrap(), "--key", key_path.to_str().unwrap(),
-        "--anchor-cert", &cert, "--out", f.root.to_str().unwrap(),
+        "--anchor-cert", &cert, "--out", f.root.join("public").to_str().unwrap(),
     ]).output().unwrap();
     assert!(!result.status.success(), "unsigned public release was admitted");
     assert!(!catalog_path.exists(), "a refused release must not create a catalog");
@@ -92,18 +92,21 @@ fn publication_requires_runtime_evidence_even_when_reviewed() {
     let working = HubKey::generate();
     let key_path = f.root.join("working.key");
     fs::write(&key_path, hex::encode(working.to_bytes())).unwrap();
-    let certificate = HubKey::generate().certify(&working.public_hex()).unwrap();
-    let catalog = f.root.join("catalog.json");
+    let anchor = HubKey::generate();
+    let certificate = anchor.certify(&working.public_hex()).unwrap();
+    let catalog = f.root.join("public/catalog.json");
     let result = Command::new(env!("CARGO_BIN_EXE_hub")).args([
         "publish", f.bundle.to_str().unwrap(), "--publisher", "publisher-one",
         "--publisher-key", &format!("publisher-one={}", f.publisher.public_hex()),
         "--catalog", catalog.to_str().unwrap(), "--key", key_path.to_str().unwrap(),
-        "--anchor-cert", &certificate, "--out", f.root.to_str().unwrap(),
-        "--reviewed", "--validator", "/missing/app-validator",
+        "--anchor-cert", &certificate, "--out", f.root.join("public").to_str().unwrap(),
+        "--reviewed-by", "test-operator", "--review-id", "test-review", "--validator", "/missing/app-validator",
+        "--anchor", &anchor.public_hex(), "--state-dir", f.root.join("state").to_str().unwrap(),
+        "--expected-sequence", "0", "--idempotency-key", "runtime-required",
     ]).output().unwrap();
     assert!(!result.status.success(), "a missing validator must refuse publication");
     assert!(!catalog.exists());
-    assert!(!f.root.join("artifacts").exists());
+    assert!(!f.root.join("public/artifacts").exists());
 }
 
 #[test]
@@ -140,18 +143,20 @@ fn publish_authenticates_history_and_preserves_the_registered_key() {
     let certificate = anchor.certify(&working.public_hex()).unwrap();
     let key_path = f.root.join("working.key");
     fs::write(&key_path, hex::encode(working.to_bytes())).unwrap();
-    let catalog_path = f.root.join("catalog.json");
+    let catalog_path = f.root.join("public/catalog.json");
     let publish = |f: &Fixture, with_anchor: bool| {
         let validator = f.protocol_worker();
         let mut command = Command::new(env!("CARGO_BIN_EXE_hub"));
         command.args(["publish", f.bundle.to_str().unwrap(), "--publisher", "publisher-one",
             "--publisher-key", &format!("publisher-one={}", f.publisher.public_hex()),
             "--catalog", catalog_path.to_str().unwrap(), "--key", key_path.to_str().unwrap(),
-            "--anchor-cert", &certificate, "--out", f.root.to_str().unwrap(), "--validator", validator.to_str().unwrap()]);
+            "--anchor-cert", &certificate, "--out", f.root.join("public").to_str().unwrap(), "--validator", validator.to_str().unwrap(),
+            "--state-dir", f.root.join("state").to_str().unwrap(), "--expected-sequence", if catalog_path.exists() { "1" } else { "0" },
+            "--idempotency-key", &f.manifest.version, "--reviewed-by", "test-operator", "--review-id", "test-review"]);
         if with_anchor { command.args(["--anchor", &anchor.public_hex()]); }
         command.output().unwrap()
     };
-    let first = publish(&f, false);
+    let first = publish(&f, true);
     assert!(first.status.success(), "{}", String::from_utf8_lossy(&first.stderr));
     let before = fs::read(&catalog_path).unwrap();
     f.manifest.version = "2.0.0".into();
@@ -165,7 +170,7 @@ fn publish_authenticates_history_and_preserves_the_registered_key() {
     f.sign();
     let substitution = publish(&f, true);
     assert!(!substitution.status.success());
-    assert!(String::from_utf8_lossy(&substitution.stdout).contains("continuity"));
+    assert!(String::from_utf8_lossy(&substitution.stderr).contains("continuity"));
     assert_eq!(before, fs::read(&catalog_path).unwrap());
     f.publisher = HubKey::from_bytes(&original);
     f.sign();

@@ -25,6 +25,7 @@ pub mod scan;
 pub mod signing;
 pub mod runtime;
 pub mod release;
+pub mod approval;
 mod process;
 
 pub use client::{days_between, AppAvailability, Availability, Listing, PreparedLaunch, Store, CATALOG_FRESHNESS_DAYS};
@@ -34,3 +35,9 @@ pub use scan::{packet, scan, Packet, Route, Verdict};
 pub use gate::{check_bundle, entry_for, Finding, GateReport, Severity};
 pub use index::{Catalog, Entry, Source, Status, WorkingKey, CATALOG_SCHEMA};
 pub use signing::{sign_manifest, verify_catalog, HubKey, PublisherKeys};
+
+#[cfg(test)]
+extern crate self as octosense_app_hub;
+#[cfg(test)]
+#[path = "../tests/common/mod.rs"]
+mod test_bundle;

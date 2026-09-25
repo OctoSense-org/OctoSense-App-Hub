@@ -7,22 +7,28 @@ hub — the OctoSense app hub command (ADR 0003)
   hub sign-manifest <bundle> --key <f> --key-id <id>
   hub check <bundle> [--catalog <f> --anchor <hex>] [--allow-unsigned] [--publisher-key id=hex]
   hub test <bundle> [--validator <executable>] [--json] [check flags]
-  hub publish <bundle> --catalog <f> --key <f> --anchor-cert <hex>
-              --publisher <id> --publisher-key id=hex [--anchor <hex>]
-              [--repo <url>] [--commit <sha>] [--out <dir>] [--validator <executable>]
-  hub withdraw <app> --version <v> --reason <text> --catalog <f> --key <f> --anchor-cert <hex>
-  hub remove <app> [--version <v>] --catalog <f> --key <f> --anchor-cert <hex> [--out <dir>]
-              (drops the entry, its index file and its artifacts; for a
-              publish that should never have been offered — withdraw otherwise)
+  hub admin publish <bundle> --catalog <f> --state-dir <private directory>
+              --expected-sequence <n> --idempotency-key <request>
+              --anchor <hex> --key <f> --anchor-cert <hex>
+              --publisher <id> --publisher-key id=hex
+              --reviewed-by <operator> --review-id <decision>
+              [--repo <url>] [--commit <sha>] [--validator <executable>]
+  hub admin withdraw <app> --version <v> --reason <text>
+              --catalog <f> --state-dir <private directory>
+              --expected-sequence <n> --idempotency-key <request>
+              --anchor <hex> --key <f> --anchor-cert <hex>
+              (retains released identity/history; destructive remove is disabled)
   hub scan <bundle> [--catalog <f> --anchor <hex>] [--reviewer <cmd>] [--packet <out.json>]
   hub verify <catalog> --anchor <hex>
   hub admin renew --catalog <f> --state-dir <private durable directory>
               --expected-sequence <n> --idempotency-key <request>
               --anchor <hex> --key <f> --anchor-cert <hex>
 
-publish also accepts --reviewer <cmd> (the agent scan; a reject stops the
-publish, human-review stops it until --reviewed) and writes
-<artifact>.pack.json beside the artifact for HTTP delivery.
+Publication requires recorded operator review and creates immutable artifacts,
+pack.json and validation.json before atomically signing/swapping the catalog.
+Run reviewer commands separately with scan; --reviewer/--reviewed are not publish
+flags. publish/withdraw remain operator aliases for admin publish/withdraw.
+State must be outside the public catalog directory, on the same filesystem.
 
 check --json emits structural findings; test --json adds native validation
 with structured failures and evidence on success. Both accept local

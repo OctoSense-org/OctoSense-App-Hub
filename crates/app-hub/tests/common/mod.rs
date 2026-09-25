@@ -15,6 +15,7 @@ impl Fixture {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let root = std::env::temp_dir().join(format!("hub-regression-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
         fs::create_dir(&root).unwrap();
+        fs::create_dir(root.join("public")).unwrap();
         let bundle = root.join("bundle");
         fs::create_dir(&bundle).unwrap();
         fs::write(bundle.join("icon.svg"), r##"<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" fill="#146"/></svg>"##).unwrap();

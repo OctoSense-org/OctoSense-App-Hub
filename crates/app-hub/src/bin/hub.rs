@@ -27,7 +27,10 @@ fn main() {
 }
 
 fn run() -> Result<(), String> {
-    let argv: Vec<String> = std::env::args().collect();
+    let mut argv: Vec<String> = std::env::args().collect();
+    if argv.get(1).is_some_and(|s| s == "admin") && argv.get(2).is_some_and(|s| ["publish", "withdraw", "remove"].contains(&s.as_str())) {
+        argv.remove(1);
+    }
     let command = argv.get(1).map(String::as_str).unwrap_or("help");
     let flag = |name: &str| argv.windows(2).find(|w| w[0] == format!("--{name}")).map(|w| w[1].clone());
     let has = |name: &str| argv.iter().any(|a| a == &format!("--{name}"));
@@ -129,130 +132,62 @@ fn run() -> Result<(), String> {
             Ok(())
         }
         "publish" => {
-            if has("allow-unsigned") {
-                return Err("public releases require a signed manifest; --allow-unsigned is only for local checks".into());
+            if has("allow-unsigned") { return Err("public releases require a signed manifest; --allow-unsigned is only for local checks".into()); }
+            if has("reviewer") || has("reviewed") {
+                return Err("run review separately with hub scan; publication requires --reviewed-by and --review-id, not a caller-supplied command or passed flag".into());
             }
-            let bundle = PathBuf::from(positional.ok_or("usage: hub publish <bundle> --catalog <file> …")?);
+            let bundle = PathBuf::from(positional.ok_or("usage: hub admin publish <bundle> [operator transaction flags]")?);
             let catalog_path = PathBuf::from(flag("catalog").ok_or("--catalog <file>")?);
-            let report = gate_for(&bundle, &argv, false, Some(catalog_path.to_string_lossy().into()))?;
+            let state = PathBuf::from(flag("state-dir").ok_or("--state-dir <private durable directory>")?);
+            let expected = flag("expected-sequence").ok_or("--expected-sequence <number>")?.parse::<u64>().map_err(|e| e.to_string())?;
+            let request = flag("idempotency-key").ok_or("--idempotency-key <unique request>")?;
+            let anchor = flag("anchor").ok_or("--anchor <hex> is required to authenticate catalog history and its signer")?;
+            let review = approval::OperatorReview {
+                reviewer: flag("reviewed-by").ok_or("--reviewed-by <authenticated operator identity> is required")?,
+                review_id: flag("review-id").ok_or("--review-id <review decision record> is required")?,
+            };
+            // Structural/native work happens before loading a signing key or
+            // taking the release lock. Continuity is rechecked under that lock.
+            let report = gate_for(&bundle, &argv, false, None)?;
             print!("{}", report.render());
-            if !report.passed() {
-                return Err("refusing to publish a bundle the gate refused".into());
-            }
+            if !report.passed() { return Err("refusing to publish a bundle the gate refused".into()); }
             let evidence = runtime::validate(&bundle, &report, &validator_path(flag("validator"))?)?;
-            // From here on, publish the owned bytes actually checked by the
-            // worker. A publisher can keep editing the original working tree.
-            let bundle = evidence.bundle();
-            let working = load_key(&flag("key").ok_or("--key <working key file>")?)?;
-            let anchor_certificate = flag("anchor-cert").ok_or("--anchor-cert <hex>")?;
             let publisher = flag("publisher").ok_or("--publisher <id>")?;
-            let repository = flag("repo").unwrap_or_default();
-            let commit = flag("commit").unwrap_or_default();
-            let out = PathBuf::from(flag("out").unwrap_or_else(|| ".".into()));
-
-            let mut catalog = if catalog_path.exists() { read_catalog(&catalog_path)? } else { Catalog::new(0, &today(), Vec::new()) };
-            // The publisher's public key travels in the signed catalog, so a
-            // device can check their signature without asking the hub again.
-            let publisher_key = argv
-                .windows(2)
-                .filter(|w| w[0] == "--publisher-key")
-                .filter_map(|w| w[1].split_once('=').map(|(id, key)| (id.to_string(), key.to_string())))
-                .find(|(id, _)| id == &publisher)
-                .map(|(_, key)| key)
-                .unwrap_or_default();
-            let entry = entry_for(&bundle, &report, &publisher, &publisher_key, &repository, &commit, &today())?;
-            // The artifact store keeps its own copy: review binds to bytes.
-            let artifact = out.join(&entry.artifact);
-            if let Some(parent) = artifact.parent() {
-                std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-            }
-            copy_tree(&bundle, &artifact)?;
-            // The same bytes as one file, for devices that fetch over HTTP.
-            let pack = pack_dir(&bundle)?;
-            let pack_path = out.join(format!("{}.pack.json", entry.artifact));
-            std::fs::write(&pack_path, serde_json::to_string(&pack).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
-            // Stage two, when a reviewer is configured: judgement on top of
-            // the facts. A reject stops the publish; human-review stops it
-            // too, until a person re-runs with --reviewed.
-            if let Some(reviewer) = flag("reviewer") {
-                let packet = packet(&bundle, &report)?;
-                let verdict = scan(&packet, &reviewer);
-                println!("  scan: {:?} — {}", verdict.route, verdict.reasons.join("; "));
-                match verdict.route {
-                    Route::Pass => {}
-                    Route::Reject => return Err("the scan rejected this bundle".into()),
-                    Route::HumanReview if has("reviewed") => println!("  scan: human review recorded by --reviewed"),
-                    Route::HumanReview => return Err("the scan asks for human review; publish again with --reviewed once a person has looked".into()),
+            let publisher_key = argv.windows(2).filter(|w| w[0] == "--publisher-key")
+                .filter_map(|w| w[1].split_once('='))
+                .find(|(id, _)| *id == publisher).map(|(_, key)| key).unwrap_or("");
+            let release = approval::ApprovedRelease::new(evidence, &report, &publisher, publisher_key,
+                &flag("repo").unwrap_or_default(), &flag("commit").unwrap_or_default(), review)?;
+            if let Some(out) = flag("out") {
+                let parent = catalog_path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+                if Path::new(&out).canonicalize().map_err(|e| e.to_string())? != parent.canonicalize().map_err(|e| e.to_string())? {
+                    return Err("--out must be the catalog's parent directory so its relative artifact paths are reachable".into());
                 }
             }
-            evidence.verify_bundle(&artifact)?;
-            let evidence_path = out.join(format!("{}.validation.json", entry.artifact));
-            std::fs::write(evidence_path, serde_json::to_vec_pretty(&evidence).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
-            catalog.entries.push(entry);
-            catalog.sequence += 1;
-            catalog.published = today();
-            working.sign_catalog(&mut catalog, &anchor_certificate)?;
-            write_json(&catalog_path, &serde_json::to_value(&catalog).map_err(|e| e.to_string())?)?;
-            println!("published {} {} (catalog sequence {})", report.app_id, report.version, catalog.sequence);
+            let working = load_key(&flag("key").ok_or("--key <working key file>")?)?;
+            let certificate = flag("anchor-cert").ok_or("--anchor-cert <certificate>")?;
+            let store = release::ReleaseStore::open(&catalog_path, &state, &anchor)?;
+            let catalog = store.publish(expected, &request, &today(), &signing::LocalCatalogSigner { key: &working, anchor_certificate: &certificate }, &release)?;
+            println!("published {} {} (catalog sequence {}, approval {})", report.app_id, report.version, catalog.sequence, release.id());
             Ok(())
         }
         "withdraw" => {
-            let app_id = positional.ok_or("usage: hub withdraw <app id> --version <v> --reason <text> --catalog <f> --key <f> --anchor-cert <hex>")?;
+            let app = positional.ok_or("usage: hub admin withdraw <app id> [operator transaction flags]")?;
             let version = flag("version").ok_or("--version <v>")?;
             let reason = flag("reason").ok_or("--reason <text shown to the person>")?;
             let catalog_path = PathBuf::from(flag("catalog").ok_or("--catalog <file>")?);
+            let state = PathBuf::from(flag("state-dir").ok_or("--state-dir <private durable directory>")?);
+            let expected = flag("expected-sequence").ok_or("--expected-sequence <number>")?.parse::<u64>().map_err(|e| e.to_string())?;
+            let request = flag("idempotency-key").ok_or("--idempotency-key <unique request>")?;
+            let anchor = flag("anchor").ok_or("--anchor <trusted public key>")?;
             let working = load_key(&flag("key").ok_or("--key <working key file>")?)?;
-            let anchor_certificate = flag("anchor-cert").ok_or("--anchor-cert <hex>")?;
-            let mut catalog = read_catalog(&catalog_path)?;
-            let entry = catalog
-                .entries
-                .iter_mut()
-                .find(|e| e.app_id() == app_id && e.version() == version)
-                .ok_or_else(|| format!("{app_id} {version} is not in the catalog"))?;
-            entry.status = Status::Withdrawn(reason.clone());
-            catalog.sequence += 1;
-            catalog.published = today();
-            working.sign_catalog(&mut catalog, &anchor_certificate)?;
-            write_json(&catalog_path, &serde_json::to_value(&catalog).map_err(|e| e.to_string())?)?;
-            println!("withdrew {app_id} {version}: {reason} (catalog sequence {})", catalog.sequence);
+            let certificate = flag("anchor-cert").ok_or("--anchor-cert <certificate>")?;
+            let store = release::ReleaseStore::open(&catalog_path, &state, &anchor)?;
+            let catalog = store.withdraw(expected, &request, &today(), &signing::LocalCatalogSigner { key: &working, anchor_certificate: &certificate }, &app, &version, &reason)?;
+            println!("withdrew {app} {version}: {reason} (catalog sequence {})", catalog.sequence);
             Ok(())
         }
-        // Withdrawal is the normal end of a version: the entry stays, marked,
-        // so a device can say why it stopped running. Removal is for an entry
-        // that should never have been offered (a test publish, a mistaken
-        // id): it leaves the catalog and its copies leave the store, and the
-        // version number becomes free again.
-        "remove" => {
-            let app_id = positional.ok_or("usage: hub remove <app id> [--version <v>] --catalog <f> --key <f> --anchor-cert <hex> [--out <dir>]")?;
-            let version = flag("version");
-            let catalog_path = PathBuf::from(flag("catalog").ok_or("--catalog <file>")?);
-            let working = load_key(&flag("key").ok_or("--key <working key file>")?)?;
-            let anchor_certificate = flag("anchor-cert").ok_or("--anchor-cert <hex>")?;
-            let out = PathBuf::from(flag("out").unwrap_or_else(|| ".".into()));
-            let mut catalog = read_catalog(&catalog_path)?;
-            let before = catalog.entries.len();
-            let (removed, kept): (Vec<_>, Vec<_>) = catalog
-                .entries
-                .drain(..)
-                .partition(|e| e.app_id() == app_id && version.as_deref().map_or(true, |v| e.version() == v));
-            catalog.entries = kept;
-            if removed.is_empty() {
-                return Err(format!("{app_id}{} is not in the catalog", version.map(|v| format!(" {v}")).unwrap_or_default()));
-            }
-            for entry in &removed {
-                let artifact = out.join(&entry.artifact);
-                let _ = std::fs::remove_dir_all(&artifact);
-                let _ = std::fs::remove_file(out.join(format!("{}.pack.json", entry.artifact)));
-                let _ = std::fs::remove_file(out.join("index").join(format!("{}-{}.json", entry.app_id(), entry.version())));
-                println!("removed {} {}", entry.app_id(), entry.version());
-            }
-            catalog.sequence += 1;
-            catalog.published = today();
-            working.sign_catalog(&mut catalog, &anchor_certificate)?;
-            write_json(&catalog_path, &serde_json::to_value(&catalog).map_err(|e| e.to_string())?)?;
-            println!("{} of {} entries remain (catalog sequence {})", catalog.entries.len(), before, catalog.sequence);
-            Ok(())
-        }
+        "remove" => Err("catalog history and immutable artifacts cannot be removed by a release command; use hub admin withdraw for an exact app/version".into()),
         "scan" => {
             let bundle = PathBuf::from(positional.ok_or("usage: hub scan <bundle> [--reviewer <cmd>] [--packet <out.json>]")?);
             let report = gate_for(&bundle, &argv, true, flag("catalog"))?;
@@ -334,18 +269,4 @@ fn read_catalog(path: &Path) -> Result<Catalog, String> {
 fn write_json(path: &Path, value: &serde_json::Value) -> Result<(), String> {
     let text = serde_json::to_string_pretty(value).map_err(|e| e.to_string())?;
     std::fs::write(path, format!("{text}\n")).map_err(|e| format!("{}: {e}", path.display()))
-}
-
-fn copy_tree(from: &Path, to: &Path) -> Result<(), String> {
-    std::fs::create_dir_all(to).map_err(|e| e.to_string())?;
-    for entry in std::fs::read_dir(from).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let target = to.join(entry.file_name());
-        if entry.file_type().map_err(|e| e.to_string())?.is_dir() {
-            copy_tree(&entry.path(), &target)?;
-        } else {
-            std::fs::copy(entry.path(), &target).map_err(|e| e.to_string())?;
-        }
-    }
-    Ok(())
 }

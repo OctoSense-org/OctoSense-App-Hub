@@ -7,7 +7,7 @@ fn renew(f: &Fixture, anchor: &HubKey, working: &HubKey, expected: u64, retry: &
     let key = f.root.join("working.key");
     fs::write(&key, hex::encode(working.to_bytes())).unwrap();
     Command::new(env!("CARGO_BIN_EXE_hub")).args([
-        "admin", "renew", "--catalog", f.root.join("catalog.json").to_str().unwrap(),
+        "admin", "renew", "--catalog", f.root.join("public/catalog.json").to_str().unwrap(),
         "--state-dir", f.root.join("release-state").to_str().unwrap(),
         "--anchor", &anchor.public_hex(), "--key", key.to_str().unwrap(),
         "--anchor-cert", &anchor.certify(&working.public_hex()).unwrap(),
@@ -24,7 +24,7 @@ fn renewal_advances_sequence_and_date_without_changing_releases() {
         let entries = if populated { vec![f.entry()] } else { vec![] };
         let mut before = Catalog::new(7, "2026-09-01", entries);
         working.sign_catalog(&mut before, &anchor.certify(&working.public_hex()).unwrap()).unwrap();
-        let path = f.root.join("catalog.json");
+        let path = f.root.join("public/catalog.json");
         write_catalog(&path, &before);
         let output = renew(&f, &anchor, &working, 7, "daily-renewal");
         assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
@@ -48,7 +48,7 @@ fn renewal_refuses_bad_future_dates_and_invalid_signatures() {
         let mut catalog = Catalog::new(1, date, vec![]);
         working.sign_catalog(&mut catalog, &anchor.certify(&working.public_hex()).unwrap()).unwrap();
         if invalid { catalog.sequence += 1; }
-        let path = f.root.join("catalog.json");
+        let path = f.root.join("public/catalog.json");
         write_catalog(&path, &catalog);
         let before = fs::read(&path).unwrap();
         assert!(!renew(&f, &anchor, &working, catalog.sequence, "bad").status.success());
@@ -64,7 +64,7 @@ fn restore_never_replays_an_old_sequence_and_working_keys_can_rotate() {
     let rotated = HubKey::generate();
     let mut old = Catalog::new(12, "2026-09-01", vec![]);
     working.sign_catalog(&mut old, &anchor.certify(&working.public_hex()).unwrap()).unwrap();
-    let path = f.root.join("catalog.json");
+    let path = f.root.join("public/catalog.json");
     write_catalog(&path, &old);
     assert!(renew(&f, &anchor, &rotated, 12, "rotation").status.success());
     let latest: Catalog = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
@@ -73,4 +73,24 @@ fn restore_never_replays_an_old_sequence_and_working_keys_can_rotate() {
     write_catalog(&path, &old);
     assert!(!renew(&f, &anchor, &working, 12, "restored").status.success(), "restored catalog must reconcile with durable generation history");
     assert_eq!(serde_json::from_slice::<Catalog>(&fs::read(path).unwrap()).unwrap().sequence, 12);
+}
+
+#[test]
+fn publication_requires_a_recorded_operator_review() {
+    let f = Fixture::new();
+    let working = HubKey::generate();
+    let anchor = HubKey::generate();
+    let key = f.root.join("working.key");
+    fs::write(&key, hex::encode(working.to_bytes())).unwrap();
+    let worker = f.protocol_worker();
+    let output = Command::new(env!("CARGO_BIN_EXE_hub")).args([
+        "publish", f.bundle.to_str().unwrap(), "--catalog", f.root.join("public/catalog.json").to_str().unwrap(),
+        "--state-dir", f.root.join("state").to_str().unwrap(), "--expected-sequence", "0", "--idempotency-key", "release-one",
+        "--publisher", "publisher-one", "--publisher-key", &format!("publisher-one={}", f.publisher.public_hex()),
+        "--validator", worker.to_str().unwrap(), "--key", key.to_str().unwrap(),
+        "--anchor", &anchor.public_hex(), "--anchor-cert", &anchor.certify(&working.public_hex()).unwrap(),
+        "--out", f.root.join("public").to_str().unwrap(),
+    ]).output().unwrap();
+    assert!(!output.status.success(), "passing validators do not replace a review decision");
+    assert!(!f.root.join("public/catalog.json").exists());
 }

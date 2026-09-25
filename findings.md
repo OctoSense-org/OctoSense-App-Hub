@@ -39,3 +39,7 @@
 - Plans 16 (release channels) depend on Plan 17 (data migrations) for safe functional rollback; stable plan numbers are references, not a strict topological execution order.
 - Completed the master importance ranking and executable delivery waves. 15 P0 plans qualify an invited free Card pilot; 7 P1 plans complete broader public-beta reliability/integration; 2 P2 growth plans and 2 optional product tracks follow.
 - All 29 review issues map to one or more implementation plans; the final validator reports zero coverage, dependency or path errors.
+
+## Release automation references — 2026-09-25
+
+- GitHub primary documentation: scheduled workflows run from the default branch and can be delayed; concurrency limits overlapping runs but does not replace the filesystem transaction lock. Use protected operator runners with no submission checkout; external monitoring is needed to notice a scheduler/runner that never starts. Sources: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule and https://docs.github.com/en/actions/concepts/workflows-and-actions/concurrency .

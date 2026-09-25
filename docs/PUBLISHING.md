@@ -86,8 +86,9 @@ contains `evidence`: payload/complete-manifest hashes, validator executable hash
 runtime/check versions, host target and completed checks.
 
 Publication requires these checks again, uses the owned checked bytes, and writes
-`<artifact>.validation.json` alongside the published pack. `--reviewed` cannot
-bypass native validation. Reports and temporary data stay outside the bundle.
+`<artifact>.validation.json` alongside the published pack. `--reviewed` is not accepted: operators record a reviewer identity and decision
+ID, and native validation is always required. See [catalog operations](operations/catalog.md)
+for the privileged publication/withdrawal commands and transaction inputs. Reports and temporary data stay outside the bundle.
 This smoke check does not draw GPU frames or establish device, visual or functional
 interaction quality. Test the app's declared behavior in the reference host and
 on each claimed platform; the current static fixture declares no interactions.
