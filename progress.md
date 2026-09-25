@@ -48,3 +48,15 @@
 - Verification: 68 Hub/policy tests; 41 mobile App Hub tests; one real native shared-store action regression, all passed. Full mobile shell checked successfully against its pinned framework/runtime. New cancellation test failed when its fix was removed, then passed when restored.
 - Build preparation initially used the older shared Makepad checkout and hit an existing windows API mismatch. Prepared separate runtime checkouts with tools/setup-native.py; no shared runtime source was changed. Validated Makepad 1d3d383, Octoscript-Makepad c4c9682, Octoscript 68f6a9d.
 - Native widget evaluation and shell compilation are host evidence; no Android/device rollout claimed. Coordinated Hub revision-pin verification is the remaining integration checkpoint.
+
+- Coordinated integration passed: mobile pins published Hub commit `0269a85b0b2166de3866464716f06dce3e69ab1a`; full shell check and 41 mobile tests passed again using fetched Git dependencies, without a local Hub patch. Framework overrides point to exact pinned revisions in isolated checkouts. Hub feature branch pushed; no main merge or deployment.
+- Beginning plan 03: bounded structural admission, shared runtime preparation and isolated validation evidence.
+
+## Plan 03 structural slice — 2026-09-25
+
+- Added bounded inventory, UTF-8/JSON/Card syntax and kit closure checks; full PNG/JPEG/WebP decode, SVG resource checks, square icons, structured diagnostics and typed resource inventories. Public `hub check --json` and library reports match.
+- Packing and unpacking now enforce size/entry/depth limits before writes and refuse nonempty/symlink staging. Tests reproduced both oversized unpacking and staging-symlink escapes before fixes.
+- Twenty admission tests pass, including seven initial structural failures and reviewer regressions. Retained conservative text URL denial pending plan 07.
+- Review found Card/kit expansion was not bounded by input size. Removed realization from the headless Hub process; full preparation must occur in the upcoming constrained runtime worker. Cached token weights, checked every SVG CSS URL, and avoided interpreting kit property declarations as resource paths or theme overlays as native-only Cards.
+- Added dependencies from cached pinned releases: existing image 0.25.10 with PNG/JPEG/WebP codecs, roxmltree 0.21.1 and the already-used Octoscript L0 revision. Policy core remains free of graphical dependencies. Image maximum dimensions are strict; decoded output bytes are checked explicitly before allocation because decoder max_alloc is advisory (https://docs.rs/image/0.25.10/image/struct.Limits.html).
+- Plan 03 remains in progress: shared native preparation, isolated runtime evidence, publication binding and native end-to-end verification are still required.

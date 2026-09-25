@@ -10,8 +10,8 @@
 //! trivially inspectable, and bundles are small by rule (8 MB ceiling).
 use base64::Engine;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::path::{Component, Path};
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
 
 pub const PACK_SCHEMA: u32 = 1;
 
@@ -26,30 +26,12 @@ pub struct Pack {
 /// directory is the bundle exactly.
 pub fn pack_dir(root: &Path) -> Result<Pack, String> {
     let mut files = BTreeMap::new();
-    collect(root, root, &mut files)?;
-    Ok(Pack { schema: PACK_SCHEMA, files })
-}
-
-fn collect(root: &Path, dir: &Path, out: &mut BTreeMap<String, String>) -> Result<(), String> {
-    for entry in std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let path = entry.path();
-        let kind = entry.file_type().map_err(|e| e.to_string())?;
-        if kind.is_symlink() {
-            return Err(format!("{}: a bundle may not hold a symlink", path.display()));
-        }
-        if kind.is_dir() {
-            collect(root, &path, out)?;
-            continue;
-        }
-        let relative = path.strip_prefix(root).map_err(|e| e.to_string())?;
-        let bytes = std::fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-        out.insert(
-            relative.to_string_lossy().replace('\\', "/"),
-            base64::engine::general_purpose::STANDARD.encode(bytes),
-        );
+    for file in crate::admission::inventory(root)? {
+        let bytes = crate::admission::read_bounded(&root.join(&file.path), file.bytes)?;
+        files.insert(file.path.to_str().ok_or("bundle path is not UTF-8")?.to_string(),
+            base64::engine::general_purpose::STANDARD.encode(bytes));
     }
-    Ok(())
+    Ok(Pack { schema: PACK_SCHEMA, files })
 }
 
 /// Unpack into `into`, refusing any path that is not a plain relative path:
@@ -59,20 +41,39 @@ pub fn unpack(pack: &Pack, into: &Path) -> Result<(), String> {
     if pack.schema != PACK_SCHEMA {
         return Err(format!("pack schema {} is not {}", pack.schema, PACK_SCHEMA));
     }
-    std::fs::create_dir_all(into).map_err(|e| e.to_string())?;
+    use crate::admission::{MAX_DEPTH, MAX_ENTRIES, MAX_MANIFEST_BYTES};
+    if pack.files.len() > MAX_ENTRIES { return Err("pack exceeds file count limit".into()); }
+    // Decode and check every path before writing anything. The caller supplies
+    // a fresh staging directory, so old symlinks can never redirect a write.
+    let mut decoded = Vec::new();
+    let mut remaining = crate::gate::MAX_BUNDLE_BYTES;
+    let mut entries = BTreeSet::new();
     for (name, encoded) in &pack.files {
+        crate::admission::safe_relative(name).map_err(|e| format!("pack names a path it may not: {e}"))?;
         let relative = Path::new(name);
-        if relative.components().any(|c| !matches!(c, Component::Normal(_))) || name.is_empty() {
-            return Err(format!("pack names a path it may not: {name:?}"));
+        if relative.components().count() > MAX_DEPTH + 1 { return Err("pack exceeds directory depth limit".into()); }
+        for path in relative.ancestors().filter(|p| !p.as_os_str().is_empty()) { entries.insert(path); }
+        if entries.len() > MAX_ENTRIES { return Err("pack exceeds file count limit".into()); }
+        let manifest = name == "manifest.json";
+        let max = if manifest { MAX_MANIFEST_BYTES } else { remaining };
+        if encoded.len() as u64 > max.div_ceil(3) * 4 { return Err("pack exceeds size limit".into()); }
+        let bytes = base64::engine::general_purpose::STANDARD.decode(encoded).map_err(|e| format!("{name}: not base64: {e}"))?;
+        if bytes.len() as u64 > max { return Err("pack exceeds size limit".into()); }
+        if !manifest { remaining -= bytes.len() as u64; }
+        decoded.push((relative, bytes));
+    }
+    if let Ok(meta) = std::fs::symlink_metadata(into) {
+        if !meta.is_dir() || std::fs::read_dir(into).map_err(|e| e.to_string())?.next().is_some() {
+            return Err("unpack requires an empty, real staging directory".into());
         }
+    }
+    std::fs::create_dir_all(into).map_err(|e| e.to_string())?;
+    for (relative, bytes) in decoded {
         let target = into.join(relative);
-        if let Some(parent) = target.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        let bytes = base64::engine::general_purpose::STANDARD
-            .decode(encoded)
-            .map_err(|e| format!("{name}: not base64: {e}"))?;
-        std::fs::write(&target, bytes).map_err(|e| format!("{}: {e}", target.display()))?;
+        if let Some(parent) = target.parent() { std::fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
+        use std::io::Write;
+        std::fs::OpenOptions::new().write(true).create_new(true).open(&target)
+            .and_then(|mut f| f.write_all(&bytes)).map_err(|e| format!("{}: {e}", target.display()))?;
     }
     Ok(())
 }

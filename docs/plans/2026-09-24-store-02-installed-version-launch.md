@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust, serde/JSON, the existing Hub policy/client, Makepad/Octoscript where applicable; additional service/storage adapters follow the [shared design](2026-09-24-app-store-design.md).
 
-**Status:** Implemented; core and native widget verification recorded below (2026-09-25). Coordinated mobile revision update follows the Hub commit. No Android device coverage or deployment is claimed. **Priority:** P0. **Phase:** A — Correctness. **Relative size:** M (complexity, not a delivery-date estimate).
+**Status:** Implemented; core and native widget verification recorded below (2026-09-25). Mobile now pins Hub `0269a85b0b2166de3866464716f06dce3e69ab1a`; full shell check and 41 native App Hub tests passed again against the fetched Git dependency. No Android device coverage or deployment is claimed. **Priority:** P0. **Phase:** A — Correctness. **Relative size:** M (complexity, not a delivery-date estimate).
 
 **Prerequisites:** None; can start against the reviewed baseline.
 

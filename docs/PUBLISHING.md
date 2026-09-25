@@ -45,7 +45,9 @@ test data directories and review packets outside the submitted bundle.
 | --- | --- |
 | Assets are local | Any `http://`, `https://`, `file://` or `../` in a card, data or text file. Ship the asset in the bundle and reference it by a bundle-relative path such as `assets/icon.svg`. |
 | Allowed file types only | Anything other than `.card .json .l0 .octoscript .svg .png .jpg .jpeg .webp .ttf .otf .txt .md`. No scripts, archives or binaries. |
-| Size | A bundle over 8 MB. |
+| Size and shape | Payload over 8 MiB, manifest over 64 KiB, more than 2,048 entries, directory depth over 32, text over 1 MiB or Card source over 256 KiB. |
+| Card and kit | Missing `page.card`, invalid UTF-8/JSON/Card syntax or missing kit files. Native component/token references receive structural checks; full realization is a separate runtime check. |
+| Artwork | Corrupt PNG/JPEG/WebP, images over 4096×4096 or 64 MiB decoded, malformed/active SVG or external SVG resources. Icons must be square; bitmap icons are at most 1 MiB and 1024×1024. |
 | No symlinks | Any symlink in the bundle. |
 | Digest matches | A manifest whose `integrity.bundle_blake3` does not match the directory. Run `hub stamp` after any change. |
 | Manifest is exact | Unknown fields, an unknown capability, a `schema` other than 1, an id outside `[a-z0-9.-]{1,64}` not starting with `.`. |
@@ -55,6 +57,14 @@ test data directories and review packets outside the submitted bundle.
 | Listing present and complete | No `listing.json`; no icon or no screenshot; an unknown category, platform or age rating; a non-https privacy policy; or an icon or screenshot the listing names that is not in the bundle. |
 | Publisher continuity | An update signed by a different key than the one on record for this app. |
 | Public release signature | An unsigned first release or update; `--allow-unsigned` is a local development check only. Publisher and signature key IDs must agree. |
+
+`hub check <bundle> --json` emits the same structural report as the library:
+stable check codes, file/property paths and a typed resource inventory. Schema
+properties and arbitrary app data are not resource loads. Display URLs remain
+subject to the existing conservative text rule until runtime network conformance
+is implemented. Structural checks do not prove native loading, successful app
+behavior or visual quality; the separate runtime validator is the next delivery
+slice. Checks do not write reports inside the signed bundle.
 
 ## The manifest
 

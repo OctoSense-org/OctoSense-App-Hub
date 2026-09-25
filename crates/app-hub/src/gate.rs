@@ -5,7 +5,7 @@
 //! the hub's job after. A finding is either a refusal or a warning; an agent
 //! scan runs afterwards on what passes, and never overrides a refusal.
 use crate::index::{Catalog, Entry};
-use octosense_app_policy::{digest_dir, policy, AppManifest, AppPolicy, HostLimits, Listing, SignatureVerifier, LISTING_FILE};
+use octosense_app_policy::{ policy, AppManifest, AppPolicy, HostLimits, Listing, SignatureVerifier, LISTING_FILE};
 use std::path::Path;
 
 /// Everything a bundle may hold besides its manifest, by extension. A bundle
@@ -17,7 +17,8 @@ const ALLOWED_EXTENSIONS: &[&str] = &["card", "json", "l0", "octoscript", "svg",
 /// than this is either shipping something it should not, or should be split.
 pub const MAX_BUNDLE_BYTES: u64 = 8 * 1024 * 1024;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Severity {
     /// The bundle is not admitted.
     Refusal,
@@ -25,19 +26,24 @@ pub enum Severity {
     Warning,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Finding {
     pub severity: Severity,
     pub check: &'static str,
     pub detail: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 
 impl Finding {
     fn refuse(check: &'static str, detail: impl Into<String>) -> Self {
-        Finding { severity: Severity::Refusal, check, detail: detail.into() }
+        Finding { severity: Severity::Refusal, check, detail: detail.into(), path: None }
     }
     fn warn(check: &'static str, detail: impl Into<String>) -> Self {
-        Finding { severity: Severity::Warning, check, detail: detail.into() }
+        Finding { severity: Severity::Warning, check, detail: detail.into(), path: None }
+    }
+    pub(crate) fn at(check: &'static str, path: impl Into<String>, detail: impl Into<String>) -> Self {
+        Self { severity: Severity::Refusal, check, path: Some(path.into()), detail: detail.into() }
     }
 }
 
@@ -49,11 +55,20 @@ pub struct GateReport {
     pub findings: Vec<Finding>,
     /// What the app would actually get, when the gate passed.
     pub policy: Option<AppPolicy>,
+    pub resources: Vec<crate::admission::ResourceReference>,
     // Bind entry creation to the complete manifest checked by this report.
     admitted_manifest: Vec<u8>,
 }
 
 impl GateReport {
+    pub fn json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "schema": 1, "stage": "structural", "passed": self.passed(),
+            "app_id": self.app_id, "version": self.version, "digest": self.digest,
+            "findings": self.findings, "resources": self.resources,
+        })
+    }
+
     pub fn passed(&self) -> bool {
         !self.findings.iter().any(|f| f.severity == Severity::Refusal)
     }
@@ -66,7 +81,8 @@ impl GateReport {
                 Severity::Refusal => "refused",
                 Severity::Warning => "warning",
             };
-            out.push_str(&format!("  [{mark}] {}: {}\n", finding.check, finding.detail));
+            let path = finding.path.as_ref().map(|p| format!(" ({p})")).unwrap_or_default();
+            out.push_str(&format!("  [{mark}] {}{path}: {}\n", finding.check, finding.detail));
         }
         if let Some(policy) = &self.policy {
             out.push_str(&format!(
@@ -94,10 +110,11 @@ pub fn check_bundle(
     previous: Option<&Catalog>,
 ) -> Result<GateReport, String> {
     let manifest_path = bundle.join(octosense_app_policy::MANIFEST_FILE);
-    let manifest_json = std::fs::read_to_string(&manifest_path).map_err(|e| format!("{}: {e}", manifest_path.display()))?;
+    let files = crate::admission::inventory(bundle)?;
+    let manifest_json = crate::admission::read_text(&manifest_path, crate::admission::MAX_MANIFEST_BYTES)?;
     let manifest = AppManifest::parse(&manifest_json)?;
-    let digest = digest_dir(bundle)?;
-    let mut findings = Vec::new();
+    let digest = octosense_app_policy::bundle::digest_dir_limited(bundle, MAX_BUNDLE_BYTES, crate::admission::MAX_ENTRIES, crate::admission::MAX_DEPTH)?;
+    let (mut findings, resources) = crate::admission::validate(bundle, &files);
 
     // ---- integrity ------------------------------------------------------
     if digest.to_ascii_lowercase() != manifest.integrity.bundle_blake3.to_ascii_lowercase() {
@@ -120,7 +137,7 @@ pub fn check_bundle(
 
     // ---- contents -------------------------------------------------------
     let mut total = 0u64;
-    for file in list_files(bundle)? {
+    for file in files.iter().filter(|f| f.path != Path::new(octosense_app_policy::MANIFEST_FILE)).map(|f| &f.path) {
         let path = bundle.join(&file);
         let size = std::fs::metadata(&path).map_err(|e| e.to_string())?.len();
         total += size;
@@ -141,7 +158,7 @@ pub fn check_bundle(
     // images over HTTP, because the resource loader is not the network module
     // the grant gates. Until that is closed in the runtime, the gate is what
     // keeps a bundle from reaching outside itself.
-    for reference in external_references(bundle)? {
+    for reference in external_references(bundle, &files)? {
         findings.push(Finding::refuse(
             "assets",
             format!("{reference} points outside the bundle; ship the asset with the app"),
@@ -202,42 +219,15 @@ pub fn check_bundle(
     }
 
     let admitted_manifest = serde_json::to_vec(&manifest).map_err(|e| e.to_string())?;
-    Ok(GateReport { app_id: manifest.id, version: manifest.version, digest, findings, policy, admitted_manifest })
-}
-
-/// Every file in the bundle except the manifest, relative to its root.
-fn list_files(root: &Path) -> Result<Vec<std::path::PathBuf>, String> {
-    fn walk(root: &Path, dir: &Path, out: &mut Vec<std::path::PathBuf>) -> Result<(), String> {
-        for entry in std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))? {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let path = entry.path();
-            let kind = entry.file_type().map_err(|e| e.to_string())?;
-            if kind.is_symlink() {
-                return Err(format!("{}: a bundle may not hold a symlink", path.display()));
-            }
-            if kind.is_dir() {
-                walk(root, &path, out)?;
-            } else {
-                let relative = path.strip_prefix(root).map_err(|e| e.to_string())?.to_path_buf();
-                if relative != Path::new(octosense_app_policy::MANIFEST_FILE) {
-                    out.push(relative);
-                }
-            }
-        }
-        Ok(())
-    }
-    let mut out = Vec::new();
-    walk(root, root, &mut out)?;
-    out.sort();
-    Ok(out)
+    Ok(GateReport { app_id: manifest.id, version: manifest.version, digest, findings, policy, resources, admitted_manifest })
 }
 
 /// Anything in the bundle's text that reaches outside it: an absolute URL, or
 /// a path that climbs out. Cards name their artwork in text, so this is a
 /// textual check by necessity; it is a gate, not the runtime's enforcement.
-fn external_references(root: &Path) -> Result<Vec<String>, String> {
+fn external_references(root: &Path, files: &[crate::admission::BundleFile]) -> Result<Vec<String>, String> {
     let mut found = Vec::new();
-    for file in list_files(root)? {
+    for file in files.iter().map(|f| &f.path) {
         // The two metadata files carry URLs on purpose (a support page, a
         // privacy policy); nothing loads them. Their own asset paths are
         // checked by the listing rules.
@@ -248,7 +238,7 @@ fn external_references(root: &Path) -> Result<Vec<String>, String> {
         if !matches!(extension.as_str(), "card" | "json" | "l0" | "octoscript" | "txt" | "md") {
             continue;
         }
-        let text = match std::fs::read_to_string(root.join(&file)) {
+        let text = match crate::admission::read_text(&root.join(&file), crate::admission::MAX_TEXT_BYTES) {
             Ok(text) => text,
             Err(_) => continue, // not valid text: the extension check already covers it
         };
@@ -277,11 +267,12 @@ pub fn entry_for(
     if !report.passed() {
         return Err("cannot create an entry from a refused gate report".into());
     }
-    let manifest_json = std::fs::read_to_string(bundle.join(octosense_app_policy::MANIFEST_FILE)).map_err(|e| e.to_string())?;
+    crate::admission::inventory(bundle)?;
+    let manifest_json = crate::admission::read_text(&bundle.join(octosense_app_policy::MANIFEST_FILE), crate::admission::MAX_MANIFEST_BYTES)?;
     let manifest = AppManifest::parse(&manifest_json)?;
     if serde_json::to_vec(&manifest).map_err(|e| e.to_string())? != report.admitted_manifest
         || manifest.id != report.app_id || manifest.version != report.version
-        || digest_dir(bundle)? != report.digest {
+        || octosense_app_policy::bundle::digest_dir_limited(bundle, MAX_BUNDLE_BYTES, crate::admission::MAX_ENTRIES, crate::admission::MAX_DEPTH)? != report.digest {
         return Err("bundle or manifest changed after the gate; check it again".into());
     }
     let signature = manifest.integrity.signature.as_ref().ok_or("public releases require a signed manifest")?;

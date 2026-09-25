@@ -27,6 +27,10 @@ impl Fixture {
             "publisher": {"name": "Example", "support": "https://example.test/support", "privacy_policy_url": "https://example.test/privacy"},
             "age_rating": "all"
         })).unwrap()).unwrap();
+        fs::create_dir_all(bundle.join("kit/native/light")).unwrap();
+        fs::write(bundle.join("page.card"), include_str!("../fixtures/card/page.card")).unwrap();
+        fs::write(bundle.join("page.data.json"), include_str!("../fixtures/card/page.data.json")).unwrap();
+        fs::write(bundle.join("kit/native/light/kit.json"), include_str!("../fixtures/card/kit/native/light/kit.json")).unwrap();
         let publisher = HubKey::generate();
         let manifest = AppManifest::parse(r#"{"schema":1,"id":"example-app","version":"1.0.0","name":"Example","integrity":{"bundle_blake3":""}}"#).unwrap();
         let mut fixture = Self { root, bundle, publisher, manifest };

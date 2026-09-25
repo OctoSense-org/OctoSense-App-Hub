@@ -76,8 +76,14 @@ fn run() -> Result<(), String> {
         }
         "check" => {
             let bundle = PathBuf::from(positional.ok_or("usage: hub check <bundle>")?);
-            let report = gate_for(&bundle, &argv, has("allow-unsigned"), flag("catalog"))?;
-            print!("{}", report.render());
+            let report = match gate_for(&bundle, &argv, has("allow-unsigned"), flag("catalog")) {
+                Ok(report) => report,
+                Err(error) => {
+                    if has("json") { println!("{}", serde_json::json!({"schema":1,"stage":"structural","passed":false,"findings":[{"severity":"refusal","check":"bundle-invalid","detail":error}]})); }
+                    return Err(error);
+                }
+            };
+            if has("json") { println!("{}", report.json()); } else { print!("{}", report.render()); }
             if report.passed() {
                 Ok(())
             } else {

@@ -36,13 +36,12 @@ needs another format.
 | Declare an icon and include the referenced file | Hub admission gate |
 | Use a bundle-relative PNG/SVG path, without an absolute path, `..` or URL | Listing validator |
 | No symlinks; bundle contents within the 8 MiB limit | Hub admission gate |
-| Icon at most 1 MiB; positive square dimensions | OctoSense mobile installed-icon loader |
-| PNG no larger than 1024×1024; valid PNG bytes | Mobile loader/header check and image decoder |
+| Icon at most 1 MiB; positive square dimensions | Hub admission and mobile installed-icon loader |
+| Icon PNG no larger than 1024×1024; valid PNG bytes | Hub full decode and mobile loader |
 | SVG parses into drawable geometry with a square logical canvas | Mobile SVG loader |
 | Clear silhouette, suitable padding and readable contrast | Author's visual review |
 
-`hub check` currently checks the icon path, type and presence, **not decoded
-dimensions or visual quality**. A gate pass does not prove that an icon will
+`hub check` decodes bitmap artwork with dimension/output limits and checks SVG XML, dimensions and resource references. It does **not** prove drawable SVG geometry or visual quality. A gate pass does not prove that an icon will
 render. The mobile bounds above describe its current installed-icon loader;
 invalid artwork falls back to a generic icon. Test in the target shell.
 

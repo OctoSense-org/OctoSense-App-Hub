@@ -12,8 +12,9 @@ Goal: implement the reviewed App Hub roadmap in dependency order, prioritizing f
 7. Validate issue coverage, file paths, plan dependencies and acceptance gates — complete.
 
 8. Implement and verify publisher key continuity (plan 01) — verified locally.
-9. Implement and verify installed-version launch (plan 02) — in progress.
-10. Continue remaining plans in dependency order — pending.
+9. Implement and verify installed-version launch (plan 02) — verified locally.
+10. Implement runnable bundle admission (plan 03) — in progress.
+11. Continue remaining plans in dependency order — pending.
 
 Implementation worktree: `/Users/guofoo/git/octosense/app-hub-store-work`, branch `feat/app-store-foundations`.
 

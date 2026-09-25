@@ -6,7 +6,7 @@
 
 **Deliverables:** 26 individual implementation plans, a [shared architecture/execution guide](2026-09-24-app-store-design.md), explicit dependencies, review coverage and stage acceptance gates.
 
-**Status:** Implementation in progress. Plan **01 verified locally** (2026-09-25); plan **02 in progress**. Plans 03–26 are not started. No deployment is claimed.
+**Status:** Implementation in progress. Plans **01–02 verified locally** (2026-09-25); plan **03 in progress**. Plans 04–26 are not started. No deployment is claimed.
 
 ## Priority order
 
