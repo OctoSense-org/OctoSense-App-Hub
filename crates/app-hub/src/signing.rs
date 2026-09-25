@@ -144,3 +144,22 @@ pub fn sign_manifest(key: &HubKey, manifest: &mut AppManifest, key_id: &str) -> 
     });
     Ok(())
 }
+
+/// A signer receives only a transaction constructed by release operations.
+/// Production implementations keep key custody outside validation workers.
+pub trait CatalogSigner {
+    fn sign(&self, transaction: &crate::release::ValidatedCatalog) -> Result<Catalog, String>;
+}
+
+/// Local operator adapter. The key never enters the validator process.
+pub struct LocalCatalogSigner<'a> {
+    pub key: &'a HubKey,
+    pub anchor_certificate: &'a str,
+}
+impl CatalogSigner for LocalCatalogSigner<'_> {
+    fn sign(&self, transaction: &crate::release::ValidatedCatalog) -> Result<Catalog, String> {
+        let mut catalog = transaction.catalog().clone();
+        self.key.sign_catalog(&mut catalog, self.anchor_certificate)?;
+        Ok(catalog)
+    }
+}

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust, serde/JSON, the existing Hub policy/client, Makepad/Octoscript where applicable; additional service/storage adapters follow the [shared design](2026-09-24-app-store-design.md).
 
-**Status:** Planned; no feature implementation is claimed. **Priority:** P0. **Phase:** A — Correctness. **Relative size:** M (complexity, not a delivery-date estimate).
+**Status:** In progress (2026-09-25). **Priority:** P0. **Phase:** A — Correctness. **Relative size:** M (complexity, not a delivery-date estimate).
 
 **Prerequisites:** [01 — Publisher key continuity and signed release identity](2026-09-24-store-01-publisher-key-continuity.md)
 

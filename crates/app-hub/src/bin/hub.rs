@@ -34,6 +34,20 @@ fn run() -> Result<(), String> {
     let positional = argv.get(2).cloned();
 
     match command {
+        "admin" if positional.as_deref() == Some("renew") => {
+            let catalog_path = PathBuf::from(flag("catalog").ok_or("--catalog <file>")?);
+            let state = PathBuf::from(flag("state-dir").ok_or("--state-dir <private durable directory>")?);
+            let expected = flag("expected-sequence").ok_or("--expected-sequence <number>")?.parse::<u64>().map_err(|e| e.to_string())?;
+            let request = flag("idempotency-key").ok_or("--idempotency-key <unique request>")?;
+            let anchor = flag("anchor").ok_or("--anchor <trusted public key>")?;
+            let working = load_key(&flag("key").ok_or("--key <working key file>")?)?;
+            let certificate = flag("anchor-cert").ok_or("--anchor-cert <certificate>")?;
+            let store = release::ReleaseStore::open(&catalog_path, &state, &anchor)?;
+            let catalog = store.renew(expected, &request, &today(), &signing::LocalCatalogSigner { key: &working, anchor_certificate: &certificate })?;
+            println!("renewed catalog sequence {} ({})", catalog.sequence, catalog.published);
+            Ok(())
+        }
+        "admin" => Err("usage: hub admin renew --catalog <file> --state-dir <private directory> --expected-sequence <n> --idempotency-key <request> --anchor <hex> --key <file> --anchor-cert <hex>".into()),
         "keygen" => {
             let path = positional.ok_or("usage: hub keygen <path>")?;
             let key = HubKey::generate();

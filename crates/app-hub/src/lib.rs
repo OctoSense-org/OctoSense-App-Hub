@@ -24,6 +24,7 @@ pub mod remote;
 pub mod scan;
 pub mod signing;
 pub mod runtime;
+pub mod release;
 mod process;
 
 pub use client::{days_between, AppAvailability, Availability, Listing, PreparedLaunch, Store, CATALOG_FRESHNESS_DAYS};

@@ -72,3 +72,12 @@
 - Native end-to-end CLI journey passed: ephemeral publisher/anchor/working keys, signed real Card fixture, native hub test, publication, catalog signature verification and identical runtime sidecar. No production publication. Independent follow-up review found no important issues.
 - Mobile local-consumer integration passed: 41 App Hub tests and the native shared-store action regression, using isolated exact mobile runtime revisions.
 - Exact mobile runtime verification also passed all seven native-validator cases from the Hub workspace, plus the full mobile shell check. Cargo cannot test dev-dependencies of a non-member dependency; reran from the owning Hub workspace with runtime overrides, then restored its normal lockfile. No framework source changes.
+
+## Plan 04 begins — 2026-09-25
+
+- Starting monotonic renewal and serialized, durable release transactions. Current CLI rewrites catalogs in place, writes artifacts before optional review, and independently reads/signs catalog generations; these paths must share one transaction boundary.
+- Plan 03 Hub commit ab76fcc is pushed on the feature branch. Consumer pin verification is in progress; an offline lookup correctly required fetching the new revision first.
+- Consumer integration finished: mobile pins fetched Hub ab76fcc (no local Hub override), full shell check and 41 mobile tests passed. Existing shell cfg warnings remain unrelated. Mobile commit records the new shared validator dependency.
+- Three renewal regressions failed on the old CLI, then passed: unchanged entries with advanced date/sequence, strict date/signature refusal, idempotent retry/CAS conflict, durable restore refusal and certified working-key rotation.
+- Renewal interruption/concurrency review identified a prepared-receipt gap; added a durable pre-signing intent so another request cannot reuse the reserved sequence. Recovery revalidates its original date after clock correction. Added bounded compact serialization and a real oversized-record regression (observed red with the prior writer, then restored the fix).
+- All five renewal transaction unit tests and three CLI tests pass; independent follow-up review has no important findings. This slice is renewal only: legacy publish/withdraw/remove must still migrate to the same transaction boundary before production use.
