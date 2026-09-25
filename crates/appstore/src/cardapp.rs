@@ -142,7 +142,21 @@ impl AppModule for CardModule {
         if let Some(mut view) = root.borrow_mut::<CardAppView>() {
             view.app_id = open.text("app").unwrap_or_default().to_string();
         }
-        InstanceParts { root, executor: Box::new(CardExecutor), shutdown: Box::new(|_vm| {}) }
+        let closing = root.clone();
+        InstanceParts {
+            root,
+            executor: Box::new(CardExecutor),
+            // The camera and any web views the app opened go when the app
+            // does, not whenever its isolate is next collected.
+            shutdown: Box::new(move |vm| {
+                let cx = vm.cx_mut();
+                let splash = closing.splash(cx, ids!(card));
+                let heap = splash.borrow_mut().and_then(|mut s| s.isolate_heap_key(cx));
+                if let Some(heap) = heap {
+                    makepad_widgets::camera_preview::release_isolate_devices(cx, heap);
+                }
+            }),
+        }
     }
 }
 

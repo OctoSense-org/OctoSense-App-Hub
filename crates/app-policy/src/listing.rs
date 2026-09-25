@@ -158,6 +158,8 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
         ("prompt", "May ask you questions."),
         ("images", "Shows pictures from any website its content links to."),
         ("web", "Opens web pages, which cannot reach back into the app."),
+        ("microphone", "Records sound with videos."),
+        ("library", "Saves photos and videos to your photo library."),
     ] {
         if has(cap) {
             lines.push(text.to_string());

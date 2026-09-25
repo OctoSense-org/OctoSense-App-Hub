@@ -34,6 +34,11 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // Open any public https page in the system WebView, which gets no way
     // back into the app: a reader for the stories it lists.
     "web",
+    // Record sound with a camera video.
+    "microphone",
+    // Offer what it captures to the system photo library, where other apps
+    // can see it; without this, captures stay in the app's own storage.
+    "library",
 ];
 
 /// The permission profiles an app's agent session may ask for. Full access is
