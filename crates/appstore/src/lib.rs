@@ -23,6 +23,7 @@ use std::path::PathBuf;
 
 pub mod cardapp;
 pub mod source;
+pub mod system;
 pub mod ui;
 
 pub use makepad_widgets;
@@ -406,8 +407,12 @@ pub(crate) fn register_card_vocabulary() {
     });
 }
 
-/// Lower a card bundle to isolate source. Nothing outside the bundle is read.
+/// Lower a bundle to isolate source. Nothing outside the bundle is read. A
+/// script app's program runs as it is; a card is lowered to widgets.
 pub(crate) fn card_source(bundle: &std::path::Path, asset_origin: &str) -> Result<String, String> {
+    if let Some(script) = octosense_app_policy::script_source(bundle, asset_origin) {
+        return script;
+    }
     let card = std::fs::read_to_string(bundle.join("page.card")).map_err(|e| format!("page.card: {e}"))?;
     let data_text = std::fs::read_to_string(bundle.join("page.data.json")).unwrap_or_else(|_| "{}".into());
     let mut data: serde_json::Value = serde_json::from_str(&data_text).map_err(|e| format!("page.data.json: {e}"))?;

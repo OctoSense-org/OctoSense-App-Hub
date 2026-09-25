@@ -28,6 +28,12 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     "location",
     "camera",
     "clipboard",
+    // Show pictures from any public https host, not just `network.hosts`:
+    // a feed reader's thumbnails come from wherever its stories link.
+    "images",
+    // Open any public https page in the system WebView, which gets no way
+    // back into the app: a reader for the stories it lists.
+    "web",
 ];
 
 /// The permission profiles an app's agent session may ask for. Full access is

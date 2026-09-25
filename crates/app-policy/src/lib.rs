@@ -30,6 +30,7 @@
 pub mod assets;
 pub mod bundle;
 pub mod containers;
+pub mod entry;
 pub mod listing;
 #[cfg(feature = "splash")]
 pub mod splash_adapter;
@@ -40,6 +41,7 @@ pub mod verify;
 pub use assets::{rewrite_assets, AssetServer};
 pub use bundle::{digest_dir, MANIFEST_FILE};
 pub use containers::{IsolateSettings, Provenance, SessionProfile};
+pub use entry::{script_source, ASSETS_PLACEHOLDER, SCRIPT_ENTRY};
 pub use listing::{privacy_summary, Listing, Publisher, LISTING_FILE};
 pub use manifest::{AgentSpec, AppManifest, ProfileMode, KNOWN_CAPABILITIES, SCHEMA};
 pub use policy::{AgentPolicy, AppPolicy, HostLimits};

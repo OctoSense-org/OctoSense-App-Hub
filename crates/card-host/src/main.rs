@@ -1,13 +1,15 @@
 //! Run one card bundle under its own policy.
 //!
 //! ```sh
-//! card-host --bundle <dir> [--app-data <dir>] [--allow-unsigned] [--stamp]
+//! card-host --bundle <dir> [--app-data <dir>] [--allow-unsigned] [--stamp] [--system]
 //! ```
 //!
 //! The bundle is a directory holding `manifest.json`, `page.card`,
 //! `page.data.json` and a `kit/` directory. `--stamp` rewrites the manifest's
 //! digest to match the directory, which is what a build step does before
-//! signing; without it a bundle whose bytes changed is refused.
+//! signing; without it a bundle whose bytes changed is refused. `--system`
+//! admits the bundle as a system app is admitted (by digest, under
+//! `HostLimits::system`), for developing one.
 //!
 //! The order is the one ADR 0002 fixes: admit, resolve, apply, then evaluate.
 //! Nothing here may widen what the manifest asked for, and the two settings
@@ -52,6 +54,7 @@ struct Args {
     app_data: PathBuf,
     allow_unsigned: bool,
     stamp: bool,
+    system: bool,
 }
 
 fn args() -> Args {
@@ -64,6 +67,7 @@ fn args() -> Args {
             .unwrap_or_else(|| std::env::temp_dir().join("octosense-card-apps")),
         allow_unsigned: argv.iter().any(|a| a == "--allow-unsigned"),
         stamp: argv.iter().any(|a| a == "--stamp"),
+        system: argv.iter().any(|a| a == "--system"),
     }
 }
 
@@ -83,7 +87,11 @@ fn policy_for(args: &Args) -> Result<AppPolicy, String> {
         log!("card-host: stamped {} with digest {}", manifest_path.display(), digest);
     }
 
-    let limits = HostLimits { require_signature: !args.allow_unsigned, ..HostLimits::default() };
+    let limits = if args.system {
+        HostLimits::system()
+    } else {
+        HostLimits { require_signature: !args.allow_unsigned, ..HostLimits::default() }
+    };
     // The digest is computed from the directory, so the manifest's claim is
     // checked against what is actually there.
     admit_and_resolve_dir(&manifest_json, &digest, &limits, &RefuseAllSignatures)
@@ -92,6 +100,10 @@ fn policy_for(args: &Args) -> Result<AppPolicy, String> {
 /// Lower the card to isolate source: realize it, then lower it with the kit
 /// that ships in the bundle. Nothing is read from outside the bundle.
 fn card_source(bundle: &Path, asset_origin: &str) -> Result<String, String> {
+    // A script app runs its own program.
+    if let Some(script) = octosense_app_policy::script_source(bundle, asset_origin) {
+        return script;
+    }
     let card = std::fs::read_to_string(bundle.join("page.card")).map_err(|e| format!("page.card: {e}"))?;
     let data_text = std::fs::read_to_string(bundle.join("page.data.json")).unwrap_or_else(|_| "{}".into());
     let mut data: serde_json::Value = serde_json::from_str(&data_text).map_err(|e| format!("page.data.json: {e}"))?;
