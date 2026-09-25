@@ -4,10 +4,13 @@ use octosense_app_hub::*;
 use std::{fs, process::Command};
 
 fn renew(f: &Fixture, anchor: &HubKey, working: &HubKey, expected: u64, retry: &str) -> std::process::Output {
+    operation(f, anchor, working, expected, retry, "renew")
+}
+fn operation(f: &Fixture, anchor: &HubKey, working: &HubKey, expected: u64, retry: &str, operation: &str) -> std::process::Output {
     let key = f.root.join("working.key");
     fs::write(&key, hex::encode(working.to_bytes())).unwrap();
     Command::new(env!("CARGO_BIN_EXE_hub")).args([
-        "admin", "renew", "--catalog", f.root.join("public/catalog.json").to_str().unwrap(),
+        "admin", operation, "--catalog", f.root.join("public/catalog.json").to_str().unwrap(),
         "--state-dir", f.root.join("release-state").to_str().unwrap(),
         "--anchor", &anchor.public_hex(), "--key", key.to_str().unwrap(),
         "--anchor-cert", &anchor.certify(&working.public_hex()).unwrap(),
@@ -93,4 +96,42 @@ fn publication_requires_a_recorded_operator_review() {
     ]).output().unwrap();
     assert!(!output.status.success(), "passing validators do not replace a review decision");
     assert!(!f.root.join("public/catalog.json").exists());
+}
+
+#[test]
+fn recovery_republishes_durable_history_above_the_high_water_mark() {
+    let f = Fixture::new();
+    let anchor = HubKey::generate();
+    let working = HubKey::generate();
+    let mut backup = Catalog::new(12, "2026-09-01", vec![]);
+    working.sign_catalog(&mut backup, &anchor.certify(&working.public_hex()).unwrap()).unwrap();
+    let path = f.root.join("public/catalog.json");
+    write_catalog(&path, &backup);
+    assert!(renew(&f, &anchor, &working, 12, "renewal").status.success());
+    write_catalog(&path, &backup);
+    assert!(!operation(&f, &anchor, &working, 12, "bad-recovery", "recover").status.success());
+    let recovered = operation(&f, &anchor, &working, 13, "restore", "recover");
+    assert!(recovered.status.success(), "{}", String::from_utf8_lossy(&recovered.stderr));
+    let result: Catalog = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    assert_eq!(result.sequence, 14);
+    verify_catalog(&result, &anchor.public_hex()).unwrap();
+    assert!(operation(&f, &anchor, &working, 13, "restore", "recover").status.success());
+    assert_eq!(serde_json::from_slice::<Catalog>(&fs::read(&path).unwrap()).unwrap().sequence, 14);
+}
+
+#[test]
+fn operator_status_reports_authenticated_freshness_as_json() {
+    let f = Fixture::new();
+    let anchor = HubKey::generate();
+    let working = HubKey::generate();
+    let mut catalog = Catalog::new(9, &today(), vec![]);
+    working.sign_catalog(&mut catalog, &anchor.certify(&working.public_hex()).unwrap()).unwrap();
+    let path = f.root.join("public/catalog.json");
+    write_catalog(&path, &catalog);
+    let output = Command::new(env!("CARGO_BIN_EXE_hub")).args(["admin", "status", "--catalog", path.to_str().unwrap(), "--anchor", &anchor.public_hex()]).output().unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let status: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(status["sequence"], 9);
+    assert_eq!(status["age_days"], 0);
+    assert_eq!(status["level"], "healthy");
 }

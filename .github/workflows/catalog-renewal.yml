@@ -1,0 +1,68 @@
+name: Catalog renewal
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+# This privileged runner never checks out or builds submission/PR code.
+# Deployment is opt-in; provision the trusted binary, filesystem and keys first.
+permissions: {}
+concurrency:
+  group: app-hub-catalog-operator
+  cancel-in-progress: false
+
+jobs:
+  renew:
+    if: vars.CATALOG_RENEWAL_ENABLED == 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: [self-hosted, linux, octosense-catalog-operator]
+    environment: catalog-signing
+    timeout-minutes: 10
+    env:
+      HUB_BIN: /opt/octosense/bin/hub
+      HUB_BIN_SHA256: ${{ vars.CATALOG_HUB_SHA256 }}
+      HUB_CATALOG: ${{ vars.CATALOG_FILE }}
+      HUB_STATE: ${{ vars.CATALOG_STATE_DIR }}
+      HUB_PUBLIC_BASE: ${{ vars.CATALOG_PUBLIC_BASE }}
+      HUB_ANCHOR: ${{ vars.CATALOG_ANCHOR_PUBLIC }}
+      HUB_WORKING_KEY_FILE: ${{ vars.CATALOG_WORKING_KEY_FILE }}
+      HUB_CERTIFICATE: ${{ vars.CATALOG_WORKING_KEY_CERTIFICATE }}
+    steps:
+      - name: Check trusted operator installation
+        id: installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${HUB_BIN_SHA256:?Configure the installed binary checksum}"
+          : "${HUB_CATALOG:?Configure the public catalog path}"
+          : "${HUB_STATE:?Configure independent private release state}"
+          : "${HUB_PUBLIC_BASE:?Configure the HTTPS distribution origin}"
+          : "${HUB_ANCHOR:?Configure the trusted public anchor}"
+          : "${HUB_WORKING_KEY_FILE:?Provision a protected working-key file}"
+          : "${HUB_CERTIFICATE:?Configure its anchor certificate}"
+          [[ "$HUB_BIN_SHA256" =~ ^[[:xdigit:]]{64}$ ]]
+          test -x "$HUB_BIN"
+          test -r "$HUB_WORKING_KEY_FILE"
+          printf '%s  %s\n' "$HUB_BIN_SHA256" "$HUB_BIN" | sha256sum -c -
+      - name: Renew signed catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          renewal_request="daily-$(date -u +%F)"
+          "$HUB_BIN" admin renew --catalog "$HUB_CATALOG" \
+            --state-dir "$HUB_STATE" --expected-sequence auto \
+            --idempotency-key "$renewal_request" --anchor "$HUB_ANCHOR" \
+            --key "$HUB_WORKING_KEY_FILE" --anchor-cert "$HUB_CERTIFICATE"
+      - name: Verify public signature, freshness and sampled artifacts
+        if: always() && steps.installation.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe_status=0
+          "$HUB_BIN" admin probe --base "$HUB_PUBLIC_BASE" \
+            --anchor "$HUB_ANCHOR" --expected-catalog "$HUB_CATALOG" \
+            --max-artifacts 10 > "$RUNNER_TEMP/catalog-probe.json" || probe_status=$?
+          cat "$RUNNER_TEMP/catalog-probe.json"
+          if [ "$probe_status" -ne 0 ]; then
+            echo '::error::Catalog probe failed or freshness reached a warning threshold; inspect the JSON report.'
+          fi
+          exit "$probe_status"

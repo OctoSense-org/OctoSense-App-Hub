@@ -37,17 +37,63 @@ fn run() -> Result<(), String> {
     let positional = argv.get(2).cloned();
 
     match command {
-        "admin" if positional.as_deref() == Some("renew") => {
+        "admin" if positional.as_deref() == Some("status") => {
+            let result = (|| {
+                let catalog = read_catalog(Path::new(&flag("catalog").ok_or("--catalog <file>")?))?;
+                operations::health(&catalog, &flag("anchor").ok_or("--anchor <trusted public key>")?, &today())
+            })();
+            match result {
+                Ok(report) => {
+                    println!("{}", serde_json::to_string(&report).map_err(|e| e.to_string())?);
+                    if report.level == operations::HealthLevel::Healthy { Ok(()) }
+                    else { Err(format!("catalog freshness is {:?} at {} days", report.level, report.age_days)) }
+                }
+                Err(error) => { println!("{}", serde_json::json!({"schema":1,"passed":false,"stage":"distribution","error":error})); Err(error) }
+            }
+        }
+        "admin" if positional.as_deref() == Some("probe") => {
+            let result = (|| {
+                let base = flag("base").ok_or("--base <https hub origin>")?;
+                let uri = base.parse::<ureq::http::Uri>().map_err(|e| format!("invalid probe origin: {e}"))?;
+                if uri.authority().is_none_or(|a| a.as_str().contains('@')) || uri.path_and_query().is_some_and(|p| p.query().is_some()) {
+                    return Err("probe origin must have a host and no credentials or query".into());
+                }
+                if uri.scheme_str() != Some("https") && !(has("allow-local-http") && uri.scheme_str() == Some("http")
+                    && matches!(uri.host(), Some("127.0.0.1" | "localhost"))) {
+                    return Err("public probes require HTTPS; --allow-local-http is for explicit loopback tests".into());
+                }
+                let anchor = flag("anchor").ok_or("--anchor <trusted public key>")?;
+                let minimum = if let Some(path) = flag("expected-catalog") {
+                    let local = read_catalog(Path::new(&path))?;
+                    verify_catalog(&local, &anchor)?;
+                    local.sequence
+                } else { flag("minimum-sequence").unwrap_or_else(|| "0".into()).parse::<u64>().map_err(|e| e.to_string())? };
+                let sample = flag("max-artifacts").unwrap_or_else(|| "10".into()).parse::<usize>().map_err(|e| e.to_string())?;
+                operations::probe(&Remote::new(&base), &anchor, minimum, &today(), sample)
+            })();
+            match result {
+                Ok(report) => {
+                    println!("{}", serde_json::to_string(&report).map_err(|e| e.to_string())?);
+                    if report.passed { Ok(()) } else { Err("distribution probe requires operator attention".into()) }
+                }
+                Err(error) => { println!("{}", serde_json::json!({"schema":1,"passed":false,"stage":"distribution","error":error})); Err(error) }
+            }
+        }
+        "admin" if matches!(positional.as_deref(), Some("renew" | "recover")) => {
             let catalog_path = PathBuf::from(flag("catalog").ok_or("--catalog <file>")?);
             let state = PathBuf::from(flag("state-dir").ok_or("--state-dir <private durable directory>")?);
-            let expected = flag("expected-sequence").ok_or("--expected-sequence <number>")?.parse::<u64>().map_err(|e| e.to_string())?;
+            let expected = flag("expected-sequence").ok_or("--expected-sequence <number or auto for renewal>")?;
             let request = flag("idempotency-key").ok_or("--idempotency-key <unique request>")?;
             let anchor = flag("anchor").ok_or("--anchor <trusted public key>")?;
             let working = load_key(&flag("key").ok_or("--key <working key file>")?)?;
             let certificate = flag("anchor-cert").ok_or("--anchor-cert <certificate>")?;
             let store = release::ReleaseStore::open(&catalog_path, &state, &anchor)?;
-            let catalog = store.renew(expected, &request, &today(), &signing::LocalCatalogSigner { key: &working, anchor_certificate: &certificate })?;
-            println!("renewed catalog sequence {} ({})", catalog.sequence, catalog.published);
+            let signer = signing::LocalCatalogSigner { key: &working, anchor_certificate: &certificate };
+            let catalog = if positional.as_deref() == Some("recover") {
+                store.recover(expected.parse::<u64>().map_err(|e| e.to_string())?, &request, &today(), &signer)?
+            } else if expected == "auto" { store.renew_current(&request, &today(), &signer)? }
+            else { store.renew(expected.parse::<u64>().map_err(|e| e.to_string())?, &request, &today(), &signer)? };
+            println!("{} catalog sequence {} ({})", positional.unwrap(), catalog.sequence, catalog.published);
             Ok(())
         }
         "admin" => Err("usage: hub admin renew --catalog <file> --state-dir <private directory> --expected-sequence <n> --idempotency-key <request> --anchor <hex> --key <file> --anchor-cert <hex>".into()),

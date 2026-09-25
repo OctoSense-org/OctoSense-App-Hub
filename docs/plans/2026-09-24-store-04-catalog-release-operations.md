@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust, serde/JSON, the existing Hub policy/client, Makepad/Octoscript where applicable; additional service/storage adapters follow the [shared design](2026-09-24-app-store-design.md).
 
-**Status:** In progress (2026-09-25). **Priority:** P0. **Phase:** A — Correctness. **Relative size:** M (complexity, not a delivery-date estimate).
+**Status:** Implemented and verified locally (2026-09-25); deployment/alert routing remain unactivated. **Priority:** P0. **Phase:** A — Correctness. **Relative size:** M (complexity, not a delivery-date estimate).
 
 **Prerequisites:** [01 — Publisher key continuity and signed release identity](2026-09-24-store-01-publisher-key-continuity.md)
 
@@ -111,13 +111,13 @@ cargo test --locked -p octosense-app-hub --test release_transactions
 cargo test --locked -p octosense-app-hub --test freshness
 ```
 
-Expected after implementation: all listed suites pass with zero failures. These commands have **not** been run to claim completion of the proposed feature. Native/device checks described in the tasks are additional acceptance evidence; a host-only test is not platform coverage.
+Expected after implementation: all listed suites pass with zero failures. The release/freshness suites passed as part of 117 Hub/policy tests on 2026-09-25. Native/device checks described in the tasks are additional acceptance evidence; a host-only test is not platform coverage.
 
 ## Acceptance criteria
 
-- [ ] A quiet store remains installable through scheduled fresh signed catalogs.
-- [ ] Concurrent/retried publishes cannot lose entries or expose incomplete artifacts.
-- [ ] Recovery preserves monotonic trust history; signing jobs do not execute submission code.
+- [x] Renewal and warning/escalation behavior verified with test clocks; opt-in scheduled workflows provided. Production scheduler and delivered alerts require deployment validation.
+- [x] Concurrent/retried publishes cannot lose entries or expose incomplete artifacts.
+- [x] Recovery preserves monotonic trust history; signing jobs do not execute submission code.
 
 ## Rollout, migration and recovery
 
@@ -130,3 +130,11 @@ Keep the previous release/artifacts available while validating the new behavior.
 Suggested commit subject after verified slices: `feat(hub): add atomic publication and catalog renewal`.
 
 Use @superpowers:verification-before-completion before reporting success. Link the final test/native evidence and record updated dependency revisions in the owning pull requests. This planning document does not itself authorize deployment, credential creation, payments or public publication.
+
+## Implementation evidence
+
+- Local renewal/publication slices: commits `11c0483` and `aa6b8d1`; recovery/monitoring checkpoint follows.
+- 117 Hub/policy tests pass, including durable interruption/concurrency, recovery, signature/date/freshness, immutable artifact and key rotation cases. Native CLI publication plus real loopback HTTP healthy/damaged-pack probes pass.
+- Workflow YAML, bash syntax and actual checksum refusal/success pass locally. Independent final code review found no remaining important issues. The hosted and self-hosted workflows were not executed or activated.
+- `CatalogSigner` accepts validated candidates only; the included key-file adapter is an operator implementation. Authenticated service roles and a deployed remote signer are not claimed.
+- See [catalog runbook](../operations/catalog.md) for configuration, retained-history recovery and bounded monitoring coverage.

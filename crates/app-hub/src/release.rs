@@ -34,6 +34,7 @@ struct Intent {
 
 enum Change<'a> {
     Renew,
+    Recover,
     Publish(&'a crate::approval::ApprovedRelease),
     Withdraw { app: &'a str, version: &'a str, reason: &'a str },
 }
@@ -41,6 +42,7 @@ impl Change<'_> {
     fn identity(&self) -> serde_json::Value {
         match self {
             Self::Renew => serde_json::json!({"operation":"renew"}),
+            Self::Recover => serde_json::json!({"operation":"recover"}),
             Self::Publish(release) => serde_json::json!({"operation":"publish","approval":release.id}),
             Self::Withdraw { app, version, reason } => serde_json::json!({"operation":"withdraw","app":app,"version":version,"reason":reason}),
         }
@@ -48,7 +50,7 @@ impl Change<'_> {
     fn candidate(&self, current: &Catalog, now: &str) -> Result<Catalog, String> {
         let mut next = current.clone();
         match self {
-            Self::Renew => { if current.published.is_empty() { return Err("renewal requires an existing signed catalog".into()); } }
+            Self::Renew | Self::Recover => { if current.published.is_empty() { return Err("renewal requires an existing signed catalog".into()); } }
             Self::Publish(release) => {
                 if current.entries.iter().any(|entry| entry.app_id() == release.entry.app_id() && entry.version() == release.entry.version()) {
                     return Err("this app version is already in the catalog".into());
@@ -135,6 +137,88 @@ impl ReleaseStore {
         self.renew_with_hook(expected, idempotency_key, now, signer, |_| Ok(()))
     }
 
+    /// Scheduled renewals can select the current generation under the lock,
+    /// while a retry retains its original expected sequence.
+    pub fn renew_current(self, idempotency_key: &str, now: &str, signer: &impl CatalogSigner) -> Result<Catalog, String> {
+        let key = blake3::hash(idempotency_key.as_bytes()).to_hex().to_string();
+        let receipt = self.state.join("requests").join(format!("{key}.json"));
+        let expected = if receipt.exists() {
+            let record: Record = read_json(&receipt)?;
+            verify_catalog(&record.catalog, &self.anchor)?;
+            record.previous_sequence
+        } else if self.state.join("pending.json").exists() {
+            let pending: Intent = read_json(&self.state.join("pending.json"))?;
+            if pending.idempotency_hash == key { pending.previous_sequence } else { self.catalog.sequence }
+        } else { self.catalog.sequence };
+        self.renew(expected, idempotency_key, now, signer)
+    }
+
+    /// Recover a restored/missing public pointer from independently retained
+    /// signed history, then publish a new generation above that history.
+    /// It never trusts backup entries over a newer durable withdrawal.
+    pub fn recover(self, expected: u64, idempotency_key: &str, now: &str, signer: &impl CatalogSigner) -> Result<Catalog, String> {
+        self.recover_with_hook(expected, idempotency_key, now, signer, |_| Ok(()))
+    }
+    fn recover_with_hook(mut self, expected: u64, idempotency_key: &str, now: &str, signer: &impl CatalogSigner,
+        hook: impl Fn(&str) -> Result<(), String>) -> Result<Catalog, String> {
+        date(now)?;
+        validate_request_key(idempotency_key)?;
+        let head: Record = read_json(&self.state.join("head.json"))?;
+        verify_catalog(&head.catalog, &self.anchor)?;
+        valid_date_at(&head.catalog.published, now)?;
+        crate::publishers::CatalogPublishers::from_catalog(&head.catalog)?;
+        if self.catalog.sequence > head.catalog.sequence {
+            return Err("public catalog is newer than retained release state; recover the latest state before proceeding".into());
+        }
+        let receipt_path = self.state.join("requests").join(format!("{}.json", blake3::hash(idempotency_key.as_bytes()).to_hex()));
+        let receipt: Option<Record> = if receipt_path.exists() { Some(read_json(&receipt_path)?) } else { None };
+        if let Some(receipt) = &receipt {
+            verify_catalog(&receipt.catalog, &self.anchor)?;
+            valid_date_at(&receipt.catalog.published, now)?;
+            if receipt.request_hash != request_hash(&self.anchor, expected, &Change::Recover)? {
+                return Err("idempotency key was already used for another request".into());
+            }
+        }
+        if expected != head.catalog.sequence {
+            let receipt = receipt.as_ref().ok_or("recovery expected sequence does not match durable history")?;
+            if receipt.previous_sequence != expected || hash(&receipt.catalog)? != hash(&head.catalog)? {
+                return Err("historical recovery request does not identify the current head; use a new recovery request at its sequence".into());
+            }
+        }
+        if self.state.join("pending.json").exists() {
+            let pending: Intent = read_json(&self.state.join("pending.json"))?;
+            if pending.catalog.sequence > head.catalog.sequence
+                && (pending.idempotency_hash != blake3::hash(idempotency_key.as_bytes()).to_hex().as_str()
+                    || pending.request_hash != request_hash(&self.anchor, expected, &Change::Recover)?) {
+                return Err("finish the original prepared request before recovering another generation".into());
+            }
+        }
+        if self.catalog.sequence == head.catalog.sequence && hash(&self.catalog)? != hash(&head.catalog)? {
+            return Err("conflicting signed catalogs at one sequence require operator investigation".into());
+        }
+        // Prove every retained artifact is present before exposing the repaired
+        // pointer. No native code or reviewer command runs in recovery.
+        for entry in &head.catalog.entries {
+            crate::admission::safe_relative(&entry.artifact)?;
+            let artifact = self.catalog_path.parent().unwrap().join(&entry.artifact);
+            let pack_path = self.catalog_path.parent().unwrap().join(format!("{}.pack.json", entry.artifact));
+            verify_artifact(&artifact, entry)?;
+            let pack: crate::Pack = read_json(&pack_path)?;
+            verify_pack(&pack, entry, &self.state)?;
+            hook("before-recovered-artifact-sync")?;
+            crate::approval::sync_bundle(&artifact)?;
+            sync_parent(&artifact)?;
+            File::open(&pack_path).and_then(|file| file.sync_all()).map_err(|e| e.to_string())?;
+            sync_parent(&pack_path)?;
+        }
+        if self.catalog.sequence < head.catalog.sequence {
+            atomic_json(&self.catalog_path, &head.catalog)?;
+            self.catalog = head.catalog;
+        }
+        hook("after-pointer-repair")?;
+        self.transact(expected, idempotency_key, now, signer, Change::Recover, hook)
+    }
+
     pub fn publish(self, expected: u64, idempotency_key: &str, now: &str, signer: &impl CatalogSigner,
         release: &crate::approval::ApprovedRelease) -> Result<Catalog, String> {
         self.transact(expected, idempotency_key, now, signer, Change::Publish(release), |_| Ok(()))
@@ -154,8 +238,8 @@ impl ReleaseStore {
         change: Change<'_>, hook: impl Fn(&str) -> Result<(), String>) -> Result<Catalog, String> {
         date(now)?;
         if !self.catalog.published.is_empty() { valid_date_at(&self.catalog.published, now)?; }
-        if idempotency_key.is_empty() || idempotency_key.len() > 256 { return Err("idempotency key must be 1 to 256 bytes".into()); }
-        let request_hash = blake3::hash(&serde_json::to_vec(&serde_json::json!({"change":change.identity(),"anchor":self.anchor,"expected":expected})).map_err(|e| e.to_string())?).to_hex().to_string();
+        validate_request_key(idempotency_key)?;
+        let request_hash = request_hash(&self.anchor, expected, &change)?;
         let idempotency_hash = blake3::hash(idempotency_key.as_bytes()).to_hex().to_string();
         let receipt_path = self.state.join("requests").join(format!("{idempotency_hash}.json"));
         let head_path = self.state.join("head.json");
@@ -253,11 +337,41 @@ impl ReleaseStore {
     }
 }
 
+fn validate_request_key(key: &str) -> Result<(), String> {
+    if key.is_empty() || key.len() > 256 { return Err("idempotency key must be 1 to 256 bytes".into()); }
+    Ok(())
+}
+
+fn request_hash(anchor: &str, expected: u64, change: &Change<'_>) -> Result<String, String> {
+    Ok(blake3::hash(&serde_json::to_vec(&serde_json::json!({"change":change.identity(),"anchor":anchor,"expected":expected})).map_err(|e| e.to_string())?).to_hex().to_string())
+}
+
+pub(crate) fn verify_artifact(path: &Path, entry: &crate::Entry) -> Result<(), String> {
+    let (payload, manifest) = crate::runtime::identity(path)?;
+    let expected_manifest = blake3::hash(&serde_json::to_vec(&entry.manifest).map_err(|e| e.to_string())?).to_hex().to_string();
+    if payload != entry.manifest.integrity.bundle_blake3 || manifest != expected_manifest {
+        return Err(format!("artifact differs from signed release {} {}", entry.app_id(), entry.version()));
+    }
+    Ok(())
+}
+
+pub(crate) fn verify_pack(pack: &crate::Pack, entry: &crate::Entry, scratch_parent: &Path) -> Result<(), String> {
+    let mut nonce = [0u8; 16];
+    rand_core::TryRngCore::try_fill_bytes(&mut rand_core::OsRng, &mut nonce).map_err(|e| e.to_string())?;
+    let path = scratch_parent.join(format!("verify-{}", hex::encode(nonce)));
+    struct Scratch(PathBuf);
+    impl Drop for Scratch { fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); } }
+    fs::create_dir(&path).map_err(|e| e.to_string())?;
+    let path = Scratch(path);
+    crate::unpack(pack, &path.0)?;
+    verify_artifact(&path.0, entry)
+}
+
 fn clear_pending(path: &Path) -> Result<(), String> {
     fs::remove_file(path).map_err(|e| e.to_string())?;
     sync_parent(path)
 }
-fn valid_date_at(value: &str, now: &str) -> Result<(), String> {
+pub(crate) fn valid_date_at(value: &str, now: &str) -> Result<(), String> {
     date(value)?;
     if value > now { return Err("prepared catalog date is in the future; check the operator clock".into()); }
     Ok(())
@@ -268,7 +382,7 @@ fn hash(catalog: &Catalog) -> Result<String, String> {
 }
 
 /// Strict Gregorian YYYY-MM-DD; device freshness remains wire-compatible.
-fn date(value: &str) -> Result<(), String> {
+pub(crate) fn date(value: &str) -> Result<(), String> {
     let bytes = value.as_bytes();
     if bytes.len() != 10 || bytes[4] != b'-' || bytes[7] != b'-'
         || bytes.iter().enumerate().any(|(i, b)| i != 4 && i != 7 && !b.is_ascii_digit()) {
@@ -550,6 +664,81 @@ mod tests {
             assert!(!f.public.join(&refused.entry.artifact).exists(), "rejected admission must precede public artifact exposure");
             assert_eq!(f.open().catalog().sequence, 8);
         }
+    }
+
+    #[test]
+    fn recovery_keeps_withdrawals_and_requires_complete_artifacts() {
+        for damage_pack in [false, true] {
+            let f = Fixture::new();
+            let bundle = crate::test_bundle::Fixture::new();
+            let approved = approve(&bundle);
+            let certificate = f.anchor.certify(&f.working.public_hex()).unwrap();
+            let signer = LocalCatalogSigner { key: &f.working, anchor_certificate: &certificate };
+            let old = f.open().publish(7, "publish", "2026-09-25", &signer, &approved).unwrap();
+            f.open().withdraw(8, "withdraw", "2026-09-25", &signer, "example-app", "1.0.0", "retired").unwrap();
+            atomic_json(&f.public.join("catalog.json"), &old).unwrap();
+            if damage_pack { fs::write(f.public.join(format!("{}.pack.json", old.entries[0].artifact)), "{}").unwrap(); }
+            let result = f.open().recover(9, "restore", "2026-09-25", &signer);
+            if damage_pack {
+                assert!(result.is_err());
+                assert_eq!(f.open().catalog().sequence, 8);
+            } else {
+                let result = result.unwrap();
+                assert_eq!(result.sequence, 10);
+                assert!(!result.entries[0].status.is_offered(), "an old backup cannot undo a recorded withdrawal");
+            }
+        }
+    }
+
+    #[test]
+    fn recovery_and_scheduled_renewal_retries_keep_the_original_generation() {
+        for point in ["after-pointer-repair", "before-intent", "before-signing", "before-receipt", "before-head", "before-catalog", "after-catalog"] {
+            let f = Fixture::new();
+            let backup = f.open().catalog().clone();
+            let certificate = f.anchor.certify(&f.working.public_hex()).unwrap();
+            let signer = LocalCatalogSigner { key: &f.working, anchor_certificate: &certificate };
+            assert_eq!(f.open().renew_current("daily", "2026-09-25", &signer).unwrap().sequence, 8);
+            assert_eq!(f.open().renew_current("daily", "2026-09-25", &signer).unwrap().sequence, 8);
+            atomic_json(&f.public.join("catalog.json"), &backup).unwrap();
+            assert!(f.open().recover_with_hook(8, "restore", "2026-09-25", &signer,
+                |stage| if stage == point { Err("interruption".into()) } else { Ok(()) }).is_err());
+            let result = f.open().recover(8, "restore", "2026-09-25", &signer).unwrap();
+            assert_eq!(result.sequence, 9);
+        }
+    }
+
+    #[test]
+    fn recovery_preconditions_do_not_change_the_public_pointer() {
+        for request in ["", "daily", "old-recovery"] {
+            let f = Fixture::new();
+            let backup = f.open().catalog().clone();
+            let certificate = f.anchor.certify(&f.working.public_hex()).unwrap();
+            let signer = LocalCatalogSigner { key: &f.working, anchor_certificate: &certificate };
+            f.open().renew_current("daily", "2026-09-25", &signer).unwrap();
+            if request == "old-recovery" {
+                f.open().recover(8, request, "2026-09-25", &signer).unwrap();
+                f.open().renew_current("later", "2026-09-25", &signer).unwrap();
+            }
+            atomic_json(&f.public.join("catalog.json"), &backup).unwrap();
+            assert!(f.open().recover(8, request, "2026-09-25", &signer).is_err());
+            assert_eq!(f.open().catalog().sequence, 7, "refused recovery must not repair a pointer as a side effect");
+        }
+    }
+
+    #[test]
+    fn failed_restore_sync_cannot_publish_the_repaired_pointer() {
+        let f = Fixture::new();
+        let bundle = crate::test_bundle::Fixture::new();
+        let approved = approve(&bundle);
+        let certificate = f.anchor.certify(&f.working.public_hex()).unwrap();
+        let signer = LocalCatalogSigner { key: &f.working, anchor_certificate: &certificate };
+        let backup = f.open().publish(7, "publish", "2026-09-25", &signer, &approved).unwrap();
+        f.open().renew_current("daily", "2026-09-25", &signer).unwrap();
+        atomic_json(&f.public.join("catalog.json"), &backup).unwrap();
+        assert!(f.open().recover_with_hook(9, "restore", "2026-09-25", &signer,
+            |stage| if stage == "before-recovered-artifact-sync" { Err("sync failure".into()) } else { Ok(()) }).is_err());
+        assert_eq!(f.open().catalog().sequence, 8);
+        assert_eq!(f.open().recover(9, "restore", "2026-09-25", &signer).unwrap().sequence, 10);
     }
 
     #[test]

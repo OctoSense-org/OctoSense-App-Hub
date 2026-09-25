@@ -104,7 +104,7 @@ fn publish_file(path: &Path, bytes: &[u8], private_state: &Path, hook: &impl Fn(
     result
 }
 
-fn sync_bundle(root: &Path) -> Result<(), String> {
+pub(crate) fn sync_bundle(root: &Path) -> Result<(), String> {
     for file in crate::admission::inventory(root)? {
         let path = root.join(file.path);
         std::fs::File::open(&path).and_then(|f| f.sync_all()).map_err(|e| e.to_string())?;

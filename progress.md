@@ -90,3 +90,13 @@
 - Publication review prompted ordering and durability refinements: candidate continuity/duplicate checks now precede artifact exposure; artifact staging precedes sequence reservation; matching existing artifacts/sidecars are re-synced on retry. A duplicate/ownership rejection regression failed before the ordering fix. State must be outside the public catalog directory.
 - The real native CLI signed-fixture → publication → catalog verification journey passed with the new recorded-review and transaction inputs; proof sidecars still match the validator's bytes.
 - Publication slice verification: 109 Hub/policy tests pass, including 11 release transaction unit tests and 4 CLI release tests. Real native CLI publication/catalog verification passed again after final ordering/private-state fixes. Independent final review has no findings; diff whitespace check passes.
+
+## Plan 04 recovery and monitoring
+
+- Added explicit recovery from authenticated durable history, preserving withdrawals and refusing stale/reused recovery identities before any pointer repair. Restored bundles/packs are synchronized before exposure. Recovery interruption and sync-failure regressions pass.
+- Read-only JSON status/public probes verify age, signatures, sequence floors and a bounded pack sample; warnings at 7 days, critical at 12, expiry after 14.
+- Daily renewal uses locked automatic sequence selection. Opt-in workflows use a protected preinstalled operator binary and an independent hosted read-only monitor. No workflows activated or signing infrastructure deployed.
+- Independent final review found no remaining important issues. Corrected an always-run probe that could have executed after checksum refusal; monitor runs separately from the signer runner.
+- Local HTTP fixture required loopback socket permission; reran with approved escalation. Workflow checksum probe revealed macOS sha256sum requires -c with an explicit stdin filename rather than --check; switched to portable -c - (also supported on the Linux runner).
+- Native CLI publication and real HTTP healthy/damaged-pack probes passed. Workflow YAML/shell syntax and actual trusted-installation checksum rejection/success passed; GitHub execution remains unexercised.
+- Recovery/monitoring checkpoint: 117 Hub/policy tests passed, diff whitespace clean. Operator setup and actual alert delivery remain unactivated. Next: coordinated consumer pin and plan 05.

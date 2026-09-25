@@ -1,0 +1,52 @@
+name: Catalog availability monitor
+on:
+  schedule:
+    - cron: '37 */6 * * *'
+  workflow_dispatch:
+
+# Separate scheduler/job and hosted runner: a stopped signing runner does not
+# suppress freshness checks. This job has no signing credentials or repo checkout.
+permissions: {}
+concurrency:
+  group: app-hub-catalog-monitor
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    if: vars.CATALOG_MONITOR_ENABLED == 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      MONITOR_BINARY_URL: ${{ vars.CATALOG_MONITOR_BINARY_URL }}
+      MONITOR_BINARY_SHA256: ${{ vars.CATALOG_MONITOR_BINARY_SHA256 }}
+      HUB_PUBLIC_BASE: ${{ vars.CATALOG_PUBLIC_BASE }}
+      HUB_ANCHOR: ${{ vars.CATALOG_ANCHOR_PUBLIC }}
+      HUB_MINIMUM_SEQUENCE: ${{ vars.CATALOG_MONITOR_MINIMUM_SEQUENCE || '0' }}
+    steps:
+      - name: Install verified read-only monitor
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${MONITOR_BINARY_URL:?Configure a reviewed Linux hub binary HTTPS URL}"
+          : "${MONITOR_BINARY_SHA256:?Configure its reviewed checksum}"
+          : "${HUB_PUBLIC_BASE:?Configure the public HTTPS origin}"
+          : "${HUB_ANCHOR:?Configure the trusted public anchor}"
+          [[ "$MONITOR_BINARY_SHA256" =~ ^[[:xdigit:]]{64}$ ]]
+          curl --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --fail --location --max-time 60 "$MONITOR_BINARY_URL" \
+            --output "$RUNNER_TEMP/catalog-monitor"
+          printf '%s  %s\n' "$MONITOR_BINARY_SHA256" "$RUNNER_TEMP/catalog-monitor" | sha256sum -c -
+          chmod 700 "$RUNNER_TEMP/catalog-monitor"
+      - name: Check freshness even when the signing runner is unavailable
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe_status=0
+          "$RUNNER_TEMP/catalog-monitor" admin probe --base "$HUB_PUBLIC_BASE" \
+            --anchor "$HUB_ANCHOR" --minimum-sequence "$HUB_MINIMUM_SEQUENCE" \
+            --max-artifacts 10 > "$RUNNER_TEMP/catalog-health.json" || probe_status=$?
+          cat "$RUNNER_TEMP/catalog-health.json"
+          if [ "$probe_status" -ne 0 ]; then
+            echo '::error::Independent catalog monitoring requires attention: inspect signature, age (warning at 7 days, critical at 12) and artifact findings.'
+          fi
+          exit "$probe_status"
