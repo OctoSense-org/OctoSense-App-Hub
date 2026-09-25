@@ -404,6 +404,12 @@ pub(crate) fn register_card_vocabulary() {
         }
         makepad_widgets::widget_async::register_splash_isolate_mod(design);
         makepad_widgets::widget_async::register_splash_isolate_mod(kit);
+        // `sys`: places, routes, weather and the other live-data helpers a
+        // script app reads, every fetch held to the app's host list, the
+        // device's location to its `location` grant. It also carries
+        // `agent.notify`, which an app under a policy may call only with the
+        // `agent` grant.
+        makepad_widgets::widget_async::register_splash_isolate_mod(makepad_widgets::splash::register_agent_module);
     });
 }
 

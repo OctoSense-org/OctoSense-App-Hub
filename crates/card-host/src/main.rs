@@ -168,6 +168,7 @@ fn register_card_vocabulary() {
     }
     register_splash_isolate_mod(design);
     register_splash_isolate_mod(kit);
+    register_splash_isolate_mod(makepad_widgets::splash::register_agent_module);
 }
 
 impl App {
