@@ -5,6 +5,7 @@ pub(crate) const MAX_MANIFEST_BYTES: u64 = 64 * 1024;
 const MAX_FILES: usize = 2048;
 const MAX_DEPTH: usize = 32;
 
+#[derive(Debug)]
 pub(crate) struct LaunchSnapshot {
     root: PathBuf,
 }

@@ -87,6 +87,26 @@ fn public_publish_rejects_unsigned_first_release() {
 }
 
 #[test]
+fn publication_requires_runtime_evidence_even_when_reviewed() {
+    let f = Fixture::new();
+    let working = HubKey::generate();
+    let key_path = f.root.join("working.key");
+    fs::write(&key_path, hex::encode(working.to_bytes())).unwrap();
+    let certificate = HubKey::generate().certify(&working.public_hex()).unwrap();
+    let catalog = f.root.join("catalog.json");
+    let result = Command::new(env!("CARGO_BIN_EXE_hub")).args([
+        "publish", f.bundle.to_str().unwrap(), "--publisher", "publisher-one",
+        "--publisher-key", &format!("publisher-one={}", f.publisher.public_hex()),
+        "--catalog", catalog.to_str().unwrap(), "--key", key_path.to_str().unwrap(),
+        "--anchor-cert", &certificate, "--out", f.root.to_str().unwrap(),
+        "--reviewed", "--validator", "/missing/app-validator",
+    ]).output().unwrap();
+    assert!(!result.status.success(), "a missing validator must refuse publication");
+    assert!(!catalog.exists());
+    assert!(!f.root.join("artifacts").exists());
+}
+
+#[test]
 fn unsigned_update_is_refused_even_in_local_check() {
     let mut f = Fixture::new();
     let catalog = Catalog::new(1, "2026-09-25", vec![f.entry()]);
@@ -122,11 +142,12 @@ fn publish_authenticates_history_and_preserves_the_registered_key() {
     fs::write(&key_path, hex::encode(working.to_bytes())).unwrap();
     let catalog_path = f.root.join("catalog.json");
     let publish = |f: &Fixture, with_anchor: bool| {
+        let validator = f.protocol_worker();
         let mut command = Command::new(env!("CARGO_BIN_EXE_hub"));
         command.args(["publish", f.bundle.to_str().unwrap(), "--publisher", "publisher-one",
             "--publisher-key", &format!("publisher-one={}", f.publisher.public_hex()),
             "--catalog", catalog_path.to_str().unwrap(), "--key", key_path.to_str().unwrap(),
-            "--anchor-cert", &certificate, "--out", f.root.to_str().unwrap()]);
+            "--anchor-cert", &certificate, "--out", f.root.to_str().unwrap(), "--validator", validator.to_str().unwrap()]);
         if with_anchor { command.args(["--anchor", &anchor.public_hex()]); }
         command.output().unwrap()
     };

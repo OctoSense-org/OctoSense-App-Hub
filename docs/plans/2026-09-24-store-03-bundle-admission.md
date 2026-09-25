@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust, serde/JSON, the existing Hub policy/client, Makepad/Octoscript where applicable; additional service/storage adapters follow the [shared design](2026-09-24-app-store-design.md).
 
-**Status:** In progress (2026-09-25); structural admission is the first slice. **Priority:** P0. **Phase:** A — Correctness. **Relative size:** M (complexity, not a delivery-date estimate).
+**Status:** Verified locally (2026-09-25); native evidence is widget construction and startup/shutdown on macOS. Functional app interactions and device qualification are tracked in plans 06/26. **Priority:** P0. **Phase:** A — Correctness. **Relative size:** M (complexity, not a delivery-date estimate).
 
 **Prerequisites:** [01 — Publisher key continuity and signed release identity](2026-09-24-store-01-publisher-key-continuity.md)
 
@@ -117,9 +117,9 @@ Expected after implementation: all listed suites pass with zero failures. These 
 
 ## Acceptance criteria
 
-- [ ] Missing entrypoints, missing kits, corrupt images and unresolvable local resources are refused with useful diagnostics.
-- [ ] A real signed starter passes both structural and native checks using the same reviewed bytes.
-- [ ] A failed, stale or missing runtime validation report never becomes an automatic approval.
+- [x] Missing entrypoints, missing kits, corrupt images and unresolvable local resources are refused with useful diagnostics.
+- [x] A real signed starter passes both structural and native checks using the same reviewed bytes.
+- [x] A failed, stale or missing runtime validation report never becomes an automatic approval.
 
 ## Rollout, migration and recovery
 
@@ -132,3 +132,20 @@ Keep the previous release/artifacts available while validating the new behavior.
 Suggested commit subject after verified slices: `feat(hub): validate runnable bundles and artwork`.
 
 Use @superpowers:verification-before-completion before reporting success. Link the final test/native evidence and record updated dependency revisions in the owning pull requests. This planning document does not itself authorize deployment, credential creation, payments or public publication.
+
+## Implementation evidence — 2026-09-25
+
+Structural and native admission are implemented with shared host preparation,
+resolved Splash policies, bounded subprocesses and mandatory digest/manifest/
+validator binding at publication. Both CLI stages return JSON findings on failure.
+The full Hub/policy/validator suite passed 101 tests; mobile App Hub passed 41
+tests and the shared-store action regression passed. Independent review is clear.
+A signed static Card completed real `hub test` → local publication → signed
+catalog verification with identical evidence sidecars, recorded under ignored
+`target/store-admission/native-publish.json`. This was local with temporary keys.
+
+The static fixture declares no interactions. This checkpoint establishes native
+widget/lifecycle admission; it does not establish GPU rendering, functional app
+state/effect behavior or Android coverage. Plans 06 and 26 carry that conformance
+and qualification work. Deployment, signer isolation and publication transactions
+are separate work in plan 04.

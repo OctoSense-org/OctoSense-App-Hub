@@ -63,8 +63,34 @@ stable check codes, file/property paths and a typed resource inventory. Schema
 properties and arbitrary app data are not resource loads. Display URLs remain
 subject to the existing conservative text rule until runtime network conformance
 is implemented. Structural checks do not prove native loading, successful app
-behavior or visual quality; the separate runtime validator is the next delivery
-slice. Checks do not write reports inside the signed bundle.
+behavior or visual quality. Run `hub test <bundle> --json` for native checks.
+It uses the same Card preparation and Splash policy adapter as installed apps,
+including resolved memory/instruction limits, a private temporary storage jail,
+and startup/shutdown. Resolved local assets must exist; the current installed
+font loader supports `makepad_widgets:resources/Inter.ttf` only.
+
+Build the worker beside `hub` with
+`cargo build --release -p octosense-app-hub -p octosense-app-validator --bins`.
+`hub test` and `hub publish` use that sibling `app-validator`; an operator can
+select a trusted executable with `--validator <path>`. Publisher-supplied reports
+are never accepted as evidence. The Hub runs the worker itself against an owned
+bundle snapshot, with a 10-second wall limit, bounded output and process resource
+limits; the worker caps Rust allocations at 256 MiB. This runner requires Unix.
+These limits are not an operating-system sandbox for arbitrary native code.
+
+`hub test --json` returns `schema`, `stage`, `passed`, and `findings` on success
+and refusal (with nonzero exit status for refusal). Structural failures retain
+the same codes/paths as `hub check`; worker failures use
+`runtime-validation-failed` with the cause in `detail`. A successful result also
+contains `evidence`: payload/complete-manifest hashes, validator executable hash,
+runtime/check versions, host target and completed checks.
+
+Publication requires these checks again, uses the owned checked bytes, and writes
+`<artifact>.validation.json` alongside the published pack. `--reviewed` cannot
+bypass native validation. Reports and temporary data stay outside the bundle.
+This smoke check does not draw GPU frames or establish device, visual or functional
+interaction quality. Test the app's declared behavior in the reference host and
+on each claimed platform; the current static fixture declares no interactions.
 
 ## The manifest
 
@@ -175,7 +201,8 @@ locally is the report the hub acts on.
 
 ```sh
 hub stamp my-app                       # write the bundle digest into manifest.json; rerun after every change
-hub check my-app --allow-unsigned      # current local gate; not a runtime or visual test
+hub check my-app --allow-unsigned      # structural checks
+hub test my-app --allow-unsigned --json # native loading and lifecycle
 hub scan  my-app --packet review.json  # the agent-scan packet, to answer yourself or hand to a reviewer
 ```
 
@@ -195,7 +222,7 @@ submitting; the hub's reviewer will ask the same ones.
 ## Signing
 
 Signing is required for every public release, including the first. Unsigned
-bundles remain usable with `hub check --allow-unsigned` during local development;
+bundles remain usable with `hub check/test --allow-unsigned` during local development;
 `hub publish` refuses that flag. The example GitHub release workflow below is planned; use
 manual signing until that action and submission route are available:
 

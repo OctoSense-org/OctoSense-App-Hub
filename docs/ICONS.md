@@ -41,7 +41,7 @@ needs another format.
 | SVG parses into drawable geometry with a square logical canvas | Mobile SVG loader |
 | Clear silhouette, suitable padding and readable contrast | Author's visual review |
 
-`hub check` decodes bitmap artwork with dimension/output limits and checks SVG XML, dimensions and resource references. It does **not** prove drawable SVG geometry or visual quality. A gate pass does not prove that an icon will
+`hub check` decodes bitmap artwork with dimension/output limits and checks SVG XML, dimensions and resource references. `hub test` additionally checks supported native SVG geometry. Neither proves visual quality. A gate pass does not prove that an icon will
 render. The mobile bounds above describe its current installed-icon loader;
 invalid artwork falls back to a generic icon. Test in the target shell.
 

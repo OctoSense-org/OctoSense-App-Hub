@@ -60,3 +60,15 @@
 - Review found Card/kit expansion was not bounded by input size. Removed realization from the headless Hub process; full preparation must occur in the upcoming constrained runtime worker. Cached token weights, checked every SVG CSS URL, and avoided interpreting kit property declarations as resource paths or theme overlays as native-only Cards.
 - Added dependencies from cached pinned releases: existing image 0.25.10 with PNG/JPEG/WebP codecs, roxmltree 0.21.1 and the already-used Octoscript L0 revision. Policy core remains free of graphical dependencies. Image maximum dimensions are strict; decoded output bytes are checked explicitly before allocation because decoder max_alloc is advisory (https://docs.rs/image/0.25.10/image/struct.Limits.html).
 - Plan 03 remains in progress: shared native preparation, isolated runtime evidence, publication binding and native end-to-end verification are still required.
+
+## Plan 03 native admission slice — 2026-09-25
+
+- Added the native worker, shared Card preparation, owned validation snapshots, full manifest/payload/runtime binary binding and mandatory publish checks. Reference and installed hosts use the same preparation function.
+- Native smoke uses actual Splash + the existing policy adapter, temporary storage, startup and shutdown. Review found fixed evaluator budgets diverged from installed policies; regressions for tiny memory/instruction budgets now pass using the actual host.
+- Worker timeout/crash/output/environment checks pass; reviewer subprocesses retain their configured cwd/environment after a compatibility regression was fixed. Worker Rust allocations are capped at 256 MiB before Card expansion, with a real expansion regression.
+- JSON refusal regressions failed before fixes; hub test now preserves structural findings and returns a stable runtime failure envelope, also emitted by the worker.
+- Current full suite: 101 tests pass (Hub/policy/native validator, including doctest). A native CLI signed-fixture/publication/catalog check and consumer integration are being verified before checkpoint.
+- Evidence scope is macOS native widget construction and lifecycle. The static fixture has no declared interactions; GPU rendering, Android and application-state conformance remain separate (plans 06/26). Initial compile needed closures to discard script_mod return values; corrected with no framework edits.
+- Native end-to-end CLI journey passed: ephemeral publisher/anchor/working keys, signed real Card fixture, native hub test, publication, catalog signature verification and identical runtime sidecar. No production publication. Independent follow-up review found no important issues.
+- Mobile local-consumer integration passed: 41 App Hub tests and the native shared-store action regression, using isolated exact mobile runtime revisions.
+- Exact mobile runtime verification also passed all seven native-validator cases from the Hub workspace, plus the full mobile shell check. Cargo cannot test dev-dependencies of a non-member dependency; reran from the owning Hub workspace with runtime overrides, then restored its normal lockfile. No framework source changes.

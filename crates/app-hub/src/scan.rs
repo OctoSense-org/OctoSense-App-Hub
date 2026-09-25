@@ -16,9 +16,7 @@
 use crate::gate::GateReport;
 use octosense_app_policy::{AppManifest, Listing, LISTING_FILE};
 use serde::{Deserialize, Serialize};
-use std::io::Write;
 use std::path::Path;
-use std::process::{Command, Stdio};
 
 pub const PACKET_SCHEMA: u32 = 1;
 
@@ -115,23 +113,15 @@ pub fn scan(packet: &Packet, reviewer: &str) -> Verdict {
         Ok(json) => json,
         Err(e) => return fallback(format!("the packet did not serialise: {e}")),
     };
-    let mut child = match Command::new("sh").arg("-c").arg(reviewer).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::inherit()).spawn() {
-        Ok(child) => child,
-        Err(e) => return fallback(format!("the reviewer could not start: {e}")),
-    };
-    if let Some(mut stdin) = child.stdin.take() {
-        if let Err(e) = stdin.write_all(json.as_bytes()) {
-            return fallback(format!("the reviewer did not read the packet: {e}"));
-        }
-    }
-    let output = match child.wait_with_output() {
+    let cwd = match std::env::current_dir() { Ok(cwd) => cwd, Err(e) => return fallback(e.to_string()) };
+    // The reviewer command is trusted operator configuration and may need its
+    // installed tools/provider credentials. The native worker never inherits it.
+    let output = match crate::process::run(Path::new("/bin/sh"), &["-c".as_ref(), reviewer.as_ref()],
+        &cwd, json.into_bytes(), crate::process::Limits { isolated_env: false, ..Default::default() }) {
         Ok(output) => output,
-        Err(e) => return fallback(format!("the reviewer did not finish: {e}")),
+        Err(error) => return fallback(format!("reviewer failed: {error}")),
     };
-    if !output.status.success() {
-        return fallback(format!("the reviewer exited with {}", output.status));
-    }
-    let text = String::from_utf8_lossy(&output.stdout);
+    let text = String::from_utf8_lossy(&output);
     // A model may wrap its JSON in prose; take the outermost object.
     let start = text.find('{');
     let end = text.rfind('}');
@@ -180,6 +170,11 @@ mod tests {
         assert_eq!(scan(&packet_stub(), "cat >/dev/null; echo nonsense").route, Route::HumanReview);
         assert_eq!(scan(&packet_stub(), r#"cat >/dev/null; echo '{"route":"pass","extra":1}'"#).route, Route::HumanReview, "unknown fields are refused");
         assert_eq!(scan(&packet_stub(), "/nonexistent/reviewer").route, Route::HumanReview);
+    }
+
+    #[test]
+    fn trusted_reviewer_keeps_its_command_resolution_context() {
+        assert_eq!(scan(&packet_stub(), r#"cat >/dev/null; test -f Cargo.toml && printf '{"route":"pass","reasons":[]}'"#).route, Route::Pass);
     }
 
     #[test]

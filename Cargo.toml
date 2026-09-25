@@ -18,6 +18,7 @@ members = [
     "crates/appstore-app",
     "crates/card-host",
     "crates/app-host",
+    "crates/app-validator",
 ]
 
 # Builds resolve the pinned sources from the prepared sibling checkouts, as

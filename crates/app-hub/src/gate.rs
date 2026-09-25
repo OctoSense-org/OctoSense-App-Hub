@@ -61,6 +61,9 @@ pub struct GateReport {
 }
 
 impl GateReport {
+    pub fn manifest_digest(&self) -> String {
+        blake3::hash(&self.admitted_manifest).to_hex().to_string()
+    }
     pub fn json(&self) -> serde_json::Value {
         serde_json::json!({
             "schema": 1, "stage": "structural", "passed": self.passed(),

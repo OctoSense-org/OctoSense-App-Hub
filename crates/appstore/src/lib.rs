@@ -457,13 +457,7 @@ pub(crate) fn register_card_vocabulary() {
 
 /// Lower a card bundle to isolate source. Nothing outside the bundle is read.
 pub(crate) fn card_source(bundle: &std::path::Path, asset_origin: &str) -> Result<String, String> {
-    let card = std::fs::read_to_string(bundle.join("page.card")).map_err(|e| format!("page.card: {e}"))?;
-    let data_text = std::fs::read_to_string(bundle.join("page.data.json")).unwrap_or_else(|_| "{}".into());
-    let mut data: serde_json::Value = serde_json::from_str(&data_text).map_err(|e| format!("page.data.json: {e}"))?;
-    octosense_app_policy::rewrite_assets(&mut data, asset_origin);
-    let prepared = octoscript_makepad::l0::prepare(&card, &data, &bundle.join("kit"))?;
-    let ui = octoscript_makepad::design::to_makepad_ui(&prepared.tree)?;
-    Ok(format!("width:Fill height:Fill flow:Overlay {ui}"))
+    octosense_app_validator::card_source(bundle, asset_origin)
 }
 
 impl Widget for AppStoreView {

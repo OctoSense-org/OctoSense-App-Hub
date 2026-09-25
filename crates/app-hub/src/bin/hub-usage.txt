@@ -6,9 +6,10 @@ hub — the OctoSense app hub command (ADR 0003)
   hub stamp <bundle>                    write the bundle's digest into its manifest
   hub sign-manifest <bundle> --key <f> --key-id <id>
   hub check <bundle> [--catalog <f> --anchor <hex>] [--allow-unsigned] [--publisher-key id=hex]
+  hub test <bundle> [--validator <executable>] [--json] [check flags]
   hub publish <bundle> --catalog <f> --key <f> --anchor-cert <hex>
               --publisher <id> --publisher-key id=hex [--anchor <hex>]
-              [--repo <url>] [--commit <sha>] [--out <dir>]
+              [--repo <url>] [--commit <sha>] [--out <dir>] [--validator <executable>]
   hub withdraw <app> --version <v> --reason <text> --catalog <f> --key <f> --anchor-cert <hex>
   hub remove <app> [--version <v>] --catalog <f> --key <f> --anchor-cert <hex> [--out <dir>]
               (drops the entry, its index file and its artifacts; for a
@@ -19,6 +20,13 @@ hub — the OctoSense app hub command (ADR 0003)
 publish also accepts --reviewer <cmd> (the agent scan; a reject stops the
 publish, human-review stops it until --reviewed) and writes
 <artifact>.pack.json beside the artifact for HTTP delivery.
+
+check --json emits structural findings; test --json adds native validation
+with structured failures and evidence on success. Both accept local
+--allow-unsigned checks. Build app-validator beside hub, or provide a trusted
+operator-selected worker with --validator. Publication requires native evidence
+and writes <artifact>.validation.json. Worker limits: 10 seconds, bounded output,
+256 MiB Rust allocations; Unix runner required. Visual/device review is separate.
 
 check is the gate: a publisher runs it before submitting, the hub runs the
 same code after. publish re-runs it, copies the bundle into the artifact

@@ -52,6 +52,23 @@ impl Fixture {
         PublisherKeys::new().with("publisher-one", &self.publisher.public_hex())
     }
 
+    /// Trusted test worker for CLI ownership tests. Real native execution is
+    /// covered separately by app-validator/tests/runtime_validation.rs.
+    #[cfg(unix)]
+    pub fn protocol_worker(&self) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        let (digest, manifest_digest) = runtime::identity(&self.bundle).unwrap();
+        let report = runtime::RuntimeReport {
+            schema: 1, check_version: runtime::CHECK_VERSION, runtime: runtime::CARD_RUNTIME.into(),
+            target: format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH), digest, manifest_digest,
+            checks: vec!["structural".into(), "card-preparation".into(), "native-widget-load".into(), "startup-shutdown".into()],
+        };
+        let path = self.root.join("protocol-worker");
+        fs::write(&path, format!("#!/bin/sh\ncat <<'VALIDATION_JSON'\n{}\nVALIDATION_JSON\n", serde_json::to_string(&report).unwrap())).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+        path
+    }
+
     pub fn report(&self, previous: Option<&Catalog>) -> GateReport {
         check_bundle(&self.bundle, &HostLimits::default(), &self.keys(), previous).unwrap()
     }

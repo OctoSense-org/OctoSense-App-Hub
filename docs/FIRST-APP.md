@@ -15,7 +15,7 @@ shared checkout just to satisfy a guide.
 From the Hub repository:
 
 ```sh
-cargo build --release -p octosense-app-hub --bin hub
+cargo build --release -p octosense-app-hub -p octosense-app-validator --bins
 cargo build --release -p octosense-card-host --bin card-host
 ```
 
@@ -127,12 +127,15 @@ produce a review packet **outside** the bundle:
 mkdir -p "$APP_REPO/build"
 "$HUB_BIN" stamp "$APP_REPO/bundle"
 "$HUB_BIN" check "$APP_REPO/bundle" --allow-unsigned
+"$HUB_BIN" test "$APP_REPO/bundle" --allow-unsigned --json
 "$HUB_BIN" scan "$APP_REPO/bundle" --packet "$APP_REPO/build/review.json"
 ```
 
 An unsigned warning is expected for this development check. A gate pass means
-the current admission rules passed; it does not run the app, decode all artwork,
-approve placeholders or verify your privacy-policy contents. The untouched
+the structural rules and bounded artwork decoding passed. `hub test` also loads
+the Card with its resolved policy and sends startup/shutdown through the native
+host. Neither check approves placeholders, verifies privacy-policy contents or
+replaces the visual and interaction checks above. The untouched
 starter is expected to fail because its declared screenshot is absent.
 
 Confirm the granted permissions match the app's behavior and record native

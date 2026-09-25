@@ -90,6 +90,30 @@ fn run() -> Result<(), String> {
                 Err("the bundle was refused".into())
             }
         }
+        "test" => {
+            let bundle = PathBuf::from(positional.ok_or("usage: hub test <bundle> [--validator <executable>] [--json]")?);
+            let report = match gate_for(&bundle, &argv, has("allow-unsigned"), flag("catalog")) {
+                Ok(report) => report,
+                Err(error) => {
+                    if has("json") { println!("{}", serde_json::json!({"schema":1,"stage":"structural","passed":false,"findings":[{"severity":"refusal","check":"bundle-invalid","detail":error}]})); }
+                    return Err(error);
+                }
+            };
+            if !report.passed() {
+                if has("json") { println!("{}", report.json()); } else { print!("{}", report.render()); }
+                return Err("the bundle was refused".into());
+            }
+            let evidence = match validator_path(flag("validator")).and_then(|validator| runtime::validate(&bundle, &report, &validator)) {
+                Ok(evidence) => evidence,
+                Err(error) => {
+                    if has("json") { println!("{}", runtime::failure_json(&error)); }
+                    return Err(error);
+                }
+            };
+            if has("json") { println!("{}", serde_json::json!({"schema":1,"stage":"runtime","passed":true,"findings":report.findings,"evidence":evidence})); }
+            else { print!("{}", report.render()); println!("  runtime: {} — {}", evidence.report().runtime, evidence.report().checks.join(", ")); }
+            Ok(())
+        }
         "publish" => {
             if has("allow-unsigned") {
                 return Err("public releases require a signed manifest; --allow-unsigned is only for local checks".into());
@@ -101,6 +125,10 @@ fn run() -> Result<(), String> {
             if !report.passed() {
                 return Err("refusing to publish a bundle the gate refused".into());
             }
+            let evidence = runtime::validate(&bundle, &report, &validator_path(flag("validator"))?)?;
+            // From here on, publish the owned bytes actually checked by the
+            // worker. A publisher can keep editing the original working tree.
+            let bundle = evidence.bundle();
             let working = load_key(&flag("key").ok_or("--key <working key file>")?)?;
             let anchor_certificate = flag("anchor-cert").ok_or("--anchor-cert <hex>")?;
             let publisher = flag("publisher").ok_or("--publisher <id>")?;
@@ -143,6 +171,9 @@ fn run() -> Result<(), String> {
                     Route::HumanReview => return Err("the scan asks for human review; publish again with --reviewed once a person has looked".into()),
                 }
             }
+            evidence.verify_bundle(&artifact)?;
+            let evidence_path = out.join(format!("{}.validation.json", entry.artifact));
+            std::fs::write(evidence_path, serde_json::to_vec_pretty(&evidence).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
             catalog.entries.push(entry);
             catalog.sequence += 1;
             catalog.published = today();
@@ -247,6 +278,11 @@ fn run() -> Result<(), String> {
             Ok(())
         }
     }
+}
+
+fn validator_path(override_path: Option<String>) -> Result<PathBuf, String> {
+    if let Some(path) = override_path { return Ok(PathBuf::from(path)); }
+    Ok(std::env::current_exe().map_err(|e| e.to_string())?.with_file_name("app-validator"))
 }
 
 fn gate_for(bundle: &Path, argv: &[String], allow_unsigned: bool, catalog: Option<String>) -> Result<GateReport, String> {

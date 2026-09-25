@@ -222,3 +222,20 @@ fn native_theme_overlay_does_not_require_native_placements() {
     f.sign();
     assert!(f.report(None).passed(), "the runtime worker selects and verifies the actual rendering branch");
 }
+
+#[test]
+fn native_cli_failures_preserve_machine_readable_findings() {
+    for structural in [true, false] {
+        let mut f = Fixture::new();
+        if structural { fs::remove_file(f.bundle.join("page.card")).unwrap(); f.sign(); }
+        let result = std::process::Command::new(env!("CARGO_BIN_EXE_hub")).args([
+            "test", f.bundle.to_str().unwrap(), "--json", "--publisher-key", &format!("publisher-one={}", f.publisher.public_hex()),
+            "--validator", f.root.join("missing-worker").to_str().unwrap(),
+        ]).output().unwrap();
+        assert!(!result.status.success());
+        let json: serde_json::Value = serde_json::from_slice(&result.stdout).expect("failed validation must produce JSON");
+        assert_eq!(json["passed"], false);
+        if structural { assert_eq!(json["findings"], serde_json::to_value(f.report(None).findings).unwrap()); }
+        else { assert_eq!(json["findings"][0]["check"], "runtime-validation-failed"); assert!(json["findings"][0]["detail"].as_str().unwrap().contains("unavailable")); }
+    }
+}

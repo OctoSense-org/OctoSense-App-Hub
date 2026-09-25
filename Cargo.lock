@@ -1109,6 +1109,7 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "image",
+ "libc",
  "octoscript-ui-l0",
  "octosense-app-policy",
  "rand_core 0.9.5",
@@ -1129,6 +1130,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "octosense-app-validator"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "blake3",
+ "makepad-widgets",
+ "octoscript-makepad",
+ "octoscript-widgets",
+ "octosense-app-hub",
+ "octosense-app-policy",
+ "serde_json",
+]
+
+[[package]]
 name = "octosense-appstore"
 version = "0.1.0"
 dependencies = [
@@ -1138,6 +1153,7 @@ dependencies = [
  "octoscript-widgets",
  "octosense-app-hub",
  "octosense-app-policy",
+ "octosense-app-validator",
  "serde_json",
 ]
 
@@ -1158,6 +1174,7 @@ dependencies = [
  "octoscript-makepad",
  "octoscript-widgets",
  "octosense-app-policy",
+ "octosense-app-validator",
  "serde_json",
 ]
 

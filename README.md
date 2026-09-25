@@ -52,7 +52,7 @@ Start with [Build your first Hub app](docs/FIRST-APP.md) and the
 [app starter](templates/app/README.md). Follow [Publishing](docs/PUBLISHING.md)
 for the complete contract and [Icons](docs/ICONS.md) for artwork. The
 [development guide map](docs/DEVELOPMENT.md) links the existing authoring and
-testing guides. Build the bundle, run `hub check`, sign the manifest, and open
+testing guides. Build the bundle, run `hub check` and `hub test`, sign the manifest, and open
 an entry here. The gate and the agent scan run on the
 exact bytes; a passing submission from a publisher on record merges without a
 person, a first submission waits for one. A version is withdrawn with
