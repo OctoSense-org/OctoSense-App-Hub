@@ -38,7 +38,7 @@ pub mod manifest;
 pub mod policy;
 pub mod verify;
 
-pub use assets::{rewrite_assets, AssetServer};
+pub use assets::{rewrite_assets, AssetServer, StaticAssets};
 pub use bundle::{digest_dir, MANIFEST_FILE};
 pub use containers::{IsolateSettings, Provenance, SessionProfile};
 pub use entry::{script_source, ASSETS_PLACEHOLDER, SCRIPT_ENTRY};

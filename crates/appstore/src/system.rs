@@ -19,13 +19,16 @@ use std::sync::Mutex;
 /// The id prefix only system apps may use.
 pub const SYSTEM_ID_PREFIX: &str = "os.";
 
-/// A system app as the shell registers it: its id and the bundle packed as
-/// one JSON file (`hub pack`'s format), usually `include_str!`'d.
+/// A system app as the shell registers it: its id, the bundle packed as one
+/// JSON file (`octosense_app_hub::pack::pack_system_app` in the shell's
+/// build script, then `include_str!`), and artwork too large to pack,
+/// compiled in and served from memory at bundle paths (`photos/01.png`).
 #[derive(Clone, Copy, Debug)]
 pub struct SystemApp {
     pub id: &'static str,
     pub name: &'static str,
     pub pack: &'static str,
+    pub assets: octosense_app_policy::StaticAssets,
 }
 
 static SYSTEM_APPS: Mutex<Vec<SystemApp>> = Mutex::new(Vec::new());
@@ -39,27 +42,12 @@ pub fn register_system_app(app: SystemApp) {
     apps.push(app);
 }
 
-mod packs {
-    include!(concat!(env!("OUT_DIR"), "/system_packs.rs"));
-}
-
-/// The system apps this build ships (`system-apps/` in this repository).
-pub fn builtin() -> Vec<SystemApp> {
-    packs::PACKS.iter().map(|&(id, name, pack)| SystemApp { id, name, pack }).collect()
-}
-
-/// A system app by id: one a shell registered, else one this build ships.
 pub fn system_app(id: &str) -> Option<SystemApp> {
-    SYSTEM_APPS.lock().unwrap().iter().find(|a| a.id == id).copied().or_else(|| builtin().into_iter().find(|a| a.id == id))
+    SYSTEM_APPS.lock().unwrap().iter().find(|a| a.id == id).copied()
 }
 
-/// Every system app: those this build ships, and any a shell registered
-/// over or beside them.
 pub fn system_apps() -> Vec<SystemApp> {
-    let registered = SYSTEM_APPS.lock().unwrap().clone();
-    let mut apps: Vec<SystemApp> = builtin().into_iter().filter(|b| !registered.iter().any(|r| r.id == b.id)).collect();
-    apps.extend(registered);
-    apps
+    SYSTEM_APPS.lock().unwrap().clone()
 }
 
 /// Unpack a system app's bundle (once per build of it) outside every jail,
@@ -116,7 +104,7 @@ mod tests {
         let pack: &'static str = Box::leak(pack_of("runs", &[("main.splash", "Label{text: \"hi\"}")]).into_boxed_str());
         let root = std::env::temp_dir().join(format!("appstore-system-root-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        let app = SystemApp { id: "os.demo", name: "Demo", pack };
+        let app = SystemApp { id: "os.demo", name: "Demo", pack, assets: &[] };
         let (dir, policy) = prepare(&root, &app).unwrap();
         assert!(dir.starts_with(root.join(".system")));
         assert!(!dir.starts_with(policy.jail_root(&root)), "the app cannot rewrite its own program");
@@ -128,24 +116,11 @@ mod tests {
     }
 
     #[test]
-    fn the_shipped_system_apps_admit_under_system_limits() {
-        let root = std::env::temp_dir().join(format!("appstore-system-builtin-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&root);
-        let apps = builtin();
-        assert!(apps.iter().any(|a| a.id == "os.news" && a.name == "News"), "{apps:?}");
-        for app in apps {
-            let (dir, policy) = prepare(&root, &app).unwrap_or_else(|e| panic!("{}: {e}", app.id));
-            assert!(dir.join(octosense_app_policy::SCRIPT_ENTRY).is_file(), "{} is a script app", app.id);
-            assert_eq!(policy.app_id, app.id);
-        }
-    }
-
-    #[test]
     fn a_pack_must_hold_the_app_it_was_registered_as() {
         let pack: &'static str = Box::leak(pack_of("mismatch", &[("main.splash", "x")]).into_boxed_str());
         let root = std::env::temp_dir().join(format!("appstore-system-root-mismatch-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        let err = prepare(&root, &SystemApp { id: "os.other", name: "Other", pack }).unwrap_err();
+        let err = prepare(&root, &SystemApp { id: "os.other", name: "Other", pack, assets: &[] }).unwrap_err();
         assert!(err.contains("holds os.demo"), "{err}");
     }
 }

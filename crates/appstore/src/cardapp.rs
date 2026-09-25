@@ -47,9 +47,9 @@ impl CardAppView {
         let root = crate::data_root(cx);
         // A system app shipped with the build; anything else must be an
         // installed app the last verified catalog still offers.
-        let (policy, bundle) = match crate::system::system_app(&self.app_id) {
+        let (policy, bundle, statics) = match crate::system::system_app(&self.app_id) {
             Some(app) => match crate::system::prepare(&root, &app) {
-                Ok((bundle, policy)) => (policy, bundle),
+                Ok((bundle, policy)) => (policy, bundle, app.assets),
                 Err(e) => return self.refuse(cx, &format!("Cannot open {}: {e}", app.name)),
             },
             None => {
@@ -63,7 +63,7 @@ impl CardAppView {
                     return self.refuse(cx, &format!("Cannot open {}: no verified catalog on this device ({e})", self.app_id));
                 }
                 match store.may_run(&self.app_id) {
-                    Ok(policy) => (policy, store.install_dir(&self.app_id)),
+                    Ok(policy) => (policy, store.install_dir(&self.app_id), &[] as octosense_app_policy::StaticAssets),
                     Err(e) => return self.refuse(cx, &format!("Cannot open: {e}")),
                 }
             }
@@ -72,7 +72,7 @@ impl CardAppView {
         if let Err(e) = std::fs::create_dir_all(&settings.jail_root) {
             return self.refuse(cx, &format!("Cannot make the app's storage: {e}"));
         }
-        let server = match octosense_app_policy::AssetServer::start(&bundle) {
+        let server = match octosense_app_policy::AssetServer::start_with_static(&bundle, statics) {
             Ok(server) => server,
             Err(e) => return self.refuse(cx, &format!("Cannot serve the app's artwork: {e}")),
         };

@@ -2,6 +2,7 @@
 //!
 //! ```sh
 //! card-host --bundle <dir> [--app-data <dir>] [--allow-unsigned] [--stamp] [--system]
+//!           [--static <prefix>=<dir>]...
 //! ```
 //!
 //! The bundle is a directory holding `manifest.json`, `page.card`,
@@ -11,6 +12,8 @@
 //! admits the bundle as a system app is admitted (by digest, under
 //! `HostLimits::system`), for developing one; an empty digest in its
 //! manifest is filled in memory, as the build fills it in the packed copy.
+//! `--static photos=<dir>` serves `<dir>`'s files at `photos/...` from memory,
+//! the way a shell serves a system app's compiled-in artwork.
 //!
 //! The order is the one ADR 0002 fixes: admit, resolve, apply, then evaluate.
 //! Nothing here may widen what the manifest asked for, and the two settings
@@ -56,6 +59,7 @@ struct Args {
     allow_unsigned: bool,
     stamp: bool,
     system: bool,
+    statics: Vec<(String, PathBuf)>,
 }
 
 fn args() -> Args {
@@ -69,7 +73,27 @@ fn args() -> Args {
         allow_unsigned: argv.iter().any(|a| a == "--allow-unsigned"),
         stamp: argv.iter().any(|a| a == "--stamp"),
         system: argv.iter().any(|a| a == "--system"),
+        statics: argv
+            .windows(2)
+            .filter(|w| w[0] == "--static")
+            .filter_map(|w| w[1].split_once('=').map(|(p, d)| (p.trim_matches('/').to_string(), PathBuf::from(d))))
+            .collect(),
     }
+}
+
+/// Read `--static` directories into memory for the life of the process.
+fn load_statics(mounts: &[(String, PathBuf)]) -> octosense_app_policy::StaticAssets {
+    let mut out: Vec<(&'static str, &'static [u8])> = Vec::new();
+    for (prefix, dir) in mounts {
+        let Ok(entries) = std::fs::read_dir(dir) else { continue };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Ok(bytes) = std::fs::read(&path) else { continue };
+            let name = format!("{prefix}/{}", entry.file_name().to_string_lossy());
+            out.push((Box::leak(name.into_boxed_str()), Box::leak(bytes.into_boxed_slice())));
+        }
+    }
+    Box::leak(out.into_boxed_slice())
 }
 
 /// Admit the bundle and resolve what it gets. Refusals are fatal: a card that
@@ -174,7 +198,7 @@ impl App {
         // The app's artwork is served from a loopback origin of our own,
         // serving only its bundle, and that origin — this port, no other — is
         // the one loopback entry the isolate may reach.
-        let server = match octosense_app_policy::AssetServer::start(&args.bundle) {
+        let server = match octosense_app_policy::AssetServer::start_with_static(&args.bundle, load_statics(&args.statics)) {
             Ok(server) => server,
             Err(e) => {
                 error!("card-host: cannot serve the app's artwork: {e}");
