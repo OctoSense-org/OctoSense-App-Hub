@@ -35,8 +35,9 @@ script_mod! {
                 window.inner_size: vec2(412, 892)
                 pass +: { clear_color: #fff }
                 body +: {
-                    padding: 0 margin: 0 spacing: 0
+                    padding: 0 margin: 0 spacing: 0 flow: Overlay
                     card := Splash { width: Fill height: Fill }
+                    sheet := Splash { visible: false width: Fill height: Fill }
                 }
             }
         }
@@ -51,6 +52,10 @@ pub struct App {
     mounted: bool,
     #[rust]
     assets: Option<octosense_app_policy::AssetServer>,
+    #[rust]
+    app_id: String,
+    #[rust]
+    host_dir: PathBuf,
 }
 
 struct Args {
@@ -191,6 +196,8 @@ impl App {
             policy.agent.as_ref().map(|a| a.profile.as_kernel_mode()).unwrap_or("none"),
         );
 
+        self.app_id = policy.app_id.clone();
+        self.host_dir = args.app_data.join(".host");
         let mut settings = policy.isolate_settings(&args.app_data);
         if let Err(e) = std::fs::create_dir_all(&settings.jail_root) {
             error!("card-host: cannot make the app's jail at {}: {e}", settings.jail_root.display());
@@ -251,8 +258,14 @@ impl AppMain for App {
         if !self.mounted {
             self.mounted = true;
             register_card_vocabulary();
+            #[cfg(feature = "mail-demo")]
+            octosense_mail_service::register_demo();
             self.mount(cx);
         }
         self.ui.handle_event(cx, event, &mut Scope::empty());
+        // Host services (a sheet the service raises, answers from its
+        // workers), exactly as the Card runner does.
+        let (card, sheet) = (self.ui.splash(cx, ids!(card)), self.ui.splash(cx, ids!(sheet)));
+        octosense_appstore::services::pump(cx, &self.app_id, &self.host_dir, &card, &sheet);
     }
 }

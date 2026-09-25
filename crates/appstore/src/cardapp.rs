@@ -23,10 +23,16 @@ script_mod! {
     use mod.prelude.widgets.*
 
     mod.widgets.CardAppView = set_type_default() do #(CardAppView::register_widget(vm)) {
-        width: Fill height: Fill flow: Down
+        width: Fill height: Fill flow: Overlay
         show_bg: true draw_bg.color: #fff
-        notice := Label { width: Fill text: "" draw_text.color: #b00 draw_text.text_style.font_size: 12 margin: 16 }
-        card := Splash { width: Fill height: Fill }
+        body := View { width: Fill height: Fill flow: Down
+            notice := Label { width: Fill text: "" draw_text.color: #b00 draw_text.text_style.font_size: 12 margin: 16 }
+            card := Splash { width: Fill height: Fill }
+        }
+        // A host service's sheet over the app (services.rs): its own isolate,
+        // under no app's policy, where the person types what the app must
+        // never see.
+        sheet := Splash { visible: false width: Fill height: Fill }
     }
 }
 
@@ -40,11 +46,15 @@ pub struct CardAppView {
     started: bool,
     #[rust]
     asset_server: Option<octosense_app_policy::AssetServer>,
+    #[rust]
+    host_dir: PathBuf,
 }
 
 impl CardAppView {
     fn start(&mut self, cx: &mut Cx) {
         let root = crate::data_root(cx);
+        // `.host` can never be an app id, so it is no app's jail.
+        self.host_dir = root.join(".host");
         // A system app shipped with the build; anything else must be an
         // installed app the last verified catalog still offers.
         let (policy, bundle, statics) = match crate::system::system_app(&self.app_id) {
@@ -104,7 +114,16 @@ impl Widget for CardAppView {
             self.started = true;
             self.start(cx);
         }
-        self.view.handle_event(cx, event, scope);
+        let (card, sheet) = (self.view.splash(cx, ids!(card)), self.view.splash(cx, ids!(sheet)));
+        // A sheet is modal: while it is up, the person's input is for it, and
+        // the app underneath must not take a tap meant for a password field.
+        let sheet_up = sheet.borrow().map(|s| s.view.visible).unwrap_or(false);
+        if sheet_up && event.requires_visibility() {
+            sheet.handle_event(cx, event, scope);
+        } else {
+            self.view.handle_event(cx, event, scope);
+        }
+        crate::services::pump(cx, &self.app_id, &self.host_dir, &card, &sheet);
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {

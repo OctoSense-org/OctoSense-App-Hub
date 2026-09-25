@@ -160,6 +160,7 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
         ("web", "Opens web pages, which cannot reach back into the app."),
         ("microphone", "Records sound with videos."),
         ("library", "Saves photos and videos to your photo library."),
+        ("mail", "Reads and sends mail from accounts you add; it never sees your password."),
     ] {
         if has(cap) {
             lines.push(text.to_string());

@@ -22,6 +22,7 @@ use octosense_app_policy::HostLimits;
 use std::path::PathBuf;
 
 pub mod cardapp;
+pub mod services;
 pub mod source;
 pub mod system;
 pub mod ui;

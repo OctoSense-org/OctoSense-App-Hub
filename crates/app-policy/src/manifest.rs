@@ -39,6 +39,10 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // Offer what it captures to the system photo library, where other apps
     // can see it; without this, captures stay in the app's own storage.
     "library",
+    // Read and send mail through the host's mail service, from accounts the
+    // person signs in to on the host's own sheet. The app never holds the
+    // password or the connection.
+    "mail",
 ];
 
 /// The permission profiles an app's agent session may ask for. Full access is

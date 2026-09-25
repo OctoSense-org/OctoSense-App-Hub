@@ -38,3 +38,10 @@ octoscript-node = { path = "../octoscript-makepad/crates/octoscript-node" }
 
 [patch."https://github.com/OctoSense-org/Octoscript.git"]
 octoscript-ui-l0 = { path = "../octoscript/crates/octoscript-ui-l0" }
+
+# A service crate that names this hub by its URL (the mail service) resolves
+# to these crates, so there is one service registry, not two.
+[patch."https://github.com/OctoSense-org/OctoSense-App-Hub"]
+octosense-appstore = { path = "crates/appstore" }
+octosense-app-hub = { path = "crates/app-hub" }
+octosense-app-policy = { path = "crates/app-policy" }
