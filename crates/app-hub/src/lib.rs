@@ -17,6 +17,7 @@ pub mod client;
 pub mod gate;
 pub mod index;
 pub mod pack;
+pub mod publishers;
 pub mod remote;
 pub mod scan;
 pub mod signing;

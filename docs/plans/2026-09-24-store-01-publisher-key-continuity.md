@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust, serde/JSON, the existing Hub policy/client, Makepad/Octoscript where applicable; additional service/storage adapters follow the [shared design](2026-09-24-app-store-design.md).
 
-**Status:** Planned; no feature implementation is claimed. **Priority:** P0. **Phase:** A — Correctness. **Relative size:** S (complexity, not a delivery-date estimate).
+**Status:** Implemented and verified locally on 2026-09-25; not deployed. **Priority:** P0. **Phase:** A — Correctness. **Relative size:** S (complexity, not a delivery-date estimate).
 
 **Prerequisites:** None; can start against the reviewed baseline.
 
@@ -100,9 +100,9 @@ Expected after implementation: all listed suites pass with zero failures. These 
 
 ## Acceptance criteria
 
-- [ ] The exact different-key/same-ID reproduction fails; a same-key update passes.
-- [ ] No submission field can overwrite the trusted verification key; public first releases are signed.
-- [ ] Existing signed v1 catalogs continue to verify without reserialization changes.
+- [x] The exact different-key/same-ID reproduction fails; a same-key update passes.
+- [x] No submission field can overwrite the trusted verification key; public first releases are signed.
+- [x] Existing signed v1 catalogs continue to verify without reserialization changes.
 
 ## Rollout, migration and recovery
 
@@ -115,3 +115,12 @@ Keep the previous release/artifacts available while validating the new behavior.
 Suggested commit subject after verified slices: `fix(hub): enforce trusted publisher key continuity`.
 
 Use @superpowers:verification-before-completion before reporting success. Link the final test/native evidence and record updated dependency revisions in the owning pull requests. This planning document does not itself authorize deployment, credential creation, payments or public publication.
+
+## Implementation evidence — 2026-09-25
+
+- Added a read-only catalog publisher registry; conflicting historical keys/owners fail closed. No rotation override.
+- Gate verifies updates and new apps from an existing publisher against the historical public key; entry creation binds publisher, signature, full manifest and content to the gate report.
+- `hub publish` requires signatures, and checking/publishing against an existing catalog requires `--anchor` authentication. Local unsigned checks remain supported.
+- Observed seven intended regression failures before implementation. All 12 publisher tests and the 42 preexisting Hub/policy tests then passed. Existing v1 catalog verifies unchanged.
+- Independent code review found no important issues. Corrected the tiny PNG fixture CRC found during review.
+- No new dependencies or wire format changes. First publisher enrollment and authorized rotation remain plans 11/19.

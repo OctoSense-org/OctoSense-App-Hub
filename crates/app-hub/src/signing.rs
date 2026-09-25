@@ -125,6 +125,9 @@ impl SignatureVerifier for PublisherKeys {
             .iter()
             .find(|(id, _)| id == key_id)
             .ok_or_else(|| format!("publisher key {key_id:?} is not registered with this hub"))?;
+        if self.keys.iter().any(|(id, candidate)| id == key_id && !candidate.eq_ignore_ascii_case(public)) {
+            return Err(format!("conflicting public keys for publisher key {key_id:?}"));
+        }
         verifying_key(public)?
             .verify(signed_bytes, &signature(signature_hex)?)
             .map_err(|_| format!("the signature from key {key_id:?} does not match the manifest"))

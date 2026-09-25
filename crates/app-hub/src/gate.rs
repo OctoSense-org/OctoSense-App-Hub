@@ -49,6 +49,8 @@ pub struct GateReport {
     pub findings: Vec<Finding>,
     /// What the app would actually get, when the gate passed.
     pub policy: Option<AppPolicy>,
+    // Bind entry creation to the complete manifest checked by this report.
+    admitted_manifest: Vec<u8>,
 }
 
 impl GateReport {
@@ -83,7 +85,8 @@ impl GateReport {
 ///
 /// `previous` is the catalog the hub already published, used for the identity
 /// rules: a version may not be republished, and once a publisher key is on
-/// record every later version must carry it.
+/// record every later version must carry it. The caller must authenticate
+/// this catalog before passing it as trusted history.
 pub fn check_bundle(
     bundle: &Path,
     limits: &HostLimits,
@@ -191,26 +194,15 @@ pub fn check_bundle(
                 ));
             }
         }
-        if let Some(previous_entry) = catalog.entries.iter().filter(|e| e.app_id() == manifest.id).next_back() {
-            let declared = manifest.integrity.signature.as_ref().map(|s| s.key_id.as_str());
-            match declared {
-                Some(key_id) if key_id == previous_entry.publisher => {}
-                Some(key_id) => findings.push(Finding::refuse(
-                    "continuity",
-                    format!(
-                        "{} was published by {:?}; this version is signed by {:?}. Re-keying is a reviewed change.",
-                        manifest.id, previous_entry.publisher, key_id
-                    ),
-                )),
-                None => findings.push(Finding::refuse(
-                    "continuity",
-                    format!("{} is already published by {:?}; an update must carry that key", manifest.id, previous_entry.publisher),
-                )),
-            }
+        let continuity = crate::publishers::CatalogPublishers::from_catalog(catalog)
+            .and_then(|registry| crate::publishers::verify_continuity(&manifest, &registry));
+        if let Err(e) = continuity {
+            findings.push(Finding::refuse("continuity", e));
         }
     }
 
-    Ok(GateReport { app_id: manifest.id, version: manifest.version, digest, findings, policy })
+    let admitted_manifest = serde_json::to_vec(&manifest).map_err(|e| e.to_string())?;
+    Ok(GateReport { app_id: manifest.id, version: manifest.version, digest, findings, policy, admitted_manifest })
 }
 
 /// Every file in the bundle except the manifest, relative to its root.
@@ -282,8 +274,22 @@ pub fn entry_for(
     commit: &str,
     admitted: &str,
 ) -> Result<Entry, String> {
+    if !report.passed() {
+        return Err("cannot create an entry from a refused gate report".into());
+    }
     let manifest_json = std::fs::read_to_string(bundle.join(octosense_app_policy::MANIFEST_FILE)).map_err(|e| e.to_string())?;
     let manifest = AppManifest::parse(&manifest_json)?;
+    if serde_json::to_vec(&manifest).map_err(|e| e.to_string())? != report.admitted_manifest
+        || manifest.id != report.app_id || manifest.version != report.version
+        || digest_dir(bundle)? != report.digest {
+        return Err("bundle or manifest changed after the gate; check it again".into());
+    }
+    let signature = manifest.integrity.signature.as_ref().ok_or("public releases require a signed manifest")?;
+    if publisher.is_empty() || publisher != signature.key_id {
+        return Err("publisher must match the manifest signature owner".into());
+    }
+    crate::PublisherKeys::new().with(publisher, publisher_key)
+        .verify(publisher, &signature.value, &manifest.signing_bytes()?)?;
     let listing = std::fs::read_to_string(bundle.join(LISTING_FILE)).ok().and_then(|t| Listing::parse(&t).ok());
     Ok(Entry {
         artifact: format!("artifacts/{}-{}.bundle", report.app_id, report.version),

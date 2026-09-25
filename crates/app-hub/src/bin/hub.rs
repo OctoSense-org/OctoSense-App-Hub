@@ -85,9 +85,12 @@ fn run() -> Result<(), String> {
             }
         }
         "publish" => {
+            if has("allow-unsigned") {
+                return Err("public releases require a signed manifest; --allow-unsigned is only for local checks".into());
+            }
             let bundle = PathBuf::from(positional.ok_or("usage: hub publish <bundle> --catalog <file> …")?);
             let catalog_path = PathBuf::from(flag("catalog").ok_or("--catalog <file>")?);
-            let report = gate_for(&bundle, &argv, has("allow-unsigned"), Some(catalog_path.to_string_lossy().into()))?;
+            let report = gate_for(&bundle, &argv, false, Some(catalog_path.to_string_lossy().into()))?;
             print!("{}", report.render());
             if !report.passed() {
                 return Err("refusing to publish a bundle the gate refused".into());
@@ -99,7 +102,7 @@ fn run() -> Result<(), String> {
             let commit = flag("commit").unwrap_or_default();
             let out = PathBuf::from(flag("out").unwrap_or_else(|| ".".into()));
 
-            let mut catalog = read_catalog(&catalog_path).unwrap_or_else(|_| Catalog::new(0, &today(), Vec::new()));
+            let mut catalog = if catalog_path.exists() { read_catalog(&catalog_path)? } else { Catalog::new(0, &today(), Vec::new()) };
             // The publisher's public key travels in the signed catalog, so a
             // device can check their signature without asking the hub again.
             let publisher_key = argv
@@ -248,7 +251,13 @@ fn gate_for(bundle: &Path, argv: &[String], allow_unsigned: bool, catalog: Optio
     }
     let limits = HostLimits { require_signature: !allow_unsigned, ..HostLimits::default() };
     let previous = match catalog {
-        Some(path) if Path::new(&path).exists() => Some(read_catalog(Path::new(&path))?),
+        Some(path) if Path::new(&path).exists() => {
+            let catalog = read_catalog(Path::new(&path))?;
+            let anchor = argv.windows(2).find(|w| w[0] == "--anchor")
+                .map(|w| w[1].as_str()).ok_or("--anchor <hex> is required to authenticate an existing catalog")?;
+            verify_catalog(&catalog, anchor)?;
+            Some(catalog)
+        }
         _ => None,
     };
     check_bundle(bundle, &limits, &keys, previous.as_ref())

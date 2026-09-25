@@ -32,3 +32,10 @@
 - Created isolated `feat/app-store-foundations` branch/worktree beside existing repositories to preserve relative Cargo patches.
 - Copied review and implementation plans into the worktree; existing shared checkouts preserved.
 - Starting plan 01 with regression tests for publisher identity and key continuity.
+
+## Plan 01 verified — 2026-09-25
+
+- Twelve publisher/CLI regressions pass, with seven intended failures observed before the fix. Existing 42 Hub/policy tests remain green.
+- Authenticated catalog history now anchors actual publisher keys; unsigned public releases, ambiguous legacy mappings, mismatched owners and reused reports after edits are refused.
+- Independent code review found no important issues; corrected a PNG fixture CRC.
+- Plan 02 regression suite reproduces all seven launch/manifest defects after correcting a test field name (`version`). No plan 02 production changes yet.

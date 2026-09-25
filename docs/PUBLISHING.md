@@ -54,6 +54,7 @@ test data directories and review packets outside the submitted bundle.
 | Version is new | Re-publishing a version already in the catalog. |
 | Listing present and complete | No `listing.json`; no icon or no screenshot; an unknown category, platform or age rating; a non-https privacy policy; or an icon or screenshot the listing names that is not in the bundle. |
 | Publisher continuity | An update signed by a different key than the one on record for this app. |
+| Public release signature | An unsigned first release or update; `--allow-unsigned` is a local development check only. Publisher and signature key IDs must agree. |
 
 ## The manifest
 
@@ -170,8 +171,10 @@ hub scan  my-app --packet review.json  # the agent-scan packet, to answer yourse
 
 `hub check` prints what the app will be granted. Read it back against the
 manifest: if the grants are wider than the app visibly needs, reduce the manifest.
-Use `--catalog <catalog.json>` when checking version and publisher continuity
-against an existing catalog. Keep `review.json` outside `my-app/`; it is a
+Use `--catalog <catalog.json> --anchor <trusted-anchor-public-hex>` when checking
+version and publisher continuity against an existing catalog. The anchor must
+come from your trusted Hub configuration: history is authenticated before it
+can establish publisher keys. Keep `review.json` outside `my-app/`; it is a
 review artifact, not app content.
 
 `hub scan` writes the questions a reviewer answers: does the app do what its
@@ -181,8 +184,9 @@ submitting; the hub's reviewer will ask the same ones.
 
 ## Signing
 
-Signing is optional for a first submission and required for updates once a
-key is on record. The example GitHub release workflow below is planned; use
+Signing is required for every public release, including the first. Unsigned
+bundles remain usable with `hub check --allow-unsigned` during local development;
+`hub publish` refuses that flag. The example GitHub release workflow below is planned; use
 manual signing until that action and submission route are available:
 
 ```sh
@@ -198,6 +202,14 @@ hub check my-app --publisher-key "$APP_PUBLISHER_ID=$APP_PUBLISHER_PUBLIC_KEY"
 Sign after `hub stamp`, since the signature covers the digest. Once a bundle
 is signed, `hub check` needs `--publisher-key <id>=<public key>` to verify it;
 a signed bundle checked without the key is refused, by design.
+
+For an existing publisher, the gate also verifies against the public key in
+the authenticated catalog. Passing a different `--publisher-key` under the same
+ID cannot replace that binding, even for another app. V1 uses the publisher ID
+as the signature key ID; `hub publish --publisher` must match it. Conflicting
+historical bindings or an unknown rotation require operator reconciliation;
+there is no key-override flag. Keep your signing key for updates. First-key
+enrollment remains an operator responsibility until publisher accounts launch.
 
 ## Submitting
 
