@@ -48,20 +48,18 @@ pub fn builtin() -> Vec<SystemApp> {
     packs::PACKS.iter().map(|&(id, name, pack)| SystemApp { id, name, pack }).collect()
 }
 
-/// Register every system app this build ships. Call once at startup, before
-/// a launcher lists apps.
-pub fn register_builtin() {
-    for app in builtin() {
-        register_system_app(app);
-    }
-}
-
+/// A system app by id: one a shell registered, else one this build ships.
 pub fn system_app(id: &str) -> Option<SystemApp> {
-    SYSTEM_APPS.lock().unwrap().iter().find(|a| a.id == id).copied()
+    SYSTEM_APPS.lock().unwrap().iter().find(|a| a.id == id).copied().or_else(|| builtin().into_iter().find(|a| a.id == id))
 }
 
+/// Every system app: those this build ships, and any a shell registered
+/// over or beside them.
 pub fn system_apps() -> Vec<SystemApp> {
-    SYSTEM_APPS.lock().unwrap().clone()
+    let registered = SYSTEM_APPS.lock().unwrap().clone();
+    let mut apps: Vec<SystemApp> = builtin().into_iter().filter(|b| !registered.iter().any(|r| r.id == b.id)).collect();
+    apps.extend(registered);
+    apps
 }
 
 /// Unpack a system app's bundle (once per build of it) outside every jail,

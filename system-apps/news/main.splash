@@ -92,6 +92,7 @@ fn refresh(){
     busy = false
     updated = time_now()
     sync_status()
+    ui.tile_list.render()
 }
 
 fn load_state(){
@@ -211,6 +212,7 @@ fn open_story(r){
     sync_reader_bar()
     ui.comments.set_visible(r.discussion != "" && r.discussion != r.link)
     ui.reader_pane.set_visible(true)
+    ui.main.set_visible(false)
     ui.reader.open(r.link)
 }
 
@@ -220,6 +222,7 @@ fn open_comments(){
 
 fn close_story(){
     ui.reader.close()
+    ui.main.set_visible(true)
     ui.reader_pane.set_visible(false)
     reading = nil
 }
@@ -235,6 +238,7 @@ fn boot(){
     load_state()
     ui.tabbar.render()
     ui.list.render()
+    ui.tile_list.render()
     refresh()
 }
 start_timeout(0.05, || boot())
@@ -274,69 +278,86 @@ let CardHead = StoryCard{text := StoryHead{}}
 let CardTextImage = StoryCard{text := StoryText{} thumb := Image{width: 76 height: 76 fit: ImageFit.CropToFill}}
 let CardHeadImage = StoryCard{text := StoryHead{} thumb := Image{width: 76 height: 76 fit: ImageFit.CropToFill}}
 
-View{width: Fill height: Fill flow: Overlay show_bg: true draw_bg.color: ground
-    main := View{width: Fill height: Fill flow: Down
-        View{width: Fill height: Fit flow: Right align: Align{y: 1.0} padding: Inset{left: 18 right: 12 top: 14 bottom: 6}
-            View{width: Fill height: Fit flow: Down spacing: 2
-                date := Label{text: "" draw_text.color: secondary draw_text.text_style: theme.font_bold{font_size: 12}}
-                Label{text: "News" draw_text.color: ink draw_text.text_style: theme.font_bold{font_size: 32}}
+HostedView{width: Fill height: Fill
+    full: View{width: Fill height: Fill flow: Overlay show_bg: true draw_bg.color: ground
+        main := View{width: Fill height: Fill flow: Down
+            View{width: Fill height: Fit flow: Right align: Align{y: 1.0} padding: Inset{left: 18 right: 12 top: 14 bottom: 6}
+                View{width: Fill height: Fit flow: Down spacing: 2
+                    date := Label{text: "" draw_text.color: secondary draw_text.text_style: theme.font_bold{font_size: 12}}
+                    Label{text: "News" draw_text.color: ink draw_text.text_style: theme.font_bold{font_size: 32}}
+                }
+                BarButton{text: "Refresh" on_click: || refresh()}
             }
-            BarButton{text: "Refresh" on_click: || refresh()}
-        }
-        View{width: Fill height: Fit padding: Inset{left: 16 right: 16 bottom: 8}
-            search := TextInput{width: Fill height: 36 empty_text: "Search stories"
-                on_change: |text| set_query(text)
-                draw_bg +: {color: #xe5e5ea color_hover: #xe5e5ea color_focus: #xe5e5ea color_empty: #xe5e5ea
-                    border_color: #x00000000 border_color_hover: #x00000000 border_color_focus: #x00000000 border_color_empty: #x00000000
-                    border_radius: 10.0}
-                draw_text +: {color: ink color_hover: ink color_focus: ink color_empty: secondary color_empty_hover: secondary}
-            }
-        }
-        tabbar := ScrollXView{width: Fill height: 44 flow: Right spacing: 4 padding: Inset{left: 12 right: 12 top: 4 bottom: 8}
-            on_render: || {
-                for t in tabs {
-                    if t.id == tab { TabButtonActive{text: t.label on_click: || pick(t.id)} }
-                    else { TabButton{text: t.label on_click: || pick(t.id)} }
+            View{width: Fill height: Fit padding: Inset{left: 16 right: 16 bottom: 8}
+                search := TextInput{width: Fill height: 36 empty_text: "Search stories"
+                    on_change: |text| set_query(text)
+                    draw_bg +: {color: #xe5e5ea color_hover: #xe5e5ea color_focus: #xe5e5ea color_empty: #xe5e5ea
+                        border_color: #x00000000 border_color_hover: #x00000000 border_color_focus: #x00000000 border_color_empty: #x00000000
+                        border_radius: 10.0}
+                    draw_text +: {color: ink color_hover: ink color_focus: ink color_empty: secondary color_empty_hover: secondary}
                 }
             }
-        }
-        status := Label{width: Fill padding: Inset{left: 18 right: 18 bottom: 6} text: "" draw_text.color: secondary draw_text.text_style.font_size: 11}
-        list := ScrollYView{width: Fill height: Fill flow: Down spacing: 10 padding: Inset{left: 12 right: 12 bottom: 24}
-            on_render: || {
-                let rows = visible_rows()
-                if rows.len() == 0 {
-                    View{width: Fill height: 200 align: Align{x: 0.5 y: 0.5}
-                        Label{text: empty_text() draw_text.color: secondary draw_text.text_style.font_size: 13}
+            tabbar := ScrollXView{width: Fill height: 44 flow: Right spacing: 4 padding: Inset{left: 12 right: 12 top: 4 bottom: 8}
+                on_render: || {
+                    for t in tabs {
+                        if t.id == tab { TabButtonActive{text: t.label on_click: || pick(t.id)} }
+                        else { TabButton{text: t.label on_click: || pick(t.id)} }
                     }
                 }
-                else for r in rows {
-                    GestureView{width: Fill height: Fit
-                        on_tap: |x, y| open_story(r)
-                        on_long_press: |x, y| toggle_save(r)
-                        if r.image != "" && r.summary != "" {
-                            CardTextImage{text.meta.text: meta(r) text.title.text: r.title text.summary.text: r.summary thumb.src: http_resource(r.image)}
-                        } else if r.image != "" {
-                            CardHeadImage{text.meta.text: meta(r) text.title.text: r.title thumb.src: http_resource(r.image)}
-                        } else if r.summary != "" {
-                            CardText{text.meta.text: meta(r) text.title.text: r.title text.summary.text: r.summary}
-                        } else {
-                            CardHead{text.meta.text: meta(r) text.title.text: r.title}
+            }
+            status := Label{width: Fill padding: Inset{left: 18 right: 18 bottom: 6} text: "" draw_text.color: secondary draw_text.text_style.font_size: 11}
+            list := ScrollYView{width: Fill height: Fill flow: Down spacing: 10 padding: Inset{left: 12 right: 12 bottom: 24}
+                on_render: || {
+                    let rows = visible_rows()
+                    if rows.len() == 0 {
+                        View{width: Fill height: 200 align: Align{x: 0.5 y: 0.5}
+                            Label{text: empty_text() draw_text.color: secondary draw_text.text_style.font_size: 13}
+                        }
+                    }
+                    else for r in rows {
+                        GestureView{width: Fill height: Fit
+                            on_tap: |x, y| open_story(r)
+                            on_long_press: |x, y| toggle_save(r)
+                            if r.image != "" && r.summary != "" {
+                                CardTextImage{text.meta.text: meta(r) text.title.text: r.title text.summary.text: r.summary thumb.src: http_resource(r.image)}
+                            } else if r.image != "" {
+                                CardHeadImage{text.meta.text: meta(r) text.title.text: r.title thumb.src: http_resource(r.image)}
+                            } else if r.summary != "" {
+                                CardText{text.meta.text: meta(r) text.title.text: r.title text.summary.text: r.summary}
+                            } else {
+                                CardHead{text.meta.text: meta(r) text.title.text: r.title}
+                            }
                         }
                     }
                 }
             }
         }
-    }
-    reader_pane := View{visible: false width: Fill height: Fill flow: Down new_batch: true show_bg: true draw_bg.color: #xffffff
-        View{width: Fill height: 52 flow: Right align: Align{y: 0.5} padding: Inset{left: 4 right: 8} spacing: 4
-            BarButton{text: "‹ News" on_click: || close_story()}
-            reader_title := Label{width: Fill text: "" max_lines: 1 align: Align{x: 0.5}
-                draw_text.color: ink draw_text.text_style: theme.font_bold{font_size: 14}}
-            comments := BarButton{text: "Comments" on_click: || open_comments()}
-            save := BarButton{text: "Save" on_click: || { if reading != nil { toggle_save(reading) } }}
+        reader_pane := View{visible: false width: Fill height: Fill flow: Down new_batch: true show_bg: true draw_bg.color: #xffffff
+            View{width: Fill height: 52 flow: Right align: Align{y: 0.5} padding: Inset{left: 4 right: 8} spacing: 4
+                BarButton{text: "‹ News" on_click: || close_story()}
+                reader_title := Label{width: Fill text: "" max_lines: 1 align: Align{x: 0.5}
+                    draw_text.color: ink draw_text.text_style: theme.font_bold{font_size: 14}}
+                comments := BarButton{text: "Comments" on_click: || open_comments()}
+                save := BarButton{text: "Save" on_click: || { if reading != nil { toggle_save(reading) } }}
+            }
+            reader_fail := Label{width: Fill padding: Inset{left: 18 right: 18} text: "" draw_text.color: secondary draw_text.text_style.font_size: 12}
+            reader := WebReader{width: Fill height: Fill on_error: || ui.reader_fail.set_text(ui.reader.error())}
         }
-        reader_fail := Label{width: Fill padding: Inset{left: 18 right: 18} text: "" draw_text.color: secondary draw_text.text_style.font_size: 12}
-        reader := WebReader{width: Fill height: Fill on_error: || ui.reader_fail.set_text(ui.reader.error())}
+    }
+    tile: View{width: Fill height: Fill flow: Down padding: Inset{left: 14 right: 14 top: 12 bottom: 12} spacing: 8
+        new_batch: true show_bg: true draw_bg.color: #xffffff
+        Label{text: "News" draw_text.color: accent draw_text.text_style: theme.font_bold{font_size: 13}}
+        tile_list := View{width: Fill height: Fill flow: Down spacing: 8 on_render: || {
+            let rows = today_rows()
+            if rows.len() == 0 { Label{text: "Headlines appear here." draw_text.color: secondary draw_text.text_style.font_size: 12} }
+            else for i r in rows {
+                if i < 3 {
+                    View{width: Fill height: Fit flow: Down spacing: 1
+                        Label{width: Fill text: r.source max_lines: 1 draw_text.color: secondary draw_text.text_style.font_size: 10}
+                        Label{width: Fill text: r.title max_lines: 2 draw_text.color: ink draw_text.text_style: theme.font_bold{font_size: 13}}
+                    }
+                }
+            }
+        }}
     }
 }
-
