@@ -205,12 +205,12 @@ pub fn detail_source(listing: &Listing, status: &str, asset_base: Option<&str>) 
         Availability::Withdrawn { reason } => label(&format!("This app was withdrawn: {reason}"), "#ff3b30", 12, true, "8"),
         _ => String::new(),
     };
-    let remove = match &listing.availability {
-        Availability::Installed { .. } => format!(
+    let remove = if listing.lifecycle.installed_version.is_some() { format!(
             r#"remove_button := Button {{ text: "Remove" draw_text.color: #ff3b30 draw_text.text_style.font_size: 12 draw_bg.color: {PILL} draw_bg.radius: 14 draw_bg.border_width: 0 padding: Inset{{left: 14., right: 14., top: 6., bottom: 6.}} }}"#
-        ),
-        _ => String::new(),
-    };
+        ) } else { String::new() };
+    let update = if listing.lifecycle.update_version.is_some() {
+        format!(r#"update_button := Button {{ text: "UPDATE" draw_text.color: {BLUE} draw_bg.color: {PILL} draw_bg.radius: 14 draw_bg.border_width: 0 padding: Inset{{left: 14., right: 14., top: 6., bottom: 6.}} }}"#)
+    } else { String::new() };
 
     format!(
         r#"width: Fill height: Fit flow: Down padding: Inset{{left: 16., right: 16., top: 0., bottom: 24.}}
@@ -228,6 +228,7 @@ pub fn detail_source(listing: &Listing, status: &str, asset_base: Option<&str>) 
                 View {{ width: Fill height: 8 }}
                 View {{ width: Fill height: Fit flow: Right spacing: 10 align: Align{{x: 0., y: 0.5}}
                     {pill}
+                    {update}
                     {remove}
                 }}
             }}

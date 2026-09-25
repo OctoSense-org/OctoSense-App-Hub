@@ -15,9 +15,13 @@ use makepad_app_module::{
     AppModule, ExecOutcome, InstanceHandles, InstanceParts, OpenArgKind, OpenSchema, ServiceExecutor, ValidatedOpen,
 };
 use makepad_widgets::*;
-use octosense_app_hub::Store;
+use makepad_widgets::makepad_platform::thread::{SignalToUI, ThreadOptions};
+use octosense_app_hub::{PreparedLaunch, Store};
 use octosense_app_policy::HostLimits;
 use std::path::PathBuf;
+use std::sync::mpsc::{self, Receiver};
+
+type CatalogGuard = Box<dyn Fn(u64) -> Result<(), String>>;
 
 script_mod! {
     use mod.prelude.widgets.*
@@ -40,28 +44,70 @@ pub struct CardAppView {
     started: bool,
     #[rust]
     asset_server: Option<octosense_app_policy::AssetServer>,
+    #[rust]
+    pending: Option<Receiver<Result<PreparedLaunch, String>>>,
+    #[rust]
+    running_release: Option<(String, String)>,
+    #[rust]
+    catalog_guard: Option<CatalogGuard>,
+    #[rust]
+    prepared: Option<PreparedLaunch>,
 }
 
 impl CardAppView {
+    pub fn running_release(&self) -> Option<(String, String)> {
+        self.running_release.clone()
+    }
+
+    /// A host may know about a newer verified catalog that could not yet be
+    /// saved. Let it reject stale disk state before any app code is loaded.
+    pub fn set_catalog_guard(&mut self, guard: Box<dyn Fn(u64) -> Result<(), String>>) {
+        self.catalog_guard = Some(guard);
+    }
+
     fn start(&mut self, cx: &mut Cx) {
         let root = crate::data_root(cx);
         let anchor = std::env::var("OCTOSENSE_HUB_ANCHOR").unwrap_or_else(|_| crate::DEFAULT_ANCHOR.to_string());
-        let mut store = Store::new(&anchor, &root, HostLimits::default());
-        // The catalog the store last verified. Without one, nothing runs:
-        // an app the device cannot show was offered is not run on trust.
-        let catalog = std::fs::read_to_string(root.join("catalog.json")).unwrap_or_default();
-        if let Err(e) = store.accept_catalog(&catalog) {
-            return self.refuse(cx, &format!("Cannot open {}: no verified catalog on this device ({e})", self.app_id));
+        let app_id = self.app_id.clone();
+        let (tx, rx) = mpsc::channel();
+        self.view.label(cx, ids!(notice)).set_text(cx, "Checking installed app…");
+        match cx.thread_spawner().spawn_worker(ThreadOptions::default(), move || {
+            let result = (|| {
+                let mut store = Store::new(&anchor, &root, HostLimits::default());
+                let catalog = std::fs::read_to_string(root.join("catalog.json")).map_err(|e| format!("no cached catalog: {e}"))?;
+                store.accept_catalog(&catalog)?;
+                store.prepare_launch(&app_id)
+            })();
+            let _ = tx.send(result);
+            SignalToUI::set_ui_signal();
+        }) {
+            Ok(handle) => { handle.detach(); self.pending = Some(rx); }
+            Err(e) => self.refuse(cx, &format!("Cannot verify the app: {e:?}")),
         }
-        let policy = match store.may_run(&self.app_id) {
-            Ok(policy) => policy,
-            Err(e) => return self.refuse(cx, &format!("Cannot open: {e}")),
-        };
+    }
+
+    fn finish_start(&mut self, cx: &mut Cx, prepared: PreparedLaunch) {
+        let root = crate::data_root(cx);
+        let policy = &prepared.policy;
+        let anchor = std::env::var("OCTOSENSE_HUB_ANCHOR").unwrap_or_else(|_| crate::DEFAULT_ANCHOR.to_string());
+        // The catalog may have refreshed while hashing ran. Recheck only
+        // authenticated metadata here; bundle hashing stays on the worker.
+        let current = (|| {
+            let mut store = Store::new(&anchor, &root, HostLimits::default());
+            store.accept_catalog(&std::fs::read_to_string(root.join("catalog.json")).map_err(|e| e.to_string())?)?;
+            if let Some(guard) = &self.catalog_guard { guard(store.catalog().unwrap().sequence)?; }
+            store.validate_prepared_launch(&prepared)
+        })();
+        if let Err(e) = current { return self.refuse(cx, &format!("Cannot open: {e}")); }
+        // Remember the actual running version, so a withdrawal for another
+        // version never closes this instance.
+        self.running_release = Some((policy.app_id.clone(), policy.version.clone()));
+        self.view.label(cx, ids!(notice)).set_text(cx, "");
         let mut settings = policy.isolate_settings(&root);
         if let Err(e) = std::fs::create_dir_all(&settings.jail_root) {
             return self.refuse(cx, &format!("Cannot make the app's storage: {e}"));
         }
-        let bundle = store.install_dir(&self.app_id);
+        let bundle = prepared.bundle();
         let server = match octosense_app_policy::AssetServer::start(&bundle) {
             Ok(server) => server,
             Err(e) => return self.refuse(cx, &format!("Cannot serve the app's artwork: {e}")),
@@ -77,11 +123,15 @@ impl CardAppView {
         );
         match crate::card_source(&bundle, &origin) {
             Ok(source) => splash.set_text(cx, &source),
-            Err(e) => self.refuse(cx, &format!("The app did not open: {e}")),
+            Err(e) => return self.refuse(cx, &format!("The app did not open: {e}")),
         }
+        self.prepared = Some(prepared);
     }
 
     fn refuse(&mut self, cx: &mut Cx, reason: &str) {
+        self.running_release = None;
+        self.asset_server = None;
+        self.prepared = None;
         error!("card: {reason}");
         self.view.label(cx, ids!(notice)).set_text(cx, reason);
         self.view.redraw(cx);
@@ -93,6 +143,13 @@ impl Widget for CardAppView {
         if !self.started {
             self.started = true;
             self.start(cx);
+        }
+        if let Some(result) = self.pending.as_ref().and_then(|rx| rx.try_recv().ok()) {
+            self.pending = None;
+            match result {
+                Ok(prepared) => self.finish_start(cx, prepared),
+                Err(e) => self.refuse(cx, &format!("Cannot open: {e}")),
+            }
         }
         self.view.handle_event(cx, event, scope);
     }

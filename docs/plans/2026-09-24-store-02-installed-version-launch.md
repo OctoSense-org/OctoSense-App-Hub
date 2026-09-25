@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust, serde/JSON, the existing Hub policy/client, Makepad/Octoscript where applicable; additional service/storage adapters follow the [shared design](2026-09-24-app-store-design.md).
 
-**Status:** Planned; no feature implementation is claimed. **Priority:** P0. **Phase:** A — Correctness. **Relative size:** M (complexity, not a delivery-date estimate).
+**Status:** Implemented; core and native widget verification recorded below (2026-09-25). Coordinated mobile revision update follows the Hub commit. No Android device coverage or deployment is claimed. **Priority:** P0. **Phase:** A — Correctness. **Relative size:** M (complexity, not a delivery-date estimate).
 
 **Prerequisites:** None; can start against the reviewed baseline.
 
@@ -32,7 +32,7 @@ Read the shared design first for repository aliases, wire-compatibility rules, i
 
 ## Contract
 
-The following is a proposed implementation contract, not an already-supported API:
+The shared Store now exposes this implementation contract:
 
 ```text
 pub struct AppAvailability {
@@ -98,13 +98,21 @@ cargo test --locked -p octosense-app-hub --test installed_release
 (cd ../OctoSense-mobile && cargo test --locked -p octosense-app-hub-app --lib)
 ```
 
-Expected after implementation: all listed suites pass with zero failures. These commands have **not** been run to claim completion of the proposed feature. Native/device checks described in the tasks are additional acceptance evidence; a host-only test is not platform coverage.
+Validation on 2026-09-25:
+
+- Hub/policy locked offline suites: 68 tests passed, including 13 installed-release regressions and the bounded canonical-digest case. Seven initial failures were reproduced before implementation; additional publisher-key and launch-snapshot failures were reproduced during review.
+- Mobile native App Hub suite: 41 tests passed against its exact runtime pins. Includes real Makepad detail widgets with independent Open/Update and existing staging, consent and data-preservation checks.
+- Shared store native widget test: Remove and Update actions cancel a delayed launch. Removing the cancellation reproduced the failure before restoring it.
+- Full mobile shell `cargo check --locked --offline -p octosense --bin octosense` passed using exact runtime checkouts; local Hub patches were used before the coordinated dependency-pin update. See progress.md for the final revision verification.
+- Independent review checked exact-version running-instance teardown and startup races. Native widget evaluation is host coverage; no Android device execution is claimed.
+
+Launch preparation copies at most 8 MiB of payload plus a 64 KiB manifest, 2,048 entries and 32 directory levels into an owned snapshot outside the app data jail. The copied bytes and publisher signature are verified on a worker, and current signed-catalog metadata is rechecked at startup. Normal instance shutdown removes the snapshot; process crashes can leave temporary `.running` directories for later cleanup. Running apps retain their own snapshot during an update.
 
 ## Acceptance criteria
 
-- [ ] Normal v2 publication does not disable approved v1 or silently grant v2 permissions.
-- [ ] Explicit withdrawal targets the correct release; running revoked instances are handled consistently.
-- [ ] Mobile install staging/data-preservation and consent tests remain green.
+- [x] Normal v2 publication does not disable approved v1 or silently grant v2 permissions.
+- [x] Explicit withdrawal targets the correct release; running revoked instances are handled consistently.
+- [x] Mobile install staging/data-preservation and consent tests remain green.
 
 ## Rollout, migration and recovery
 

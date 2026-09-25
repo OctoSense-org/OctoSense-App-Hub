@@ -253,9 +253,10 @@ the commands above and open the index entry by hand.)
   catalog nobody signed is never shown.
 - The app runs in its own isolate with exactly the manifest's grants; a
   request outside them fails with an error, and the person sees why.
-- A version can be withdrawn with a reason. Installed copies stop running on
-  the device's next catalog fetch. Publish a fixed version rather than
-  arguing with a withdrawal.
+- Publishing v2 leaves approved installed v1 usable with v1's permissions. The store shows Open and Update separately; update consent refers to v2.
+- A withdrawal targets an exact app/version. On the mobile shell's next verified catalog refresh, matching running instances close and further launches are refused. Unaffected versions keep working.
+- Offline launches use the last authenticated catalog. A stale catalog can still approve an installed release, while freshness rules block new installs. A device cannot learn a new withdrawal until it receives a verified catalog. Missing releases and modified installed content are refused.
+- Launch verification runs on a worker and retains an owned copy of the verified code/artwork, so an update cannot replace code underneath a starting app. App data stays in the app's existing jail.
 
 ## Do not
 

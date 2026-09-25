@@ -11,42 +11,70 @@
 //! refused rather than followed, because what it points at is not in the
 //! bundle and would not be signed.
 use std::path::{Path, PathBuf};
+use std::io::Read;
 
 /// The file inside a bundle that carries its manifest.
 pub const MANIFEST_FILE: &str = "manifest.json";
 
 /// Hex blake3 over the bundle's files, in the canonical order.
 pub fn digest_dir(root: &Path) -> Result<String, String> {
+    digest_dir_limited(root, u64::MAX, usize::MAX, usize::MAX)
+}
+
+/// Same canonical digest, with bounded traversal and streamed file reads.
+/// A file that changes length during hashing is refused instead of silently
+/// hashing bytes from a different filesystem state.
+pub fn digest_dir_limited(root: &Path, max_bytes: u64, max_entries: usize, max_depth: usize) -> Result<String, String> {
     let mut files = Vec::new();
-    collect(root, root, &mut files)?;
+    let mut remaining_entries = max_entries;
+    collect(root, root, &mut files, &mut remaining_entries, max_depth)?;
     files.sort();
     let mut hasher = blake3::Hasher::new();
+    let mut remaining = max_bytes;
     for relative in &files {
-        let bytes = std::fs::read(root.join(relative)).map_err(|e| format!("{}: {e}", relative.display()))?;
+        let file = std::fs::File::open(root.join(relative)).map_err(|e| format!("{}: {e}", relative.display()))?;
+        let length = file.metadata().map_err(|e| e.to_string())?.len();
+        if length > remaining { return Err("bundle exceeds the validation size limit".into()); }
+        remaining -= length;
         // Path, then length, then content: without the length a file ending
         // where the next path begins could be shuffled without changing the
         // digest.
         hasher.update(relative.to_string_lossy().as_bytes());
         hasher.update(&[0]);
-        hasher.update(&(bytes.len() as u64).to_le_bytes());
-        hasher.update(&bytes);
+        hasher.update(&length.to_le_bytes());
+        let mut reader = file.take(length.saturating_add(1));
+        let mut buffer = [0u8; 16 * 1024];
+        let mut consumed = 0u64;
+        loop {
+            let count = reader.read(&mut buffer).map_err(|e| e.to_string())?;
+            if count == 0 { break; }
+            consumed += count as u64;
+            hasher.update(&buffer[..count]);
+        }
+        if consumed != length { return Err(format!("{} changed while being hashed", relative.display())); }
     }
     Ok(hasher.finalize().to_hex().to_string())
 }
 
-fn collect(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> {
+fn collect(root: &Path, dir: &Path, out: &mut Vec<PathBuf>, remaining: &mut usize, depth: usize) -> Result<(), String> {
+    if std::fs::symlink_metadata(dir).map_err(|e| e.to_string())?.file_type().is_symlink() {
+        return Err("a bundle directory may not be a symlink".into());
+    }
     let entries = std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     for entry in entries {
         let entry = entry.map_err(|e| e.to_string())?;
+        *remaining = remaining.checked_sub(1).ok_or("bundle exceeds the validation file count limit")?;
         let path = entry.path();
         let kind = entry.file_type().map_err(|e| e.to_string())?;
         if kind.is_symlink() {
             return Err(format!("{}: a bundle may not hold a symlink", path.display()));
         }
         if kind.is_dir() {
-            collect(root, &path, out)?;
+            let next_depth = depth.checked_sub(1).ok_or("bundle exceeds the validation depth limit")?;
+            collect(root, &path, out, remaining, next_depth)?;
             continue;
         }
+        if !kind.is_file() { return Err("a bundle may only hold regular files and directories".into()); }
         let relative = path.strip_prefix(root).map_err(|e| e.to_string())?.to_path_buf();
         if relative == Path::new(MANIFEST_FILE) {
             continue;
@@ -68,6 +96,16 @@ mod tests {
         fs::write(dir.join("page.card"), b"card source").unwrap();
         fs::write(dir.join("kit/kit.json"), b"{}").unwrap();
         dir
+    }
+
+    #[test]
+    fn bounded_digest_preserves_wire_bytes_and_enforces_resource_limits() {
+        let dir = scratch("bounded");
+        let digest = digest_dir(&dir).unwrap();
+        assert_eq!(digest_dir_limited(&dir, 100, 5, 2).unwrap(), digest);
+        assert!(digest_dir_limited(&dir, 1, 5, 2).unwrap_err().contains("size limit"));
+        assert!(digest_dir_limited(&dir, 100, 1, 2).unwrap_err().contains("file count"));
+        assert!(digest_dir_limited(&dir, 100, 5, 0).unwrap_err().contains("depth limit"));
     }
 
     #[test]

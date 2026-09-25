@@ -17,9 +17,11 @@ use makepad_app_module::{
     AppModule, ExecOutcome, InstanceHandles, InstanceParts, OpenArgKind, OpenSchema, ServiceExecutor, ValidatedOpen,
 };
 use makepad_widgets::*;
-use octosense_app_hub::{Availability, Listing, Store};
+use makepad_widgets::makepad_platform::thread::{SignalToUI, ThreadOptions};
+use octosense_app_hub::{Availability, Listing, PreparedLaunch, Store};
 use octosense_app_policy::HostLimits;
 use std::path::PathBuf;
+use std::sync::mpsc::{self, Receiver};
 
 pub mod cardapp;
 pub mod source;
@@ -153,6 +155,12 @@ pub struct AppStoreView {
     query: String,
     #[rust]
     listings: Vec<Listing>,
+    #[rust]
+    all_listings: Vec<Listing>,
+    #[rust]
+    pending_listings: Option<Receiver<Vec<Listing>>>,
+    #[rust]
+    pending_open: Option<Receiver<Result<PreparedLaunch, String>>>,
     #[rust(Screen::List)]
     screen: Screen,
     #[rust]
@@ -166,6 +174,8 @@ pub struct AppStoreView {
     /// Serves the running app its own artwork, and dies with it.
     #[rust]
     asset_server: Option<octosense_app_policy::AssetServer>,
+    #[rust]
+    prepared: Option<PreparedLaunch>,
     #[rust]
     layout_logged: bool,
 }
@@ -226,12 +236,34 @@ impl AppStoreView {
             },
         }
         self.store = Some(store);
+        self.reload_listings(cx);
+    }
+
+    fn reload_listings(&mut self, cx: &mut Cx) {
+        if let Some(store) = self.store.clone() {
+            let (tx, rx) = mpsc::channel();
+            match cx.thread_spawner().spawn_worker(ThreadOptions::default(), move || {
+                let _ = tx.send(store.listings());
+                SignalToUI::set_ui_signal();
+            }) {
+                Ok(handle) => { handle.detach(); self.pending_listings = Some(rx); }
+                Err(e) => self.status = format!("Cannot check installed apps: {e:?}"),
+            }
+        }
         self.refresh(cx);
     }
 
     /// Re-read the listings for the current query and rebuild the screen.
     fn refresh(&mut self, cx: &mut Cx) {
-        self.listings = self.store.as_ref().map(|s| s.search(&self.query)).unwrap_or_default();
+        let needle = self.query.trim().to_ascii_lowercase();
+        self.listings = self.all_listings.iter().filter(|listing| {
+            needle.is_empty() || listing.name.to_ascii_lowercase().contains(&needle)
+                || listing.app_id.to_ascii_lowercase().contains(&needle)
+                || listing.publisher.to_ascii_lowercase().contains(&needle)
+                || listing.about.as_ref().is_some_and(|a| a.category.contains(&needle)
+                    || a.subtitle.to_ascii_lowercase().contains(&needle)
+                    || a.keywords.iter().any(|k| k.to_ascii_lowercase().contains(&needle)))
+        }).cloned().collect();
         self.view.label(cx, ids!(origin_label)).set_text(cx, &self.status);
         let screen = self.screen.clone();
         let asset_base = self.asset_base();
@@ -304,6 +336,7 @@ impl AppStoreView {
     /// client makes is reported rather than swallowed: a refusal is the most
     /// useful thing the store can say.
     fn install(&mut self, cx: &mut Cx, index: usize) {
+        self.pending_open = None;
         let Some(listing) = self.listings.get(index).cloned() else { return };
         let (Some(store), Some(origin)) = (self.store.as_ref(), self.origin.as_ref()) else { return };
         let Some(entry) = store.entry(&listing.app_id) else { return };
@@ -331,26 +364,41 @@ impl AppStoreView {
             }
             Err(e) => format!("Not installed: {e}"),
         };
-        self.refresh(cx);
+        self.reload_listings(cx);
     }
 
     /// Open an installed app: check it may still run, apply its policy to the
     /// isolate, then hand the card's source to that isolate.
     fn open(&mut self, cx: &mut Cx, app_id: &str) {
-        let Some(store) = self.store.as_ref() else { return };
-        let policy = match store.may_run(app_id) {
-            Ok(policy) => policy,
-            Err(e) => {
-                self.status = format!("Cannot open: {e}");
-                return self.refresh(cx);
-            }
-        };
+        let Some(store) = self.store.clone() else { return };
+        let app_id = app_id.to_string();
+        let (tx, rx) = mpsc::channel();
+        match cx.thread_spawner().spawn_worker(ThreadOptions::default(), move || {
+            let _ = tx.send(store.prepare_launch(&app_id));
+            SignalToUI::set_ui_signal();
+        }) {
+            Ok(handle) => { handle.detach(); self.pending_open = Some(rx); self.status = "Checking installed app…".into(); }
+            Err(e) => self.status = format!("Cannot verify app: {e:?}"),
+        }
+        self.refresh(cx);
+    }
+
+    fn finish_open(&mut self, cx: &mut Cx, prepared: PreparedLaunch) {
+        let policy = &prepared.policy;
+        let app_id = &policy.app_id;
+        let anchor = std::env::var("OCTOSENSE_HUB_ANCHOR").unwrap_or_else(|_| DEFAULT_ANCHOR.to_string());
+        let current = (|| {
+            let mut store = Store::new(&anchor, &self.app_data_root, HostLimits::default());
+            store.accept_catalog(&std::fs::read_to_string(self.app_data_root.join("catalog.json")).map_err(|e| e.to_string())?)?;
+            store.validate_prepared_launch(&prepared)
+        })();
+        if let Err(e) = current { self.status = format!("Cannot open: {e}"); return self.refresh(cx); }
         let mut settings = policy.isolate_settings(&self.app_data_root);
         if let Err(e) = std::fs::create_dir_all(&settings.jail_root) {
             self.status = format!("Cannot make the app's jail: {e}");
             return self.refresh(cx);
         }
-        let bundle = store.install_dir(app_id);
+        let bundle = prepared.bundle();
         // One asset origin per running app, serving only that app's bundle.
         // It is the ONE loopback entry the isolate may reach: exactly this
         // port, so a sibling app's origin or a stray dev server is refused.
@@ -383,6 +431,7 @@ impl AppStoreView {
             }
             Err(e) => self.status = format!("The app did not open: {e}"),
         }
+        self.prepared = Some(prepared);
         self.refresh(cx);
     }
 }
@@ -423,6 +472,26 @@ impl Widget for AppStoreView {
             self.started = true;
             self.start(cx);
         }
+        if let Some(listings) = self.pending_listings.as_ref().and_then(|rx| rx.try_recv().ok()) {
+            self.pending_listings = None;
+            self.all_listings = listings;
+            self.refresh(cx);
+        }
+        // A user action wins even if the worker's result is already queued.
+        // Otherwise finish_open could switch screens before Remove is handled.
+        if let Event::Actions(actions) = event {
+            if [ids!(back_button), ids!(update_button), ids!(remove_button), ids!(close_button)]
+                .iter().any(|id| self.view.button(cx, *id).clicked(actions)) {
+                self.pending_open = None;
+            }
+        }
+        if let Some(result) = self.pending_open.as_ref().and_then(|rx| rx.try_recv().ok()) {
+            self.pending_open = None;
+            match result {
+                Ok(prepared) => self.finish_open(cx, prepared),
+                Err(e) => { self.status = format!("Cannot open: {e}"); self.reload_listings(cx); }
+            }
+        }
         self.view.handle_event(cx, event, scope);
         let Event::Actions(actions) = event else { return };
 
@@ -445,6 +514,7 @@ impl Widget for AppStoreView {
             }
             Screen::Detail(index) => {
                 if self.view.button(cx, ids!(back_button)).clicked(actions) {
+                    self.pending_open = None;
                     self.screen = Screen::List;
                     self.status.clear();
                     self.refresh(cx);
@@ -466,13 +536,19 @@ impl Widget for AppStoreView {
                         }
                         _ => {}
                     }
+                } else if self.view.button(cx, ids!(update_button)).clicked(actions) {
+                    if self.listings.get(index).is_some_and(|l| l.lifecycle.update_version.is_some()) {
+                        self.install(cx, index);
+                        cx.widget_action(self.view.widget_uid(), AppStoreAction::CatalogChanged);
+                    }
                 } else if self.view.button(cx, ids!(remove_button)).clicked(actions) {
+                    self.pending_open = None;
                     if let (Some(store), Some(listing)) = (self.store.as_ref(), self.listings.get(index)) {
                         self.status = match store.remove(&listing.app_id) {
                             Ok(()) => format!("Removed {} and its data", listing.name),
                             Err(e) => format!("Not removed: {e}"),
                         };
-                        self.refresh(cx);
+                        self.reload_listings(cx);
                         cx.widget_action(self.view.widget_uid(), AppStoreAction::CatalogChanged);
                     }
                 }
@@ -481,6 +557,8 @@ impl Widget for AppStoreView {
                 if self.view.button(cx, ids!(close_button)).clicked(actions) {
                     // The app's asset origin goes when the app does.
                     self.asset_server = None;
+                    self.pending_open = None;
+                    self.prepared = None;
                     self.screen = Screen::List;
                     self.refresh(cx);
                 }
@@ -553,6 +631,65 @@ impl AppModule for AppStoreModule {
 }
 
 struct AppStoreExecutor;
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+    use octosense_app_hub::AppAvailability;
+
+    #[test]
+    fn remove_and_update_cancel_a_delayed_inline_launch() {
+        let mut cx = Cx::new(Box::new(|_, _| {}));
+        cx.init_cx_os();
+        cx.with_vm(makepad_widgets::script_mod);
+        let vm_id = cx.alloc_splash_vm_with_network(false);
+        let root = cx.with_script_vm_id_trusted(vm_id, |vm| {
+            octoscript_widgets::design::script_mod(vm);
+            octoscript_widgets::kit::script_mod(vm);
+            script_mod(vm);
+            let value = script_eval!(vm, { use mod.widgets.* AppStoreView {} });
+            let root = WidgetRef::script_from_value(vm, value);
+            assert!(vm.take_errors().is_empty());
+            root
+        });
+        let entered = makepad_widgets::widget_async::enter_isolate(&mut cx, vm_id);
+        let dir = std::env::temp_dir().join(format!("store-cancel-launch-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("example-app/bundle")).unwrap();
+        {
+            let mut view = root.borrow_mut::<AppStoreView>().unwrap();
+            view.started = true;
+            view.app_data_root = dir.clone();
+            view.store = Some(Store::new(DEFAULT_ANCHOR, &dir, HostLimits::default()));
+            view.all_listings = vec![Listing {
+                app_id: "example-app".into(), name: "Example".into(), version: "2.0.0".into(),
+                publisher: "Example".into(), permissions: vec![], privacy: vec![], about: None,
+                artifact: String::new(), availability: Availability::Installed { version: "1.0.0".into() },
+                lifecycle: AppAvailability {
+                    installed_version: Some("1.0.0".into()), can_open: true,
+                    update_version: Some("2.0.0".into()), unavailable_reason: None,
+                },
+            }];
+            view.screen = Screen::Detail(0);
+            view.refresh(&mut cx);
+            for action in [ids!(update_button), ids!(remove_button)] {
+                // A launch worker is running, but has not delivered its result.
+                let (sender, receiver) = mpsc::channel();
+                view.pending_open = Some(receiver);
+                let button = view.view.button(&mut cx, action);
+                assert!(!button.is_empty());
+                let actions = cx.capture_actions(|cx| cx.widget_action(button.widget_uid(), ButtonAction::Clicked(Default::default())));
+                view.handle_event(&mut cx, &Event::Actions(actions), &mut Scope::empty());
+                assert!(sender.send(Err("delayed result".into())).is_err(), "a completed worker must not reopen an app after {action:?}");
+                assert!(!matches!(view.screen, Screen::Running(_)));
+            }
+            assert!(!dir.join("example-app").exists());
+        }
+        makepad_widgets::widget_async::leave_isolate(&mut cx, entered);
+        drop(root);
+        cx.free_splash_vm(vm_id);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+}
 
 impl ServiceExecutor for AppStoreExecutor {
     fn manifest(&self) -> ServiceManifest {

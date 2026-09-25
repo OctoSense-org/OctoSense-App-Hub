@@ -16,13 +16,14 @@
 pub mod client;
 pub mod gate;
 pub mod index;
+mod launch;
 pub mod pack;
 pub mod publishers;
 pub mod remote;
 pub mod scan;
 pub mod signing;
 
-pub use client::{days_between, Availability, Listing, Store, CATALOG_FRESHNESS_DAYS};
+pub use client::{days_between, AppAvailability, Availability, Listing, PreparedLaunch, Store, CATALOG_FRESHNESS_DAYS};
 pub use pack::{pack_dir, unpack, Pack};
 pub use remote::{today, Remote};
 pub use scan::{packet, scan, Packet, Route, Verdict};
