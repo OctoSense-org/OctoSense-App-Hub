@@ -9,7 +9,8 @@
 //! digest to match the directory, which is what a build step does before
 //! signing; without it a bundle whose bytes changed is refused. `--system`
 //! admits the bundle as a system app is admitted (by digest, under
-//! `HostLimits::system`), for developing one.
+//! `HostLimits::system`), for developing one; an empty digest in its
+//! manifest is filled in memory, as the build fills it in the packed copy.
 //!
 //! The order is the one ADR 0002 fixes: admit, resolve, apply, then evaluate.
 //! Nothing here may widen what the manifest asked for, and the two settings
@@ -85,6 +86,16 @@ fn policy_for(args: &Args) -> Result<AppPolicy, String> {
         manifest_json = serde_json::to_string_pretty(&value).map_err(|e| e.to_string())?;
         std::fs::write(&manifest_path, format!("{manifest_json}\n")).map_err(|e| e.to_string())?;
         log!("card-host: stamped {} with digest {}", manifest_path.display(), digest);
+    }
+
+    // A system app's source manifest leaves its digest empty: the build
+    // stamps it into the packed copy. Developing one, stamp it in memory.
+    if args.system && !args.stamp {
+        let mut value: serde_json::Value = serde_json::from_str(&manifest_json).map_err(|e| e.to_string())?;
+        if value["integrity"]["bundle_blake3"].as_str().unwrap_or("").is_empty() {
+            value["integrity"]["bundle_blake3"] = serde_json::Value::String(digest.clone());
+            manifest_json = serde_json::to_string(&value).map_err(|e| e.to_string())?;
+        }
     }
 
     let limits = if args.system {
