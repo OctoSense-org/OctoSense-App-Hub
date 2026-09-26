@@ -22,7 +22,9 @@ use octosense_app_policy::HostLimits;
 use std::path::PathBuf;
 
 pub mod cardapp;
+pub mod services;
 pub mod source;
+pub mod system;
 pub mod ui;
 
 pub use makepad_widgets;
@@ -403,11 +405,21 @@ pub(crate) fn register_card_vocabulary() {
         }
         makepad_widgets::widget_async::register_splash_isolate_mod(design);
         makepad_widgets::widget_async::register_splash_isolate_mod(kit);
+        // `sys`: places, routes, weather and the other live-data helpers a
+        // script app reads, every fetch held to the app's host list, the
+        // device's location to its `location` grant. It also carries
+        // `agent.notify`, which an app under a policy may call only with the
+        // `agent` grant.
+        makepad_widgets::widget_async::register_splash_isolate_mod(makepad_widgets::splash::register_agent_module);
     });
 }
 
-/// Lower a card bundle to isolate source. Nothing outside the bundle is read.
+/// Lower a bundle to isolate source. Nothing outside the bundle is read. A
+/// script app's program runs as it is; a card is lowered to widgets.
 pub(crate) fn card_source(bundle: &std::path::Path, asset_origin: &str) -> Result<String, String> {
+    if let Some(script) = octosense_app_policy::script_source(bundle, asset_origin) {
+        return script;
+    }
     let card = std::fs::read_to_string(bundle.join("page.card")).map_err(|e| format!("page.card: {e}"))?;
     let data_text = std::fs::read_to_string(bundle.join("page.data.json")).unwrap_or_else(|_| "{}".into());
     let mut data: serde_json::Value = serde_json::from_str(&data_text).map_err(|e| format!("page.data.json: {e}"))?;

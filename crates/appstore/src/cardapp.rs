@@ -23,10 +23,16 @@ script_mod! {
     use mod.prelude.widgets.*
 
     mod.widgets.CardAppView = set_type_default() do #(CardAppView::register_widget(vm)) {
-        width: Fill height: Fill flow: Down
+        width: Fill height: Fill flow: Overlay
         show_bg: true draw_bg.color: #fff
-        notice := Label { width: Fill text: "" draw_text.color: #b00 draw_text.text_style.font_size: 12 margin: 16 }
-        card := Splash { width: Fill height: Fill }
+        body := View { width: Fill height: Fill flow: Down
+            notice := Label { width: Fill text: "" draw_text.color: #b00 draw_text.text_style.font_size: 12 margin: 16 }
+            card := Splash { width: Fill height: Fill }
+        }
+        // A host service's sheet over the app (services.rs): its own isolate,
+        // under no app's policy, where the person types what the app must
+        // never see.
+        sheet := Splash { visible: false width: Fill height: Fill }
     }
 }
 
@@ -40,29 +46,43 @@ pub struct CardAppView {
     started: bool,
     #[rust]
     asset_server: Option<octosense_app_policy::AssetServer>,
+    #[rust]
+    host_dir: PathBuf,
 }
 
 impl CardAppView {
     fn start(&mut self, cx: &mut Cx) {
         let root = crate::data_root(cx);
-        let anchor = std::env::var("OCTOSENSE_HUB_ANCHOR").unwrap_or_else(|_| crate::DEFAULT_ANCHOR.to_string());
-        let mut store = Store::new(&anchor, &root, HostLimits::default());
-        // The catalog the store last verified. Without one, nothing runs:
-        // an app the device cannot show was offered is not run on trust.
-        let catalog = std::fs::read_to_string(root.join("catalog.json")).unwrap_or_default();
-        if let Err(e) = store.accept_catalog(&catalog) {
-            return self.refuse(cx, &format!("Cannot open {}: no verified catalog on this device ({e})", self.app_id));
-        }
-        let policy = match store.may_run(&self.app_id) {
-            Ok(policy) => policy,
-            Err(e) => return self.refuse(cx, &format!("Cannot open: {e}")),
+        // `.host` can never be an app id, so it is no app's jail.
+        self.host_dir = root.join(".host");
+        // A system app shipped with the build; anything else must be an
+        // installed app the last verified catalog still offers.
+        let (policy, bundle, statics) = match crate::system::system_app(&self.app_id) {
+            Some(app) => match crate::system::prepare(&root, &app) {
+                Ok((bundle, policy)) => (policy, bundle, app.assets),
+                Err(e) => return self.refuse(cx, &format!("Cannot open {}: {e}", app.name)),
+            },
+            None => {
+                let anchor = std::env::var("OCTOSENSE_HUB_ANCHOR").unwrap_or_else(|_| crate::DEFAULT_ANCHOR.to_string());
+                let mut store = Store::new(&anchor, &root, HostLimits::default());
+                // The catalog the store last verified. Without one, nothing
+                // runs: an app the device cannot show was offered is not run
+                // on trust.
+                let catalog = std::fs::read_to_string(root.join("catalog.json")).unwrap_or_default();
+                if let Err(e) = store.accept_catalog(&catalog) {
+                    return self.refuse(cx, &format!("Cannot open {}: no verified catalog on this device ({e})", self.app_id));
+                }
+                match store.may_run(&self.app_id) {
+                    Ok(policy) => (policy, store.install_dir(&self.app_id), &[] as octosense_app_policy::StaticAssets),
+                    Err(e) => return self.refuse(cx, &format!("Cannot open: {e}")),
+                }
+            }
         };
         let mut settings = policy.isolate_settings(&root);
         if let Err(e) = std::fs::create_dir_all(&settings.jail_root) {
             return self.refuse(cx, &format!("Cannot make the app's storage: {e}"));
         }
-        let bundle = store.install_dir(&self.app_id);
-        let server = match octosense_app_policy::AssetServer::start(&bundle) {
+        let server = match octosense_app_policy::AssetServer::start_with_static(&bundle, statics) {
             Ok(server) => server,
             Err(e) => return self.refuse(cx, &format!("Cannot serve the app's artwork: {e}")),
         };
@@ -94,7 +114,16 @@ impl Widget for CardAppView {
             self.started = true;
             self.start(cx);
         }
-        self.view.handle_event(cx, event, scope);
+        let (card, sheet) = (self.view.splash(cx, ids!(card)), self.view.splash(cx, ids!(sheet)));
+        // A sheet is modal: while it is up, the person's input is for it, and
+        // the app underneath must not take a tap meant for a password field.
+        let sheet_up = sheet.borrow().map(|s| s.view.visible).unwrap_or(false);
+        if sheet_up && event.requires_visibility() {
+            sheet.handle_event(cx, event, scope);
+        } else {
+            self.view.handle_event(cx, event, scope);
+        }
+        crate::services::pump(cx, &self.app_id, &self.host_dir, &card, &sheet);
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
@@ -132,7 +161,21 @@ impl AppModule for CardModule {
         if let Some(mut view) = root.borrow_mut::<CardAppView>() {
             view.app_id = open.text("app").unwrap_or_default().to_string();
         }
-        InstanceParts { root, executor: Box::new(CardExecutor), shutdown: Box::new(|_vm| {}) }
+        let closing = root.clone();
+        InstanceParts {
+            root,
+            executor: Box::new(CardExecutor),
+            // The camera and any web views the app opened go when the app
+            // does, not whenever its isolate is next collected.
+            shutdown: Box::new(move |vm| {
+                let cx = vm.cx_mut();
+                let splash = closing.splash(cx, ids!(card));
+                let heap = splash.borrow_mut().and_then(|mut s| s.isolate_heap_key(cx));
+                if let Some(heap) = heap {
+                    makepad_widgets::camera_preview::release_isolate_devices(cx, heap);
+                }
+            }),
+        }
     }
 }
 
