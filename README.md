@@ -5,22 +5,29 @@ store reads, the hub's own copy of each admitted bundle, and the code that
 runs the hub and the store. No app code lives here; each app stays in its
 publisher's repository.
 
+| Looking for | Repository |
+| --- | --- |
+| How to build an app: quickstart, script API, script-app template, design flows, examples | [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) |
+| The AppCard assistant runtime and the L0 card language | [OctoSense-AppCard](https://github.com/OctoSense-org/OctoSense-AppCard) |
+| The first-party system apps (News, Photos, Maps, Camera, Mail) | [OctoSense-System-Apps](https://github.com/OctoSense-org/OctoSense-System-Apps) |
+| The bundle format, the gate, signing, submission and the store | this repository |
+
 | Path | What it is |
 | --- | --- |
 | `catalog.json` | The signed catalog. Stores verify it against the anchor below before showing anything. |
 | `index/<app>-<version>.json` | One admitted entry per app version: its manifest, publisher, source and status. |
 | `artifacts/<app>-<version>.bundle/` | The hub's copy of the bundle, exactly the bytes that were reviewed. |
 | `artifacts/<app>-<version>.bundle.pack.json` | The same bundle as one file, which stores download. |
-| `docs/FIRST-APP.md` | First-app walkthrough: author, package, run, capture, validate and submit. |
-| `docs/PUBLISHING.md` | Shared bundle, listing, permissions and publication contract. |
+| `docs/FIRST-APP.md` | First-app walkthrough for a card app or a script app: author, package, run, capture, validate and submit. |
+| `docs/PUBLISHING.md` | The bundle, listing, capabilities, host services, gate rules, signing and submission contract. |
 | `docs/ICONS.md` | Canonical icon ownership, export constraints and visual review. |
-| `docs/DEVELOPMENT.md` | Guide map for UI, data/state, runtime setup and testing. |
-| `templates/app/` | App repository scaffold with metadata, example icon and linked agent instructions. |
+| `docs/DEVELOPMENT.md` | Where authoring lives, delivery paths, and `card-host` with its remote-control routes. |
+| `templates/app/` | Card app repository scaffold with metadata, example icon and linked agent instructions. |
 | `crates/app-policy` | The signed manifest and listing, admission, and resolution into an isolate's settings and an agent session profile (ADR 0002). |
 | `crates/app-hub` | The index, the signed catalog, the gate, the agent scan, the device client and the `hub` command (ADR 0003). |
-| `crates/appstore` | The store as an OctoSense module, and the `card` module that runs an installed app as its own client. |
+| `crates/appstore` | The store as an OctoSense module, the `card` module that runs an installed app as its own client, system apps (`os.` ids) and host services with their sheets. |
 | `crates/appstore-app` | The store as a standalone app (`appstore`). |
-| `crates/card-host` | The reference contained host for one card bundle (`card-host`). |
+| `crates/card-host` | The reference contained host for one bundle, card or script app (`card-host`). |
 | `crates/app-host` | A one-window host that runs any OctoSense AppModule as a standalone app. |
 
 The crates build against the pinned OctoSense forks of Makepad and Octoscript,
@@ -48,15 +55,19 @@ appstore
 
 ## Publishing an app
 
-Start with [Build your first Hub app](docs/FIRST-APP.md) and the
-[app starter](templates/app/README.md). Follow [Publishing](docs/PUBLISHING.md)
-for the complete contract and [Icons](docs/ICONS.md) for artwork. The
-[development guide map](docs/DEVELOPMENT.md) links the existing authoring and
-testing guides. Build the bundle, run `hub check`, sign the manifest, and open
-an entry here. The gate and the agent scan run on the
-exact bytes; a passing submission from a publisher on record merges without a
-person, a first submission waits for one. A version is withdrawn with
-`hub withdraw`, and every store honours it on its next fetch.
+An app is a card app (`page.card`) or a script app (`main.splash`). Start
+with [Build your first Hub app](docs/FIRST-APP.md). Follow
+[Publishing](docs/PUBLISHING.md) for the complete contract and
+[Icons](docs/ICONS.md) for artwork; the
+[development guide map](docs/DEVELOPMENT.md) links the authoring and testing
+guides in the other repositories.
+
+Stamp the bundle, capture a screenshot, restamp, run `hub check` and
+`hub scan`, sign the manifest, then submit by opening an issue here
+([Submitting](docs/PUBLISHING.md#submitting)). There is no publish action or
+separate index repository yet: a maintainer runs `hub publish` on the exact
+bytes of your tagged commit and commits the signed catalog. A version is
+withdrawn with `hub withdraw`, and every store honours it on its next fetch.
 
 ## Apps
 

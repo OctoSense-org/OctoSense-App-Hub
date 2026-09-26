@@ -10,8 +10,10 @@ record its revision; do not invent missing requirements.
 
 - This repository owns the app; `bundle/` is the release artifact directory.
   Keep authoring instructions, source tooling, keys and test evidence outside it.
-- Use the Image-to-AppCard workflow for UI output and the L0 reference for
-  bindings. Do not hand-write L0 unless the app owner requests that approach.
+- Use the image-to-card flow in OctoScript-App-Design-Flow
+  (`flows/image-to-card/FLOW.md`) for UI output and the L0 reference in
+  OctoSense-AppCard (`a2app-l0/framework/l0.md`) for bindings. Do not
+  hand-write L0 unless the app owner requests that approach.
 - Maintain the app's own icon at the path declared by its complete listing.
   Avoid separate launcher/store artwork copies.
 - Ask for only the capabilities needed by implemented features. The starter
