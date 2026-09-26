@@ -29,6 +29,7 @@ publisher's repository.
 | `crates/appstore-app` | The store as a standalone app (`appstore`). |
 | `crates/card-host` | The reference contained host for one bundle, card or script app (`card-host`). |
 | `crates/app-host` | A one-window host that runs any OctoSense AppModule as a standalone app. |
+| `crates/app-hub-app` | The shell integration every OctoSense shell links: the native store module, the `card` runner module, the system apps named by `OCTOSENSE_SYSTEM_APPS`, installed apps and icons ([README](crates/app-hub-app/README.md)). |
 
 The crates build against the pinned OctoSense forks of Makepad and Octoscript,
 resolved from sibling checkouts (`../makepad`, `../octoscript-makepad`,
