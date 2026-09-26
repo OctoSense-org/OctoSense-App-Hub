@@ -9,7 +9,7 @@ and submission. Authoring lives in other repositories:
 | Repository | What it owns |
 | --- | --- |
 | [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) | The app-development harness: quickstart, script API, the script-app template, the `tools/octo` command, the design flows (`flows/`) and example apps (`examples/`). Formerly Octoscript-AppCard. |
-| [OctoSense-AppCard](https://github.com/OctoSense-org/OctoSense-AppCard) | The AppCard assistant runtime and the L0 card language (`a2app-l0/framework/l0.md`). |
+| [OctoSense-System-Apps `apps/appcard`](https://github.com/OctoSense-org/OctoSense-System-Apps/tree/main/apps/appcard) | The AppCard assistant runtime and the L0 card language (`a2app-l0/framework/l0.md`). |
 | [OctoSense-System-Apps](https://github.com/OctoSense-org/OctoSense-System-Apps) | The first-party system apps (News, Photos, Maps, Camera, Mail), each a script app bundle under `apps/<name>/bundle/`, and Mail's host service under `apps/mail/host-service/`. |
 
 | Task | Guide |
@@ -20,7 +20,7 @@ and submission. Authoring lives in other repositories:
 | Start a script app from a runnable template | [Quickstart](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md) and [`templates/script-app/`](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/templates/script-app) |
 | Write a script app: state, handlers, storage, requests, host services | [Script-app flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/script-app/FLOW.md) and [Script API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md) |
 | Turn UI designs into native cards | [Image-to-card flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md) |
-| Understand card data, state, events, copy, themes and views | [L0 language](https://github.com/OctoSense-org/OctoSense-AppCard/blob/main/a2app-l0/framework/l0.md) and the [L0 notes](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/docs/l0) |
+| Understand card data, state, events, copy, themes and views | [L0 language](https://github.com/OctoSense-org/OctoSense-System-Apps/blob/main/apps/appcard/a2app-l0/framework/l0.md) and the [L0 notes](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/docs/l0) |
 | Prepare shared Makepad/Octoscript dependencies | [Native workspace](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/NATIVE-WORKSPACE.md) |
 | Test real native input, capture frames and clean up test instances | [Native instrument](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md) |
 | Read worked examples | [Examples](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/examples) and the [system apps](https://github.com/OctoSense-org/OctoSense-System-Apps) |
@@ -52,7 +52,7 @@ still apply, but an icon declaration alone does not make the app
 Hub-installable.
 
 **Agent-generated app type:** specifications and lint rules teaching the agent
-to compose a new kind of app, in OctoSense-AppCard. Those specifications are
+to compose a new kind of app, in OctoSense-System-Apps (`apps/appcard`). Those specifications are
 not themselves a store bundle.
 
 Some workflow examples include native services or website integration. Check

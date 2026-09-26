@@ -64,7 +64,7 @@ handling first.
 Use the [image-to-card flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md)
 to create and review the native card output. App-specific service logic and
 data binding still require implementation; a screenshot or an atlas is not a
-running app. Use [L0](https://github.com/OctoSense-org/OctoSense-AppCard/blob/main/a2app-l0/framework/l0.md)
+running app. Use [L0](https://github.com/OctoSense-org/OctoSense-System-Apps/blob/main/apps/appcard/a2app-l0/framework/l0.md)
 for data/state/event semantics.
 
 ```text

@@ -1,5 +1,7 @@
 # Developing this Hub app
 
+> **Any coding agent, or none.** These instructions work the same for Codex, Claude Code, Cursor, Gemini CLI, GitHub Copilot or a person at a terminal: every step is a shell command or a file edit, and nothing here needs a particular agent, model or vendor. `AGENTS.md` is the one source of truth; `CLAUDE.md` and `GEMINI.md` only import it for agents that look for those names.
+
 Before changing this app, read the shared
 [first-app guide](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/FIRST-APP.md),
 [publishing contract](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/PUBLISHING.md),
@@ -12,7 +14,7 @@ record its revision; do not invent missing requirements.
   Keep authoring instructions, source tooling, keys and test evidence outside it.
 - Use the image-to-card flow in OctoScript-App-Design-Flow
   (`flows/image-to-card/FLOW.md`) for UI output and the L0 reference in
-  OctoSense-AppCard (`a2app-l0/framework/l0.md`) for bindings. Do not
+  OctoSense-System-Apps (`apps/appcard/a2app-l0/framework/l0.md`) for bindings. Do not
   hand-write L0 unless the app owner requests that approach.
 - Maintain the app's own icon at the path declared by its complete listing.
   Avoid separate launcher/store artwork copies.
