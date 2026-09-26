@@ -1,5 +1,7 @@
 # Hub app starter
 
+English | [简体中文](README.zh-CN.md)
+
 Copy this directory into a new app repository, following
 [Build your first Hub app](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/FIRST-APP.md).
 This is a **metadata scaffold**, not a runnable or publishable demo.

@@ -1,5 +1,7 @@
 # OctoSense app hub
 
+English | [简体中文](README.zh-CN.md)
+
 The index of apps published for OctoSense, the signed catalog every OctoSense
 store reads, the hub's own copy of each admitted bundle, and the code that
 runs the hub and the store. No app code lives here; each app stays in its
@@ -15,8 +17,8 @@ publisher's repository.
 | Path | What it is |
 | --- | --- |
 | `catalog.json` | The signed catalog. Stores verify it against the anchor below before showing anything. |
-| `index/<app>-<version>.json` | One admitted entry per app version: its manifest, publisher, source and status. |
-| `artifacts/<app>-<version>.bundle/` | The hub's copy of the bundle, exactly the bytes that were reviewed. |
+| `index/<app>-<version>.json` | One admitted entry per app version: its manifest, publisher, source and status. Created by `hub publish`; absent while no app is published. |
+| `artifacts/<app>-<version>.bundle/` | The hub's copy of the bundle, exactly the bytes that were reviewed. Created by `hub publish`. |
 | `artifacts/<app>-<version>.bundle.pack.json` | The same bundle as one file, which stores download. |
 | `docs/FIRST-APP.md` | First-app walkthrough for a card app or a script app: author, package, run, capture, validate and submit. |
 | `docs/PUBLISHING.md` | The bundle, listing, capabilities, host services, gate rules, signing and submission contract. |
@@ -48,6 +50,10 @@ signs the catalog. Rotating the working key needs no store release.
 
 ## Pointing a store here
 
+A store build reads this hub and trusts this anchor by default. The
+variables override them, for a mirror or a development hub; spelled out,
+the defaults are:
+
 ```sh
 OCTOSENSE_HUB=https://raw.githubusercontent.com/OctoSense-org/OctoSense-App-Hub/main/ \
 OCTOSENSE_HUB_ANCHOR=6000284a069ba7cada2925094074e8e0baae07e25d1b7fc31f396c993f363e11 \
@@ -68,7 +74,8 @@ Stamp the bundle, capture a screenshot, restamp, run `hub check` and
 ([Submitting](docs/PUBLISHING.md#submitting)). There is no publish action or
 separate index repository yet: a maintainer runs `hub publish` on the exact
 bytes of your tagged commit and commits the signed catalog. A version is
-withdrawn with `hub withdraw`, and every store honours it on its next fetch.
+withdrawn with `hub withdraw`, and every store honours it on its next fetch;
+`hub remove` drops an entry that should never have been published.
 
 ## Apps
 
