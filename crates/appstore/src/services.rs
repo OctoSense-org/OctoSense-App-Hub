@@ -14,6 +14,13 @@
 //! `from_sheet`, so a service accepts a password only from its own sheet and
 //! never from the app.
 //!
+//! **Secrets are the host's.** A contained app never collects a password,
+//! a PIN or a code: its password fields take no input (the runtime refuses
+//! them in a policed isolate), and a service method that takes one lives
+//! under `<family>.sheet.`, which [`dispatch`] accepts only from the sheet,
+//! before any service sees the call. An app cannot open a sheet either:
+//! only a service can, through [`ServiceHost`].
+//!
 //! Answers can come later, from a worker thread: [`Replier::send`] queues the
 //! result and wakes the UI, and the runner delivers it to the isolate that
 //! asked on its next event.
@@ -97,6 +104,12 @@ pub fn has_service(family: &str) -> bool {
 pub fn dispatch(call: ServiceCall, heap_key: usize, req_id: u64, host: &mut dyn ServiceHost) {
     let reply = Replier { heap_key, req_id };
     let family = call.service.split('.').next().unwrap_or("").to_string();
+    // What the person types on a sheet reaches only the sheet's methods,
+    // whatever the service does: an app calling one is refused here.
+    if call.method().starts_with("sheet.") && !call.from_sheet {
+        reply.send(Err(format!("{} is for the host's sheet, not an app", call.service)));
+        return;
+    }
     let mut services = SERVICES.lock().unwrap();
     match services.iter_mut().find(|s| s.family() == family) {
         Some(service) => service.call(call, reply, host),
@@ -268,5 +281,18 @@ mod tests {
         assert!(mine[0].2.as_ref().unwrap().contains("\"method\":\"sheet\""));
         let other = take_replies_for(&[7002]);
         assert!(other[0].2.as_ref().unwrap_err().contains("no service"), "an unanswered family fails, not hangs");
+    }
+
+    #[test]
+    fn only_the_sheet_reaches_a_sheet_method() {
+        register_host_service(Box::new(Echo));
+        let mut host = Host::default();
+        dispatch(call("echo.sheet.submit"), 7011, 1, &mut host);
+        let refused = take_replies_for(&[7011]);
+        assert!(refused[0].2.as_ref().unwrap_err().contains("for the host's sheet"), "an app is refused before the service sees it");
+        let mut from_sheet = call("echo.sheet.submit");
+        from_sheet.from_sheet = true;
+        dispatch(from_sheet, 7012, 1, &mut host);
+        assert!(take_replies_for(&[7012])[0].2.as_ref().unwrap().contains("\"sheet\":true"));
     }
 }

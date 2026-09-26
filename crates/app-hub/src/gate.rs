@@ -145,6 +145,18 @@ pub fn check_bundle(
         ));
     }
 
+    // ---- secrets are the host's ----------------------------------------
+    // A contained app never collects a password, a PIN or a code: the host's
+    // sheet does, for the service that needs it (appstore::services). The
+    // runtime makes such a field inert; the gate refuses the bundle, so a
+    // publisher learns it before a person meets a dead field.
+    for field in secret_fields(bundle)? {
+        findings.push(Finding::refuse(
+            "secrets",
+            format!("{field}: apps may not ask for passwords or codes; a host service collects them on its own sheet"),
+        ));
+    }
+
     // ---- the listing ----------------------------------------------------
     // A store shows nothing it has not reviewed: the listing ships in the
     // bundle, under the same digest, and its assets must be there too.
@@ -271,6 +283,25 @@ fn external_references(root: &Path) -> Result<Vec<String>, String> {
     Ok(found)
 }
 
+/// Password and one-time-code fields declared in the bundle's scripts.
+fn secret_fields(root: &Path) -> Result<Vec<String>, String> {
+    let mut found = Vec::new();
+    for file in list_files(root)? {
+        let extension = file.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+        if !matches!(extension.as_str(), "card" | "l0" | "octoscript" | "splash") {
+            continue;
+        }
+        let Ok(text) = std::fs::read_to_string(root.join(&file)) else { continue };
+        let compact: String = text.chars().filter(|c| !c.is_whitespace()).collect();
+        for needle in ["is_password:true", "TextInputContentType.Password", "TextInputContentType.NewPassword", "TextInputContentType.OneTimeCode"] {
+            if compact.contains(needle) {
+                found.push(format!("{} declares {needle}", file.display()));
+            }
+        }
+    }
+    Ok(found)
+}
+
 /// Build the index entry for a bundle the gate passed.
 #[allow(clippy::too_many_arguments)]
 pub fn entry_for(
@@ -295,4 +326,26 @@ pub fn entry_for(
         status: crate::index::Status::Offered,
         admitted: admitted.to_string(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_bundle_that_asks_for_a_password_is_refused() {
+        let dir = std::env::temp_dir().join(format!("gate-secrets-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("cards")).unwrap();
+        std::fs::write(dir.join("main.card"), "View{ name := TextInput{empty_text: \"Name\"} }").unwrap();
+        std::fs::write(dir.join("cards/login.card"), "View{ pw := TextInput{ is_password : true } }").unwrap();
+        std::fs::write(dir.join("cards/otp.card"), "TextInput{content_type: TextInputContentType.OneTimeCode}").unwrap();
+        std::fs::write(dir.join("notes.md"), "Set is_password: true in your own app, not here.").unwrap();
+        let mut found = secret_fields(&dir).unwrap();
+        found.sort();
+        assert_eq!(found.len(), 2, "{found:?}");
+        assert!(found[0].contains("login.card") && found[0].contains("is_password"));
+        assert!(found[1].contains("otp.card") && found[1].contains("OneTimeCode"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
