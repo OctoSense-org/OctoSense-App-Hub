@@ -7,7 +7,7 @@
 | 想找 | 仓库 |
 | --- | --- |
 | 如何开发应用：快速上手、脚本 API、脚本应用模板、设计流程、示例 | [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) |
-| AppCard 助手运行时与 L0 卡片语言 | [OctoSense-AppCard](https://github.com/OctoSense-org/OctoSense-AppCard) |
+| AppCard 助手运行时与 L0 卡片语言 | [OctoSense-System-Apps `apps/appcard`](https://github.com/OctoSense-org/OctoSense-System-Apps/tree/main/apps/appcard) |
 | 第一方系统应用（新闻、相册、地图、相机、邮件） | [OctoSense-System-Apps](https://github.com/OctoSense-org/OctoSense-System-Apps) |
 | 应用包格式、准入检查、签名、提交与商店 | 本仓库 |
 

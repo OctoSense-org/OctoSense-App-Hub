@@ -43,7 +43,7 @@ my-app/
 Produce the card, data and kit with the
 [image-to-card flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md)
 in OctoScript-App-Design-Flow. Do not hand-write L0 unless asked; the language
-is specified in [L0](https://github.com/OctoSense-org/OctoSense-AppCard/blob/main/a2app-l0/framework/l0.md).
+is specified in [L0](https://github.com/OctoSense-org/OctoSense-System-Apps/blob/main/apps/appcard/a2app-l0/framework/l0.md).
 
 A **script app** is a Splash program with its own state, handlers, storage and
 requests, evaluated as it is.

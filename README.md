@@ -10,7 +10,7 @@ publisher's repository.
 | Looking for | Repository |
 | --- | --- |
 | How to build an app: quickstart, script API, script-app template, design flows, examples | [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) |
-| The AppCard assistant runtime and the L0 card language | [OctoSense-AppCard](https://github.com/OctoSense-org/OctoSense-AppCard) |
+| The AppCard assistant runtime and the L0 card language | [OctoSense-System-Apps `apps/appcard`](https://github.com/OctoSense-org/OctoSense-System-Apps/tree/main/apps/appcard) |
 | The first-party system apps (News, Photos, Maps, Camera, Mail) | [OctoSense-System-Apps](https://github.com/OctoSense-org/OctoSense-System-Apps) |
 | The bundle format, the gate, signing, submission and the store | this repository |
 

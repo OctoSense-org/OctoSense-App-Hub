@@ -7,7 +7,7 @@
 | 仓库 | 负责内容 |
 | --- | --- |
 | [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) | 应用开发工具集：快速上手、脚本 API、脚本应用模板、`tools/octo` 命令、设计流程（`flows/`）和示例应用（`examples/`）。原名 Octoscript-AppCard。 |
-| [OctoSense-AppCard](https://github.com/OctoSense-org/OctoSense-AppCard) | AppCard 助手运行时与 L0 卡片语言（`a2app-l0/framework/l0.md`）。 |
+| [OctoSense-System-Apps `apps/appcard`](https://github.com/OctoSense-org/OctoSense-System-Apps/tree/main/apps/appcard) | AppCard 助手运行时与 L0 卡片语言（`a2app-l0/framework/l0.md`）。 |
 | [OctoSense-System-Apps](https://github.com/OctoSense-org/OctoSense-System-Apps) | 第一方系统应用（新闻、相册、地图、相机、邮件），每个都是位于 `apps/<name>/bundle/` 下的脚本应用包；邮件的宿主服务位于 `apps/mail/host-service/`。 |
 
 | 任务 | 指南 |
@@ -18,7 +18,7 @@
 | 从可运行模板开始一个脚本应用 | [快速上手](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md)和 [`templates/script-app/`](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/templates/script-app) |
 | 编写脚本应用：状态、处理函数、存储、请求、宿主服务 | [脚本应用流程](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/script-app/FLOW.md)和[脚本 API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md) |
 | 把 UI 设计转成原生卡片 | [图像到卡片流程](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md) |
-| 理解卡片的数据、状态、事件、文案、主题和视图 | [L0 语言](https://github.com/OctoSense-org/OctoSense-AppCard/blob/main/a2app-l0/framework/l0.md)和 [L0 笔记](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/docs/l0) |
+| 理解卡片的数据、状态、事件、文案、主题和视图 | [L0 语言](https://github.com/OctoSense-org/OctoSense-System-Apps/blob/main/apps/appcard/a2app-l0/framework/l0.md)和 [L0 笔记](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/docs/l0) |
 | 准备共享的 Makepad/Octoscript 依赖 | [原生工作区](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/NATIVE-WORKSPACE.md) |
 | 测试真实的原生输入、截取画面并清理测试实例 | [原生测试工具](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md) |
 | 阅读完整示例 | [示例](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/examples)和[系统应用](https://github.com/OctoSense-org/OctoSense-System-Apps) |
@@ -35,7 +35,7 @@
 
 **内置原生应用：** 源码集成进 Shell 版本。请使用原生工作区和所属应用的构建说明。共享的图标约定仍然适用，但仅声明图标并不会让应用可以通过 Hub 安装。
 
-**Agent 生成的应用类型：** 位于 OctoSense-AppCard 中的规格说明和 lint 规则，教 Agent 组合出一种新的应用。这些规格说明本身不是商店应用包。
+**Agent 生成的应用类型：** 位于 OctoSense-System-Apps（`apps/appcard`）中的规格说明和 lint 规则，教 Agent 组合出一种新的应用。这些规格说明本身不是商店应用包。
 
 有些工作流示例包含原生服务或网站集成。请确认所提议的 Hub 应用的每一项行为都能在隔离宿主中运行；不要以为复制某个服务项目的源码目录就能让它变得可安装。
 
