@@ -1203,6 +1203,7 @@ dependencies = [
  "octoscript-makepad",
  "octoscript-widgets",
  "octosense-app-policy",
+ "octosense-appstore",
  "serde_json",
 ]
 

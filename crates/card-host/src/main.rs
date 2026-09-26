@@ -258,8 +258,6 @@ impl AppMain for App {
         if !self.mounted {
             self.mounted = true;
             register_card_vocabulary();
-            #[cfg(feature = "mail-demo")]
-            octosense_mail_service::register_demo();
             self.mount(cx);
         }
         self.ui.handle_event(cx, event, &mut Scope::empty());
