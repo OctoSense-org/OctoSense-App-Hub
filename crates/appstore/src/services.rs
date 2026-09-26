@@ -130,14 +130,15 @@ impl ServiceHost for SheetOps {
     }
 }
 
-/// A sheet change asked for from a worker thread, which has no ServiceHost
-/// at hand: applied on the next pump.
-static PENDING_SHEET: Mutex<Option<Option<String>>> = Mutex::new(None);
+/// Sheet closes asked for from a worker thread, which has no ServiceHost at
+/// hand, by app: applied by the next pump for that app. Every running app
+/// pumps (a home screen shows several), so one app must not take another's.
+static PENDING_CLOSE: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
-/// Close the sheet over the app that is up, from a service's worker (a
-/// sign-in that finished).
-pub fn close_sheet_later() {
-    *PENDING_SHEET.lock().unwrap() = Some(None);
+/// Close the sheet over `app_id`, from a service's worker (a sign-in that
+/// finished).
+pub fn close_sheet_later(app_id: &str) {
+    PENDING_CLOSE.lock().unwrap().push(app_id.to_string());
     SignalToUI::set_ui_signal();
 }
 
@@ -151,23 +152,23 @@ fn heap_of(cx: &mut Cx, splash: &SplashRef, only_visible: bool) -> Option<usize>
 
 fn apply_sheet(cx: &mut Cx, sheet: &SplashRef, change: Option<String>) {
     static OPENED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let up = change.is_some();
     match change {
         Some(body) => {
-            if let Some(mut s) = sheet.borrow_mut() {
-                s.view.visible = true;
-            }
             // Every sheet starts empty: the same body again would keep the
             // last one's fields, a password typed into a cancelled sign-in
             // among them. The counter makes each opening a new program.
             let n = OPENED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             sheet.set_text(cx, &format!("let sheet_opening = {n}\n{body}"));
         }
-        None => {
-            if let Some(mut s) = sheet.borrow_mut() {
-                s.view.visible = false;
-            }
-            sheet.set_text(cx, "");
-        }
+        None => sheet.set_text(cx, ""),
+    }
+    // After the text: a new program, or tearing the old one down, replaces
+    // the sheet's view, and the replacement is visible. A sheet left
+    // visible and empty would stay modal and take every touch meant for
+    // the app.
+    if let Some(mut s) = sheet.borrow_mut() {
+        s.view.visible = up;
     }
     cx.redraw_all();
 }
@@ -176,6 +177,13 @@ fn apply_sheet(cx: &mut Cx, sheet: &SplashRef, change: Option<String>) {
 /// requests to the services, apply the sheets they raise, and deliver the
 /// answers that are ready. Call it on every event the host sees.
 pub fn pump(cx: &mut Cx, app_id: &str, host_dir: &std::path::Path, card: &SplashRef, sheet: &SplashRef) {
+    // An answer runs the app's script, which may re-render a list, and a
+    // redraw asked for during a draw is dropped: the new rows would take
+    // taps without ever being drawn. Everything queued here signalled the
+    // UI when it was queued, so it waits for that event instead.
+    if cx.in_draw_event() {
+        return;
+    }
     let app = heap_of(cx, card, false);
     let sheet_heap = heap_of(cx, sheet, true);
     let heaps: Vec<usize> = app.into_iter().chain(sheet_heap).collect();
@@ -203,9 +211,14 @@ pub fn pump(cx: &mut Cx, app_id: &str, host_dir: &std::path::Path, card: &Splash
         };
         makepad_widgets::splash_host::splash_host_respond(cx, heap, req_id, answer);
     }
-    let pending = PENDING_SHEET.lock().unwrap().take();
-    if let Some(change) = pending {
-        apply_sheet(cx, sheet, change);
+    let closing = {
+        let mut pending = PENDING_CLOSE.lock().unwrap();
+        let before = pending.len();
+        pending.retain(|app| app != app_id);
+        pending.len() != before
+    };
+    if closing {
+        apply_sheet(cx, sheet, None);
     }
 }
 
