@@ -1,5 +1,7 @@
 # App developer guide map
 
+English | [简体中文](DEVELOPMENT.zh-CN.md)
+
 For a downloadable Hub app, begin with [Build your first Hub app](FIRST-APP.md).
 The Hub owns publication requirements: the bundle format, the gate, signing
 and submission. Authoring lives in other repositories:
