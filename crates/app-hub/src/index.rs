@@ -90,6 +90,7 @@ impl Entry {
                 "microphone" => "Use the microphone".to_string(),
                 "library" => "Save to your photo library, where other apps can see it".to_string(),
                 "mail" => "Read and send mail from accounts you sign in to on the device".to_string(),
+                "llm" => "Manage the assistant's AI providers, whose keys stay with the device".to_string(),
                 other => format!("Use {other}"),
             });
         }
