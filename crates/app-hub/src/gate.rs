@@ -115,6 +115,16 @@ pub fn check_bundle(
         None => findings.push(Finding::warn("publisher-signature", "unsigned: accountability rests on the hub alone")),
     }
 
+    // ---- identity ------------------------------------------------------
+    // Ids under `os.` are the system apps' (appstore::system): every device
+    // refuses to install one from a store, so the hub refuses to offer one.
+    if manifest.id.starts_with("os.") {
+        findings.push(Finding::refuse(
+            "identity",
+            format!("{} is under os., which is reserved for system apps that ship with the device", manifest.id),
+        ));
+    }
+
     // ---- contents -------------------------------------------------------
     let mut total = 0u64;
     for file in list_files(bundle)? {
@@ -389,6 +399,35 @@ mod tests {
         assert!(external_references(&dir, &manifest(&["net", "images"], &["api.example.com"])).unwrap().is_empty(), "images reaches any public host");
         std::fs::write(dir.join("main.splash"), "let x = \"http://api.example.com\"").unwrap();
         assert!(!external_references(&dir, &manifest(&["net", "web"], &["api.example.com"])).unwrap().is_empty(), "plain http is never allowed");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_store_bundle_may_not_take_a_system_app_id() {
+        let dir = std::env::temp_dir().join(format!("gate-os-id-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("main.splash"), "Label{text: \"hi\"}").unwrap();
+        let write = |id: &str| {
+            std::fs::write(
+                dir.join(octosense_app_policy::MANIFEST_FILE),
+                serde_json::json!({"schema": 1, "id": id, "version": "1.0.0", "name": "App", "integrity": {"bundle_blake3": ""}}).to_string(),
+            )
+            .unwrap()
+        };
+        let limits = HostLimits { require_signature: false, ..HostLimits::default() };
+        let identity = |dir: &Path| {
+            check_bundle(dir, &limits, &octosense_app_policy::RefuseAllSignatures, None)
+                .unwrap()
+                .findings
+                .into_iter()
+                .filter(|f| f.check == "identity")
+                .count()
+        };
+        write("os.mail");
+        assert_eq!(identity(&dir), 1, "os. ids belong to system apps");
+        write("dev.example.mail");
+        assert_eq!(identity(&dir), 0);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
