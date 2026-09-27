@@ -23,4 +23,5 @@ members = [
     "crates/app-validator",
     "crates/app-hub-app",
     "crates/app-runtime",
+    "crates/hub-service",
 ]

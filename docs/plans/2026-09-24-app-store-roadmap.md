@@ -6,7 +6,7 @@
 
 **Deliverables:** 26 individual implementation plans, a [shared architecture/execution guide](2026-09-24-app-store-design.md), explicit dependencies, review coverage and stage acceptance gates.
 
-**Status:** Implementation in progress. Plans **01–02 verified locally** (2026-09-25); plan **03 verified locally**. Plan 04 is in progress; plans 05–26 are not started. No deployment is claimed.
+**Status:** Implementation in progress. Plans **01–05 are verified locally** across Hub and the active Home consumer; native/device rollout remains. Plans **06–07 are in progress**: portable Card events, restart snapshots and bounded host requests are implemented, while effects and device conformance remain. Plans 08–26 have not been completed. No deployment is claimed.
 
 ## Priority order
 
@@ -154,4 +154,3 @@ Every issue from the review is represented below. Closely related observations a
 Read the [shared design](2026-09-24-app-store-design.md), then implement [Plan 01](2026-09-24-store-01-publisher-key-continuity.md), [Plan 02](2026-09-24-store-02-installed-version-launch.md) and [Plan 03](2026-09-24-store-03-bundle-admission.md) as separate reviewable changes. Convert the temporary review reproductions into maintained tests first. Track each plan as not started / in progress / verified, and attach actual test/device evidence before marking it complete.
 
 Planning deliverables can be used directly to create issues or PR-sized work items later. No issue tracker entries, commits, deployments or app publications were created by this planning task.
-

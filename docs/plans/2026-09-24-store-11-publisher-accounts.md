@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust, serde/JSON, the existing Hub policy/client, Makepad/Octoscript where applicable; additional service/storage adapters follow the [shared design](2026-09-24-app-store-design.md).
 
-**Status:** Planned; no feature implementation is claimed. **Priority:** P0. **Phase:** D — Self-service publishing. **Relative size:** L (complexity, not a delivery-date estimate).
+**Status:** In progress. Transactional SQLite migrations, GitHub device adapter, account sessions, ownership claims, HTTP routes and possession-based key enrollment pass local tests. Live GitHub conformance, owner inventory, request-rate limits and integration with submission remain. **Priority:** P0. **Phase:** D — Self-service publishing. **Relative size:** L (complexity, not a delivery-date estimate).
 
 **Prerequisites:** [01 — Publisher key continuity and signed release identity](2026-09-24-store-01-publisher-key-continuity.md); [05 — Versioned runtime contracts and release compatibility](2026-09-24-store-05-runtime-compatibility.md)
 
@@ -26,6 +26,9 @@ Read the shared design first for repository aliases, wire-compatibility rules, i
 | Create | [H/crates/hub-service/src/auth.rs](../../crates/hub-service/src/auth.rs) |
 | Create | [H/crates/hub-service/src/publishers.rs](../../crates/hub-service/src/publishers.rs) |
 | Create | [H/crates/hub-service/migrations/001_identity.sql](../../crates/hub-service/migrations/001_identity.sql) |
+| Create | [H/crates/hub-service/migrations/002_device_login.sql](../../crates/hub-service/migrations/002_device_login.sql) |
+| Create | [H/crates/hub-service/migrations/003_claim_status.sql](../../crates/hub-service/migrations/003_claim_status.sql) |
+| Create | [H/crates/hub-service/src/auth/github.rs](../../crates/hub-service/src/auth/github.rs) |
 | Create | [H/crates/hub-service/tests/publisher_accounts.rs](../../crates/hub-service/tests/publisher_accounts.rs) |
 | Modify | [H/Cargo.toml](../../Cargo.toml) |
 | Create | [H/docs/api/publishers.md](../../docs/api/publishers.md) |
