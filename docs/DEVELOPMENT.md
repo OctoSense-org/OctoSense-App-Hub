@@ -68,7 +68,11 @@ admission order a device uses: admit, resolve, apply, evaluate.
 ```sh
 cargo build --release -p octosense-card-host --bin card-host
 card-host --bundle <dir> [--app-data <dir>] [--allow-unsigned] [--stamp] [--system] [--static <prefix>=<dir>]...
+card-host --help
 ```
+
+`--help` prints the flags and exits 0; an unknown option prints them and
+exits 2. Neither opens a window.
 
 | Flag | Effect |
 | --- | --- |
