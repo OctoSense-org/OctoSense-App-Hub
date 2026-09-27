@@ -27,7 +27,7 @@ publisher's repository.
 | `docs/ICONS.md` | Canonical icon ownership, export constraints and visual review. |
 | `docs/DEVELOPMENT.md` | Where authoring lives, delivery paths, and `card-host` with its remote-control routes. |
 | `templates/app/` | Card app repository scaffold with metadata, example icon and linked agent instructions. |
-| `crates/app-policy` | The signed manifest and listing, admission, and resolution into an isolate's settings and an agent session profile (ADR 0002); an app's own agent (`tools.json`, `AGENT.md`, skills) loaded as an `AgentBundle`. |
+| `crates/app-policy` | The signed manifest and listing, admission, and resolution into an isolate's settings and an agent session profile (ADR 0002); an app's own agent (`tools.json`, `AGENT.md`, skills) loaded as an `AgentBundle`; the `tools.json` parser and checks that native modules' tool manifests share (`ToolManifest::load`). |
 | `crates/app-hub` | The index, the signed catalog, the gate, the agent scan, the device client and the `hub` command (ADR 0003). |
 | `crates/appstore` | The store as an OctoSense module, the `card` module that runs an installed app as its own client, system apps (`os.` ids) and host services with their sheets. |
 | `crates/appstore-app` | The store as a standalone app (`appstore`). |

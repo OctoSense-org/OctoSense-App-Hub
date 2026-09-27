@@ -196,8 +196,8 @@ pub fn check_bundle(
 
     // ---- the app's agent and tools (ADR 0002 §3, §4) --------------------
     // tools.json, AGENT.md and skills are checked here and pinned by the
-    // digest above like every other file. Native modules never come through
-    // this gate: they declare tools through the app-peers broker.
+    // digest above like every other file. A native module's tools.json gets
+    // the same checks from the app-peers broker (ToolManifest::load).
     let agent_review = octosense_app_policy::agent::review(bundle, &manifest);
     for issue in &agent_review.issues {
         findings.push(if issue.refusal {
@@ -210,9 +210,13 @@ pub fn check_bundle(
         for tool in agent.tools.iter().filter(|t| t.risk == octosense_app_policy::Risk::Destructive) {
             // Recorded, not refused: a destructive tool is allowed, and the
             // host always asks before it runs, whoever calls it.
+            let who = match tool.confirm {
+                octosense_app_policy::Confirm::Host => "the host's approval",
+                octosense_app_policy::Confirm::App => "the app's own confirmation sheet (an approval request when the person is away)",
+            };
             findings.push(Finding::warn(
                 "tools",
-                format!("{} is destructive: every call waits for the person's approval", tool.name),
+                format!("{} is destructive: every call waits for {who}", tool.name),
             ));
         }
     }

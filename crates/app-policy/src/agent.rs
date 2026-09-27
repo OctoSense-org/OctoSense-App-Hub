@@ -15,11 +15,14 @@
 //!   executables, MCP servers or hooks is refused, and a skill may use only
 //!   tools the app already has.
 //!
-//! This is for contained apps, the bundles the Card runner runs. A native
-//! module declares its tools through the app-peers broker (`ServiceExecutor`
-//! and `ToolDef` in OctoSense's `crates/app-peers`) and never ships a
-//! `tools.json`; the risk vocabulary here is the broker's
-//! ([`Risk::broker_name`]), so one approval gate serves both.
+//! `tools.json` is the one tool manifest for every app, contained or native.
+//! A contained app ships it in its bundle, and the gate checks it here. A
+//! native module ships the same file as a module resource, pinned by the
+//! shell build; the app-peers broker (OctoSense `crates/app-peers`) loads it
+//! with [`ToolManifest::load`] under [`ToolHost::Native`] and builds its
+//! `ToolDef`s from it, so Rust only implements executors keyed by tool name.
+//! The parser and validator make no assumption about bundles or the Card
+//! runner. The risk vocabulary is the broker's ([`Risk::broker_name`]).
 //!
 //! Every file is under the bundle digest like the rest of the app, so what
 //! was reviewed is what runs. [`review`] is what the gate runs over a bundle
@@ -101,15 +104,57 @@ pub enum ImplementedBy {
     App,
 }
 
-/// How a call is supervised, derived from the risk and never declared: an
-/// app cannot talk its way out of an approval.
+/// Who confirms a destructive call with the person. Declared per tool and
+/// independent of the risk: the risk says whether a confirmation is needed,
+/// this says whose surface asks. Never derived from the risk.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Confirm {
+    /// The host's (kernel's) approval path asks. The default.
+    #[default]
+    Host,
+    /// The app's own confirmation sheet is the confirmation when the person
+    /// is present (Rinx's `send_message`), so the host does not ask again.
+    /// With the person absent, the call becomes an approval request in the
+    /// app's own conversation. Allowed only for tools the app implements
+    /// itself (`implemented_by: "app"`) or a native module's tools.
+    App,
+}
+
+/// How a call is supervised: whether it needs the person comes from the
+/// risk alone, and whose surface asks from [`Confirm`]. An app cannot talk
+/// its way out of a confirmation, only choose to ask on its own sheet.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Supervision {
     /// Runs without asking, with the person present or not.
     Unattended,
-    /// Runs only after the person approves it. With the person absent the
-    /// call becomes an approval request in the app's conversation.
-    Approval,
+    /// Runs only after the person approves it through the host's approval
+    /// path. With the person absent the call becomes an approval request in
+    /// the app's conversation.
+    HostApproval,
+    /// Runs only after the person confirms it on the app's own sheet; the
+    /// host does not prompt as well. With the person absent the call becomes
+    /// an approval request in the app's conversation.
+    AppConfirmation,
+}
+
+impl Supervision {
+    /// Whether the person must approve before the call runs.
+    pub fn needs_person(self) -> bool {
+        self != Supervision::Unattended
+    }
+}
+
+/// Who ships a `tools.json`, which decides the namespace and what `confirm`
+/// may say.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ToolHost {
+    /// A contained app (a bundle the Card runner runs): the namespace is the
+    /// app id's last segment.
+    Contained,
+    /// A native module: the namespace is the module id. Its tools run in the
+    /// module, which may confirm them on its own sheet.
+    Native,
 }
 
 /// One tool in `tools.json`.
@@ -141,6 +186,13 @@ pub struct ToolSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub private_data: Option<bool>,
     pub implemented_by: ImplementedBy,
+    /// Whose surface confirms a destructive call. Omitted means the host.
+    #[serde(default, skip_serializing_if = "is_host_confirm")]
+    pub confirm: Confirm,
+}
+
+fn is_host_confirm(confirm: &Confirm) -> bool {
+    *confirm == Confirm::Host
 }
 
 impl ToolSpec {
@@ -156,10 +208,17 @@ impl ToolSpec {
     }
 
     pub fn supervision(&self) -> Supervision {
-        match self.risk {
-            Risk::Read | Risk::Act => Supervision::Unattended,
-            Risk::Destructive => Supervision::Approval,
+        match (self.risk, self.confirm) {
+            (Risk::Read | Risk::Act, _) => Supervision::Unattended,
+            (Risk::Destructive, Confirm::Host) => Supervision::HostApproval,
+            (Risk::Destructive, Confirm::App) => Supervision::AppConfirmation,
         }
+    }
+
+    /// The broker's `confirmed_by_app`: exactly the declared field, never
+    /// inferred from the risk.
+    pub fn confirmed_by_app(&self) -> bool {
+        self.confirm == Confirm::App
     }
 
     /// Whether a background run may call it without anyone approving.
@@ -178,7 +237,7 @@ pub struct ToolManifest {
 
 impl ToolManifest {
     /// Parse, refusing unknown fields and a foreign schema. The rules that
-    /// need the app's identity are in [`ToolManifest::check`].
+    /// need the owner's identity are in [`ToolManifest::validate`].
     pub fn parse(json: &str) -> Result<Self, String> {
         if json.len() > MAX_TOOLS_FILE_BYTES {
             return Err(format!("{TOOLS_FILE} is {} bytes, over the {MAX_TOOLS_FILE_BYTES} ceiling", json.len()));
@@ -190,11 +249,30 @@ impl ToolManifest {
         Ok(manifest)
     }
 
-    /// Every rule for one app's tools. Refusals first, then warnings.
+    /// Parse and validate in one call, for any owner: the broker loading a
+    /// native module's `tools.json` passes the module id and
+    /// [`ToolHost::Native`]. Refusals fail the load; warnings are returned.
+    pub fn load(json: &str, namespace: &str, host: ToolHost, local_only: bool) -> Result<(Self, Vec<Issue>), String> {
+        let manifest = Self::parse(json)?;
+        let issues = manifest.validate(namespace, host, local_only);
+        let refusals: Vec<&str> = issues.iter().filter(|i| i.refusal).map(|i| i.detail.as_str()).collect();
+        if !refusals.is_empty() {
+            return Err(refusals.join("; "));
+        }
+        Ok((manifest, issues))
+    }
+
+    /// Every rule for a contained app's tools, from its manifest.
     pub fn check(&self, manifest: &AppManifest) -> Vec<Issue> {
-        let mut issues = Vec::new();
-        let namespace = short_id(&manifest.id);
         let local_only = manifest.agent.as_ref().and_then(|a| a.model.as_ref()).is_some_and(|m| m.local_only);
+        self.validate(short_id(&manifest.id), ToolHost::Contained, local_only)
+    }
+
+    /// Every rule for one owner's tools: `namespace` is the app's short id
+    /// or the native module's id; `local_only` is whether the owner's model
+    /// must stay on the person's devices.
+    pub fn validate(&self, namespace: &str, host: ToolHost, local_only: bool) -> Vec<Issue> {
+        let mut issues = Vec::new();
         if namespace.is_empty()
             || namespace.len() > MAX_NAMESPACE
             || !namespace.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
@@ -202,7 +280,7 @@ impl ToolManifest {
             issues.push(Issue::refuse(
                 "tools",
                 format!(
-                    "the app's namespace {namespace:?} (the last segment of its id) must be [a-z0-9_]{{1,{MAX_NAMESPACE}}} to declare tools"
+                    "the namespace {namespace:?} (a module id, or the last segment of an app id) must be [a-z0-9_]{{1,{MAX_NAMESPACE}}} to declare tools"
                 ),
             ));
         }
@@ -250,6 +328,23 @@ impl ToolManifest {
                     "tools",
                     format!("{name} is destructive and marked background: in a background run it only becomes an approval request, and runs after the person approves"),
                 ));
+            }
+            if tool.confirm == Confirm::App {
+                if host == ToolHost::Contained && tool.implemented_by != ImplementedBy::App {
+                    issues.push(Issue::refuse(
+                        "tools",
+                        format!(
+                            "{name} says confirm \"app\" but is implemented by the host service: only a tool the app implements itself, or a native module's tool, may confirm on the app's own sheet"
+                        ),
+                    ));
+                } else if tool.risk == Risk::Destructive {
+                    issues.push(Issue::warn(
+                        "tools",
+                        format!("{name} confirms on the app's own sheet: with the person present that sheet is the only confirmation; with the person absent it becomes an approval request in the app's conversation"),
+                    ));
+                } else {
+                    issues.push(Issue::warn("tools", format!("{name} says confirm \"app\" but is not destructive, so nothing is confirmed")));
+                }
             }
             if local_only && tool.shareable && tool.private_data != Some(false) {
                 issues.push(Issue::refuse(

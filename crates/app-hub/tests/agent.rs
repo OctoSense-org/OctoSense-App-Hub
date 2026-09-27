@@ -75,7 +75,21 @@ fn the_gate_admits_the_news_agent_and_records_destructive_tools() {
     stamp(&dir);
     let found = agent_findings(&dir);
     assert!(found.iter().all(|(s, _)| *s == Severity::Warning), "{found:?}");
-    assert!(found.iter().any(|(_, d)| d == "tools: news.topics.clear is destructive: every call waits for the person's approval"), "{found:?}");
+    assert!(found.iter().any(|(_, d)| d == "tools: news.topics.clear is destructive: every call waits for the host's approval"), "{found:?}");
+
+    // A tool the app implements may confirm on its own sheet; the report
+    // records whose confirmation it is.
+    let mut tools: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    tools["tools"].as_array_mut().unwrap().push(json!({
+        "name": "news.share", "description": "Share a story.",
+        "input_schema": {"type":"object","properties":{}}, "output_schema": {"type":"object"},
+        "risk": "destructive", "implemented_by": "app", "confirm": "app"
+    }));
+    std::fs::write(&path, tools.to_string()).unwrap();
+    stamp(&dir);
+    let found = agent_findings(&dir);
+    assert!(found.iter().all(|(s, _)| *s == Severity::Warning), "{found:?}");
+    assert!(found.iter().any(|(_, d)| d.starts_with("tools: news.share is destructive: every call waits for the app's own confirmation sheet")), "{found:?}");
 }
 
 #[test]
@@ -169,6 +183,6 @@ fn the_review_packet_shows_the_agent_files_and_asks_about_them() {
     let packet = octosense_app_hub::scan::packet(&dir, &report).unwrap();
     let files: Vec<&str> = packet.agent_files.keys().map(String::as_str).collect();
     assert_eq!(files, ["AGENT.md", "skills/news-digest/SKILL.md", "skills/news-digest/manifest.json", "tools.json"]);
-    assert!(packet.questions.iter().any(|q| q.contains("agent_files")));
+    assert!(packet.questions.iter().any(|q| q.contains("agent_files") && q.contains("confirm \"app\"")));
     assert!(packet.grants.iter().any(|g| g.contains("may work while the app is closed")), "{:?}", packet.grants);
 }

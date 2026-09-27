@@ -316,7 +316,8 @@ fn a_destructive_background_tool_is_allowed_but_always_waits_for_approval() {
     assert!(review.warnings().any(|w| w.detail.contains("background agent with destructive tools")));
     let bundle = review.bundle.unwrap();
     let clear = bundle.tool("news.topics.clear").unwrap();
-    assert_eq!(clear.supervision(), Supervision::Approval);
+    assert_eq!(clear.supervision(), Supervision::HostApproval);
+    assert!(!clear.confirmed_by_app(), "never derived from the risk");
     assert!(!clear.runs_unattended_in_background());
 }
 
@@ -455,4 +456,106 @@ fn the_store_says_what_the_agent_and_its_tools_may_do() {
     assert!(agent_permission_lines(&quiet, &[]).is_empty());
     let local = stamp(&dir, |m| m["agent"]["model"]["local_only"] = json!(true));
     assert!(privacy_summary(&local).iter().any(|l| l.contains("only models that run on your own devices")));
+}
+
+// ------------------------------------------------------------------- confirm
+
+fn destructive(name: &str, implemented_by: &str, confirm: Option<&str>) -> Value {
+    let mut tool = json!({
+        "name": name, "description": "Send it.",
+        "input_schema": {"type":"object","properties":{}}, "output_schema": {"type":"object"},
+        "risk": "destructive", "implemented_by": implemented_by
+    });
+    if let Some(confirm) = confirm {
+        tool["confirm"] = json!(confirm);
+    }
+    tool
+}
+
+#[test]
+fn confirm_is_declared_per_tool_and_defaults_to_the_host() {
+    let dir = scratch("confirm");
+    edit_tools(&dir, |t| {
+        let tools = t["tools"].as_array_mut().unwrap();
+        tools.push(destructive("news.share", "app", Some("app")));
+        tools.push(destructive("news.forget", "app", None));
+    });
+    let manifest = stamp(&dir, |_| {});
+    let review = review(&dir, &manifest);
+    assert_eq!(review.refusals().count(), 0, "{:?}", review.issues);
+    assert!(review.warnings().any(|w| w.detail.contains("news.share confirms on the app's own sheet")));
+    let bundle = review.bundle.unwrap();
+    let share = bundle.tool("news.share").unwrap();
+    assert_eq!((share.confirm, share.supervision()), (Confirm::App, Supervision::AppConfirmation));
+    assert!(share.confirmed_by_app() && share.supervision().needs_person());
+    let forget = bundle.tool("news.forget").unwrap();
+    assert_eq!((forget.confirm, forget.supervision()), (Confirm::Host, Supervision::HostApproval));
+    assert!(!forget.confirmed_by_app());
+    // The default is not written back, so a tool without the field
+    // serialises as it did before the field existed.
+    assert!(serde_json::to_value(forget).unwrap().get("confirm").is_none());
+
+    let lines = agent_permission_lines(&manifest, &bundle.tools);
+    assert!(lines.iter().any(|l| l == "Can ask to news.forget: nothing of this runs until you approve it."), "{lines:?}");
+    assert!(
+        lines.iter().any(|l| l == "Asks you on its own screen before news.share; when you are away, it waits for your approval in the app's conversation."),
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn a_contained_app_confirms_only_the_tools_it_implements_itself() {
+    let dir = scratch("confirm-host-service");
+    edit_tools(&dir, |t| t["tools"].as_array_mut().unwrap().push(destructive("news.share", "host-service", Some("app"))));
+    let manifest = stamp(&dir, |_| {});
+    refused_with(&dir, &manifest, "news.share says confirm \"app\" but is implemented by the host service");
+    edit_tools(&dir, |t| {
+        let tools = t["tools"].as_array_mut().unwrap();
+        tools.pop();
+        tools.push(destructive("news.share", "app", Some("sheet")));
+    });
+    refused_with(&dir, &manifest, "unknown variant `sheet`");
+    // On a tool that is not destructive, confirm "app" confirms nothing.
+    edit_tools(&dir, |t| {
+        t["tools"].as_array_mut().unwrap().pop();
+        t["tools"][0]["implemented_by"] = json!("app");
+        t["tools"][0]["confirm"] = json!("app");
+    });
+    let review = review(&dir, &manifest);
+    assert_eq!(review.refusals().count(), 0, "{:?}", review.issues);
+    assert!(review.warnings().any(|w| w.detail.contains("news.list says confirm \"app\" but is not destructive")));
+}
+
+#[test]
+fn a_native_modules_tools_json_loads_with_the_same_checks() {
+    // What crates/app-peers does with a native module's resource: no bundle,
+    // no Card runner, the module id as the namespace.
+    let json = json!({"schema": 1, "tools": [
+        {"name": "rinx.send_message", "description": "Send a message to a room.",
+         "input_schema": {"type":"object","properties":{"room":{"type":"string"},"text":{"type":"string"}},"required":["room","text"]},
+         "output_schema": {"type":"object","properties":{"event_id":{"type":"string"}}},
+         "risk": "Destructive", "implemented_by": "host-service", "confirm": "app"},
+        {"name": "rinx.rooms.list", "description": "List joined rooms.",
+         "input_schema": {"type":"object","properties":{}}, "output_schema": {"type":"object"},
+         "risk": "read", "implemented_by": "host-service", "shareable": true}
+    ]})
+    .to_string();
+    let (tools, warnings) = ToolManifest::load(&json, "rinx", ToolHost::Native, false).unwrap();
+    assert_eq!(tools.tools.len(), 2);
+    let send = &tools.tools[0];
+    assert!(send.confirmed_by_app());
+    assert_eq!((send.broker_name().as_str(), send.risk.broker_name()), ("send_message", "Destructive"));
+    assert_eq!(tools.tools[1].broker_name(), "rooms_list");
+    assert!(warnings.iter().any(|w| !w.refusal && w.detail.contains("rinx.send_message confirms on the app's own sheet")));
+
+    // The same file is refused as a contained app's, whose host service
+    // cannot confirm on the app's sheet, and under another namespace.
+    let err = ToolManifest::load(&json, "rinx", ToolHost::Contained, false).unwrap_err();
+    assert!(err.contains("implemented by the host service"), "{err}");
+    let err = ToolManifest::load(&json, "matrix", ToolHost::Native, false).unwrap_err();
+    assert!(err.contains("outside the app's namespace \"matrix\""), "{err}");
+    let err = ToolManifest::load(&json, "rinx", ToolHost::Native, true).unwrap_err();
+    assert!(err.contains("rinx.rooms.list is shareable but the app's model is local_only"), "{err}");
+    let err = ToolManifest::load(&json.replace("\"risk\":\"read\"", "\"risk\":\"low\""), "rinx", ToolHost::Native, false).unwrap_err();
+    assert!(err.contains("unknown variant `low`"), "{err}");
 }

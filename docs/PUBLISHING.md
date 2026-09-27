@@ -102,7 +102,7 @@ review packets outside the submitted bundle.
 | Version is new | Re-publishing a version already in the catalog. |
 | Listing present and complete | No `listing.json`; no icon or no screenshot; an unknown category, platform or age rating; a non-https privacy policy; or an icon or screenshot the listing names that is not in the bundle. |
 | Publisher continuity | An update signed by a different key than the one on record for this app. |
-| Tools are the app's own | In `tools.json`: a tool outside the app's namespace (the last segment of its id); a namespace that is not `[a-z0-9_]{1,24}`; a duplicate name, or two names the broker would spell the same; a missing `risk` or `implemented_by`; an unknown field; a schema outside the supported subset, over 8 KB or nested deeper than 8; an input that is not an object; more than 64 tools or a file over 64 KB. |
+| Tools are the app's own | In `tools.json`: a tool outside the app's namespace (the last segment of its id); a namespace that is not `[a-z0-9_]{1,24}`; a duplicate name, or two names the broker would spell the same; a missing `risk` or `implemented_by`; an unknown field; a schema outside the supported subset, over 8 KB or nested deeper than 8; an input that is not an object; more than 64 tools or a file over 64 KB; `confirm: "app"` on a tool the host service implements. |
 | Local-only data stays local | A `shareable` tool of an app whose `agent.model.local_only` is true, unless it declares `"private_data": false`. |
 | Agent files are declared text | An `AGENT.md` that `agent.instructions` does not name, or a `skills/<name>/` that `agent.skills` does not; instructions over 32 KB, not UTF-8, holding control characters, a leading `#!`, `<script`, `<iframe>`, `javascript:` or similar; agent files without an `agent`. |
 | Skills are data only | A skill manifest declaring `tools`, `binaries`, `sha256`, `mcp_servers`, `hooks` or other executable fields; a file in a skill other than `.md`, `.json`, `.txt`; a manifest `name` other than its directory; a `uses` entry that is neither one of the app's tools nor in `agent.tools`. |
@@ -205,11 +205,16 @@ An app that wants an assistant of its own (ADR 0002 §3, §4) ships it in the
 bundle. Every file is under the bundle digest, so the agent that runs is the
 one that was reviewed; a shell loads it with `AgentBundle::load`
 (`crates/app-policy/src/agent.rs`), which refuses a bundle whose digest does
-not match and everything the gate refuses. This is for contained apps, the
-bundles the Card runner runs. A native module declares its tools through the
-app-peers broker (`ServiceExecutor` and `ToolDef` in OctoSense's
-`crates/app-peers`) and never ships a `tools.json`; the risk levels are the
-broker's, so one approval gate serves both.
+not match and everything the gate refuses.
+
+`tools.json` is the one tool manifest for every app. A native module ships the
+same file as a module resource, pinned by the shell build. The app-peers broker
+(OctoSense `crates/app-peers`) loads it with
+`ToolManifest::load(json, <module id>, ToolHost::Native, local_only)`, which
+runs the same checks, and builds its `ToolDef`s from it. The module's Rust code
+only implements executors keyed by tool name. For a native module the
+namespace is the module id; for a contained app it is the last segment of the
+app id. The risk levels are the broker's, so one approval gate serves both.
 
 The News example, complete, is
 [`crates/app-policy/tests/fixtures/news-agent`](../crates/app-policy/tests/fixtures/news-agent).
@@ -260,13 +265,22 @@ The News example, complete, is
 | `shareable` | Other callers (the system agent, other apps' agents, the person's assistant) may be granted it. Default false. |
 | `private_data` | The result carries the person's private data. A shareable tool of a `local_only` app must say `false`. |
 | `implemented_by` | `host-service` (the app's native host service, which holds data, devices, network or secrets) or `app` (the app's own script, for tools that only reshape its data). |
+| `confirm` | Who asks the person before a destructive call: `host` (the default: the host's approval path) or `app` (the app's own confirmation sheet). Independent of `risk`, and never inferred from it. `app` is allowed only for a tool the app implements itself (`implemented_by: "app"`) or a native module's tool. |
 
-**Supervision comes from the risk, never from the app.** Read and act run
-unattended. A destructive tool always waits for the person's approval; with the
-person absent it becomes an approval request in the app's conversation. A
-destructive tool may still say `background: true`: the gate records a warning
-and it only ever runs after approval. A contained app cannot confirm its own
-tools.
+**Whether a call needs the person comes from the risk; whose surface asks comes
+from `confirm`.** Read and act run unattended. A destructive tool always waits
+for the person:
+
+| `risk: "destructive"` with | Person present | Person absent |
+| --- | --- | --- |
+| `confirm: "host"` (default) | The host's approval path asks. | An approval request in the app's conversation. |
+| `confirm: "app"` | The app's own confirmation sheet is the only confirmation (for example Rinx's `send_message`); the host does not ask again. | An approval request in the app's conversation. |
+
+The person is never asked twice for one call. A destructive tool may still say
+`background: true`: the gate records a warning, and the tool only runs after
+approval. `confirm: "app"` on a tool that is not destructive confirms nothing,
+and the gate warns about it. The gate report, the review packet and the store
+lines all state whose confirmation each destructive tool uses.
 
 An app may ship `tools.json` without an agent: its tools then serve other
 callers, such as the person's assistant, but no agent of its own.
@@ -342,7 +356,10 @@ Derived from the manifest and `tools.json`, beside the other permissions:
 
 - "Its assistant may work while the app is closed, on a schedule and when new
   data arrives; only if you allow it, and you can turn it off."
-- "Can ask to mail.send: nothing of this runs until you approve it."
+- "Can ask to mail.send: nothing of this runs until you approve it." (host
+  confirmation)
+- "Asks you on its own screen before rinx.send_message; when you are away, it
+  waits for your approval in the app's conversation." (`confirm: "app"`)
 - "Offers news.list to other assistants you allow." (and, for a shareable tool
   with `private_data: true`, that it can pass private data)
 - "Its assistant uses only models that run on your own devices."

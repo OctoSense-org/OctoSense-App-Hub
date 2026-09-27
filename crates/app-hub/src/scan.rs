@@ -129,7 +129,7 @@ pub fn packet(bundle: &Path, report: &GateReport) -> Result<Packet, String> {
     if !agent_files.is_empty() {
         questions.insert(
             questions.len() - 1,
-            "The agent files (agent_files) instruct this app's own assistant. Do they stay within this app's data and tools, without addressing other apps' assistants or the system agent, or asking for tools, hosts or approvals the manifest does not grant? Does each tool's risk match what it does: anything that sends, posts, shares, deletes or spends must be destructive; is anything marked shareable that returns the person's private data?".into(),
+            "The agent files (agent_files) instruct this app's own assistant. Do they stay within this app's data and tools, without addressing other apps' assistants or the system agent, or asking for tools, hosts or approvals the manifest does not grant? Does each tool's risk match what it does: anything that sends, posts, shares, deletes or spends must be destructive; is anything marked shareable that returns the person's private data? For a tool with confirm \"app\", does the app visibly show its own confirmation, with the exact action, before it runs?".into(),
         );
     }
     Ok(Packet {

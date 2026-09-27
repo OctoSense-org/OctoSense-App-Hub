@@ -41,8 +41,8 @@ pub mod services;
 pub mod verify;
 
 pub use agent::{
-    AgentBundle, ImplementedBy, Risk, Skill, SkillManifest, Supervision, ToolManifest, ToolSpec, AGENT_FILE, SKILLS_DIR,
-    TOOLS_FILE,
+    AgentBundle, Confirm, ImplementedBy, Risk, Skill, SkillManifest, Supervision, ToolHost, ToolManifest, ToolSpec, AGENT_FILE,
+    SKILLS_DIR, TOOLS_FILE,
 };
 pub use assets::{rewrite_assets, AssetServer, StaticAssets};
 pub use bundle::{digest_dir, MANIFEST_FILE};
