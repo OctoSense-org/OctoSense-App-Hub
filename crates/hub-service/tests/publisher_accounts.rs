@@ -40,13 +40,13 @@ fn identity_migration_is_repeatable() {
     let path = dir.path().join("publishers.sqlite3");
     let first = Service::open(&path).unwrap();
     assert!(first.ready().unwrap());
-    assert_eq!(first.migration_version().unwrap(), 5);
+    assert_eq!(first.migration_version().unwrap(), 6);
     assert_eq!(first.stats().unwrap().accounts, 0);
     assert_eq!(first.stats().unwrap().publishers, 0);
     drop(first);
     let again = Service::open(&path).unwrap();
     assert!(again.ready().unwrap());
-    assert_eq!(again.migration_version().unwrap(), 5);
+    assert_eq!(again.migration_version().unwrap(), 6);
     assert_eq!(again.stats().unwrap().accounts, 0);
 }
 
@@ -103,7 +103,7 @@ fn old_claims_require_review_after_schema_upgrade() {
     db.execute_batch("PRAGMA user_version = 2").unwrap();
     drop(db);
     let service = Service::open(&path).unwrap();
-    assert_eq!(service.migration_version().unwrap(), 5);
+    assert_eq!(service.migration_version().unwrap(), 6);
     assert_eq!(service.stats().unwrap().apps, 1);
     let db = rusqlite::Connection::open(&path).unwrap();
     let status: String = db

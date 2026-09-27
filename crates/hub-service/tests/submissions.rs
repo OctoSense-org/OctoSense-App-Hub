@@ -1,14 +1,22 @@
+use octosense_hub_service::jobs::ValidationOutcome;
 use octosense_hub_service::submissions::SubmissionInput;
 use octosense_hub_service::{
     auth::{Clock, DeviceChallenge, IdentityAssertion, IdentityProvider},
     Service,
 };
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 
 struct FixedClock;
 impl Clock for FixedClock {
     fn now(&self) -> i64 {
         1_000_000
+    }
+}
+struct AdjustableClock(AtomicI64);
+impl Clock for AdjustableClock {
+    fn now(&self) -> i64 {
+        self.0.load(Ordering::Relaxed)
     }
 }
 struct Developer;
@@ -481,4 +489,168 @@ async fn submission_http_requires_idempotency_key_and_returns_same_record_on_ret
     let second: serde_json::Value =
         serde_json::from_slice(&to_bytes(second.into_body(), 4096).await.unwrap()).unwrap();
     assert_eq!(first["id"], second["id"]);
+}
+
+#[test]
+fn worker_restart_does_not_skip_validation() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("jobs.sqlite3");
+    let clock = Arc::new(AdjustableClock(AtomicI64::new(1_000_000)));
+    let service = Service::open(&path)
+        .unwrap()
+        .with_auth(Arc::new(Developer), clock.clone());
+    let code = service.begin_login().unwrap();
+    let token = service
+        .finish_login(&code.device_code)
+        .unwrap()
+        .access_token;
+    let publisher = service
+        .create_publisher(&token, "uploader", "Uploader")
+        .unwrap();
+    service
+        .claim_app(&token, &publisher.id, "uploader.notes")
+        .unwrap();
+    let key = octosense_app_hub::signing::HubKey::from_bytes(&[11u8; 32]);
+    let challenge = service
+        .begin_key_enrollment(&token, &publisher.id, &key.public_hex())
+        .unwrap();
+    service
+        .finish_key_enrollment(
+            &token,
+            &publisher.id,
+            &challenge.id,
+            &key.sign_hex(challenge.message.as_bytes()),
+        )
+        .unwrap();
+    let pack = signed_pack("uploader.notes", &publisher.id, &key);
+    let digest = blake3::hash(&pack).to_hex().to_string();
+    let upload = service
+        .create_upload(&token, "uploader.notes", &digest, pack.len() as u64)
+        .unwrap();
+    service.put_upload(&token, &upload.id, &pack).unwrap();
+    let submission = service
+        .create_submission(
+            &token,
+            "uploader.notes",
+            "restart-job",
+            &SubmissionInput {
+                upload_id: upload.id,
+                source_repository: None,
+                source_commit: None,
+            },
+        )
+        .unwrap();
+    let first = service.lease_validation_job().unwrap().unwrap();
+    assert_eq!(first.submission_id, submission.id);
+    assert!(service.lease_validation_job().unwrap().is_none());
+    drop(service);
+
+    let restarted = Service::open(&path)
+        .unwrap()
+        .with_auth(Arc::new(Developer), clock.clone());
+    assert!(
+        restarted.lease_validation_job().unwrap().is_none(),
+        "live lease survives a restart"
+    );
+    clock.0.store(1_000_301, Ordering::Relaxed);
+    let second = restarted.lease_validation_job().unwrap().unwrap();
+    assert_ne!(first.token, second.token);
+    let outcome = ValidationOutcome {
+        passed: true,
+        validator_id: "native-validator@1".into(),
+        policy_version: "policy@1".into(),
+        report: serde_json::json!({"checks":["runtime","integrity"]}),
+    };
+    assert!(
+        restarted.complete_validation_job(&first, &outcome).is_err(),
+        "stale worker cannot overwrite result"
+    );
+    let result = restarted
+        .complete_validation_job(&second, &outcome)
+        .unwrap();
+    assert_eq!(result.status, "awaiting_review");
+    assert_eq!(
+        restarted
+            .complete_validation_job(&second, &outcome)
+            .unwrap()
+            .status,
+        "awaiting_review"
+    );
+    let db = rusqlite::Connection::open(path).unwrap();
+    let evidence: i64 = db
+        .query_row("SELECT count(*) FROM validation_evidence", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    let events: i64 = db
+        .query_row(
+            "SELECT count(*) FROM submission_events WHERE to_status='awaiting_review'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!((evidence, events), (1, 1));
+}
+
+#[test]
+fn repeated_worker_crashes_end_in_explicit_failure() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("crashes.sqlite3");
+    let clock = Arc::new(AdjustableClock(AtomicI64::new(1_000_000)));
+    let service = Service::open(&path)
+        .unwrap()
+        .with_auth(Arc::new(Developer), clock.clone());
+    let code = service.begin_login().unwrap();
+    let token = service
+        .finish_login(&code.device_code)
+        .unwrap()
+        .access_token;
+    let publisher = service
+        .create_publisher(&token, "uploader", "Uploader")
+        .unwrap();
+    service
+        .claim_app(&token, &publisher.id, "uploader.notes")
+        .unwrap();
+    let key = octosense_app_hub::signing::HubKey::from_bytes(&[11u8; 32]);
+    let challenge = service
+        .begin_key_enrollment(&token, &publisher.id, &key.public_hex())
+        .unwrap();
+    service
+        .finish_key_enrollment(
+            &token,
+            &publisher.id,
+            &challenge.id,
+            &key.sign_hex(challenge.message.as_bytes()),
+        )
+        .unwrap();
+    let pack = signed_pack("uploader.notes", &publisher.id, &key);
+    let digest = blake3::hash(&pack).to_hex().to_string();
+    let upload = service
+        .create_upload(&token, "uploader.notes", &digest, pack.len() as u64)
+        .unwrap();
+    service.put_upload(&token, &upload.id, &pack).unwrap();
+    service
+        .create_submission(
+            &token,
+            "uploader.notes",
+            "crash-job",
+            &SubmissionInput {
+                upload_id: upload.id,
+                source_repository: None,
+                source_commit: None,
+            },
+        )
+        .unwrap();
+    for attempt in 0..3 {
+        assert!(service.lease_validation_job().unwrap().is_some());
+        clock
+            .0
+            .store(1_000_000 + (attempt + 1) * 301, Ordering::Relaxed);
+    }
+    assert!(service.lease_validation_job().unwrap().is_none());
+    let db = rusqlite::Connection::open(path).unwrap();
+    let status: String = db
+        .query_row("SELECT status FROM submissions", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(status, "failed");
 }

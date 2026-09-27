@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust, serde/JSON, the existing Hub policy/client, Makepad/Octoscript where applicable; additional service/storage adapters follow the [shared design](2026-09-24-app-store-design.md).
 
-**Status:** In progress. Private bounded pack uploads and signed, idempotent submission records pass local tests. Validation workers, publisher feedback, reviews and publication remain. **Priority:** P0. **Phase:** D — Self-service publishing. **Relative size:** L (complexity, not a delivery-date estimate).
+**Status:** In progress. Private bounded pack uploads, signed idempotent submissions and durable job leases pass local tests. A trusted validator runner, publisher feedback, reviews and publication remain. **Priority:** P0. **Phase:** D — Self-service publishing. **Relative size:** L (complexity, not a delivery-date estimate).
 
 **Prerequisites:** [03 — Runnable bundle admission and actionable validation](2026-09-24-store-03-bundle-admission.md); [04 — Atomic catalog publication, renewal and signing operations](2026-09-24-store-04-catalog-release-operations.md); [11 — Publisher authentication, namespace ownership and registry](2026-09-24-store-11-publisher-accounts.md)
 
@@ -24,6 +24,7 @@ Read the shared design first for repository aliases, wire-compatibility rules, i
 | Create | [H/crates/hub-service/src/artifacts.rs](../../crates/hub-service/src/artifacts.rs) |
 | Create | [H/crates/hub-service/src/jobs.rs](../../crates/hub-service/src/jobs.rs) |
 | Create | [H/crates/hub-service/migrations/005_submissions.sql](../../crates/hub-service/migrations/005_submissions.sql) |
+| Create | [H/crates/hub-service/migrations/006_job_leases.sql](../../crates/hub-service/migrations/006_job_leases.sql) |
 | Create | [H/crates/hub-service/migrations/004_uploads.sql](../../crates/hub-service/migrations/004_uploads.sql) — Task 1; earlier migration numbers belong to Plan 11 |
 | Create | [H/crates/hub-service/tests/submissions.rs](../../crates/hub-service/tests/submissions.rs) |
 | Modify | [H/crates/hub-service/src/lib.rs](../../crates/hub-service/src/lib.rs) |

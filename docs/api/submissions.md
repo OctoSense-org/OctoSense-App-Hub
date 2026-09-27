@@ -1,7 +1,8 @@
 # Private artifact upload (development contract)
 
 The current service stages App Hub pack JSON and creates a durable validation
-queue record. It does not yet run the validation worker or publish an app. A developer must first own an
+queue record. It does not yet run the validator executable or publish an app.
+A developer must first own an
 `active` app claim and authenticate with an `apps.submit` token.
 
 1. `POST /v1/apps/{app_id}/uploads` with JSON
@@ -32,5 +33,13 @@ approval or publication status.
 The raw pack ceiling is 12 MiB; the contained bundle uses the Hub's 8 MiB
 unpacked limit. Blob storage lives next to the SQLite database in a private
 `*.blobs` directory. The service never fetches a publisher URL or runs code
-during upload. Worker execution, structured validation results, publisher
-status polling, cancellation and review are subsequent steps.
+during upload. Worker execution, publisher status polling, cancellation and
+review are subsequent steps.
+
+The internal job state has a five-minute lease, a random per-attempt token
+stored only as a hash, restart-safe reclaim, and a three-attempt failure
+ceiling. A stale worker cannot write evidence. A matching retry after evidence
+is committed is idempotent. Passing evidence moves a submission only to
+`awaiting_review`; it is never approval. The service currently has no worker
+credential exchange or trusted validator runner, so this internal method must
+not be exposed as a publisher API.

@@ -79,7 +79,7 @@ fn valid_source(input: &SubmissionInput) -> bool {
     }
 }
 
-fn record(row: &rusqlite::Row<'_>) -> rusqlite::Result<Submission> {
+pub(crate) fn record(row: &rusqlite::Row<'_>) -> rusqlite::Result<Submission> {
     Ok(Submission {
         id: row.get(0)?,
         app_id: row.get(1)?,

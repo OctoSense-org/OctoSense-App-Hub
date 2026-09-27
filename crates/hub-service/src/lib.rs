@@ -15,6 +15,7 @@ use std::{
 };
 pub mod artifacts;
 pub mod auth;
+pub mod jobs;
 pub mod publishers;
 pub mod submissions;
 
@@ -102,7 +103,7 @@ impl Service {
         let mut db = self.db.lock().unwrap();
         let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let version: i64 = tx.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-        if version > 5 {
+        if version > 6 {
             return Err(ServiceError::SchemaTooNew(version));
         }
         if version < 1 {
@@ -125,6 +126,10 @@ impl Service {
             tx.execute_batch(include_str!("../migrations/005_submissions.sql"))?;
             tx.execute_batch("PRAGMA user_version = 5")?;
         }
+        if version < 6 {
+            tx.execute_batch(include_str!("../migrations/006_job_leases.sql"))?;
+            tx.execute_batch("PRAGMA user_version = 6")?;
+        }
         tx.commit()?;
         Ok(())
     }
@@ -141,7 +146,7 @@ impl Service {
         let db = self.db.lock().unwrap();
         let one: i64 = db.query_row("SELECT 1", [], |row| row.get(0))?;
         let version: i64 = db.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-        Ok(one == 1 && version == 5)
+        Ok(one == 1 && version == 6)
     }
 
     pub fn stats(&self) -> Result<RegistryStats, ServiceError> {
