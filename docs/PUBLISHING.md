@@ -43,7 +43,7 @@ my-app/
 Produce the card, data and kit with the
 [image-to-card flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md)
 in OctoScript-App-Design-Flow. Do not hand-write L0 unless asked; the language
-is specified in [L0](https://github.com/OctoSense-org/OctoSense-System-Apps/blob/main/apps/appcard/a2app-l0/framework/l0.md).
+is specified in [L0](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md).
 
 A **script app** is a Splash program with its own state, handlers, storage and
 requests, evaluated as it is.
@@ -65,7 +65,7 @@ The program names its own artwork through the `{{assets}}` placeholder
 (`http_resource("{{assets}}/assets/logo.png")`): the host replaces it with a
 loopback origin that serves this bundle and nothing else, and adds only that
 origin to the app's hosts. The first-party
-[system apps](https://github.com/OctoSense-org/OctoSense-System-Apps)
+[system apps](https://github.com/OctoSense-org/OctoSense/tree/main/apps)
 (`apps/<name>/bundle/`) are complete examples; their `os.` ids are reserved,
 so a store copy needs an id of its own.
 
@@ -268,9 +268,9 @@ and the gate refuses a bundle that declares one. Service state (accounts,
 secrets, caches) lives in `<app data>/.host`, outside every app's jail.
 
 Mail is the worked example: the
-[Mail bundle](https://github.com/OctoSense-org/OctoSense-System-Apps/tree/main/apps/mail/bundle)
+[Mail bundle](https://github.com/OctoSense-org/OctoSense/tree/main/apps/mail/bundle)
 requests `mail`, and its
-[host service](https://github.com/OctoSense-org/OctoSense-System-Apps/tree/main/apps/mail/host-service)
+[host service](https://github.com/OctoSense-org/OctoSense/tree/main/apps/mail/host-service)
 signs in on its own sheet. A store app can request `mail` only where the
 shell links a mail service.
 
