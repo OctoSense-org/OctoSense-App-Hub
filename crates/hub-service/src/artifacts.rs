@@ -134,6 +134,44 @@ impl BlobStore {
         }
         Ok(())
     }
+
+    pub(crate) fn inspect(
+        &self,
+        digest: &str,
+    ) -> Result<octosense_app_policy::AppManifest, UploadError> {
+        let path = self.objects.join(digest);
+        if !std::fs::symlink_metadata(&path)?.file_type().is_file() {
+            return Err(UploadError::Invalid);
+        }
+        let file = std::fs::File::open(&path)?;
+        if file.metadata()?.len() > MAX_PACK_BYTES {
+            return Err(UploadError::Invalid);
+        }
+        let mut bytes = Vec::new();
+        file.take(MAX_PACK_BYTES + 1).read_to_end(&mut bytes)?;
+        if bytes.len() as u64 > MAX_PACK_BYTES || blake3::hash(&bytes).to_hex().as_str() != digest {
+            return Err(UploadError::Invalid);
+        }
+        let pack: octosense_app_hub::pack::Pack =
+            serde_json::from_slice(&bytes).map_err(|_| UploadError::Invalid)?;
+        let inspection = tempfile::tempdir_in(&self.quarantine)?;
+        octosense_app_hub::pack::unpack(&pack, inspection.path())
+            .map_err(|_| UploadError::Invalid)?;
+        let text = std::fs::read_to_string(inspection.path().join("manifest.json"))?;
+        let manifest =
+            octosense_app_policy::AppManifest::parse(&text).map_err(|_| UploadError::Invalid)?;
+        let actual = octosense_app_policy::bundle::digest_dir_limited(
+            inspection.path(),
+            octosense_app_hub::gate::MAX_BUNDLE_BYTES,
+            octosense_app_hub::admission::MAX_ENTRIES,
+            octosense_app_hub::admission::MAX_DEPTH,
+        )
+        .map_err(|_| UploadError::Invalid)?;
+        if !actual.eq_ignore_ascii_case(&manifest.integrity.bundle_blake3) {
+            return Err(UploadError::Invalid);
+        }
+        Ok(manifest)
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]

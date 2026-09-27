@@ -18,6 +18,7 @@ ed25519-dalek = "3"
 hex = "0.4"
 ureq = "3"
 octosense-app-hub = { path = "../app-hub" }
+octosense-app-policy = { path = "../app-policy" }
 tempfile = "3"
 http-body-util = "0.1"
 

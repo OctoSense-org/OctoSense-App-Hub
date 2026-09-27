@@ -16,6 +16,7 @@ use std::{
 pub mod artifacts;
 pub mod auth;
 pub mod publishers;
+pub mod submissions;
 
 #[derive(Debug)]
 pub enum ServiceError {
@@ -101,7 +102,7 @@ impl Service {
         let mut db = self.db.lock().unwrap();
         let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let version: i64 = tx.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-        if version > 4 {
+        if version > 5 {
             return Err(ServiceError::SchemaTooNew(version));
         }
         if version < 1 {
@@ -120,6 +121,10 @@ impl Service {
             tx.execute_batch(include_str!("../migrations/004_uploads.sql"))?;
             tx.execute_batch("PRAGMA user_version = 4")?;
         }
+        if version < 5 {
+            tx.execute_batch(include_str!("../migrations/005_submissions.sql"))?;
+            tx.execute_batch("PRAGMA user_version = 5")?;
+        }
         tx.commit()?;
         Ok(())
     }
@@ -136,7 +141,7 @@ impl Service {
         let db = self.db.lock().unwrap();
         let one: i64 = db.query_row("SELECT 1", [], |row| row.get(0))?;
         let version: i64 = db.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-        Ok(one == 1 && version == 4)
+        Ok(one == 1 && version == 5)
     }
 
     pub fn stats(&self) -> Result<RegistryStats, ServiceError> {
@@ -191,6 +196,7 @@ pub fn router(service: Arc<Service>) -> Router {
         )
         .route("/v1/apps", post(claim_app))
         .route("/v1/apps/{app_id}/uploads", post(create_upload))
+        .route("/v1/apps/{app_id}/submissions", post(create_submission))
         .route("/v1/uploads/{upload_id}", get(upload_status))
         .route("/v1/uploads/{upload_id}/content", put(put_upload))
         .layer(DefaultBodyLimit::max(4 * 1024))
@@ -485,5 +491,53 @@ async fn put_upload(
         Err(_) => upload_failure(artifacts::UploadError::Io(std::io::Error::other(
             "upload worker unavailable",
         ))),
+    }
+}
+
+fn submission_failure(
+    error: submissions::SubmissionError,
+) -> (StatusCode, Json<serde_json::Value>) {
+    let (status, code) = match error {
+        submissions::SubmissionError::Invalid => (StatusCode::BAD_REQUEST, "invalid_submission"),
+        submissions::SubmissionError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized"),
+        submissions::SubmissionError::Conflict => (StatusCode::CONFLICT, "submission_conflict"),
+        submissions::SubmissionError::Database(_) | submissions::SubmissionError::Storage => {
+            (StatusCode::SERVICE_UNAVAILABLE, "service_unavailable")
+        }
+    };
+    (
+        status,
+        Json(serde_json::json!({"error":{"code":code,"message":error.to_string()}})),
+    )
+}
+
+async fn create_submission(
+    State(service): State<Arc<Service>>,
+    RoutePath(app_id): RoutePath<String>,
+    headers: HeaderMap,
+    Json(input): Json<submissions::SubmissionInput>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    let token = match bearer(&headers) {
+        Ok(token) => token.to_owned(),
+        Err(error) => return submission_failure(error.into()),
+    };
+    let idempotency_key = match headers
+        .get("idempotency-key")
+        .and_then(|value| value.to_str().ok())
+    {
+        Some(key) => key.to_owned(),
+        None => return submission_failure(submissions::SubmissionError::Invalid),
+    };
+    match tokio::task::spawn_blocking(move || {
+        service.create_submission(&token, &app_id, &idempotency_key, &input)
+    })
+    .await
+    {
+        Ok(Ok(submission)) => (
+            StatusCode::CREATED,
+            Json(serde_json::to_value(submission).unwrap()),
+        ),
+        Ok(Err(error)) => submission_failure(error),
+        Err(_) => submission_failure(submissions::SubmissionError::Storage),
     }
 }

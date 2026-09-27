@@ -1,7 +1,7 @@
 # Private artifact upload (development contract)
 
-The current service stages App Hub pack JSON only. It does not create a
-submission, start validation, or publish an app. A developer must first own an
+The current service stages App Hub pack JSON and creates a durable validation
+queue record. It does not yet run the validation worker or publish an app. A developer must first own an
 `active` app claim and authenticate with an `apps.submit` token.
 
 1. `POST /v1/apps/{app_id}/uploads` with JSON
@@ -18,8 +18,19 @@ submission, start validation, or publish an app. A developer must first own an
    unsuccessful transfer remains `pending` and can be retried. No public blob
    URL is returned.
 
+`POST /v1/apps/{app_id}/submissions` accepts JSON
+`{ "upload_id": "...", "source_repository": "https://...", "source_commit": "..." }`
+and requires an `Idempotency-Key` header. The source fields may both be
+omitted. The service rechecks the exact stored pack, its bundle digest, v2
+manifest, app ID and signature against the enrolled publisher key. It
+transactionally reserves the manifest's version and release number and creates
+one queued validation job and audit event. Repeating the same key and request
+returns the same `submitted` record; changed input or a competing request for
+the version returns `409 submission_conflict`. An API caller cannot set an
+approval or publication status.
+
 The raw pack ceiling is 12 MiB; the contained bundle uses the Hub's 8 MiB
 unpacked limit. Blob storage lives next to the SQLite database in a private
 `*.blobs` directory. The service never fetches a publisher URL or runs code
-during upload. A later submission endpoint will bind the completed blob to a
-manifest, publisher signing key, idempotency key and validation job.
+during upload. Worker execution, structured validation results, publisher
+status polling, cancellation and review are subsequent steps.

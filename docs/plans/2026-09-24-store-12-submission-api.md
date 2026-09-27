@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust, serde/JSON, the existing Hub policy/client, Makepad/Octoscript where applicable; additional service/storage adapters follow the [shared design](2026-09-24-app-store-design.md).
 
-**Status:** In progress. Private bounded pack uploads and owner-visible upload status pass local tests. Submission identity, validation jobs, reviews and publication remain. **Priority:** P0. **Phase:** D — Self-service publishing. **Relative size:** L (complexity, not a delivery-date estimate).
+**Status:** In progress. Private bounded pack uploads and signed, idempotent submission records pass local tests. Validation workers, publisher feedback, reviews and publication remain. **Priority:** P0. **Phase:** D — Self-service publishing. **Relative size:** L (complexity, not a delivery-date estimate).
 
 **Prerequisites:** [03 — Runnable bundle admission and actionable validation](2026-09-24-store-03-bundle-admission.md); [04 — Atomic catalog publication, renewal and signing operations](2026-09-24-store-04-catalog-release-operations.md); [11 — Publisher authentication, namespace ownership and registry](2026-09-24-store-11-publisher-accounts.md)
 
@@ -23,7 +23,7 @@ Read the shared design first for repository aliases, wire-compatibility rules, i
 | Create | [H/crates/hub-service/src/submissions.rs](../../crates/hub-service/src/submissions.rs) |
 | Create | [H/crates/hub-service/src/artifacts.rs](../../crates/hub-service/src/artifacts.rs) |
 | Create | [H/crates/hub-service/src/jobs.rs](../../crates/hub-service/src/jobs.rs) |
-| Create | [H/crates/hub-service/migrations/002_submissions.sql](../../crates/hub-service/migrations/002_submissions.sql) |
+| Create | [H/crates/hub-service/migrations/005_submissions.sql](../../crates/hub-service/migrations/005_submissions.sql) |
 | Create | [H/crates/hub-service/migrations/004_uploads.sql](../../crates/hub-service/migrations/004_uploads.sql) — Task 1; earlier migration numbers belong to Plan 11 |
 | Create | [H/crates/hub-service/tests/submissions.rs](../../crates/hub-service/tests/submissions.rs) |
 | Modify | [H/crates/hub-service/src/lib.rs](../../crates/hub-service/src/lib.rs) |
@@ -61,7 +61,7 @@ Each task is a small reviewable slice. Apply the five-step test/implementation c
 
 ### Task 2: Create idempotent submissions
 
-**Touch:** `H/crates/hub-service/src/submissions.rs`, `H/crates/hub-service/migrations/002_submissions.sql`.
+**Touch:** `H/crates/hub-service/src/submissions.rs`, `H/crates/hub-service/migrations/005_submissions.sql`.
 
 1. **Write the regression/acceptance case** `retry_creates_one_submission_and_release`: Repeat the same idempotency key/body, then reuse the key with changed bytes and concurrently submit the same app version. Return one result or a conflict, never duplicate releases.
 2. **Run the relevant suite below before implementation.** Filter to that case where supported. Expected: the new behavior fails for the identified reason; if it already passes, inspect whether the scenario truly reaches the implementation and retain it only if it protects an uncovered contract.

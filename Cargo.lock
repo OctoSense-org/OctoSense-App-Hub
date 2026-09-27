@@ -1658,6 +1658,7 @@ dependencies = [
  "hex",
  "http-body-util",
  "octosense-app-hub",
+ "octosense-app-policy",
  "rand_core 0.9.5",
  "rusqlite",
  "serde",
