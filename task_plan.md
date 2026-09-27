@@ -19,7 +19,8 @@ Goal: implement the reviewed App Hub roadmap in dependency order, prioritizing f
 13. Implement Card application lifecycle and state (plan 06) — in progress: native L0 event path and same-schema state restart verified; effects, migration and device input remain.
 14. Implement host service contracts (plan 07) — in progress: bounded existing request bridge, timeouts and prompt refusal verified; service and device conformance remain.
 15. Begin publisher identity and submission work (plans 11–13) once the shared foundations are stable — plan 11 in progress: transactional identity/ownership registry, GitHub device adapter, signing-key enrollment and HTTP journeys verified locally; public-provider conformance and submission integration remain.
-16. Continue remaining plans in dependency order — pending.
+16. Implement immutable upload and submission lifecycle (plan 12) — in progress: private bounded pack upload and owner status verified; submission/validation/review linkage remain.
+17. Continue remaining plans in dependency order — pending.
 
 Implementation worktree: `/Users/guofoo/git/octosense/app-hub-store-work`, branch `feat/app-store-foundations`.
 

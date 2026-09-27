@@ -1,8 +1,9 @@
-//! Publisher control-plane service. No production identity provider is wired yet.
+//! Publisher control-plane service and private artifact staging.
 use axum::{
+    body::Body,
     extract::{DefaultBodyLimit, Path as RoutePath, State},
     http::{HeaderMap, StatusCode},
-    routing::{get, post},
+    routing::{get, post, put},
     Json, Router,
 };
 use rusqlite::{Connection, TransactionBehavior};
@@ -12,6 +13,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
+pub mod artifacts;
 pub mod auth;
 pub mod publishers;
 
@@ -45,6 +47,7 @@ impl From<rusqlite::Error> for ServiceError {
 
 pub struct Service {
     db: Mutex<Connection>,
+    blobs: artifacts::BlobStore,
     provider: Option<Arc<dyn auth::IdentityProvider>>,
     clock: Arc<dyn auth::Clock>,
     limits: Limits,
@@ -85,6 +88,7 @@ impl Service {
         db.pragma_update(None, "synchronous", "FULL")?;
         let service = Self {
             db: Mutex::new(db),
+            blobs: artifacts::BlobStore::new(&path.with_extension("blobs"))?,
             provider: None,
             clock: Arc::new(auth::SystemClock),
             limits: Limits::default(),
@@ -97,7 +101,7 @@ impl Service {
         let mut db = self.db.lock().unwrap();
         let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let version: i64 = tx.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-        if version > 3 {
+        if version > 4 {
             return Err(ServiceError::SchemaTooNew(version));
         }
         if version < 1 {
@@ -111,6 +115,10 @@ impl Service {
         if version < 3 {
             tx.execute_batch(include_str!("../migrations/003_claim_status.sql"))?;
             tx.execute_batch("PRAGMA user_version = 3")?;
+        }
+        if version < 4 {
+            tx.execute_batch(include_str!("../migrations/004_uploads.sql"))?;
+            tx.execute_batch("PRAGMA user_version = 4")?;
         }
         tx.commit()?;
         Ok(())
@@ -128,7 +136,7 @@ impl Service {
         let db = self.db.lock().unwrap();
         let one: i64 = db.query_row("SELECT 1", [], |row| row.get(0))?;
         let version: i64 = db.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-        Ok(one == 1 && version == 3)
+        Ok(one == 1 && version == 4)
     }
 
     pub fn stats(&self) -> Result<RegistryStats, ServiceError> {
@@ -182,6 +190,9 @@ pub fn router(service: Arc<Service>) -> Router {
             post(finish_key_enrollment),
         )
         .route("/v1/apps", post(claim_app))
+        .route("/v1/apps/{app_id}/uploads", post(create_upload))
+        .route("/v1/uploads/{upload_id}", get(upload_status))
+        .route("/v1/uploads/{upload_id}/content", put(put_upload))
         .layer(DefaultBodyLimit::max(4 * 1024))
         .with_state(service)
 }
@@ -382,5 +393,97 @@ async fn finish_key_enrollment(
             Json(serde_json::to_value(key).unwrap()),
         ),
         Err(error) => registry_failure(error),
+    }
+}
+
+fn upload_failure(error: artifacts::UploadError) -> (StatusCode, Json<serde_json::Value>) {
+    let (status, code) = match error {
+        artifacts::UploadError::Invalid => (StatusCode::BAD_REQUEST, "invalid_upload"),
+        artifacts::UploadError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized"),
+        artifacts::UploadError::Conflict => (StatusCode::CONFLICT, "upload_conflict"),
+        artifacts::UploadError::Database(_) | artifacts::UploadError::Io(_) => {
+            (StatusCode::SERVICE_UNAVAILABLE, "service_unavailable")
+        }
+    };
+    (
+        status,
+        Json(serde_json::json!({"error":{"code":code,"message":error.to_string()}})),
+    )
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UploadRequest {
+    expected_digest: String,
+    expected_bytes: u64,
+}
+
+async fn create_upload(
+    State(service): State<Arc<Service>>,
+    RoutePath(app_id): RoutePath<String>,
+    headers: HeaderMap,
+    Json(request): Json<UploadRequest>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    match bearer(&headers)
+        .map_err(artifacts::UploadError::from)
+        .and_then(|token| {
+            service.create_upload(
+                token,
+                &app_id,
+                &request.expected_digest,
+                request.expected_bytes,
+            )
+        }) {
+        Ok(upload) => (
+            StatusCode::CREATED,
+            Json(serde_json::to_value(upload).unwrap()),
+        ),
+        Err(error) => upload_failure(error),
+    }
+}
+
+async fn upload_status(
+    State(service): State<Arc<Service>>,
+    RoutePath(upload_id): RoutePath<String>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<serde_json::Value>) {
+    match bearer(&headers)
+        .map_err(artifacts::UploadError::from)
+        .and_then(|token| service.upload_status(token, &upload_id))
+    {
+        Ok(upload) => (StatusCode::OK, Json(serde_json::to_value(upload).unwrap())),
+        Err(error) => upload_failure(error),
+    }
+}
+
+async fn put_upload(
+    State(service): State<Arc<Service>>,
+    RoutePath(upload_id): RoutePath<String>,
+    headers: HeaderMap,
+    body: Body,
+) -> (StatusCode, Json<serde_json::Value>) {
+    let token = match bearer(&headers) {
+        Ok(token) => token.to_owned(),
+        Err(error) => return upload_failure(error.into()),
+    };
+    if let Err(error) = service.authorize(&token, "apps.submit") {
+        return upload_failure(error.into());
+    }
+    let upload = match service.upload_status(&token, &upload_id) {
+        Ok(upload) => upload,
+        Err(error) => return upload_failure(error),
+    };
+    let staged = match service.blobs.stage_body(body, upload.expected_bytes).await {
+        Ok(staged) => staged,
+        Err(error) => return upload_failure(error),
+    };
+    match tokio::task::spawn_blocking(move || service.put_upload_staged(&token, &upload_id, staged))
+        .await
+    {
+        Ok(Ok(upload)) => (StatusCode::OK, Json(serde_json::to_value(upload).unwrap())),
+        Ok(Err(error)) => upload_failure(error),
+        Err(_) => upload_failure(artifacts::UploadError::Io(std::io::Error::other(
+            "upload worker unavailable",
+        ))),
     }
 }

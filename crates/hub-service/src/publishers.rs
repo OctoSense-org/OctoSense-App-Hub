@@ -92,7 +92,7 @@ fn identifier(value: &str, max: usize) -> Result<String, RegistryError> {
     Ok(canonical)
 }
 
-fn new_id() -> Result<String, RegistryError> {
+pub(crate) fn new_id() -> Result<String, RegistryError> {
     let mut bytes = [0u8; 16];
     rand_core::OsRng
         .try_fill_bytes(&mut bytes)

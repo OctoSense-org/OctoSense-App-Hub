@@ -11,15 +11,17 @@ axum = "0.8"
 rusqlite = { version = "0.37", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "fs", "io-util"] }
 blake3 = "1"
 rand_core = { version = "0.9", features = ["os_rng"] }
 ed25519-dalek = "3"
 hex = "0.4"
 ureq = "3"
+octosense-app-hub = { path = "../app-hub" }
+tempfile = "3"
+http-body-util = "0.1"
 
 [dev-dependencies]
-tempfile = "3"
 tower = { version = "0.5", features = ["util"] }
 
 [[bin]]
