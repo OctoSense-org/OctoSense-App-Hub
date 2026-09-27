@@ -72,7 +72,7 @@ code at the same pin.
    widget that draws a visible sheet over the app; a shell with its own card
    presentation does the same.
 
-OctoSense is the reference: `phone/src/apps.rs` (`system_card_apps`,
+OctoSense is the reference: `crates/shell/src/apps.rs` (`system_card_apps`,
 `register_host_services`, `card_apps`) and, for the sheet and mounting, the
 `HostedHubCard` widget in this crate's `src/card_host.rs` (formerly
 OctoSense-ROM's `home/apps/app-hub/src/card_host.rs`).
