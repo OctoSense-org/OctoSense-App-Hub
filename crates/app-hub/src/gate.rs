@@ -194,6 +194,29 @@ pub fn check_bundle(
         },
     }
 
+    // ---- the app's agent and tools (ADR 0002 §3, §4) --------------------
+    // tools.json, AGENT.md and skills are checked here and pinned by the
+    // digest above like every other file. Native modules never come through
+    // this gate: they declare tools through the app-peers broker.
+    let agent_review = octosense_app_policy::agent::review(bundle, &manifest);
+    for issue in &agent_review.issues {
+        findings.push(if issue.refusal {
+            Finding::refuse(issue.check, issue.detail.clone())
+        } else {
+            Finding::warn(issue.check, issue.detail.clone())
+        });
+    }
+    if let Some(agent) = &agent_review.bundle {
+        for tool in agent.tools.iter().filter(|t| t.risk == octosense_app_policy::Risk::Destructive) {
+            // Recorded, not refused: a destructive tool is allowed, and the
+            // host always asks before it runs, whoever calls it.
+            findings.push(Finding::warn(
+                "tools",
+                format!("{} is destructive: every call waits for the person's approval", tool.name),
+            ));
+        }
+    }
+
     // ---- what it would get ----------------------------------------------
     let policy = match policy::resolve(&manifest, limits) {
         Ok(policy) => Some(policy),
@@ -279,7 +302,10 @@ fn external_references(root: &Path, manifest: &AppManifest) -> Result<Vec<String
             Ok(text) => text,
             Err(_) => continue, // not valid text: the extension check already covers it
         };
-        if extension == "splash" {
+        // A script, and the agent's own files (instructions, skills, the
+        // tool manifest), may name the hosts the app declares: the agent's
+        // network is the app's network. Nothing else may reach out.
+        if extension == "splash" || octosense_app_policy::agent::is_agent_file(&file, manifest) {
             found.extend(script_references(&file, &text, manifest));
             continue;
         }
@@ -364,6 +390,7 @@ pub fn entry_for(
         artifact: format!("artifacts/{}-{}.bundle", report.app_id, report.version),
         manifest,
         listing,
+        tools: octosense_app_policy::agent::read_tools(bundle)?.map(|t| t.tools).unwrap_or_default(),
         publisher: publisher.to_string(),
         publisher_key: publisher_key.to_string(),
         source: crate::index::Source { repository: repository.to_string(), commit: commit.to_string() },

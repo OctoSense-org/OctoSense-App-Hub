@@ -685,6 +685,7 @@ mod tests {
             octosense_app_hub::Entry {
                 manifest,
                 listing: None,
+                tools: Vec::new(),
                 artifact: artifact.into(),
                 publisher: "test-publisher".into(),
                 publisher_key: self.publisher.public_hex(),
