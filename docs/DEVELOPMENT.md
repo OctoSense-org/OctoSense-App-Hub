@@ -9,8 +9,8 @@ and submission. Authoring lives in other repositories:
 | Repository | What it owns |
 | --- | --- |
 | [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) | The app-development harness: quickstart, script API, the script-app template, the `tools/octo` command, the design flows (`flows/`) and example apps (`examples/`). Formerly Octoscript-AppCard. |
-| [OctoSense-System-Apps `apps/appcard`](https://github.com/OctoSense-org/OctoSense-System-Apps/tree/main/apps/appcard) | The AppCard assistant runtime and the L0 card language (`a2app-l0/framework/l0.md`). |
-| [OctoSense-System-Apps](https://github.com/OctoSense-org/OctoSense-System-Apps) | The first-party system apps (News, Photos, Maps, Camera, Mail), each a script app bundle under `apps/<name>/bundle/`, and Mail's host service under `apps/mail/host-service/`. |
+| [OctoSense-System-Apps `apps/appcard`](https://github.com/OctoSense-org/OctoSense-System-Apps/tree/main/apps/appcard) | The AppCard assistant runtime (opt-in in the shells) and the L0 card language (`a2app-l0/framework/l0.md`). |
+| [OctoSense-System-Apps](https://github.com/OctoSense-org/OctoSense-System-Apps) | The first-party system apps (News, Photos, Maps, Camera, Mail, AI providers), each a script app bundle under `apps/<name>/bundle/`, and their host services under `apps/mail/host-service/` and `apps/ai-providers/host-service/`. |
 
 | Task | Guide |
 | --- | --- |

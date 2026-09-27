@@ -4,7 +4,11 @@ English | [简体中文](README.zh-CN.md)
 
 Copy this directory into a new app repository, following
 [Build your first Hub app](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/FIRST-APP.md).
-This is a **metadata scaffold**, not a runnable or publishable demo.
+This is a **metadata scaffold** for a card app, not a runnable or publishable
+demo. Building a script app (`main.splash`)? Use
+`tools/octo new` from
+[OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow)
+instead of this directory.
 
 Included: schema-1 manifest and complete listing fields, an example SVG icon,
 ignore rules, and agent instructions pointing to the shared authoring guides.

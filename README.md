@@ -10,8 +10,8 @@ publisher's repository.
 | Looking for | Repository |
 | --- | --- |
 | How to build an app: quickstart, script API, script-app template, design flows, examples | [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) |
-| The AppCard assistant runtime and the L0 card language | [OctoSense-System-Apps `apps/appcard`](https://github.com/OctoSense-org/OctoSense-System-Apps/tree/main/apps/appcard) |
-| The first-party system apps (News, Photos, Maps, Camera, Mail) | [OctoSense-System-Apps](https://github.com/OctoSense-org/OctoSense-System-Apps) |
+| The AppCard assistant runtime (opt-in in the shells, `--features app-appcard`) and the L0 card language | [OctoSense-System-Apps `apps/appcard`](https://github.com/OctoSense-org/OctoSense-System-Apps/tree/main/apps/appcard) |
+| The first-party system apps (News, Photos, Maps, Camera, Mail, AI providers) and their host services (`mail`, `llm`) | [OctoSense-System-Apps](https://github.com/OctoSense-org/OctoSense-System-Apps) |
 | The bundle format, the gate, signing, submission and the store | this repository |
 
 **Building an app?** Start at the [OctoSense-org profile](https://github.com/OctoSense-org)'s "read these first" list (OctoScript-App-Design-Flow's `AGENTS.md`, then its `docs/QUICKSTART.md`). You need this repository only as a sibling checkout to build `hub` and `card-host`, and to submit (an issue here, see [Submitting](docs/PUBLISHING.md#submitting)). Clone it; do not edit `catalog.json`, `index/` or `artifacts/`.
@@ -86,7 +86,7 @@ withdrawn with `hub withdraw`, and every store honours it on its next fetch;
 | _none yet_ | | | | | | |
 
 The camera card that exercised the pipeline was removed on 20 Sep 2026:
-Camera is a system app that ships with the ROM (like Calendar, News and
-Photos), not a store app. Its repository stays at
+Camera is a system app that ships with the shells (like News and Photos),
+not a store app. Its repository stays at
 [ymote/camera-card](https://github.com/ymote/camera-card) as a worked
 example of a publishable bundle.
