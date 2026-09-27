@@ -6,6 +6,7 @@
 //! the bundle, and the store shows it beside the permissions, never instead
 //! of them. What the store says an app may do always comes from the resolved
 //! manifest; the listing cannot claim otherwise.
+use crate::agent::{Risk, ToolSpec};
 use crate::manifest::AppManifest;
 use serde::{Deserialize, Serialize};
 
@@ -192,6 +193,51 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
             if agent.tools.is_empty() { String::new() } else { format!(" with {}", agent.tools.join(", ")) }
         )),
         None => lines.push("Runs no assistant.".to_string()),
+    }
+    if manifest.agent.as_ref().and_then(|a| a.model.as_ref()).is_some_and(|m| m.local_only) {
+        lines.push("Its assistant uses only models that run on your own devices.".to_string());
+    }
+    lines
+}
+
+/// The permission lines for an app's agent and tools, in plain words: a
+/// background agent, tools that wait for approval, tools other assistants
+/// may be allowed to call. Derived from the manifest and `tools.json`, never
+/// from anything the app says about itself.
+pub fn agent_permission_lines(manifest: &AppManifest, tools: &[ToolSpec]) -> Vec<String> {
+    let mut lines = Vec::new();
+    if let Some(agent) = &manifest.agent {
+        if agent.background {
+            let when = match (agent.triggers.schedule.is_empty(), agent.triggers.events.is_empty()) {
+                (false, false) => "on a schedule and when new data arrives",
+                (false, true) => "on a schedule",
+                _ => "when new data arrives",
+            };
+            lines.push(format!(
+                "Its assistant may work while the app is closed, {when}; only if you allow it, and you can turn it off."
+            ));
+        }
+        if agent.model.as_ref().is_some_and(|m| m.local_only) {
+            lines.push("Its assistant uses only models that run on your own devices.".to_string());
+        }
+    }
+    let names = |risk: Option<Risk>, pick: &dyn Fn(&ToolSpec) -> bool| -> Vec<&str> {
+        tools.iter().filter(|t| risk.is_none_or(|r| t.risk == r) && pick(t)).map(|t| t.name.as_str()).collect()
+    };
+    let destructive = names(Some(Risk::Destructive), &|_| true);
+    if !destructive.is_empty() {
+        lines.push(format!(
+            "Can ask to {}: nothing of this runs until you approve it.",
+            destructive.join(", ")
+        ));
+    }
+    let shared = names(None, &|t| t.shareable);
+    if !shared.is_empty() {
+        lines.push(format!("Offers {} to other assistants you allow.", shared.join(", ")));
+    }
+    let shared_private = names(None, &|t| t.shareable && t.private_data == Some(true));
+    if !shared_private.is_empty() {
+        lines.push(format!("{} can pass your private data to those assistants.", shared_private.join(", ")));
     }
     lines
 }

@@ -6,6 +6,7 @@
 //! refused rather than ignored, so a manifest written for a newer host does
 //! not silently run with less containment than it asked for.
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// The manifest schema this build understands. A bundle declaring anything
 /// else is refused: an older host must not guess at a newer grammar.
@@ -224,6 +225,128 @@ pub struct AgentSpec {
     /// Tokens the session may spend per request.
     #[serde(default)]
     pub token_budget: Option<u64>,
+    /// What the agent needs from a model, never which model (ADR 0002 §3).
+    /// The host picks one from the person's providers that meets it.
+    ///
+    /// Every field added after the first release of schema 1 is skipped when
+    /// it holds its default, so a manifest written before it existed
+    /// serialises, and therefore signs, exactly as it did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<ModelSpec>,
+    /// The agent may run while the app is closed, woken by `triggers`. A
+    /// request: the person grants or refuses it per app, and it requires at
+    /// least one trigger.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub background: bool,
+    /// What wakes the agent besides the person (ADR 0002 §2).
+    #[serde(default, skip_serializing_if = "Triggers::is_empty")]
+    pub triggers: Triggers,
+    /// The bundle-relative path of the agent's instructions, conventionally
+    /// [`crate::agent::AGENT_FILE`]. Named here so the file is declared, not
+    /// merely present; the digest pins its bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
+    /// The skills the bundle ships under `skills/<name>/`. Installed into
+    /// this app's peer workspace only, and data-only for a contained app.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skills: Vec<String>,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+/// What a task needs from a model. Closed: a need that is not here cannot be
+/// matched by any host, so adding one is a change here and in the host's
+/// model selection, together.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ModelNeed {
+    /// Structured tool calls. An agent with any tools needs this.
+    ToolCalling,
+    /// Image input, for example to critique a rendered card.
+    Vision,
+    /// A long context window (the host decides what "long" means today).
+    LongContext,
+    /// A reasoning (thinking) model.
+    Reasoning,
+    /// Reliable JSON output against a schema.
+    StructuredOutput,
+    /// Reads and writes more than one language well.
+    Multilingual,
+}
+
+/// Every [`ModelNeed`], as the manifest spells it.
+pub const KNOWN_MODEL_NEEDS: &[&str] =
+    &["tool_calling", "vision", "long_context", "reasoning", "structured_output", "multilingual"];
+
+/// How capable (and costly) a model the task deserves. The host maps a tier
+/// to the person's providers; policy may lower it (budget, battery).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ModelTier {
+    Fast,
+    #[default]
+    Standard,
+    Strong,
+}
+
+/// The model an app's agent needs. Never a provider or a model name: the
+/// app cannot know which ones the person configured, and never sees keys.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ModelSpec {
+    #[serde(default)]
+    pub needs: Vec<ModelNeed>,
+    #[serde(default)]
+    pub tier: ModelTier,
+    /// Only a model that runs on the device (or the person's own machine)
+    /// may see this app's data. App-wide: a task cannot relax it.
+    #[serde(default)]
+    pub local_only: bool,
+    /// Different requirements for named tasks, for example a fast model for
+    /// `triage` and a strong one for `synthesis`. Task names are the app's
+    /// own (`[a-z_]{1,32}`); `AGENT.md` says which task a step is.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub per_task: BTreeMap<String, TaskModel>,
+}
+
+/// One task's model requirements. `local_only` is deliberately absent: it
+/// holds for the whole app.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskModel {
+    #[serde(default)]
+    pub needs: Vec<ModelNeed>,
+    #[serde(default)]
+    pub tier: ModelTier,
+}
+
+/// What wakes an app's agent without the person asking.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Triggers {
+    /// Five-field cron expressions (minute hour day-of-month month
+    /// day-of-week), in the device's local time: `"0 7 * * *"`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub schedule: Vec<String>,
+    /// Events from the app's own host service, in the app's namespace:
+    /// `"news.items.new"`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub events: Vec<String>,
+}
+
+impl Triggers {
+    pub fn is_empty(&self) -> bool {
+        self.schedule.is_empty() && self.events.is_empty()
+    }
+}
+
+/// The namespace an app's tools and events live in: the last segment of its
+/// id (`os.news` and `dev.example.news` are both `news`). Peers are per app,
+/// so two apps with the same short id never share a tool registry.
+pub fn short_id(app_id: &str) -> &str {
+    app_id.rsplit('.').next().unwrap_or(app_id)
 }
 
 impl AppManifest {
