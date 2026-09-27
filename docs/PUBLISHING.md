@@ -134,6 +134,7 @@ they install.
 | `microphone` | Record sound with a camera video. | Use the microphone |
 | `library` | Offer captures to the system photo library, where other apps can see them; without it, captures stay in the app's storage. | Save to your photo library, where other apps can see it |
 | `mail` | Read and send mail through the host's mail service, from accounts the person signs in to on the host's sheet. | Read and send mail from accounts you sign in to on the device |
+| `llm` | See and arrange the assistant's LLM providers through the host's `llm` service; keys are typed, shown and scanned only on the host's sheets. The service answers only `os.` system apps (AI providers), so a store app gains nothing from it. | Manage the assistant's AI providers, whose keys stay with the device |
 
 Location, camera and clipboard are each a separate consent; none implies
 another.
@@ -388,7 +389,8 @@ app appeared in, or with the findings to fix.
 - Reference any server, CDN or local path from a card, or an undeclared host
   from a script app. Bundle the asset.
 - Request `prompt`, `location`, `camera`, `microphone`, `clipboard`, `library`,
-  `images`, `web` or `mail` unless a screen needs it; each is shown to the
+  `images`, `web` or `mail` unless a screen needs it (and never `llm`, which
+  serves only system apps); each is shown to the
   person as a separate line.
 - Ask for a password, PIN or code in the app. A host service asks on its own
   sheet.

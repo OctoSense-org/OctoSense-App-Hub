@@ -7,8 +7,8 @@
 | 仓库 | 负责内容 |
 | --- | --- |
 | [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) | 应用开发工具集：快速上手、脚本 API、脚本应用模板、`tools/octo` 命令、设计流程（`flows/`）和示例应用（`examples/`）。原名 Octoscript-AppCard。 |
-| [OctoSense-System-Apps `apps/appcard`](https://github.com/OctoSense-org/OctoSense-System-Apps/tree/main/apps/appcard) | AppCard 助手运行时与 L0 卡片语言（`a2app-l0/framework/l0.md`）。 |
-| [OctoSense-System-Apps](https://github.com/OctoSense-org/OctoSense-System-Apps) | 第一方系统应用（新闻、相册、地图、相机、邮件），每个都是位于 `apps/<name>/bundle/` 下的脚本应用包；邮件的宿主服务位于 `apps/mail/host-service/`。 |
+| [OctoSense-System-Apps `apps/appcard`](https://github.com/OctoSense-org/OctoSense-System-Apps/tree/main/apps/appcard) | AppCard 助手运行时（在 Shell 中为可选功能）与 L0 卡片语言（`a2app-l0/framework/l0.md`）。 |
+| [OctoSense-System-Apps](https://github.com/OctoSense-org/OctoSense-System-Apps) | 第一方系统应用（新闻、相册、地图、相机、邮件、AI providers），每个都是位于 `apps/<name>/bundle/` 下的脚本应用包；它们的宿主服务位于 `apps/mail/host-service/` 和 `apps/ai-providers/host-service/`。 |
 
 | 任务 | 指南 |
 | --- | --- |
