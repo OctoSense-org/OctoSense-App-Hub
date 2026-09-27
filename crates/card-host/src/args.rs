@@ -13,7 +13,7 @@ its manifest resolves to: admit, resolve, apply, then evaluate.
 
 Usage:
   card-host [--bundle <dir>] [--app-data <dir>] [--allow-unsigned] [--stamp]
-            [--system] [--static <prefix>=<dir>]...
+            [--system] [--static <prefix>=<dir>]... [--size <w>x<h>]
   card-host -h | --help
 
 Options:
@@ -30,7 +30,14 @@ Options:
                            system ceilings. An empty digest is filled in memory.
   --static <prefix>=<dir>  Serve <dir>'s files at <prefix>/... from memory.
                            Repeatable.
+  --size <w>x<h>           The window's inner size in layout points, e.g.
+                           390x844. Default: 412x892. card-studio renders a
+                           card at several sizes with it.
   -h, --help               Print this and exit.
+
+Every L0 card logs one `card-host: realize {json}` line: the lint result
+(valid, level, diagnostics), the realize report (nodes, truncated,
+diagnostics), each declared source's $state and which lowering drew it.
 
 Remote control: set MAKEPAD_REMOTE=<port> (or pass --remote [<port>]) for a
 localhost HTTP control surface; GET / on it lists the routes. See
@@ -45,6 +52,15 @@ pub struct Args {
     pub stamp: bool,
     pub system: bool,
     pub statics: Vec<(String, PathBuf)>,
+    /// `--size`: the window's inner size in layout points.
+    pub size: Option<(f64, f64)>,
+}
+
+/// Parse `<w>x<h>` (layout points, both positive and finite).
+pub fn parse_size(text: &str) -> Option<(f64, f64)> {
+    let (w, h) = text.split_once(['x', 'X'])?;
+    let (w, h) = (w.trim().parse::<f64>().ok()?, h.trim().parse::<f64>().ok()?);
+    (w.is_finite() && h.is_finite() && w >= 1.0 && h >= 1.0).then_some((w, h))
 }
 
 #[derive(Debug, PartialEq)]
@@ -82,6 +98,7 @@ pub fn parse<I: IntoIterator<Item = String>>(argv: I) -> Result<Args, ArgsError>
         stamp: false,
         system: false,
         statics: Vec::new(),
+        size: None,
     };
     let mut argv = argv.into_iter().peekable();
     while let Some(arg) = argv.next() {
@@ -106,6 +123,12 @@ pub fn parse<I: IntoIterator<Item = String>>(argv: I) -> Result<Args, ArgsError>
                     return Err(ArgsError::Invalid(format!("--static wants <prefix>=<dir>, got {mount:?}")));
                 };
                 args.statics.push((prefix.trim_matches('/').to_string(), PathBuf::from(dir)));
+            }
+            "--size" => {
+                let text = value("--size")?;
+                args.size = Some(
+                    parse_size(&text).ok_or_else(|| ArgsError::Invalid(format!("--size wants <w>x<h>, got {text:?}")))?,
+                );
             }
             "--allow-unsigned" | "--stamp" | "--system" if inline.is_some() => {
                 return Err(ArgsError::Invalid(format!("{flag} takes no value")));
@@ -152,13 +175,14 @@ mod tests {
         assert_eq!(args.app_data, std::env::temp_dir().join("octosense-card-apps"));
         assert!(!args.allow_unsigned && !args.stamp && !args.system);
         assert!(args.statics.is_empty());
+        assert_eq!(args.size, None);
     }
 
     #[test]
     fn every_documented_flag_parses() {
         let args = parse_strs(&[
             "--bundle", "app/bundle", "--app-data=/tmp/state", "--allow-unsigned", "--stamp", "--system",
-            "--static", "/photos/=art", "--static=icons=icons",
+            "--static", "/photos/=art", "--static=icons=icons", "--size", "390x844",
         ])
         .unwrap();
         assert_eq!(
@@ -170,6 +194,7 @@ mod tests {
                 stamp: true,
                 system: true,
                 statics: vec![("photos".into(), PathBuf::from("art")), ("icons".into(), PathBuf::from("icons"))],
+                size: Some((390.0, 844.0)),
             }
         );
     }
@@ -185,6 +210,9 @@ mod tests {
             &["--app-data"],
             &["--static", "no-equals-sign"],
             &["--stamp=yes"],
+            &["--size", "390"],
+            &["--size=0x10"],
+            &["--size", "wide"],
         ] {
             assert!(matches!(parse_strs(argv), Err(ArgsError::Invalid(_))), "{argv:?}");
         }
@@ -204,7 +232,7 @@ mod tests {
 
     #[test]
     fn usage_names_every_flag() {
-        for flag in ["--bundle", "--app-data", "--allow-unsigned", "--stamp", "--system", "--static", "--help"] {
+        for flag in ["--bundle", "--app-data", "--allow-unsigned", "--stamp", "--system", "--static", "--size", "--help"] {
             assert!(USAGE.contains(flag), "{flag}");
         }
     }

@@ -11,6 +11,9 @@
 #   app-host      a one-window host for any AppModule
 #   app-hub-app   the shell integration every OctoSense shell links: the
 #                 native store module, the Card runner, system apps, icons
+#   card-studio   renders a card in card-host --remote at glance, phone and
+#                 desktop sizes, runs the measured checks, and prepares its
+#                 vision critique (ADR 0002 section 7)
 [workspace]
 resolver = "2"
 members = [
@@ -21,6 +24,7 @@ members = [
     "crates/card-host",
     "crates/app-host",
     "crates/app-hub-app",
+    "crates/card-studio",
 ]
 
 # Builds resolve the pinned sources from the prepared sibling checkouts, as

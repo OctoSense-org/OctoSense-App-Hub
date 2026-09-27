@@ -32,6 +32,8 @@ publisher's repository.
 | `crates/appstore` | The store as an OctoSense module, the `card` module that runs an installed app as its own client, system apps (`os.` ids) and host services with their sheets. |
 | `crates/appstore-app` | The store as a standalone app (`appstore`). |
 | `crates/card-host` | The reference contained host for one bundle, card or script app (`card-host`). |
+| `crates/card-studio` | Renders a card in a hidden `card-host --remote` at glance, phone and desktop sizes, runs the measured checks and prepares the vision critique (`card-studio`, ADR 0002 section 7). |
+| `skills/card-studio` | The octos skill over `card-studio`: `card_render`, `card_critique_payload`. |
 | `crates/app-host` | A one-window host that runs any OctoSense AppModule as a standalone app. |
 | `crates/app-hub-app` | The shell integration every OctoSense shell links: the native store module, the `card` runner module, the system apps named by `OCTOSENSE_SYSTEM_APPS`, installed apps and icons ([README](crates/app-hub-app/README.md)). |
 

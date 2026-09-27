@@ -29,6 +29,8 @@
 | `crates/appstore` | 作为 OctoSense 模块的商店；把已安装应用作为独立客户端运行的 `card` 模块；系统应用（`os.` 前缀 id）；以及宿主服务及其面板。 |
 | `crates/appstore-app` | 作为独立应用的商店（`appstore`）。 |
 | `crates/card-host` | 隔离运行单个应用包（卡片应用或脚本应用）的参考宿主（`card-host`）。 |
+| `crates/card-studio` | 在隐藏的 `card-host --remote` 中按速览卡片、手机和桌面尺寸渲染卡片，运行测量检查，并准备视觉评审请求（`card-studio`，ADR 0002 第 7 节）。 |
+| `skills/card-studio` | 基于 `card-studio` 的 octos 技能：`card_render`、`card_critique_payload`。 |
 | `crates/app-host` | 单窗口宿主，可把任意 OctoSense AppModule 作为独立应用运行。 |
 | `crates/app-hub-app` | 每个 OctoSense Shell 都会链接的集成：原生商店模块、`card` 运行模块、由 `OCTOSENSE_SYSTEM_APPS` 指定的系统应用、已安装应用和图标（[README](crates/app-hub-app/README.md)）。 |
 
