@@ -27,6 +27,7 @@
 //! assert!(!policy.allows_host("example.com"));
 //! assert!(policy.agent.is_none(), "an app gets no agent unless it asks");
 //! ```
+pub mod agent;
 pub mod assets;
 pub mod bundle;
 pub mod containers;
@@ -39,12 +40,19 @@ pub mod policy;
 pub mod services;
 pub mod verify;
 
+pub use agent::{
+    AgentBundle, Confirm, ImplementedBy, Risk, Skill, SkillManifest, Supervision, ToolHost, ToolManifest, ToolSpec, AGENT_FILE,
+    SKILLS_DIR, TOOLS_FILE,
+};
 pub use assets::{rewrite_assets, AssetServer, StaticAssets};
 pub use bundle::{digest_dir, MANIFEST_FILE};
 pub use containers::{IsolateSettings, Provenance, SessionProfile};
 pub use entry::{script_source, ASSETS_PLACEHOLDER, SCRIPT_ENTRY};
-pub use listing::{privacy_summary, Listing, Publisher, LISTING_FILE};
-pub use manifest::{AgentSpec, AppManifest, ProfileMode, KNOWN_CAPABILITIES, SCHEMA};
+pub use listing::{agent_permission_lines, privacy_summary, Listing, Publisher, LISTING_FILE};
+pub use manifest::{
+    short_id, AgentSpec, AppManifest, ModelNeed, ModelSpec, ModelTier, ProfileMode, TaskModel, Triggers, KNOWN_CAPABILITIES,
+    KNOWN_MODEL_NEEDS, SCHEMA,
+};
 pub use policy::{AgentPolicy, AppPolicy, HostLimits};
 pub use services::{is_host_service, service_words, MATRIX_ACTIONS, OCTOS_SERVICES};
 pub use verify::{admit, admit_digest, bundle_digest, RefuseAllSignatures, SignatureVerifier};

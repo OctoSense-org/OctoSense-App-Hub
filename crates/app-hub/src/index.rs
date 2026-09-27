@@ -7,7 +7,7 @@
 //!
 //! The manifest is embedded rather than referenced so that what a reviewer
 //! read, what the hub signed and what the device enforces are the same bytes.
-use octosense_app_policy::{AppManifest, Listing};
+use octosense_app_policy::{AppManifest, Listing, ToolSpec};
 use serde::{Deserialize, Serialize};
 
 /// Whether this version is still offered, and why not.
@@ -37,6 +37,13 @@ pub struct Entry {
     /// permissions the store shows still come from the manifest.
     #[serde(default)]
     pub listing: Option<Listing>,
+    /// The app's tool manifest (`tools.json`) as reviewed, so a store can
+    /// say which tools wait for approval or may be shared before anything is
+    /// installed. Omitted when the app ships no tools, so an entry without
+    /// them serialises, and signs, as it did before the field existed. The
+    /// bundle's copy is authoritative on the device: the digest pins it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tools: Vec<ToolSpec>,
     /// Where the hub's own copy of the bundle lives, relative to the catalog.
     pub artifact: String,
     /// The publisher's key identity, as the hub knows it. Update continuity
@@ -91,6 +98,7 @@ impl Entry {
                 "library" => "Save to your photo library, where other apps can see it".to_string(),
                 "mail" => "Read and send mail from accounts you sign in to on the device".to_string(),
                 "llm" => "Manage the assistant's AI providers, whose keys stay with the device".to_string(),
+                "news" => "Read news the device collects from its feeds and topics".to_string(),
                 other => match octosense_app_policy::service_words(other) {
                     Some(words) => words.to_string(),
                     None => format!("Use {other}"),
@@ -101,6 +109,7 @@ impl Entry {
             let tools = if agent.tools.is_empty() { "no tools".to_string() } else { agent.tools.join(", ") };
             lines.push(format!("Run an assistant for this app ({tools}), inside this app's own data only"));
         }
+        lines.extend(octosense_app_policy::agent_permission_lines(&self.manifest, &self.tools));
         if lines.is_empty() {
             lines.push("Draw its screens, and nothing else".to_string());
         }
@@ -207,6 +216,7 @@ mod tests {
             artifact: String::new(),
             manifest,
             listing: None,
+            tools: Vec::new(),
             publisher: String::new(),
             publisher_key: String::new(),
             source: Source { repository: String::new(), commit: String::new() },
