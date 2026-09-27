@@ -167,6 +167,25 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
             lines.push(text.to_string());
         }
     }
+    let matrix_reads = manifest
+        .capabilities
+        .iter()
+        .any(|c| c.starts_with("matrix.") && !crate::services::MATRIX_ACTIONS.contains(&c.as_str()));
+    let matrix_acts = manifest
+        .capabilities
+        .iter()
+        .any(|c| crate::services::MATRIX_ACTIONS.contains(&c.as_str()));
+    if matrix_reads {
+        lines.push("Reads from your Matrix account, only in the rooms you allow.".to_string());
+    }
+    if matrix_acts {
+        lines.push("Acts on your Matrix account, only in the rooms you allow.".to_string());
+    }
+    if has("octos.turn.start") {
+        lines.push("Asks the device's assistant to work for it; the assistant's keys stay with the device.".to_string());
+    } else if has("octos.session.open") || has("octos.session.history") {
+        lines.push("Opens or reads its own conversations with the device's assistant, but cannot ask it to work.".to_string());
+    }
     match &manifest.agent {
         Some(agent) => lines.push(format!(
             "Runs an assistant limited to this app's own data{}.",
