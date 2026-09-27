@@ -1244,9 +1244,18 @@ version = "0.1.0"
 dependencies = [
  "makepad-widgets",
  "octoscript-makepad",
+ "octoscript-ui-l0",
  "octoscript-widgets",
  "octosense-app-policy",
  "octosense-appstore",
+ "serde_json",
+]
+
+[[package]]
+name = "octosense-card-studio"
+version = "0.1.0"
+dependencies = [
+ "serde",
  "serde_json",
 ]
 

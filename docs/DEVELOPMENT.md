@@ -67,7 +67,7 @@ admission order a device uses: admit, resolve, apply, evaluate.
 
 ```sh
 cargo build --release -p octosense-card-host --bin card-host
-card-host --bundle <dir> [--app-data <dir>] [--allow-unsigned] [--stamp] [--system] [--static <prefix>=<dir>]...
+card-host --bundle <dir> [--app-data <dir>] [--allow-unsigned] [--stamp] [--system] [--static <prefix>=<dir>]... [--size <w>x<h>]
 card-host --help
 ```
 
@@ -82,10 +82,43 @@ exits 2. Neither opens a window.
 | `--stamp` | Rewrite the manifest's `integrity.bundle_blake3` to match the directory before admitting. Without it, a bundle whose bytes changed since the last `hub stamp` is refused. |
 | `--system` | Admit as a system app is admitted: by digest only, under the system ceilings. An empty digest is filled in memory. For developing a system app. |
 | `--static <prefix>=<dir>` | Serve `<dir>`'s files at `<prefix>/...` from memory, as a shell serves a system app's compiled-in artwork (Photos uses `--static photos=<dir>`). |
+| `--size <w>x<h>` | The window's inner size in layout points, with no caption bar, so the card gets exactly that viewport (glance tile, phone, desktop). `card-studio` launches one card-host per size with it. |
 
 The log line `card-host: <id> <version> admitted — capabilities …, hosts …`
 is what the app got. A refusal is logged as `card-host: refused: …` and
 nothing is drawn.
+
+An L0 card also logs one line `card-host: realize {json}` before it is
+drawn: `lint` (`check_ui_l0`: `valid`, `level`, `diagnostics`), `realize`
+(`nodes`, `truncated` — a bound was hit and the tree is partial —
+`diagnostics`), `sources` (each declared source's `$state`: the data's
+`$status` entry, else `ready` with a value and `pending` without), and
+`lowering` (`design` for a native kit pack, `l0-kit` for a card composed from
+the role kit, whose nodes get inspectable ids `beauty_0_1_…`) or
+`lower_error`. Read it with `/log`.
+
+## Inspecting a card before publishing: `card-studio`
+
+`card-studio` (`crates/card-studio`, ADR 0002 section 7) renders a card in a
+hidden `card-host --remote` at the target sizes, runs the measured checks and
+prepares the vision critique. It drives card-host over HTTP and never links
+Makepad; its checks run on saved captures with no GPU.
+
+```sh
+cargo build --release -p octosense-card-host -p octosense-card-studio
+export CARD_STUDIO_KIT=../octoscript-makepad/components/l0   # the L0 kit a bare card is lowered with
+target/release/card-studio render --card news.card --data digest.json \
+    --size glance --size phone --size desktop --out out/
+target/release/card-studio critique --report out/report.json --rubric AGENT-rubric.md --inline > request.json
+target/release/card-studio check --snap out/glance.snap.json --tree out/glance.tree.txt --log out/glance.log.json --size glance
+```
+
+`render` writes `out/report.json` with, per size, the PNG (`/gq`), the
+snapshot (`/snap?all=1`), the tree (`/d`), the log, card-host's realize
+report, the findings and the metrics, and exits 1 when any finding is an
+error. The checks, the severity model, the report and the critique payload
+are documented in the crate (`src/checks.rs`, `src/report.rs`,
+`src/critique.rs`); the octos skill is in `skills/card-studio`.
 
 `card-host` registers no host services. A script app that calls
 `host.request("mail.…", …)` gets `no service answers "mail" on this device`

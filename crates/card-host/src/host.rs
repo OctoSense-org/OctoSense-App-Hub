@@ -107,6 +107,11 @@ fn policy_for(args: &Args) -> Result<AppPolicy, String> {
 
 /// Lower the card to isolate source: realize it, then lower it with the kit
 /// that ships in the bundle. Nothing is read from outside the bundle.
+///
+/// An L0 card also logs one `card-host: realize {json}` line (see
+/// [`realize_report`]) before it is lowered, so a harness reading the log —
+/// card-studio does — gets the lint result, the realize report and each
+/// source's `$state`, whether or not the card then lowers.
 fn card_source(bundle: &Path, asset_origin: &str) -> Result<String, String> {
     // A script app runs its own program.
     if let Some(script) = octosense_app_policy::script_source(bundle, asset_origin) {
@@ -116,11 +121,84 @@ fn card_source(bundle: &Path, asset_origin: &str) -> Result<String, String> {
     let data_text = std::fs::read_to_string(bundle.join("page.data.json")).unwrap_or_else(|_| "{}".into());
     let mut data: serde_json::Value = serde_json::from_str(&data_text).map_err(|e| format!("page.data.json: {e}"))?;
     octosense_app_policy::rewrite_assets(&mut data, asset_origin);
-    let prepared = octoscript_makepad::l0::prepare(&card, &data, &bundle.join("kit"))?;
-    let ui = octoscript_makepad::design::to_makepad_ui(&prepared.tree)?;
+    let mut report = realize_report(&card, &data);
+    let lowered = lower(&card, &data, &bundle.join("kit"));
+    match &lowered {
+        Ok((_, lowering)) => report["lowering"] = serde_json::Value::String((*lowering).into()),
+        Err(e) => report["lower_error"] = serde_json::Value::String(e.clone()),
+    }
+    log!("card-host: realize {report}");
     // The isolate's prelude opens a `View{`; the body continues it, exactly as
     // a splash app's body does.
-    Ok(format!("width:Fill height:Fill flow:Overlay {ui}"))
+    lowered.map(|(ui, _)| format!("width:Fill height:Fill flow:Overlay {ui}"))
+}
+
+/// Lower a realized card to Makepad UI, naming the lowering used.
+///
+/// A card built from a native kit pack (the image-to-card flow's measured
+/// placements) goes through the measured-design lowering, as before. A plain
+/// L0 card composed from the role kit (`Surface`, `Col`, `TextTitle`, …) has
+/// no placements, so the measured lowering refuses it ("unsupported measured
+/// design node"); it falls back to the kit lowering the Card runner uses,
+/// with inspectable ids (`beauty_0_1_…`) so `/snap` can name every node.
+fn lower(card: &str, data: &serde_json::Value, kit: &Path) -> Result<(String, &'static str), String> {
+    let mut prepared = octoscript_makepad::l0::prepare(card, data, kit)?;
+    match octoscript_makepad::design::to_makepad_ui(&prepared.tree) {
+        Ok(ui) => Ok((ui, "design")),
+        Err(e) if prepared.native_components => Err(e),
+        Err(_) => {
+            octoscript_makepad::l0::inspectable(&mut prepared.tree);
+            Ok((octoscript_makepad::to_makepad_l0_ui(&prepared.tree), "l0-kit"))
+        }
+    }
+}
+
+/// The card's lint result, realize report and source lifecycle, as JSON.
+///
+/// This is what ADR 0002 §7 asks a render tool to return next to the frame:
+/// `lint` is `check_ui_l0` (valid, level, diagnostics), `realize` is the
+/// realization the card is drawn from (`nodes`, `truncated` — a bound was
+/// reached and the tree is partial — and diagnostics), and `sources` gives
+/// each declared source's `$state` as the card sees it: the host's
+/// `$status` entry if it reported one, else `ready` with a value, `pending`
+/// without.
+fn realize_report(card: &str, data: &serde_json::Value) -> serde_json::Value {
+    use octoscript_ui_l0 as l0;
+    let diagnostics = |ds: &[l0::SyntaxDiagnostic]| -> Vec<serde_json::Value> {
+        ds.iter()
+            .map(|d| serde_json::json!({"line": d.line, "column": d.column, "message": d.message}))
+            .collect()
+    };
+    let lint = l0::check_ui_l0(card);
+    let realized = l0::realize(card, data, Default::default());
+    let sources: Vec<serde_json::Value> = l0::source_plan(card)
+        .requests
+        .iter()
+        .map(|request| {
+            let reported = data.get("$status").and_then(|s| s.get(&request.name)).and_then(|v| v.as_str());
+            let present = request
+                .name
+                .split('.')
+                .try_fold(data, |value, key| value.get(key))
+                .is_some_and(|value| !value.is_null());
+            let state = reported.unwrap_or(if present { "ready" } else { "pending" });
+            serde_json::json!({"name": request.name, "helper": request.helper, "state": state})
+        })
+        .collect();
+    serde_json::json!({
+        "lint": {
+            "valid": lint.valid,
+            "level": format!("{:?}", lint.level),
+            "diagnostics": diagnostics(&lint.diagnostics),
+            "diagnostics_truncated": lint.diagnostics_truncated,
+        },
+        "realize": {
+            "nodes": realized.nodes,
+            "truncated": realized.truncated,
+            "diagnostics": diagnostics(&realized.diagnostics),
+        },
+        "sources": sources,
+    })
 }
 
 /// Give every card isolate the kit vocabulary it needs to draw.
@@ -150,6 +228,16 @@ impl App {
             error!("card-host: started without its arguments");
             return;
         };
+        if let Some((w, h)) = args.size {
+            // A sized window is a render target (card-studio): the card gets
+            // the whole inner size, so the caption bar goes.
+            let mut window = self.ui.widget(cx, ids!(main_window));
+            script_apply_eval!(cx, window, { show_caption_bar: false });
+            let size = dvec2(w, h);
+            self.ui.window(cx, ids!(main_window)).configure_window(cx, size, dvec2(40.0, 40.0), false, "Card host".into());
+            self.ui.window(cx, ids!(main_window)).resize(cx, size);
+            log!("card-host: window sized {w}x{h}");
+        }
         let policy = match policy_for(args) {
             Ok(policy) => policy,
             Err(e) => {
