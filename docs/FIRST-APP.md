@@ -67,7 +67,7 @@ handling first.
 Use the [image-to-card flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md)
 to create and review the native card output. App-specific service logic and
 data binding still require implementation; a screenshot or an atlas is not a
-running app. Use [L0](https://github.com/OctoSense-org/OctoSense-System-Apps/blob/main/apps/appcard/a2app-l0/framework/l0.md)
+running app. Use [L0](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md)
 for data/state/event semantics.
 
 ```text
@@ -90,7 +90,7 @@ my-app/
 Follow the [script-app flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/script-app/FLOW.md);
 the calls a program may make (`fs`, `net`, `host.request`, widget handles)
 are in the [script API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md).
-The [system apps](https://github.com/OctoSense-org/OctoSense-System-Apps) are
+The [system apps](https://github.com/OctoSense-org/OctoSense/tree/main/apps) are
 complete worked examples of the same format.
 
 ```text
@@ -212,7 +212,7 @@ changes the digest and can introduce development-only content.
 ## 6. Sign and submit
 
 To see the app in a shell before submitting, publish it into a local catalog
-with a throwaway anchor and point OctoSense-Desktop's `OCTOSENSE_HUB` and
+with a throwaway anchor and point the OctoSense desktop shell's `OCTOSENSE_HUB` and
 `OCTOSENSE_HUB_ANCHOR` at it
 ([rehearsal steps](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally)).
 
