@@ -139,6 +139,29 @@ they install.
 Location, camera and clipboard are each a separate consent; none implies
 another.
 
+**Host services by exact name** (`crates/app-policy/src/services.rs`). A host
+that offers the Matrix account (Rinx) or the device's assistant (Octos) serves
+these to a bundle that requests them. Each name is its own consent, checked
+exactly: a prefix such as `octos.` or `matrix.`, or any name not listed here,
+is an unknown capability and the manifest is refused. Admission is not
+dispatch: the host also intersects the request with the services it supports,
+its policy and the person's per-instance grant (for Matrix, the rooms they
+allow), and checks that lease on every call. A host that does not offer a
+requested service shows the app as unavailable with the reason.
+
+| Capability | Grants | The store says |
+| --- | --- | --- |
+| `octos.session.open` | Open the app's own conversation with the host's assistant. The host binds it to this app and the current account; the app never names a profile, provider or workspace. | Open its own conversation with the assistant |
+| `octos.session.history` | Read that conversation's history. Does not allow starting a turn. | Read its own conversations with the assistant |
+| `octos.turn.start` | Send a request the assistant works on, under the host's AI settings and tool limits. The model provider and its keys stay with the host. | Ask the assistant to work for it, using the device's AI settings |
+| `octos.turn.interrupt` | Stop a turn this app started. | Stop assistant work it started |
+| `matrix.*` (45 names) | One Matrix operation each, on the person's current account, in the rooms they allow: reads such as `matrix.read_messages`, `matrix.room_members`, `matrix.profile`; actions such as `matrix.send_message`, `matrix.react`, `matrix.join`. The exact list is `KNOWN_CAPABILITIES`. | One plain line per name, for example "Read messages in rooms you allow" |
+
+Sending room data to the assistant needs both the Matrix read grant and the
+assistant grant. No `octos.*` service chooses a model provider, submits a key
+or reaches the kernel's raw protocol.
+
+
 **Network**: `net` plus an exact host list. The list is enforced on every path
 out of the isolate: the network module, artwork loading and data fetches. An
 empty list with `net` reaches nothing. Hosts match exactly: listing

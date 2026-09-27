@@ -36,6 +36,7 @@ pub mod listing;
 pub mod splash_adapter;
 pub mod manifest;
 pub mod policy;
+pub mod services;
 pub mod verify;
 
 pub use assets::{rewrite_assets, AssetServer, StaticAssets};
@@ -45,6 +46,7 @@ pub use entry::{script_source, ASSETS_PLACEHOLDER, SCRIPT_ENTRY};
 pub use listing::{privacy_summary, Listing, Publisher, LISTING_FILE};
 pub use manifest::{AgentSpec, AppManifest, ProfileMode, KNOWN_CAPABILITIES, SCHEMA};
 pub use policy::{AgentPolicy, AppPolicy, HostLimits};
+pub use services::{is_host_service, service_words, MATRIX_ACTIONS, OCTOS_SERVICES};
 pub use verify::{admit, admit_digest, bundle_digest, RefuseAllSignatures, SignatureVerifier};
 
 /// The whole admission path for a bundle that is a directory: parse, check
