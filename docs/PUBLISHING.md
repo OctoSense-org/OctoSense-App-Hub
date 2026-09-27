@@ -57,6 +57,18 @@ my-app/
   screenshots/       at least one PNG the listing names     (required)
 ```
 
+Either kind may also ship **its own agent** (ADR 0002): a tool manifest, the
+agent's instructions and skills, next to `manifest.json`. See
+[The app's agent and tools](#the-apps-agent-and-tools).
+
+```
+my-app/
+  tools.json                     the app's tools, typed, with risk levels   (optional)
+  AGENT.md                       the agent's instructions                   (optional)
+  skills/<name>/SKILL.md         an octos skill, data only                  (optional)
+  skills/<name>/manifest.json    its manifest                               (with SKILL.md)
+```
+
 Write it with the
 [script-app flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/script-app/FLOW.md)
 and the [script API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md),
@@ -76,8 +88,8 @@ review packets outside the submitted bundle.
 
 | Rule | What is refused |
 | --- | --- |
-| Assets are local | Any `http://`, `https://`, `file://` or `../` in a `.card`, `.l0`, `.octoscript`, `.json`, `.txt` or `.md` file (`manifest.json` and `listing.json` excepted). Ship the asset in the bundle and reference it by a bundle-relative path such as `assets/icon.svg`. |
-| Script apps reach only declared hosts | In a `.splash` file: any `http://`, `file://` or `../`; and any `https://` address whose host is not in `network.hosts`, unless the app requests `images` or `web`, which allow any public https host. Name bundle artwork through `{{assets}}`. |
+| Assets are local | Any `http://`, `https://`, `file://` or `../` in a `.card`, `.l0`, `.octoscript`, `.json`, `.txt` or `.md` file (`manifest.json`, `listing.json` and the agent files excepted). Ship the asset in the bundle and reference it by a bundle-relative path such as `assets/icon.svg`. |
+| Script apps and agent files reach only declared hosts | In a `.splash` file, `tools.json`, the agent's instructions or anything under `skills/`: any `http://`, `file://` or `../`; and any `https://` address whose host is not in `network.hosts`, unless the app requests `images` or `web`, which allow any public https host. Name bundle artwork through `{{assets}}`. |
 | Allowed file types only | Anything other than `.card .json .l0 .octoscript .splash .svg .png .jpg .jpeg .webp .ttf .otf .txt .md`. No other scripts, archives or binaries. |
 | No secrets | A `.card`, `.l0`, `.octoscript` or `.splash` file declaring `is_password: true` or a `TextInputContentType` of `Password`, `NewPassword` or `OneTimeCode`. Apps never collect secrets; see [host services](#host-services-and-sheets). |
 | System ids are reserved | An id starting with `os.`. Those belong to system apps that ship with the device, and no device installs one from a store. |
@@ -90,6 +102,11 @@ review packets outside the submitted bundle.
 | Version is new | Re-publishing a version already in the catalog. |
 | Listing present and complete | No `listing.json`; no icon or no screenshot; an unknown category, platform or age rating; a non-https privacy policy; or an icon or screenshot the listing names that is not in the bundle. |
 | Publisher continuity | An update signed by a different key than the one on record for this app. |
+| Tools are the app's own | In `tools.json`: a tool outside the app's namespace (the last segment of its id); a namespace that is not `[a-z0-9_]{1,24}`; a duplicate name, or two names the broker would spell the same; a missing `risk` or `implemented_by`; an unknown field; a schema outside the supported subset, over 8 KB or nested deeper than 8; an input that is not an object; more than 64 tools or a file over 64 KB. |
+| Local-only data stays local | A `shareable` tool of an app whose `agent.model.local_only` is true, unless it declares `"private_data": false`. |
+| Agent files are declared text | An `AGENT.md` that `agent.instructions` does not name, or a `skills/<name>/` that `agent.skills` does not; instructions over 32 KB, not UTF-8, holding control characters, a leading `#!`, `<script`, `<iframe>`, `javascript:` or similar; agent files without an `agent`. |
+| Skills are data only | A skill manifest declaring `tools`, `binaries`, `sha256`, `mcp_servers`, `hooks` or other executable fields; a file in a skill other than `.md`, `.json`, `.txt`; a manifest `name` other than its directory; a `uses` entry that is neither one of the app's tools nor in `agent.tools`. |
+| Background needs triggers | `agent.background: true` without a schedule or an event; a schedule that is not five cron fields; an event outside the app's namespace; an unknown model need or tier. |
 
 ## The manifest
 
@@ -179,7 +196,160 @@ not exist in this schema; do not add it. `tools` may name only what the host
 offers contained apps: `ledger.read`, `ledger.write`, `net.fetch`,
 `storage.read`, `storage.write`, `card.render`. Iterations clamp to 8, tokens
 to 200 000. The agent's workspace is the app's own storage jail and its hosts are
-the app's hosts; it cannot be given more than the app.
+the app's hosts; it cannot be given more than the app. The agent's own
+tools, instructions, skills, model requirements and triggers are below.
+
+## The app's agent and tools
+
+An app that wants an assistant of its own (ADR 0002 §3, §4) ships it in the
+bundle. Every file is under the bundle digest, so the agent that runs is the
+one that was reviewed; a shell loads it with `AgentBundle::load`
+(`crates/app-policy/src/agent.rs`), which refuses a bundle whose digest does
+not match and everything the gate refuses. This is for contained apps, the
+bundles the Card runner runs. A native module declares its tools through the
+app-peers broker (`ServiceExecutor` and `ToolDef` in OctoSense's
+`crates/app-peers`) and never ships a `tools.json`; the risk levels are the
+broker's, so one approval gate serves both.
+
+The News example, complete, is
+[`crates/app-policy/tests/fixtures/news-agent`](../crates/app-policy/tests/fixtures/news-agent).
+
+### `tools.json`: the app's tools
+
+```json
+{
+  "schema": 1,
+  "tools": [
+    {
+      "name": "news.list",
+      "description": "List collected stories, newest first, optionally for one topic or since a time.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "topic": { "type": "string" },
+          "since": { "type": "string", "format": "date-time" },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": { "items": { "type": "array", "items": { "type": "object" } } },
+        "required": ["items"]
+      },
+      "risk": "read",
+      "background": true,
+      "shareable": true,
+      "private_data": false,
+      "implemented_by": "host-service"
+    },
+    { "name": "news.read",         "risk": "read", "…": "…" },
+    { "name": "news.topics.get",   "risk": "read", "…": "…" },
+    { "name": "news.topics.set",   "risk": "act",  "…": "…" },
+    { "name": "news.digest.write", "risk": "act",  "…": "…" }
+  ]
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `name` | `<namespace>.<tool>`, the namespace being the last segment of the app's id (`os.news` and `dev.example.news` are both `news`). Segments are `[a-z0-9_]`; the broker sees the rest with dots as underscores (`topics_get`, at most 32 characters). |
+| `description` | What it does and when to use it, for a model; at most 1024 characters. |
+| `input_schema`, `output_schema` | JSON Schema, this subset only: `type title description properties required items enum const default minimum maximum minLength maxLength minItems maxItems additionalProperties format pattern`. No `$ref`, no `anyOf`/`oneOf`/`allOf`, no conditionals. The input is an object. |
+| `risk` | `read` (looks), `act` (changes the app's own state) or `destructive` (sends, posts, shares, buys, deletes: anything past the app). Required. The broker's `Read`/`Act`/`Destructive` spelling is accepted. |
+| `background` | May run in a run the person did not start. Default false. |
+| `shareable` | Other callers (the system agent, other apps' agents, the person's assistant) may be granted it. Default false. |
+| `private_data` | The result carries the person's private data. A shareable tool of a `local_only` app must say `false`. |
+| `implemented_by` | `host-service` (the app's native host service, which holds data, devices, network or secrets) or `app` (the app's own script, for tools that only reshape its data). |
+
+**Supervision comes from the risk, never from the app.** Read and act run
+unattended. A destructive tool always waits for the person's approval; with the
+person absent it becomes an approval request in the app's conversation. A
+destructive tool may still say `background: true`: the gate records a warning
+and it only ever runs after approval. A contained app cannot confirm its own
+tools.
+
+An app may ship `tools.json` without an agent: its tools then serve other
+callers, such as the person's assistant, but no agent of its own.
+
+### The manifest's `agent`
+
+```json
+"agent": {
+  "profile": "workspace-write-never-ask",
+  "tools": [],
+  "max_iterations": 8,
+  "token_budget": 120000,
+  "model": {
+    "needs": ["tool_calling", "long_context", "multilingual"],
+    "tier": "standard",
+    "local_only": false,
+    "per_task": {
+      "triage": { "needs": ["tool_calling"], "tier": "fast" },
+      "synthesis": { "needs": ["tool_calling", "reasoning", "long_context"], "tier": "strong" }
+    }
+  },
+  "background": true,
+  "triggers": { "schedule": ["0 7 * * *", "0 19 * * *"], "events": ["news.items.new"] },
+  "instructions": "AGENT.md",
+  "skills": ["news-digest"]
+}
+```
+
+- `tools` stays the generic host tools (above). The app's own tools come from
+  `tools.json`; the agent gets both and nothing else.
+- `model` states needs, never a provider or model name: `needs` from
+  `tool_calling vision long_context reasoning structured_output multilingual`,
+  `tier` one of `fast standard strong` (default `standard`), `local_only` for
+  data that must not leave the person's devices (app-wide; a task cannot relax
+  it), and `per_task` for named tasks (`[a-z_]{1,32}`, at most 8) that
+  `AGENT.md` refers to. The host picks a model from the person's providers.
+- `background` asks to run while the app is closed. It is a request: the
+  person grants it per app, and it requires `triggers`.
+- `triggers.schedule` is five-field cron in local time; `triggers.events` are
+  the app's own host-service events, in its namespace (`news.items.new`).
+- `instructions` names the agent's instructions (`AGENT.md`); `skills` names
+  each `skills/<name>/` directory. Undeclared agent files are refused.
+
+These fields are optional additions to schema 1. A manifest without them
+reads, and signs, exactly as before; a host older than them refuses a manifest
+that uses them (unknown fields are refused), which is the safe direction.
+
+### `AGENT.md` and skills
+
+`AGENT.md` is the agent's role and instructions: what to do on each trigger,
+what matters in the app's data, the rubric for its output, and its rules for
+memory. Text only (32 KB, UTF-8, no HTML scripts or `#!`); the system agent may
+add a local overlay but never edits it.
+
+A skill is an octos skill directory with `SKILL.md` and `manifest.json`,
+installed into this app's peer workspace only. For a contained app it is data
+only: its manifest holds `name` (its directory), `version`, `description`,
+`uses` (the tools it calls, each one of the app's tools or in `agent.tools`)
+and optionally `prompts.include`; `.md`, `.json` and `.txt` files only.
+
+```json
+{
+  "name": "news-digest",
+  "version": "1.0.0",
+  "description": "Write a cited morning or evening digest from collected stories.",
+  "uses": ["news.list", "news.read", "news.digest.write"]
+}
+```
+
+### What the store shows
+
+Derived from the manifest and `tools.json`, beside the other permissions:
+
+- "Its assistant may work while the app is closed, on a schedule and when new
+  data arrives; only if you allow it, and you can turn it off."
+- "Can ask to mail.send: nothing of this runs until you approve it."
+- "Offers news.list to other assistants you allow." (and, for a shareable tool
+  with `private_data: true`, that it can pass private data)
+- "Its assistant uses only models that run on your own devices."
+
+The catalog entry carries the reviewed `tools.json` so a store can show these
+before install; the review packet carries the agent files with a question on
+them.
 
 ## The listing
 
