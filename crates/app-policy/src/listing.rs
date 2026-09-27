@@ -163,6 +163,7 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
         ("library", "Saves photos and videos to your photo library."),
         ("mail", "Reads and sends mail from accounts you add; it never sees your password."),
         ("llm", "Manages the assistant's AI providers; it never sees your API keys."),
+        ("news", "Reads news the device collects from its feeds and topics."),
     ] {
         if has(cap) {
             lines.push(text.to_string());

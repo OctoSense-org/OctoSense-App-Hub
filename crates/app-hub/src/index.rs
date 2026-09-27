@@ -98,6 +98,7 @@ impl Entry {
                 "library" => "Save to your photo library, where other apps can see it".to_string(),
                 "mail" => "Read and send mail from accounts you sign in to on the device".to_string(),
                 "llm" => "Manage the assistant's AI providers, whose keys stay with the device".to_string(),
+                "news" => "Read news the device collects from its feeds and topics".to_string(),
                 other => match octosense_app_policy::service_words(other) {
                     Some(words) => words.to_string(),
                     None => format!("Use {other}"),

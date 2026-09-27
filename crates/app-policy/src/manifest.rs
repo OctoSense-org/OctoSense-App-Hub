@@ -48,6 +48,10 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // service. Keys are typed, shown as a QR and scanned only on the host's
     // own sheets; the app sees masked status, never a key.
     "llm",
+    // Read the host's news service: feeds and topic feeds it collects on a
+    // schedule into the app's store, and the items' text. The app never
+    // fetches arbitrary sites itself through it.
+    "news",
     // Host services reached by exact name (see [`crate::services`]). Each is
     // a separate consent: a host adapter checks the exact name, the person's
     // per-instance grant and its own ceilings on every request. A prefix is
