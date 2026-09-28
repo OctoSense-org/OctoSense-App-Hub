@@ -22,7 +22,7 @@ serde_json = "1"
 blake3 = "1"
 # Only for the splash adapter: the policy core never touches makepad, so the
 # rules stay testable in milliseconds. Off by default.
-makepad-widgets = { git = "https://github.com/OctoSense-org/makepad.git", rev = "75e3e24dbfb37381edb2745f62eba3615b335897", optional = true }
+makepad-widgets = { git = "https://github.com/OctoSense-org/makepad.git", rev = "f08eec5378fa3f83902a2794dacda03e829a0ef0", optional = true }
 
 [features]
 default = []
