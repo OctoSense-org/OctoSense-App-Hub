@@ -171,6 +171,21 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
             lines.push(text.to_string());
         }
     }
+    if has("research") || has("crawl") {
+        let scope = manifest.shown_research_scope();
+        if has("research") {
+            lines.push(format!(
+                "Searches {}; the device runs each search, within these limits.",
+                crate::research::search_words(&scope)
+            ));
+        }
+        if has("crawl") {
+            lines.push(format!(
+                "Crawls websites, {}: this reaches more of the web than searching.",
+                crate::research::crawl_words(&scope)
+            ));
+        }
+    }
     let matrix_reads = manifest
         .capabilities
         .iter()
@@ -313,6 +328,29 @@ mod tests {
         assert!(lines.contains(&"Never contacts the network.".to_string()), "{lines:?}");
         let quiet = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"}}"#).unwrap();
         assert!(!privacy_summary(&quiet).iter().any(|l| l.contains("glance")));
+    }
+
+    #[test]
+    fn a_research_app_is_told_what_it_searches_and_a_crawl_app_that_it_reaches_more() {
+        let m = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"},
+            "capabilities":["research"],"research":{"langs":["en","zh"],"categories":["news"],"max_age_days":7}}"#).unwrap();
+        let lines = privacy_summary(&m);
+        assert!(
+            lines.contains(&"Searches news in English and Chinese, from the last 7 days; the device runs each search, within these limits.".to_string()),
+            "{lines:?}"
+        );
+        assert!(!lines.iter().any(|l| l.starts_with("Crawls")), "{lines:?}");
+        // The toolbox is the host's, not the app's network.
+        assert!(lines.contains(&"Never contacts the network.".to_string()), "{lines:?}");
+
+        let m = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"},
+            "capabilities":["crawl"],"research":{"domains_allow":["docs.rs"],"max_depth":2,"max_pages":30}}"#).unwrap();
+        let lines = privacy_summary(&m);
+        assert!(
+            lines.contains(&"Crawls websites, following links up to 2 deep and reading up to 30 pages a crawl, only on docs.rs: this reaches more of the web than searching.".to_string()),
+            "{lines:?}"
+        );
+        assert!(!lines.iter().any(|l| l.starts_with("Searches")), "{lines:?}");
     }
 
     #[test]

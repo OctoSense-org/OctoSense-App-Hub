@@ -74,6 +74,12 @@ impl GateReport {
                 policy.storage_bytes,
                 policy.agent.as_ref().map(|a| a.profile.as_kernel_mode()).unwrap_or("none")
             ));
+            if let Some(scope) = &policy.research {
+                out.push_str(&format!(
+                    "  research scope (octos Scope): {}\n",
+                    serde_json::to_string(scope).unwrap_or_default()
+                ));
+            }
         }
         out
     }
