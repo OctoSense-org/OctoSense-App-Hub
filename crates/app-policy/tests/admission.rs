@@ -295,3 +295,19 @@ fn glance_is_its_own_capability_and_implies_nothing_else() {
         assert!(err.contains("unknown capability"), "{name}: {err}");
     }
 }
+
+#[test]
+fn model_is_its_own_capability_and_implies_nothing_else() {
+    let policy = resolve(r#""capabilities":["model"]"#).unwrap();
+    assert!(policy.allows("model"));
+    assert_eq!(policy.capabilities.len(), 1, "model grants nothing else");
+    // Not the provider manager, not the assistant, not the network.
+    assert!(!policy.allows("llm") && !policy.allows("net") && !policy.allows("octos.turn.start"));
+    assert!(!policy.may_prompt);
+    for name in ["model.", "model.complete", "Model", "models"] {
+        let err = resolve(&format!(r#""capabilities":["{name}"]"#)).unwrap_err();
+        assert!(err.contains("unknown capability"), "{name}: {err}");
+    }
+    let manifest = AppManifest::parse(&manifest_with(r#""capabilities":["model"]"#)).unwrap();
+    assert!(privacy_summary(&manifest).iter().any(|l| l.contains("AI provider you configured")));
+}

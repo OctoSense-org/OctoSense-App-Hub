@@ -165,6 +165,7 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
         ("llm", "Manages the assistant's AI providers; it never sees your API keys."),
         ("news", "Reads news the device collects from its feeds and topics."),
         ("glance", "Shows short cards on your glance screen; each opens only this app."),
+        ("model", "Sends what you give it to the AI provider you configured, for one-off answers within a daily budget; it never sees your API keys."),
     ] {
         if has(cap) {
             lines.push(text.to_string());
@@ -312,5 +313,20 @@ mod tests {
         assert!(lines.contains(&"Never contacts the network.".to_string()), "{lines:?}");
         let quiet = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"}}"#).unwrap();
         assert!(!privacy_summary(&quiet).iter().any(|l| l.contains("glance")));
+    }
+
+    #[test]
+    fn a_model_app_is_told_its_inputs_go_to_your_ai_provider() {
+        let m = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"},
+            "capabilities":["model"]}"#).unwrap();
+        let lines = privacy_summary(&m);
+        assert!(
+            lines.iter().any(|l| l.contains("to the AI provider you configured") && l.contains("never sees your API keys")),
+            "{lines:?}"
+        );
+        // The model service is the host's, not the app's network.
+        assert!(lines.contains(&"Never contacts the network.".to_string()), "{lines:?}");
+        let quiet = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"}}"#).unwrap();
+        assert!(!privacy_summary(&quiet).iter().any(|l| l.contains("AI provider")));
     }
 }
