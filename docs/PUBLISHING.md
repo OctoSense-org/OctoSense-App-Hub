@@ -159,6 +159,13 @@ they install.
 Location, camera and clipboard are each a separate consent; none implies
 another.
 
+**Where these are served today (2026-09-27):** the OctoSense shells serve
+`mail`; `llm`, `news` and `glance` only to `os.` system apps; and no shell
+registers a `model` service yet (the OctoSense side is still to come), so a
+`model.complete` call answers `no service answers "model" on this device`
+(run in `card-host` at `e8601b8`). The shells also pin App Hub `46d67e51`,
+which does not know `news`, `glance` or `model`.
+
 **Host services by exact name** (`crates/app-policy/src/services.rs`). A host
 that offers the Matrix account (Rinx) or the device's assistant (Octos) serves
 these to a bundle that requests them. Each name is its own consent, checked
@@ -168,6 +175,13 @@ dispatch: the host also intersects the request with the services it supports,
 its policy and the person's per-instance grant (for Matrix, the rooms they
 allow), and checks that lease on every call. A host that does not offer a
 requested service shows the app as unavailable with the reason.
+
+**Where these are served today (2026-09-27):** only by Rinx's mini-app host,
+for bundles a person imports into Rinx. The OctoSense shells' Card runner
+registers no `octos` or `matrix` service: it installs and opens such an app,
+and every call answers `no service answers "octos" on this device` (the
+dispatch in `crates/appstore/src/services.rs`). See OctoSense
+[`docs/ai-services.md`](https://github.com/OctoSense-org/OctoSense/blob/main/docs/ai-services.md).
 
 | Capability | Grants | The store says |
 | --- | --- | --- |
@@ -203,6 +217,17 @@ the app's hosts; it cannot be given more than the app. The agent's own
 tools, instructions, skills, model requirements and triggers are below.
 
 ## The app's agent and tools
+
+> **Status (2026-09-27):** the gate admits, checks and pins everything in this
+> section, and the store shows its lines. **No shell loads or runs it yet**:
+> OctoSense [ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0002-event-driven-app-agents.md)
+> is Proposed, the kernel's host-registered tools are
+> [octos#2567](https://github.com/octos-org/octos/pull/2567) (open), and no
+> host offers the generic `agent.tools` names to contained apps. The OctoSense
+> shells pin App Hub `46d67e51`, which predates `model`, `background`,
+> `triggers`, `instructions`, `skills` and the `news` and `glance`
+> capabilities, so today they refuse a manifest that uses any of them (the
+> "host older than them" below).
 
 An app that wants an assistant of its own (ADR 0002 §3, §4) ships it in the
 bundle. Every file is under the bundle digest, so the agent that runs is the
