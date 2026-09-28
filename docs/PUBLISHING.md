@@ -99,6 +99,8 @@ review packets outside the submitted bundle.
 | Manifest is exact | Unknown fields, an unknown capability, a `schema` other than 1, an id outside `[a-z0-9.-]{1,64}` not starting with `.`. |
 | Hosts are bare | A host with a scheme, path, port, wildcard or credentials. `api.example.com` is right; `https://api.example.com/v1` and `*.example.com` are refused. |
 | Hosts need `net` | Listing hosts without requesting the `net` capability. |
+| Research has a scope | `research` or `crawl` without a top-level `research` scope; a scope without either capability; a scope that octos's `Scope::from_grant` would refuse (a language that is not a BCP-47 tag, a region that is not two letters, a category outside `news`, `general`, `science`, `it`, `social`, `max_results` of 0, an unknown field); a domain pattern that is not a bare domain; the toolbox's old field names (`languages`, `allowed_domains`, `denied_domains`, `recency_hours`). |
+| Crawl limits need `crawl` | `crawl` without `max_depth` and `max_pages` above 0, or crawl limits without `crawl`. |
 | Version is new | Re-publishing a version already in the catalog. |
 | Listing present and complete | No `listing.json`; no icon or no screenshot; an unknown category, platform or age rating; a non-https privacy policy; or an icon or screenshot the listing names that is not in the bundle. |
 | Publisher continuity | An update signed by a different key than the one on record for this app. |
@@ -154,17 +156,84 @@ they install.
 | `llm` | See and arrange the assistant's LLM providers through the host's `llm` service; keys are typed, shown and scanned only on the host's sheets. The service answers only `os.` system apps (AI providers), so a store app gains nothing from it. | Manage the assistant's AI providers, whose keys stay with the device |
 | `news` | Read the host's `news` service: items the device collects on a schedule from its feeds and topic feeds, and their text. The app does not fetch arbitrary sites through it. | Read news the device collects from its feeds and topics |
 | `glance` | Publish cards to the glance screen through the host's `glance` service (`glance.publish`, `glance.withdraw`, `glance.list`). A card is an L0 card the host checks and lowers before storing it; the host caps its size, rate-limits publishing, keeps a few cards per app and expires them. The publisher is always the calling app: it sees, replaces and withdraws only its own cards, and a card opens only that app. | Show cards on your glance screen |
+| `research` | Search through the system toolbox (`search`, `deep_research`) within the manifest's [`research` scope](#the-research-scope): languages, regions, domains, recency, categories and results per search. The host runs each search and refuses or narrows a call outside the scope; the app never fetches the sites itself, so it needs no `net` for it. | Search *what the scope allows*, for example "Search news in English and Chinese, from the last 7 days" |
+| `crawl` | Crawl a site through the system toolbox (`deep_crawl`): follow links up to the scope's `max_depth` and read up to its `max_pages` a crawl, inside its domain lists. **More reach than `research`**, which reads only search results: ask for it only when a screen needs whole sites, and prefer a `domains_allow` list. Neither capability implies the other. | Crawl websites, following links up to *depth* deep and reading up to *pages* pages a crawl, *on which sites*, which reaches more than searching |
 | `model` | Make bounded one-shot model calls through the host's `model` service (`model.complete`). The app names a model class (`fast` or `strong`) and a JSON Schema; the host picks the model from the person's own AI providers, sends the app's inputs there, checks the reply against the schema (URLs refused unless the app asks for them) and keeps a per-app daily rate and token budget. No tools, memory or history; the app never sees the provider, model id or key. Not `llm`, which only manages providers. | Send what you give it to the AI provider you configured, within a daily budget |
 
 Location, camera and clipboard are each a separate consent; none implies
 another.
+
+### The research scope
+
+`research` and `crawl` share one scope, the manifest's top-level `research`
+object. Its schema is exactly octos's `octos_research::toolbox::Scope`
+(octos `crates/octos-research/src/toolbox.rs`), the single source of truth for
+an app's research permission: the gate checks it with the same rules as
+`Scope::from_grant`, pins it, and the host hands the same JSON to the toolbox
+(OctoSense `crates/toolbox/src/scope.rs` parses it). App Hub mirrors the
+struct in `crates/app-policy/src/research.rs` because the policy crate links
+no octos code; the two change together.
+
+```json
+{
+  "capabilities": ["research", "crawl"],
+  "research": {
+    "langs": ["en", "zh"],
+    "regions": ["US", "CN"],
+    "domains_allow": [],
+    "domains_deny": ["example-spam.com"],
+    "max_age_days": 7,
+    "categories": ["news"],
+    "max_results": 20,
+    "max_depth": 2,
+    "max_pages": 20
+  }
+}
+```
+
+| Field | Meaning | Rule |
+| --- | --- | --- |
+| `langs` | BCP-47 languages the app may search in | each a language tag (`en`, `zh-CN`, `zh-Hant`); normalised |
+| `regions` | ISO 3166-1 alpha-2 regions | two letters; upper-cased |
+| `domains_allow` | only these domains (and their subdomains) | a bare domain: `example.com`, `.example.com` or `*.example.com`; no scheme, path or port |
+| `domains_deny` | never these domains | as above |
+| `max_age_days` | the oldest material, in days back from now | a whole number of days |
+| `categories` | metasearch categories | `news`, `general`, `science`, `it`, `social` |
+| `max_results` | most results per search | above 0; default 20 |
+| `max_depth`, `max_pages` | the `crawl` limits: link depth and pages of one crawl | both above 0 with `crawl`; both 0 (or absent) without it |
+
+An empty list or an absent field means no limit, and `{}` is a scope with no
+limits (the store then says "Search the web in any language, from any time").
+Unknown fields are refused. The bare-domain rule is App Hub's and is stricter
+than octos, which compares patterns as strings: `https://example.com/` would
+match no site, so in `domains_deny` it would deny nothing the person was told
+it denies. A scope in the toolbox's old shape (`languages`,
+`allowed_domains`, `denied_domains`, `recency_hours`, and `max_pages` as
+articles per run) is refused with the fields to rename; it is not converted,
+because rounding hours up to days would widen the grant.
+
+The store shows the scope in plain words, derived from the manifest:
+
+| Scope | The store's privacy summary says |
+| --- | --- |
+| `research`, `{"langs":["en","zh"],"categories":["news"],"max_age_days":7}` | Searches news in English and Chinese, from the last 7 days |
+| `research`, `{}` | Searches the web in any language, from any time |
+| `research`, `{"langs":["zh-TW"],"regions":["TW"],"categories":["news","it"],"max_age_days":1,"domains_allow":["cna.com.tw"]}` | Searches news and technology in Chinese (TW), region TW, from the last day, only on cna.com.tw |
+| `crawl`, `{"max_depth":2,"max_pages":50}` | Crawls websites, following links up to 2 deep and reading up to 50 pages a crawl, on any site: this reaches more of the web than searching |
+| `crawl`, `{"domains_allow":["docs.rs"],"max_depth":1,"max_pages":10}` | Crawls websites, following links up to 1 deep and reading up to 10 pages a crawl, only on docs.rs: this reaches more of the web than searching |
+
+The person or the store may grant a narrower scope than the one requested;
+never a wider one.
 
 **Where these are served today (2026-09-27):** the OctoSense shells serve
 `mail`; `llm`, `news` and `glance` only to `os.` system apps; and no shell
 registers a `model` service yet (the OctoSense side is still to come), so a
 `model.complete` call answers `no service answers "model" on this device`
 (run in `card-host` at `e8601b8`). The shells also pin App Hub `46d67e51`,
-which does not know `news`, `glance` or `model`.
+which does not know `news`, `glance` or `model`. No shell serves `research`
+or `crawl` yet: OctoSense's toolbox (`crates/toolbox`) parses the scope but
+the shells do not link it, and OctoSense and Rinx adopt this App Hub through
+the Rinx-first pin split (OctoSense pins only tagged Rinx releases).
 
 **Host services by exact name** (`crates/app-policy/src/services.rs`). A host
 that offers the Matrix account (Rinx) or the device's assistant (Octos) serves
@@ -627,7 +696,7 @@ app appeared in, or with the findings to fix.
 - Reference any server, CDN or local path from a card, or an undeclared host
   from a script app. Bundle the asset.
 - Request `prompt`, `location`, `camera`, `microphone`, `clipboard`, `library`,
-  `images`, `web`, `mail`, `news`, `glance` or `model` unless a screen needs it (and never `llm`, which
+  `images`, `web`, `mail`, `news`, `glance`, `model`, `research` or `crawl` unless a screen needs it (and never `llm`, which
   serves only system apps); each is shown to the
   person as a separate line.
 - Ask for a password, PIN or code in the app. A host service asks on its own

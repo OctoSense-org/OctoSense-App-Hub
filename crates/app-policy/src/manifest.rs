@@ -5,6 +5,7 @@
 //! [`crate::policy`] resolves against the host's ceilings. Unknown fields are
 //! refused rather than ignored, so a manifest written for a newer host does
 //! not silently run with less containment than it asked for.
+use crate::research::ResearchScope;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -64,6 +65,17 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // provider, model id or key. The app's inputs go to the AI provider the
     // person configured. Not `llm`, which manages providers for os.* apps.
     "model",
+    // Search through the system toolbox (`search`, `deep_research`), within
+    // the manifest's `research` scope: languages, regions, domains, recency,
+    // categories and results per search. The host runs the search and
+    // checks every call against the scope; the app never fetches the sites
+    // itself. The scope's schema is octos's `Scope` (see [`crate::research`]).
+    "research",
+    // Crawl a site through the system toolbox (`deep_crawl`): follow links
+    // up to the scope's `max_depth` and read up to its `max_pages` a crawl,
+    // inside its domain lists. More reach than `research`, which only reads
+    // search results; neither implies the other.
+    "crawl",
     // Host services reached by exact name (see [`crate::services`]). Each is
     // a separate consent: a host adapter checks the exact name, the person's
     // per-instance grant and its own ceilings on every request. A prefix is
@@ -171,6 +183,12 @@ pub struct AppManifest {
     /// Absent means the app gets no agent at all, which is the default.
     #[serde(default)]
     pub agent: Option<AgentSpec>,
+    /// The scope of the `research` and `crawl` capabilities: octos's
+    /// `Scope`, exactly (see [`crate::research`]). Required with either
+    /// capability and refused without both. Skipped when absent, so a
+    /// manifest written before it existed signs exactly as it did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub research: Option<ResearchScope>,
 }
 
 /// What the bundle must hash to. The digest covers the bundle bytes as they
@@ -368,11 +386,26 @@ pub fn short_id(app_id: &str) -> &str {
 impl AppManifest {
     /// Parse a manifest, refusing unknown fields and a foreign schema.
     pub fn parse(json: &str) -> Result<Self, String> {
-        let manifest: AppManifest = serde_json::from_str(json).map_err(|e| format!("manifest is not valid: {e}"))?;
+        let manifest: AppManifest = serde_json::from_str(json).map_err(|e| {
+            // A research scope in the toolbox's old shape gets the fields to
+            // rename, not only serde's "unknown field".
+            serde_json::from_str::<serde_json::Value>(json)
+                .ok()
+                .and_then(|v| v.get("research").and_then(crate::research::old_shape_advice))
+                .unwrap_or_else(|| format!("manifest is not valid: {e}"))
+        })?;
         if manifest.schema != SCHEMA {
             return Err(format!("manifest schema {} is not {}", manifest.schema, SCHEMA));
         }
         Ok(manifest)
+    }
+
+    /// The research scope as the host grants it (normalised), for the words
+    /// a store shows. A scope the host would refuse is shown as written; an
+    /// absent one as `{}`.
+    pub fn shown_research_scope(&self) -> ResearchScope {
+        let scope = self.research.clone().unwrap_or_default();
+        scope.validated().unwrap_or(scope)
     }
 
     /// The bytes a signature covers: the manifest without its own signature,

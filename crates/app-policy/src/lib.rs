@@ -37,6 +37,7 @@ pub mod listing;
 pub mod splash_adapter;
 pub mod manifest;
 pub mod policy;
+pub mod research;
 pub mod services;
 pub mod verify;
 
@@ -54,6 +55,7 @@ pub use manifest::{
     KNOWN_MODEL_NEEDS, SCHEMA,
 };
 pub use policy::{AgentPolicy, AppPolicy, HostLimits};
+pub use research::{crawl_words, search_words, ResearchScope, RESEARCH_CATEGORIES};
 pub use services::{is_host_service, service_words, MATRIX_ACTIONS, OCTOS_SERVICES};
 pub use verify::{admit, admit_digest, bundle_digest, RefuseAllSignatures, SignatureVerifier};
 
