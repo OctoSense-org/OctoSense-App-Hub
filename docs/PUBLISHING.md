@@ -154,6 +154,7 @@ they install.
 | `llm` | See and arrange the assistant's LLM providers through the host's `llm` service; keys are typed, shown and scanned only on the host's sheets. The service answers only `os.` system apps (AI providers), so a store app gains nothing from it. | Manage the assistant's AI providers, whose keys stay with the device |
 | `news` | Read the host's `news` service: items the device collects on a schedule from its feeds and topic feeds, and their text. The app does not fetch arbitrary sites through it. | Read news the device collects from its feeds and topics |
 | `glance` | Publish cards to the glance screen through the host's `glance` service (`glance.publish`, `glance.withdraw`, `glance.list`). A card is an L0 card the host checks and lowers before storing it; the host caps its size, rate-limits publishing, keeps a few cards per app and expires them. The publisher is always the calling app: it sees, replaces and withdraws only its own cards, and a card opens only that app. | Show cards on your glance screen |
+| `model` | Make bounded one-shot model calls through the host's `model` service (`model.complete`). The app names a model class (`fast` or `strong`) and a JSON Schema; the host picks the model from the person's own AI providers, sends the app's inputs there, checks the reply against the schema (URLs refused unless the app asks for them) and keeps a per-app daily rate and token budget. No tools, memory or history; the app never sees the provider, model id or key. Not `llm`, which only manages providers. | Send what you give it to the AI provider you configured, within a daily budget |
 
 Location, camera and clipboard are each a separate consent; none implies
 another.
@@ -601,7 +602,7 @@ app appeared in, or with the findings to fix.
 - Reference any server, CDN or local path from a card, or an undeclared host
   from a script app. Bundle the asset.
 - Request `prompt`, `location`, `camera`, `microphone`, `clipboard`, `library`,
-  `images`, `web`, `mail`, `news` or `glance` unless a screen needs it (and never `llm`, which
+  `images`, `web`, `mail`, `news`, `glance` or `model` unless a screen needs it (and never `llm`, which
   serves only system apps); each is shown to the
   person as a separate line.
 - Ask for a password, PIN or code in the app. A host service asks on its own

@@ -56,6 +56,14 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // L0 cards the shell checks, caps, rate-limits and expires, keyed to the
     // app itself. The app sees only its own cards and a card opens only it.
     "glance",
+    // Make bounded one-shot model calls through the host's model service
+    // (`model.complete`): the app names a model class ("fast" or "strong")
+    // and a JSON Schema; the host picks the model from the person's own
+    // providers, validates the reply against the schema and keeps a per-app
+    // daily budget. No tools, memory or history; the app never sees the
+    // provider, model id or key. The app's inputs go to the AI provider the
+    // person configured. Not `llm`, which manages providers for os.* apps.
+    "model",
     // Host services reached by exact name (see [`crate::services`]). Each is
     // a separate consent: a host adapter checks the exact name, the person's
     // per-instance grant and its own ceilings on every request. A prefix is
