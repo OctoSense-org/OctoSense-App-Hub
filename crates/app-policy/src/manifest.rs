@@ -52,6 +52,10 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // schedule into the app's store, and the items' text. The app never
     // fetches arbitrary sites itself through it.
     "news",
+    // Publish cards to the glance screen through the host's glance service:
+    // L0 cards the shell checks, caps, rate-limits and expires, keyed to the
+    // app itself. The app sees only its own cards and a card opens only it.
+    "glance",
     // Host services reached by exact name (see [`crate::services`]). Each is
     // a separate consent: a host adapter checks the exact name, the person's
     // per-instance grant and its own ceilings on every request. A prefix is

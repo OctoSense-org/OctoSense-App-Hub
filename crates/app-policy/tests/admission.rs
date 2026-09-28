@@ -281,3 +281,17 @@ fn the_store_says_what_a_service_grant_allows() {
     let manifest = AppManifest::parse(&manifest_with(r#""capabilities":["octos.turn.start"]"#)).unwrap();
     assert!(privacy_summary(&manifest).iter().any(|l| l.contains("keys stay with the device")));
 }
+
+#[test]
+fn glance_is_its_own_capability_and_implies_nothing_else() {
+    let policy = resolve(r#""capabilities":["glance"]"#).unwrap();
+    assert!(policy.allows("glance"));
+    assert_eq!(policy.capabilities.len(), 1, "glance grants nothing else");
+    assert!(!policy.allows("news") && !policy.allows("net") && !policy.allows("storage"));
+    assert!(!policy.may_prompt);
+    // Only the exact name: a method or a near name is not a grant.
+    for name in ["glance.", "glance.publish", "glance.list", "Glance", "glances"] {
+        let err = resolve(&format!(r#""capabilities":["{name}"]"#)).unwrap_err();
+        assert!(err.contains("unknown capability"), "{name}: {err}");
+    }
+}

@@ -99,6 +99,7 @@ impl Entry {
                 "mail" => "Read and send mail from accounts you sign in to on the device".to_string(),
                 "llm" => "Manage the assistant's AI providers, whose keys stay with the device".to_string(),
                 "news" => "Read news the device collects from its feeds and topics".to_string(),
+                "glance" => "Show cards on your glance screen".to_string(),
                 other => match octosense_app_policy::service_words(other) {
                     Some(words) => words.to_string(),
                     None => format!("Use {other}"),

@@ -164,6 +164,7 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
         ("mail", "Reads and sends mail from accounts you add; it never sees your password."),
         ("llm", "Manages the assistant's AI providers; it never sees your API keys."),
         ("news", "Reads news the device collects from its feeds and topics."),
+        ("glance", "Shows short cards on your glance screen; each opens only this app."),
     ] {
         if has(cap) {
             lines.push(text.to_string());
@@ -300,5 +301,16 @@ mod tests {
         let lines = privacy_summary(&quiet);
         assert!(lines.contains(&"Stores nothing.".to_string()));
         assert!(lines.contains(&"Never contacts the network.".to_string()));
+    }
+
+    #[test]
+    fn a_glance_app_is_told_as_showing_cards_that_open_only_it() {
+        let m = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"},
+            "capabilities":["glance"]}"#).unwrap();
+        let lines = privacy_summary(&m);
+        assert!(lines.contains(&"Shows short cards on your glance screen; each opens only this app.".to_string()), "{lines:?}");
+        assert!(lines.contains(&"Never contacts the network.".to_string()), "{lines:?}");
+        let quiet = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"}}"#).unwrap();
+        assert!(!privacy_summary(&quiet).iter().any(|l| l.contains("glance")));
     }
 }
