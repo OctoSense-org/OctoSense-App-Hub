@@ -19,4 +19,4 @@ path = "src/main.rs"
 [dependencies]
 octosense-appstore = { path = "../appstore" }
 octosense-app-host = { path = "../app-host" }
-makepad-widgets = { git = "https://github.com/OctoSense-org/makepad.git", rev = "4531e695251f03bf8b248075491691ecf77ecdaf" }
+makepad-widgets = { git = "https://github.com/OctoSense-org/makepad.git", rev = "7c2e458b5daa1744a016c6070f1457d6f004d784" }

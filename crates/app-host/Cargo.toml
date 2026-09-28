@@ -13,5 +13,5 @@ publish = false
 description = "A one-window host for a Makepad AppModule: the same app crate as a standalone app"
 
 [dependencies]
-makepad-widgets = { git = "https://github.com/OctoSense-org/makepad.git", rev = "4531e695251f03bf8b248075491691ecf77ecdaf" }
-makepad-app-module = { git = "https://github.com/OctoSense-org/makepad.git", rev = "4531e695251f03bf8b248075491691ecf77ecdaf" }
+makepad-widgets = { git = "https://github.com/OctoSense-org/makepad.git", rev = "7c2e458b5daa1744a016c6070f1457d6f004d784" }
+makepad-app-module = { git = "https://github.com/OctoSense-org/makepad.git", rev = "7c2e458b5daa1744a016c6070f1457d6f004d784" }
