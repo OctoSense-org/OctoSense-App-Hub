@@ -19,12 +19,12 @@ description = "Runs one card bundle inside a policy-configured splash isolate (A
 
 [dependencies]
 octosense-app-policy = { path = "../app-policy", features = ["splash"] }
-makepad-widgets = { git = "https://github.com/OctoSense-org/makepad.git", rev = "975c5630e01b0f3f3ae16cafd2e0fce3c9a5f7d9", features = ["maps"] }
-octoscript-makepad = { git = "https://github.com/OctoSense-org/Octoscript-Makepad.git", rev = "65d30a091eee284ed45afe5b8502835563fb56f7" }
+makepad-widgets = { git = "https://github.com/OctoSense-org/makepad.git", rev = "b0cbc9bcfb204ade5d8ceecb66e0a58e972c70f1", features = ["maps"] }
+octoscript-makepad = { git = "https://github.com/OctoSense-org/Octoscript-Makepad.git", rev = "6351524b77a49a382c96373d7bfe6a105f142dbc" }
 # The lint and realize report card-host logs for card-studio; the workspace
 # patch resolves it to the same checkout octoscript-makepad uses.
 octoscript-ui-l0 = { git = "https://github.com/OctoSense-org/Octoscript.git", rev = "68f6a9df55692b5d8ef8873a12721e279a3f40d6" }
-octoscript-widgets = { git = "https://github.com/OctoSense-org/Octoscript-Makepad.git", rev = "65d30a091eee284ed45afe5b8502835563fb56f7" }
+octoscript-widgets = { git = "https://github.com/OctoSense-org/Octoscript-Makepad.git", rev = "6351524b77a49a382c96373d7bfe6a105f142dbc" }
 serde_json = "1"
 octosense-appstore = { path = "../appstore" }
 
