@@ -6,6 +6,7 @@
 //! the bundle, and the store shows it beside the permissions, never instead
 //! of them. What the store says an app may do always comes from the resolved
 //! manifest; the listing cannot claim otherwise.
+use crate::agent::{Confirm, Risk, ToolSpec};
 use crate::manifest::AppManifest;
 use serde::{Deserialize, Serialize};
 
@@ -161,10 +162,33 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
         ("microphone", "Records sound with videos."),
         ("library", "Saves photos and videos to your photo library."),
         ("mail", "Reads and sends mail from accounts you add; it never sees your password."),
+        ("llm", "Manages the assistant's AI providers; it never sees your API keys."),
+        ("news", "Reads news the device collects from its feeds and topics."),
+        ("glance", "Shows short cards on your glance screen; each opens only this app."),
+        ("model", "Sends what you give it to the AI provider you configured, for one-off answers within a daily budget; it never sees your API keys."),
     ] {
         if has(cap) {
             lines.push(text.to_string());
         }
+    }
+    let matrix_reads = manifest
+        .capabilities
+        .iter()
+        .any(|c| c.starts_with("matrix.") && !crate::services::MATRIX_ACTIONS.contains(&c.as_str()));
+    let matrix_acts = manifest
+        .capabilities
+        .iter()
+        .any(|c| crate::services::MATRIX_ACTIONS.contains(&c.as_str()));
+    if matrix_reads {
+        lines.push("Reads from your Matrix account, only in the rooms you allow.".to_string());
+    }
+    if matrix_acts {
+        lines.push("Acts on your Matrix account, only in the rooms you allow.".to_string());
+    }
+    if has("octos.turn.start") {
+        lines.push("Asks the device's assistant to work for it; the assistant's keys stay with the device.".to_string());
+    } else if has("octos.session.open") || has("octos.session.history") {
+        lines.push("Opens or reads its own conversations with the device's assistant, but cannot ask it to work.".to_string());
     }
     match &manifest.agent {
         Some(agent) => lines.push(format!(
@@ -172,6 +196,58 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
             if agent.tools.is_empty() { String::new() } else { format!(" with {}", agent.tools.join(", ")) }
         )),
         None => lines.push("Runs no assistant.".to_string()),
+    }
+    if manifest.agent.as_ref().and_then(|a| a.model.as_ref()).is_some_and(|m| m.local_only) {
+        lines.push("Its assistant uses only models that run on your own devices.".to_string());
+    }
+    lines
+}
+
+/// The permission lines for an app's agent and tools, in plain words: a
+/// background agent, tools that wait for approval, tools other assistants
+/// may be allowed to call. Derived from the manifest and `tools.json`, never
+/// from anything the app says about itself.
+pub fn agent_permission_lines(manifest: &AppManifest, tools: &[ToolSpec]) -> Vec<String> {
+    let mut lines = Vec::new();
+    if let Some(agent) = &manifest.agent {
+        if agent.background {
+            let when = match (agent.triggers.schedule.is_empty(), agent.triggers.events.is_empty()) {
+                (false, false) => "on a schedule and when new data arrives",
+                (false, true) => "on a schedule",
+                _ => "when new data arrives",
+            };
+            lines.push(format!(
+                "Its assistant may work while the app is closed, {when}; only if you allow it, and you can turn it off."
+            ));
+        }
+        if agent.model.as_ref().is_some_and(|m| m.local_only) {
+            lines.push("Its assistant uses only models that run on your own devices.".to_string());
+        }
+    }
+    let names = |risk: Option<Risk>, pick: &dyn Fn(&ToolSpec) -> bool| -> Vec<&str> {
+        tools.iter().filter(|t| risk.is_none_or(|r| t.risk == r) && pick(t)).map(|t| t.name.as_str()).collect()
+    };
+    let destructive = names(Some(Risk::Destructive), &|t| t.confirm == Confirm::Host);
+    if !destructive.is_empty() {
+        lines.push(format!(
+            "Can ask to {}: nothing of this runs until you approve it.",
+            destructive.join(", ")
+        ));
+    }
+    let app_confirmed = names(Some(Risk::Destructive), &|t| t.confirm == Confirm::App);
+    if !app_confirmed.is_empty() {
+        lines.push(format!(
+            "Asks you on its own screen before {}; when you are away, it waits for your approval in the app's conversation.",
+            app_confirmed.join(", ")
+        ));
+    }
+    let shared = names(None, &|t| t.shareable);
+    if !shared.is_empty() {
+        lines.push(format!("Offers {} to other assistants you allow.", shared.join(", ")));
+    }
+    let shared_private = names(None, &|t| t.shareable && t.private_data == Some(true));
+    if !shared_private.is_empty() {
+        lines.push(format!("{} can pass your private data to those assistants.", shared_private.join(", ")));
     }
     lines
 }
@@ -226,5 +302,31 @@ mod tests {
         let lines = privacy_summary(&quiet);
         assert!(lines.contains(&"Stores nothing.".to_string()));
         assert!(lines.contains(&"Never contacts the network.".to_string()));
+    }
+
+    #[test]
+    fn a_glance_app_is_told_as_showing_cards_that_open_only_it() {
+        let m = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"},
+            "capabilities":["glance"]}"#).unwrap();
+        let lines = privacy_summary(&m);
+        assert!(lines.contains(&"Shows short cards on your glance screen; each opens only this app.".to_string()), "{lines:?}");
+        assert!(lines.contains(&"Never contacts the network.".to_string()), "{lines:?}");
+        let quiet = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"}}"#).unwrap();
+        assert!(!privacy_summary(&quiet).iter().any(|l| l.contains("glance")));
+    }
+
+    #[test]
+    fn a_model_app_is_told_its_inputs_go_to_your_ai_provider() {
+        let m = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"},
+            "capabilities":["model"]}"#).unwrap();
+        let lines = privacy_summary(&m);
+        assert!(
+            lines.iter().any(|l| l.contains("to the AI provider you configured") && l.contains("never sees your API keys")),
+            "{lines:?}"
+        );
+        // The model service is the host's, not the app's network.
+        assert!(lines.contains(&"Never contacts the network.".to_string()), "{lines:?}");
+        let quiet = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"}}"#).unwrap();
+        assert!(!privacy_summary(&quiet).iter().any(|l| l.contains("AI provider")));
     }
 }

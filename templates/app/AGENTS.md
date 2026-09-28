@@ -14,7 +14,7 @@ record its revision; do not invent missing requirements.
   Keep authoring instructions, source tooling, keys and test evidence outside it.
 - Use the image-to-card flow in OctoScript-App-Design-Flow
   (`flows/image-to-card/FLOW.md`) for UI output and the L0 reference in
-  OctoSense-System-Apps (`apps/appcard/a2app-l0/framework/l0.md`) for bindings. Do not
+  OctoSense (`apps/appcard/a2app-l0/framework/l0.md`) for bindings. Do not
   hand-write L0 unless the app owner requests that approach.
 - Maintain the app's own icon at the path declared by its complete listing.
   Avoid separate launcher/store artwork copies.

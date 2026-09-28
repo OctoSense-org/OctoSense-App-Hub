@@ -230,3 +230,84 @@ fn a_directory_bundle_is_admitted_by_its_precomputed_digest() {
         .unwrap_err();
     assert!(err.contains("does not match the manifest"), "{err}");
 }
+
+// ------------------------------------------------------- host services
+
+#[test]
+fn each_published_assistant_service_is_admitted_by_its_exact_name() {
+    for service in OCTOS_SERVICES {
+        let policy = resolve(&format!(r#""capabilities":["{service}"]"#)).unwrap();
+        assert!(policy.allows(service), "{service}");
+        assert_eq!(policy.capabilities.len(), 1, "{service} grants nothing else");
+    }
+}
+
+#[test]
+fn an_assistant_prefix_or_invented_service_is_refused() {
+    for name in ["octos.", "octos.session", "octos.admin", "octos.peer.prepare", "octos.session.open.all", "Octos.turn.start"] {
+        let err = resolve(&format!(r#""capabilities":["{name}"]"#)).unwrap_err();
+        assert!(err.contains("unknown capability"), "{name}: {err}");
+    }
+}
+
+#[test]
+fn reading_assistant_history_does_not_grant_starting_a_turn() {
+    let policy = resolve(r#""capabilities":["octos.session.open","octos.session.history"]"#).unwrap();
+    assert!(policy.allows("octos.session.history"));
+    assert!(!policy.allows("octos.turn.start"));
+    assert!(!policy.allows("octos.turn.interrupt"));
+    assert!(policy.agent.is_none(), "a service grant is not an app agent");
+}
+
+#[test]
+fn matrix_services_are_exact_and_reading_does_not_grant_sending() {
+    let policy = resolve(r#""capabilities":["matrix.read_messages","matrix.profile"]"#).unwrap();
+    assert!(policy.allows("matrix.read_messages"));
+    assert!(!policy.allows("matrix.send_message"));
+    let err = resolve(r#""capabilities":["matrix.admin"]"#).unwrap_err();
+    assert!(err.contains("unknown capability"), "{err}");
+}
+
+#[test]
+fn the_store_says_what_a_service_grant_allows() {
+    let manifest = AppManifest::parse(&manifest_with(
+        r#""capabilities":["matrix.read_messages","matrix.send_message","octos.session.history"]"#,
+    ))
+    .unwrap();
+    let lines = privacy_summary(&manifest);
+    assert!(lines.iter().any(|l| l.starts_with("Reads from your Matrix account")), "{lines:?}");
+    assert!(lines.iter().any(|l| l.starts_with("Acts on your Matrix account")), "{lines:?}");
+    assert!(lines.iter().any(|l| l.contains("cannot ask it to work")), "{lines:?}");
+    let manifest = AppManifest::parse(&manifest_with(r#""capabilities":["octos.turn.start"]"#)).unwrap();
+    assert!(privacy_summary(&manifest).iter().any(|l| l.contains("keys stay with the device")));
+}
+
+#[test]
+fn glance_is_its_own_capability_and_implies_nothing_else() {
+    let policy = resolve(r#""capabilities":["glance"]"#).unwrap();
+    assert!(policy.allows("glance"));
+    assert_eq!(policy.capabilities.len(), 1, "glance grants nothing else");
+    assert!(!policy.allows("news") && !policy.allows("net") && !policy.allows("storage"));
+    assert!(!policy.may_prompt);
+    // Only the exact name: a method or a near name is not a grant.
+    for name in ["glance.", "glance.publish", "glance.list", "Glance", "glances"] {
+        let err = resolve(&format!(r#""capabilities":["{name}"]"#)).unwrap_err();
+        assert!(err.contains("unknown capability"), "{name}: {err}");
+    }
+}
+
+#[test]
+fn model_is_its_own_capability_and_implies_nothing_else() {
+    let policy = resolve(r#""capabilities":["model"]"#).unwrap();
+    assert!(policy.allows("model"));
+    assert_eq!(policy.capabilities.len(), 1, "model grants nothing else");
+    // Not the provider manager, not the assistant, not the network.
+    assert!(!policy.allows("llm") && !policy.allows("net") && !policy.allows("octos.turn.start"));
+    assert!(!policy.may_prompt);
+    for name in ["model.", "model.complete", "Model", "models"] {
+        let err = resolve(&format!(r#""capabilities":["{name}"]"#)).unwrap_err();
+        assert!(err.contains("unknown capability"), "{name}: {err}");
+    }
+    let manifest = AppManifest::parse(&manifest_with(r#""capabilities":["model"]"#)).unwrap();
+    assert!(privacy_summary(&manifest).iter().any(|l| l.contains("AI provider you configured")));
+}

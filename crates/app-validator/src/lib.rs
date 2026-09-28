@@ -22,6 +22,7 @@ pub struct CardSession {
     asset_origin: String,
     state_path: Option<std::path::PathBuf>,
     state_limit: u64,
+    inspectable: bool,
 }
 
 impl CardSession {
@@ -32,11 +33,22 @@ impl CardSession {
     /// State lives outside the app's writable jail; only the host may supply
     /// this path after resolving the bundle's storage capability.
     pub fn open_with_state(bundle: &Path, asset_origin: &str, storage: Option<(&Path, u64)>) -> Result<Self, String> {
+        Self::open_inner(bundle, asset_origin, storage, false)
+    }
+
+    /// Like [`Self::open_with_state`], with deterministic `beauty_…` node ids
+    /// on L0 lowerings so a preview host's `/snap` can name every node.
+    pub fn open_inspectable(bundle: &Path, asset_origin: &str, storage: Option<(&Path, u64)>) -> Result<Self, String> {
+        Self::open_inner(bundle, asset_origin, storage, true)
+    }
+
+    fn open_inner(bundle: &Path, asset_origin: &str, storage: Option<(&Path, u64)>, inspectable: bool) -> Result<Self, String> {
     if bundle.join(octosense_app_policy::SCRIPT_ENTRY).is_file() {
         let source = read_text(&bundle.join(octosense_app_policy::SCRIPT_ENTRY), MAX_TEXT_BYTES)?;
         return Ok(Self { source: source.replace(octosense_app_policy::ASSETS_PLACEHOLDER, asset_origin.trim_end_matches('/')),
             runtime: None, channel: None, card: String::new(), data: serde_json::Value::Null,
-            kit: bundle.join("kit"), bundle: bundle.into(), asset_origin: asset_origin.into(), state_path: None, state_limit: 0 });
+            kit: bundle.join("kit"), bundle: bundle.into(), asset_origin: asset_origin.into(), state_path: None, state_limit: 0,
+            inspectable });
     }
     let card = read_text(&bundle.join("page.card"), 256 * 1024)?;
     let data_path = bundle.join("page.data.json");
@@ -55,13 +67,13 @@ impl CardSession {
         Some(format!("octosense-card-runtime:{}", nonce.iter().map(|b| format!("{b:02x}")).collect::<String>()))
     } else { None };
     let ui = if let (Some(channel), Some(runtime)) = (&channel, &runtime) {
-        let restored = octoscript_makepad::l0::prepare_with_state(&card, &data, &bundle.join("kit"), runtime.store())?;
+        let restored = octoscript_makepad::l0::prepare_with_state(&card, &data, runtime.store(), &bundle.join("kit"))?;
         validate_resources(&restored.tree, bundle, asset_origin)?;
-        octoscript_makepad::to_makepad_l0_ui_with_events(&restored.tree, channel)
+        l0_ui(restored.tree, channel, inspectable)
     } else { octoscript_makepad::design::to_makepad_ui(&prepared.tree)? };
     Ok(Self { source: format!("width:Fill height:Fill flow:Overlay {ui}"), runtime, channel,
         card, data, kit: bundle.join("kit"), bundle: bundle.into(), asset_origin: asset_origin.into(),
-        state_path: storage.map(|(path, _)| path.to_path_buf()), state_limit: storage.map(|(_, limit)| limit).unwrap_or(0) })
+        state_path: storage.map(|(path, _)| path.to_path_buf()), state_limit: storage.map(|(_, limit)| limit).unwrap_or(0), inspectable })
     }
 
     pub fn needs_event_channel(&self) -> bool { self.runtime.is_some() }
@@ -84,9 +96,9 @@ impl CardSession {
         let outcome = runtime.dispatch_native(octosense_app_runtime::NativeEvent::new(runtime.generation(), key, event, value))?;
         if !outcome.applied { return Ok(None); }
         let updated = (|| {
-            let prepared = octoscript_makepad::l0::prepare_with_state(&self.card, &self.data, &self.kit, runtime.store())?;
+            let prepared = octoscript_makepad::l0::prepare_with_state(&self.card, &self.data, runtime.store(), &self.kit)?;
             validate_resources(&prepared.tree, &self.bundle, &self.asset_origin)?;
-            let ui = octoscript_makepad::to_makepad_l0_ui_with_events(&prepared.tree, event_id);
+            let ui = l0_ui(prepared.tree, event_id, self.inspectable);
             if let Some(path) = &self.state_path {
                 let bytes = runtime.snapshot_bytes()?;
                 if bytes.len() as u64 > self.state_limit { return Err("Card state exceeds the app's storage quota".into()); }
@@ -101,6 +113,14 @@ impl CardSession {
         self.source = source.clone();
         Ok(Some(source))
     }
+}
+
+/// Lower a realized L0 tree with its controls routed to `channel`.
+fn l0_ui(mut tree: octoscript_render::UiNode, channel: &str, inspectable: bool) -> String {
+    if inspectable {
+        octoscript_makepad::l0::inspectable(&mut tree);
+    }
+    octoscript_makepad::to_makepad_l0_ui_with_events(&tree, channel)
 }
 
 /// A stable filename independent of app-supplied path spelling.

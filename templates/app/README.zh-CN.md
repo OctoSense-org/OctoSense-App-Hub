@@ -2,7 +2,7 @@
 
 [English](README.md) | 简体中文
 
-按照[开发你的第一个 Hub 应用](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/FIRST-APP.md)，把这个目录复制到新的应用仓库中。这是一个**元数据脚手架**，不是可运行或可发布的演示。
+按照[开发你的第一个 Hub 应用](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/FIRST-APP.md)，把这个目录复制到新的应用仓库中。这是一个卡片应用的**元数据脚手架**，不是可运行或可发布的演示。要开发脚本应用（`main.splash`）？请改用 [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) 的 `tools/octo new`，不要复制这个目录。
 
 包含内容：schema 1 清单和完整的商店信息字段、一个示例 SVG 图标、忽略规则，以及指向共享编写指南的 Agent 指引。
 

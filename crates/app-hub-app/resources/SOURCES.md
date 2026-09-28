@@ -14,7 +14,7 @@ Canonical artwork: `../assets/icon.svg`, declared by `../listing.json`.
 The selected Octo Bloom design was generated and refined with the built-in
 imagegen tool, then reconstructed as clean SVG geometry with an app grid at
 the center. Concept images and prompts live in
-OctoSense-ROM, `docs/design/app-hub/icon-exploration/`.
+OctoSense, `phone/docs/design/app-hub/icon-exploration/`.
 
 Preview entries render their actual shared launcher identities. Their artwork
 comes from the host's icon catalog, including its theme overrides; this app no

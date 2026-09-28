@@ -3,10 +3,10 @@
 //! requires the complete Hub listing and manifest, validated by the Hub gate.
 //!
 //! Also pack the system apps the shell includes (ADR 0004). Their bundles live
-//! with their apps in OctoSense-System-Apps, `apps/<name>/bundle/`; the shell's
+//! with their apps in OctoSense, `apps/<name>/bundle/`; the shell's
 //! selection file names which to include and mounts artwork the shell owns:
-//! `{"source": "../.sources/system-apps/apps", "apps": ["news"],
-//!   "assets": {"photos": {"photos": "apps/photos/resources/photos"}}}`.
+//! `{"source": "../apps", "apps": ["news"],
+//!   "assets": {"photos": {"photos": "../apps/photos/native/resources/photos"}}}`.
 //! `source` and asset paths are relative to the selection file's directory.
 //! Each bundle becomes a pack with its digest stamped; each asset directory is
 //! compiled in as static artwork served at `<prefix>/<file>`.
