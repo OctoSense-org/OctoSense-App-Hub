@@ -803,6 +803,8 @@ dependencies = [
  "makepad-live-id",
  "makepad-micro-serde",
  "makepad-script",
+ "rustls",
+ "webpki-roots",
  "windows",
 ]
 
