@@ -6,6 +6,7 @@
 //! again. This is the only place that produces [`AppPolicy`], and the two
 //! containers are derived from it, never set by hand.
 use crate::manifest::{short_id, AgentSpec, AppManifest, ModelSpec, ProfileMode, Triggers, KNOWN_CAPABILITIES};
+use crate::research::ResearchScope;
 use std::collections::BTreeSet;
 
 /// The host's own ceilings. An app may ask for less and get it; asking for
@@ -81,6 +82,10 @@ pub struct AppPolicy {
     pub may_prompt: bool,
     /// None when the manifest asked for no agent.
     pub agent: Option<AgentPolicy>,
+    /// The scope of `research` and `crawl`, validated and normalised as
+    /// octos's `Scope::from_grant` does: the grant the host hands the
+    /// toolbox. `Some` exactly when the app requests either capability.
+    pub research: Option<ResearchScope>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -147,6 +152,8 @@ pub fn resolve(manifest: &AppManifest, limits: &HostLimits) -> Result<AppPolicy,
         return Err(format!("app {} lists hosts but does not request the net capability", manifest.id));
     }
 
+    let research = resolve_research(&manifest.id, &capabilities, manifest.research.as_ref())?;
+
     let agent = match &manifest.agent {
         None => None,
         Some(spec) => Some(resolve_agent(&manifest.id, spec, limits)?),
@@ -163,7 +170,46 @@ pub fn resolve(manifest: &AppManifest, limits: &HostLimits) -> Result<AppPolicy,
         instruction_budget: clamp(manifest.compute.instruction_budget, limits.max_instruction_budget),
         memory_bytes: clamp(manifest.compute.memory_bytes, limits.max_memory_bytes),
         agent,
+        research,
     })
+}
+
+/// The `research` scope against the `research` and `crawl` capabilities.
+/// The scope says what the capabilities reach, so neither goes without the
+/// other: a capability without a scope would reach whatever the host
+/// defaults to, which the store could not show, and a scope without a
+/// capability is a mistake the author should see. Crawl limits need `crawl`,
+/// because octos grants crawling from the limits alone.
+fn resolve_research(
+    app_id: &str,
+    capabilities: &BTreeSet<String>,
+    scope: Option<&ResearchScope>,
+) -> Result<Option<ResearchScope>, String> {
+    let research = capabilities.contains("research");
+    let crawl = capabilities.contains("crawl");
+    let Some(scope) = scope else {
+        if research || crawl {
+            let cap = if research { "research" } else { "crawl" };
+            return Err(format!(
+                "app {app_id} requests {cap} but declares no research scope; add a top-level \"research\" object (octos's scope; {{}} means no limits)"
+            ));
+        }
+        return Ok(None);
+    };
+    if !research && !crawl {
+        return Err(format!("app {app_id} declares a research scope but requests neither the research nor the crawl capability"));
+    }
+    let scope = scope.validated().map_err(|e| format!("app {app_id} {e}"))?;
+    if crawl && !scope.crawls() {
+        return Err(format!(
+            "app {app_id} requests crawl, so its research scope needs max_depth and max_pages above 0 (got {} and {})",
+            scope.max_depth, scope.max_pages
+        ));
+    }
+    if !crawl && (scope.max_depth > 0 || scope.max_pages > 0) {
+        return Err(format!("app {app_id} sets crawl limits (max_depth, max_pages) but does not request the crawl capability"));
+    }
+    Ok(Some(scope))
 }
 
 fn resolve_agent(app_id: &str, spec: &AgentSpec, limits: &HostLimits) -> Result<AgentPolicy, String> {

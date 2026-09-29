@@ -311,3 +311,115 @@ fn model_is_its_own_capability_and_implies_nothing_else() {
     let manifest = AppManifest::parse(&manifest_with(r#""capabilities":["model"]"#)).unwrap();
     assert!(privacy_summary(&manifest).iter().any(|l| l.contains("AI provider you configured")));
 }
+
+// ------------------------------------------------------- research and crawl
+
+#[test]
+fn research_is_its_own_capability_with_octos_scope() {
+    let policy = resolve(
+        r#""capabilities":["research"],"research":{"langs":["en","zh_cn"],"regions":["us"],"categories":["news"],"max_age_days":7}"#,
+    )
+    .unwrap();
+    assert!(policy.allows("research"));
+    assert_eq!(policy.capabilities.len(), 1, "research grants nothing else");
+    // Not crawling, not the app's own network, not the news service.
+    assert!(!policy.allows("crawl") && !policy.allows("net") && !policy.allows("news"));
+    assert!(policy.hosts.is_empty());
+    let scope = policy.research.expect("the scope is granted with the capability");
+    // Normalised as octos's Scope::from_grant does.
+    assert_eq!(scope.langs, ["en", "zh-CN"]);
+    assert_eq!(scope.regions, ["US"]);
+    assert_eq!(scope.max_results, 20, "octos's default");
+    assert!(!scope.crawls());
+    for name in ["research.", "research.search", "deep_research", "Research", "crawl.", "deep_crawl"] {
+        let err = resolve(&format!(r#""capabilities":["{name}"],"research":{{}}"#)).unwrap_err();
+        assert!(err.contains("unknown capability"), "{name}: {err}");
+    }
+    // An app without either capability gets no scope.
+    assert!(resolve(r#""capabilities":["storage"]"#).unwrap().research.is_none());
+}
+
+#[test]
+fn research_and_crawl_need_a_scope_and_a_scope_needs_one_of_them() {
+    for cap in ["research", "crawl"] {
+        let err = resolve(&format!(r#""capabilities":["{cap}"]"#)).unwrap_err();
+        assert!(err.contains("declares no research scope"), "{cap}: {err}");
+    }
+    let err = resolve(r#""capabilities":["storage"],"research":{"langs":["en"]}"#).unwrap_err();
+    assert!(err.contains("requests neither the research nor the crawl capability"), "{err}");
+    // `{}` is a scope: no limits, which the store then says in words.
+    let policy = resolve(r#""capabilities":["research"],"research":{}"#).unwrap();
+    assert!(policy.research.is_some());
+}
+
+#[test]
+fn the_scope_is_checked_with_octos_rules() {
+    let refused = |scope: &str| resolve(&format!(r#""capabilities":["research"],"research":{scope}"#)).unwrap_err();
+    assert!(refused(r#"{"langs":["english"]}"#).contains("bad language"));
+    assert!(refused(r#"{"regions":["USA"]}"#).contains("bad region"));
+    assert!(refused(r#"{"categories":["video"]}"#).contains("unknown category"));
+    assert!(refused(r#"{"max_results":0}"#).contains("max_results must be > 0"));
+    assert!(refused(r#"{"domains_deny":["https://x.com/"]}"#).contains("bare domain"));
+    // Unknown fields are refused: the schema is exactly octos's.
+    let err = refused(r#"{"langs":["en"],"sites":["x.com"]}"#);
+    assert!(err.contains("manifest is not valid") && err.contains("unknown field"), "{err}");
+}
+
+#[test]
+fn the_old_toolbox_scope_shape_is_refused_with_the_fields_to_rename() {
+    let err = resolve(
+        r#""capabilities":["research"],"research":{"languages":["en"],"allowed_domains":["bbc.co.uk"],"recency_hours":24}"#,
+    )
+    .unwrap_err();
+    assert!(err.contains("old toolbox shape"), "{err}");
+    assert!(err.contains("`languages` is now `langs`"), "{err}");
+    assert!(err.contains("`allowed_domains` is now `domains_allow`"), "{err}");
+    assert!(err.contains("`recency_hours` is now `max_age_days`"), "{err}");
+}
+
+#[test]
+fn crawl_needs_its_limits_and_the_limits_need_crawl() {
+    let policy = resolve(r#""capabilities":["crawl"],"research":{"domains_allow":["docs.rs"],"max_depth":2,"max_pages":40}"#).unwrap();
+    assert!(policy.allows("crawl"));
+    assert!(!policy.allows("research"), "crawl does not imply research");
+    assert_eq!(policy.capabilities.len(), 1);
+    assert!(policy.research.unwrap().crawls());
+    for limits in [r#""max_depth":2"#, r#""max_pages":40"#, r#""max_depth":0,"max_pages":40"#, ""] {
+        let err = resolve(&format!(r#""capabilities":["crawl"],"research":{{{limits}}}"#)).unwrap_err();
+        assert!(err.contains("needs max_depth and max_pages above 0"), "{limits}: {err}");
+    }
+    // research alone may not carry crawl limits: octos would crawl on them.
+    let err = resolve(r#""capabilities":["research"],"research":{"max_depth":1,"max_pages":5}"#).unwrap_err();
+    assert!(err.contains("does not request the crawl capability"), "{err}");
+    let both = resolve(r#""capabilities":["research","crawl"],"research":{"max_depth":1,"max_pages":5}"#).unwrap();
+    assert!(both.allows("research") && both.allows("crawl"));
+}
+
+#[test]
+fn a_manifest_without_a_research_scope_signs_as_it_did() {
+    let manifest = AppManifest::parse(&manifest_with(r#""capabilities":["storage"]"#)).unwrap();
+    let bytes = String::from_utf8(manifest.signing_bytes().unwrap()).unwrap();
+    assert!(!bytes.contains("research"), "{bytes}");
+    // A scope round-trips in octos's shape, defaults left out.
+    let manifest = AppManifest::parse(&manifest_with(
+        r#""capabilities":["research"],"research":{"langs":["en"],"max_age_days":3}"#,
+    ))
+    .unwrap();
+    let bytes = String::from_utf8(manifest.signing_bytes().unwrap()).unwrap();
+    assert!(bytes.contains(r#""research":{"langs":["en"],"max_age_days":3,"max_results":20}"#), "{bytes}");
+}
+
+#[test]
+fn the_store_says_the_research_scope_in_plain_words() {
+    let manifest = AppManifest::parse(&manifest_with(
+        r#""capabilities":["research","crawl"],"research":{"langs":["en","zh"],"categories":["news"],"max_age_days":7,"max_depth":2,"max_pages":20}"#,
+    ))
+    .unwrap();
+    let lines = privacy_summary(&manifest);
+    assert!(lines.iter().any(|l| l.starts_with("Searches news in English and Chinese, from the last 7 days")), "{lines:?}");
+    assert!(
+        lines.iter().any(|l| l.starts_with("Crawls websites, following links up to 2 deep and reading up to 20 pages a crawl, on any site")
+            && l.contains("reaches more of the web than searching")),
+        "{lines:?}"
+    );
+}

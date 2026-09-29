@@ -101,6 +101,11 @@ impl Entry {
                 "news" => "Read news the device collects from its feeds and topics".to_string(),
                 "glance" => "Show cards on your glance screen".to_string(),
                 "model" => "Send what you give it to the AI provider you configured, within a daily budget".to_string(),
+                "research" => format!("Search {}", octosense_app_policy::search_words(&self.manifest.shown_research_scope())),
+                "crawl" => format!(
+                    "Crawl websites, {}, which reaches more than searching",
+                    octosense_app_policy::crawl_words(&self.manifest.shown_research_scope())
+                ),
                 other => match octosense_app_policy::service_words(other) {
                     Some(words) => words.to_string(),
                     None => format!("Use {other}"),
@@ -290,7 +295,8 @@ mod tests {
                 "schema": 1, "id": "dev.example.app", "version": "1", "name": "App",
                 "integrity": {"bundle_blake3": ""},
                 "capabilities": octosense_app_policy::KNOWN_CAPABILITIES,
-                "network": {"hosts": ["api.example.com"]}
+                "network": {"hosts": ["api.example.com"]},
+                "research": {"langs": ["en", "zh"], "categories": ["news"], "max_age_days": 7, "max_depth": 2, "max_pages": 20}
             })
             .to_string(),
         )
@@ -311,6 +317,14 @@ mod tests {
         for (capability, line) in octosense_app_policy::KNOWN_CAPABILITIES.iter().zip(&lines) {
             assert_ne!(line, &format!("Use {capability}"), "{capability} has no plain-words line");
         }
+        assert!(lines.contains(&"Search news in English and Chinese, from the last 7 days".to_string()), "{lines:?}");
+        assert!(
+            lines.contains(
+                &"Crawl websites, following links up to 2 deep and reading up to 20 pages a crawl, on any site, which reaches more than searching"
+                    .to_string()
+            ),
+            "{lines:?}"
+        );
     }
 }
 
