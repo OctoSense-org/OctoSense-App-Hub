@@ -5,7 +5,8 @@
 //! ceiling. A manifest asks; the host decides; the app is never consulted
 //! again. This is the only place that produces [`AppPolicy`], and the two
 //! containers are derived from it, never set by hand.
-use crate::manifest::{AgentSpec, AppManifest, ProfileMode, KNOWN_CAPABILITIES};
+use crate::manifest::{short_id, AgentSpec, AppManifest, ModelSpec, ProfileMode, Triggers, KNOWN_CAPABILITIES};
+use crate::research::ResearchScope;
 use std::collections::BTreeSet;
 
 /// The host's own ceilings. An app may ask for less and get it; asking for
@@ -81,14 +82,30 @@ pub struct AppPolicy {
     pub may_prompt: bool,
     /// None when the manifest asked for no agent.
     pub agent: Option<AgentPolicy>,
+    /// The scope of `research` and `crawl`, validated and normalised as
+    /// octos's `Scope::from_grant` does: the grant the host hands the
+    /// toolbox. `Some` exactly when the app requests either capability.
+    pub research: Option<ResearchScope>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AgentPolicy {
     pub profile: ProfileMode,
+    /// The generic host tools granted (`agent.tools`). The app's own tools
+    /// come from its tool manifest ([`crate::agent::ToolManifest`]).
     pub tools: BTreeSet<String>,
     pub max_iterations: u32,
     pub token_budget: u64,
+    /// The model requirements, needs deduplicated and sorted.
+    pub model: ModelSpec,
+    /// The app ASKED to run in the background. Not a grant: the host asks
+    /// the person, and a run while the app is closed needs both.
+    pub background_requested: bool,
+    pub triggers: Triggers,
+    /// Bundle-relative path of the agent's instructions, when declared.
+    pub instructions: Option<String>,
+    /// The skills the bundle declares, sorted.
+    pub skills: BTreeSet<String>,
 }
 
 impl AppPolicy {
@@ -135,6 +152,8 @@ pub fn resolve(manifest: &AppManifest, limits: &HostLimits) -> Result<AppPolicy,
         return Err(format!("app {} lists hosts but does not request the net capability", manifest.id));
     }
 
+    let research = resolve_research(&manifest.id, &capabilities, manifest.research.as_ref())?;
+
     let agent = match &manifest.agent {
         None => None,
         Some(spec) => Some(resolve_agent(&manifest.id, spec, limits)?),
@@ -151,7 +170,46 @@ pub fn resolve(manifest: &AppManifest, limits: &HostLimits) -> Result<AppPolicy,
         instruction_budget: clamp(manifest.compute.instruction_budget, limits.max_instruction_budget),
         memory_bytes: clamp(manifest.compute.memory_bytes, limits.max_memory_bytes),
         agent,
+        research,
     })
+}
+
+/// The `research` scope against the `research` and `crawl` capabilities.
+/// The scope says what the capabilities reach, so neither goes without the
+/// other: a capability without a scope would reach whatever the host
+/// defaults to, which the store could not show, and a scope without a
+/// capability is a mistake the author should see. Crawl limits need `crawl`,
+/// because octos grants crawling from the limits alone.
+fn resolve_research(
+    app_id: &str,
+    capabilities: &BTreeSet<String>,
+    scope: Option<&ResearchScope>,
+) -> Result<Option<ResearchScope>, String> {
+    let research = capabilities.contains("research");
+    let crawl = capabilities.contains("crawl");
+    let Some(scope) = scope else {
+        if research || crawl {
+            let cap = if research { "research" } else { "crawl" };
+            return Err(format!(
+                "app {app_id} requests {cap} but declares no research scope; add a top-level \"research\" object (octos's scope; {{}} means no limits)"
+            ));
+        }
+        return Ok(None);
+    };
+    if !research && !crawl {
+        return Err(format!("app {app_id} declares a research scope but requests neither the research nor the crawl capability"));
+    }
+    let scope = scope.validated().map_err(|e| format!("app {app_id} {e}"))?;
+    if crawl && !scope.crawls() {
+        return Err(format!(
+            "app {app_id} requests crawl, so its research scope needs max_depth and max_pages above 0 (got {} and {})",
+            scope.max_depth, scope.max_pages
+        ));
+    }
+    if !crawl && (scope.max_depth > 0 || scope.max_pages > 0) {
+        return Err(format!("app {app_id} sets crawl limits (max_depth, max_pages) but does not request the crawl capability"));
+    }
+    Ok(Some(scope))
 }
 
 fn resolve_agent(app_id: &str, spec: &AgentSpec, limits: &HostLimits) -> Result<AgentPolicy, String> {
@@ -162,12 +220,118 @@ fn resolve_agent(app_id: &str, spec: &AgentSpec, limits: &HostLimits) -> Result<
         }
         tools.insert(tool.clone());
     }
+    let mut model = spec.model.clone().unwrap_or_default();
+    model.needs.sort();
+    model.needs.dedup();
+    if model.per_task.len() > MAX_MODEL_TASKS {
+        return Err(format!("app {app_id} names more than {MAX_MODEL_TASKS} model tasks"));
+    }
+    for (task, task_model) in model.per_task.iter_mut() {
+        if task.is_empty() || task.len() > 32 || !task.chars().all(|c| c.is_ascii_lowercase() || c == '_') {
+            return Err(format!("app {app_id} model task {task:?} must be 1 to 32 of [a-z_]"));
+        }
+        task_model.needs.sort();
+        task_model.needs.dedup();
+    }
+    check_triggers(app_id, &spec.triggers)?;
+    // A background agent with nothing to wake it would either never run or
+    // be woken by something the manifest does not show the person.
+    if spec.background && spec.triggers.is_empty() {
+        return Err(format!("app {app_id} asks for a background agent but declares no triggers"));
+    }
+    if let Some(path) = &spec.instructions {
+        check_bundle_path(path)
+            .map_err(|e| format!("app {app_id} agent.instructions: {e}"))?;
+        if !path.ends_with(".md") {
+            return Err(format!("app {app_id} agent.instructions {path:?} must be a Markdown (.md) file"));
+        }
+    }
+    let mut skills = BTreeSet::new();
+    for skill in &spec.skills {
+        check_skill_name(skill).map_err(|e| format!("app {app_id}: {e}"))?;
+        if !skills.insert(skill.clone()) {
+            return Err(format!("app {app_id} names skill {skill:?} twice"));
+        }
+    }
+    if skills.len() > MAX_SKILLS {
+        return Err(format!("app {app_id} declares more than {MAX_SKILLS} skills"));
+    }
     Ok(AgentPolicy {
         profile: spec.profile,
         tools,
         max_iterations: clamp_u32(spec.max_iterations, limits.max_iterations),
         token_budget: clamp(spec.token_budget, limits.max_token_budget),
+        model,
+        background_requested: spec.background,
+        triggers: spec.triggers.clone(),
+        instructions: spec.instructions.clone(),
+        skills,
     })
+}
+
+/// Ceilings on what an agent declaration may list.
+pub const MAX_MODEL_TASKS: usize = 8;
+pub const MAX_SKILLS: usize = 16;
+pub const MAX_TRIGGERS: usize = 16;
+
+/// A skill's name is its directory under `skills/` and its octos identity.
+pub(crate) fn check_skill_name(name: &str) -> Result<(), String> {
+    if name.is_empty() || name.len() > 64 {
+        return Err(format!("skill name {name:?} must be 1 to 64 characters"));
+    }
+    if !name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+        || name.starts_with('-')
+    {
+        return Err(format!("skill name {name:?} may hold only [a-z0-9_-] and may not start with '-'"));
+    }
+    Ok(())
+}
+
+/// A plain bundle-relative path: no root, no climbing, no backslash.
+pub(crate) fn check_bundle_path(path: &str) -> Result<(), String> {
+    if path.is_empty()
+        || path.starts_with('/')
+        || path.contains('\\')
+        || path.contains("://")
+        || path.split('/').any(|part| part.is_empty() || part == "." || part == "..")
+    {
+        return Err(format!("{path:?} must be a plain bundle-relative path"));
+    }
+    Ok(())
+}
+
+/// Schedules are five-field cron; events are the app's own, under its
+/// namespace. Anything else is refused rather than guessed at.
+fn check_triggers(app_id: &str, triggers: &Triggers) -> Result<(), String> {
+    if triggers.schedule.len() > MAX_TRIGGERS || triggers.events.len() > MAX_TRIGGERS {
+        return Err(format!("app {app_id} declares more than {MAX_TRIGGERS} schedules or events"));
+    }
+    for entry in &triggers.schedule {
+        let fields: Vec<&str> = entry.split_whitespace().collect();
+        let well_formed = fields.len() == 5
+            && fields.iter().all(|f| f.len() <= 32 && f.chars().all(|c| c.is_ascii_digit() || matches!(c, '*' | ',' | '/' | '-')));
+        if !well_formed {
+            return Err(format!(
+                "app {app_id} schedule {entry:?} must be five cron fields (minute hour day month weekday) of digits and * , / -"
+            ));
+        }
+    }
+    let namespace = short_id(app_id);
+    for event in &triggers.events {
+        let mut parts = event.split('.');
+        let head = parts.next().unwrap_or("");
+        let rest: Vec<&str> = parts.collect();
+        let well_formed = event.len() <= 64
+            && head == namespace
+            && !rest.is_empty()
+            && rest.iter().all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'));
+        if !well_formed {
+            return Err(format!(
+                "app {app_id} event {event:?} must be {namespace}.<name>: the app's own events, lowercase, at most 64 characters"
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// An id is a path component of the app's jail, so it may not be empty, may

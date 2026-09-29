@@ -1,6 +1,6 @@
 # octosense-app-hub-app — the shell integration
 
-Every OctoSense shell (ROM Home, OctoSense-Desktop) links this one crate to
+Every OctoSense shell (the phone's Home and the desktop, both in the OctoSense repository) links this one crate to
 get the App Hub: the native store, the runner for Card and script apps, the
 system apps the shell ships, the apps the user installed, and their icons. It
 lives here, with the crates it builds on, so that every shell links the same
@@ -44,15 +44,14 @@ code at the same pin.
    ```json
    {
      "schema": 1,
-     "source": "../.sources/system-apps/apps",
+     "source": "../apps",
      "apps": ["news", "photos", "maps", "camera", "mail"],
-     "assets": { "photos": { "photos": "apps/photos/resources/photos" } }
+     "assets": { "photos": { "photos": "../apps/photos/native/resources/photos" } }
    }
    ```
 
-   `source` is a checkout of
-   [OctoSense-System-Apps](https://github.com/OctoSense-org/OctoSense-System-Apps)
-   `apps/`; each `<source>/<name>/bundle` is packed with its digest stamped,
+   `source` is the directory holding the bundles, in OctoSense
+   [`apps/`](https://github.com/OctoSense-org/OctoSense/tree/main/apps); each `<source>/<name>/bundle` is packed with its digest stamped,
    and each asset directory is compiled in and served at `<prefix>/<file>`.
    The variable is required because this crate usually builds from cargo's
    git checkout, where its own location says nothing about the shell. With
@@ -73,10 +72,10 @@ code at the same pin.
    widget that draws a visible sheet over the app; a shell with its own card
    presentation does the same.
 
-ROM Home is the reference: `home/src/apps.rs` (`system_card_apps`,
+OctoSense is the reference: `crates/shell/src/apps.rs` (`system_card_apps`,
 `register_host_services`, `card_apps`) and, for the sheet and mounting, the
 `HostedHubCard` widget in this crate's `src/card_host.rs` (formerly
-`home/apps/app-hub/src/card_host.rs`).
+OctoSense-ROM's `home/apps/app-hub/src/card_host.rs`).
 
 ## Run it alone
 

@@ -7,5 +7,5 @@ publish = false
 description = "Bounded state and native event dispatch for contained Card apps"
 
 [dependencies]
-octoscript-ui-l0 = { git = "https://github.com/OctoSense-org/Octoscript.git", rev = "3c1c6bae8c037627f8610aafa2a3a4f1c56ac567" }
+octoscript-ui-l0 = { git = "https://github.com/OctoSense-org/Octoscript.git", rev = "76032ed4b0a9cce346cbc9e4f9f30fe00d76e65b" }
 serde_json = "1"

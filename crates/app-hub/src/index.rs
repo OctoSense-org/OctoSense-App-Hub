@@ -7,7 +7,7 @@
 //!
 //! The manifest is embedded rather than referenced so that what a reviewer
 //! read, what the hub signed and what the device enforces are the same bytes.
-use octosense_app_policy::{AppManifest, Listing};
+use octosense_app_policy::{AppManifest, Listing, ToolSpec};
 use serde::{Deserialize, Serialize};
 
 /// Whether this version is still offered, and why not.
@@ -37,6 +37,13 @@ pub struct Entry {
     /// permissions the store shows still come from the manifest.
     #[serde(default)]
     pub listing: Option<Listing>,
+    /// The app's tool manifest (`tools.json`) as reviewed, so a store can
+    /// say which tools wait for approval or may be shared before anything is
+    /// installed. Omitted when the app ships no tools, so an entry without
+    /// them serialises, and signs, as it did before the field existed. The
+    /// bundle's copy is authoritative on the device: the digest pins it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tools: Vec<ToolSpec>,
     /// Where the hub's own copy of the bundle lives, relative to the catalog.
     pub artifact: String,
     /// The publisher's key identity, as the hub knows it. Update continuity
@@ -90,13 +97,26 @@ impl Entry {
                 "microphone" => "Use the microphone".to_string(),
                 "library" => "Save to your photo library, where other apps can see it".to_string(),
                 "mail" => "Read and send mail from accounts you sign in to on the device".to_string(),
-                other => format!("Use {other}"),
+                "llm" => "Manage the assistant's AI providers, whose keys stay with the device".to_string(),
+                "news" => "Read news the device collects from its feeds and topics".to_string(),
+                "glance" => "Show cards on your glance screen".to_string(),
+                "model" => "Send what you give it to the AI provider you configured, within a daily budget".to_string(),
+                "research" => format!("Search {}", octosense_app_policy::search_words(&self.manifest.shown_research_scope())),
+                "crawl" => format!(
+                    "Crawl websites, {}, which reaches more than searching",
+                    octosense_app_policy::crawl_words(&self.manifest.shown_research_scope())
+                ),
+                other => match octosense_app_policy::service_words(other) {
+                    Some(words) => words.to_string(),
+                    None => format!("Use {other}"),
+                },
             });
         }
         if let Some(agent) = &self.manifest.agent {
             let tools = if agent.tools.is_empty() { "no tools".to_string() } else { agent.tools.join(", ") };
             lines.push(format!("Run an assistant for this app ({tools}), inside this app's own data only"));
         }
+        lines.extend(octosense_app_policy::agent_permission_lines(&self.manifest, &self.tools));
         if lines.is_empty() {
             lines.push("Draw its screens, and nothing else".to_string());
         }
@@ -275,7 +295,8 @@ mod tests {
                 "schema": 1, "id": "dev.example.app", "version": "1", "name": "App",
                 "integrity": {"bundle_blake3": ""},
                 "capabilities": octosense_app_policy::KNOWN_CAPABILITIES,
-                "network": {"hosts": ["api.example.com"]}
+                "network": {"hosts": ["api.example.com"]},
+                "research": {"langs": ["en", "zh"], "categories": ["news"], "max_age_days": 7, "max_depth": 2, "max_pages": 20}
             })
             .to_string(),
         )
@@ -284,6 +305,7 @@ mod tests {
             artifact: String::new(),
             manifest,
             listing: None,
+            tools: Vec::new(),
             publisher: String::new(),
             publisher_key: String::new(),
             source: Source { repository: String::new(), commit: String::new() },
@@ -295,6 +317,14 @@ mod tests {
         for (capability, line) in octosense_app_policy::KNOWN_CAPABILITIES.iter().zip(&lines) {
             assert_ne!(line, &format!("Use {capability}"), "{capability} has no plain-words line");
         }
+        assert!(lines.contains(&"Search news in English and Chinese, from the last 7 days".to_string()), "{lines:?}");
+        assert!(
+            lines.contains(
+                &"Crawl websites, following links up to 2 deep and reading up to 20 pages a crawl, on any site, which reaches more than searching"
+                    .to_string()
+            ),
+            "{lines:?}"
+        );
     }
 }
 

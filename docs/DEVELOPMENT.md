@@ -9,8 +9,8 @@ and submission. Authoring lives in other repositories:
 | Repository | What it owns |
 | --- | --- |
 | [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) | The app-development harness: quickstart, script API, the script-app template, the `tools/octo` command, the design flows (`flows/`) and example apps (`examples/`). Formerly Octoscript-AppCard. |
-| [OctoSense-System-Apps `apps/appcard`](https://github.com/OctoSense-org/OctoSense-System-Apps/tree/main/apps/appcard) | The AppCard assistant runtime and the L0 card language (`a2app-l0/framework/l0.md`). |
-| [OctoSense-System-Apps](https://github.com/OctoSense-org/OctoSense-System-Apps) | The first-party system apps (News, Photos, Maps, Camera, Mail), each a script app bundle under `apps/<name>/bundle/`, and Mail's host service under `apps/mail/host-service/`. |
+| [OctoSense `apps/appcard`](https://github.com/OctoSense-org/OctoSense/tree/main/apps/appcard) | The AppCard assistant runtime (opt-in in the shells) and the L0 card language (`a2app-l0/framework/l0.md`). |
+| [OctoSense `apps/`](https://github.com/OctoSense-org/OctoSense/tree/main/apps) | The first-party system apps (News, Photos, Maps, Camera, Mail, AI providers), each a script app bundle under `apps/<name>/bundle/`, and their host services under `apps/mail/host-service/` and `apps/ai-providers/host-service/`. |
 
 | Task | Guide |
 | --- | --- |
@@ -20,10 +20,10 @@ and submission. Authoring lives in other repositories:
 | Start a script app from a runnable template | [Quickstart](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md) and [`templates/script-app/`](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/templates/script-app) |
 | Write a script app: state, handlers, storage, requests, host services | [Script-app flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/script-app/FLOW.md) and [Script API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md) |
 | Turn UI designs into native cards | [Image-to-card flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md) |
-| Understand card data, state, events, copy, themes and views | [L0 language](https://github.com/OctoSense-org/OctoSense-System-Apps/blob/main/apps/appcard/a2app-l0/framework/l0.md) and the [L0 notes](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/docs/l0) |
+| Understand card data, state, events, copy, themes and views | [L0 language](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md) and the [L0 notes](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/docs/l0) |
 | Prepare shared Makepad/Octoscript dependencies | [Native workspace](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/NATIVE-WORKSPACE.md) |
 | Test real native input, capture frames and clean up test instances | [Native instrument](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md) |
-| Read worked examples | [Examples](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/examples) and the [system apps](https://github.com/OctoSense-org/OctoSense-System-Apps) |
+| Read worked examples | [Examples](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/examples) and the [system apps](https://github.com/OctoSense-org/OctoSense/tree/main/apps) |
 
 ## Choose the appropriate delivery path
 
@@ -43,7 +43,7 @@ Python services and browser controllers are not installed by either format.
 
 **System app:** a script app bundle that ships inside a shell release instead
 of the store, packed at build time, under an id in the reserved `os.`
-namespace. The first-party ones are in OctoSense-System-Apps; a store bundle
+namespace. The first-party ones are in OctoSense (`apps/`); a store bundle
 may not take an `os.` id.
 
 **Built-in native app:** source integrated into a shell release. Use the native
@@ -52,7 +52,7 @@ still apply, but an icon declaration alone does not make the app
 Hub-installable.
 
 **Agent-generated app type:** specifications and lint rules teaching the agent
-to compose a new kind of app, in OctoSense-System-Apps (`apps/appcard`). Those specifications are
+to compose a new kind of app, in OctoSense (`apps/appcard`). Those specifications are
 not themselves a store bundle.
 
 Some workflow examples include native services or website integration. Check
@@ -67,8 +67,12 @@ admission order a device uses: admit, resolve, apply, evaluate.
 
 ```sh
 cargo build --release -p octosense-card-host --bin card-host
-card-host --bundle <dir> [--app-data <dir>] [--allow-unsigned] [--stamp] [--system] [--static <prefix>=<dir>]...
+card-host --bundle <dir> [--app-data <dir>] [--allow-unsigned] [--stamp] [--system] [--static <prefix>=<dir>]... [--size <w>x<h>]
+card-host --help
 ```
+
+`--help` prints the flags and exits 0; an unknown option prints them and
+exits 2. Neither opens a window.
 
 | Flag | Effect |
 | --- | --- |
@@ -78,10 +82,43 @@ card-host --bundle <dir> [--app-data <dir>] [--allow-unsigned] [--stamp] [--syst
 | `--stamp` | Rewrite the manifest's `integrity.bundle_blake3` to match the directory before admitting. Without it, a bundle whose bytes changed since the last `hub stamp` is refused. |
 | `--system` | Admit as a system app is admitted: by digest only, under the system ceilings. An empty digest is filled in memory. For developing a system app. |
 | `--static <prefix>=<dir>` | Serve `<dir>`'s files at `<prefix>/...` from memory, as a shell serves a system app's compiled-in artwork (Photos uses `--static photos=<dir>`). |
+| `--size <w>x<h>` | The window's inner size in layout points, with no caption bar, so the card gets exactly that viewport (glance tile, phone, desktop). `card-studio` launches one card-host per size with it. |
 
 The log line `card-host: <id> <version> admitted — capabilities …, hosts …`
 is what the app got. A refusal is logged as `card-host: refused: …` and
 nothing is drawn.
+
+An L0 card also logs one line `card-host: realize {json}` before it is
+drawn: `lint` (`check_ui_l0`: `valid`, `level`, `diagnostics`), `realize`
+(`nodes`, `truncated` — a bound was hit and the tree is partial —
+`diagnostics`), `sources` (each declared source's `$state`: the data's
+`$status` entry, else `ready` with a value and `pending` without), and
+`lowering` (`design` for a native kit pack, `l0-kit` for a card composed from
+the role kit, whose nodes get inspectable ids `beauty_0_1_…`) or
+`lower_error`. Read it with `/log`.
+
+## Inspecting a card before publishing: `card-studio`
+
+`card-studio` (`crates/card-studio`, ADR 0002 section 7) renders a card in a
+hidden `card-host --remote` at the target sizes, runs the measured checks and
+prepares the vision critique. It drives card-host over HTTP and never links
+Makepad; its checks run on saved captures with no GPU.
+
+```sh
+cargo build --release -p octosense-card-host -p octosense-card-studio
+export CARD_STUDIO_KIT=../octoscript-makepad/components/l0   # the L0 kit a bare card is lowered with
+target/release/card-studio render --card news.card --data digest.json \
+    --size glance --size phone --size desktop --out out/
+target/release/card-studio critique --report out/report.json --rubric AGENT-rubric.md --inline > request.json
+target/release/card-studio check --snap out/glance.snap.json --tree out/glance.tree.txt --log out/glance.log.json --size glance
+```
+
+`render` writes `out/report.json` with, per size, the PNG (`/gq`), the
+snapshot (`/snap?all=1`), the tree (`/d`), the log, card-host's realize
+report, the findings and the metrics, and exits 1 when any finding is an
+error. The checks, the severity model, the report and the critique payload
+are documented in the crate (`src/checks.rs`, `src/report.rs`,
+`src/critique.rs`); the octos skill is in `skills/card-studio`.
 
 `card-host` registers no host services. A script app that calls
 `host.request("mail.…", …)` gets `no service answers "mail" on this device`

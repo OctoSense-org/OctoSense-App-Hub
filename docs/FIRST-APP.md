@@ -13,11 +13,14 @@ a different build process; see the [development guide map](DEVELOPMENT.md).
 
 ## 1. Prepare the tools and an app repository
 
-Use a Rust toolchain and the shared Makepad/Octoscript checkouts described in
-the [native workspace guide](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/NATIVE-WORKSPACE.md).
-The Hub workspace's Cargo manifests declare its expected revisions and sibling
-source overrides. Check those revisions before building; do not update a dirty
-shared checkout just to satisfy a guide.
+Use a Rust toolchain and the shared Makepad/Octoscript checkouts beside this
+repository (`../makepad`, `../octoscript-makepad`, `../octoscript`, which this
+workspace's `Cargo.toml` patches in). The simplest setup clones
+OctoScript-App-Design-Flow next to this repository and lets its
+`tools/setup-native.py` add the three checkouts at the pinned runtime release
+([QUICKSTART §1](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md#1-prerequisites),
+[native workspace guide](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/NATIVE-WORKSPACE.md)).
+Do not update a dirty shared checkout just to satisfy a guide.
 
 From the Hub repository:
 
@@ -64,7 +67,7 @@ handling first.
 Use the [image-to-card flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md)
 to create and review the native card output. App-specific service logic and
 data binding still require implementation; a screenshot or an atlas is not a
-running app. Use [L0](https://github.com/OctoSense-org/OctoSense-System-Apps/blob/main/apps/appcard/a2app-l0/framework/l0.md)
+running app. Use [L0](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md)
 for data/state/event semantics.
 
 ```text
@@ -87,7 +90,7 @@ my-app/
 Follow the [script-app flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/script-app/FLOW.md);
 the calls a program may make (`fs`, `net`, `host.request`, widget handles)
 are in the [script API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md).
-The [system apps](https://github.com/OctoSense-org/OctoSense-System-Apps) are
+The [system apps](https://github.com/OctoSense-org/OctoSense/tree/main/apps) are
 complete worked examples of the same format.
 
 ```text
@@ -149,7 +152,9 @@ MAKEPAD_REMOTE=8151 "$CARD_HOST_BIN" --bundle "$APP_REPO/bundle" \
   --app-data "$APP_REPO/.local-state" --allow-unsigned &
 ```
 
-Launch from the Hub workspace so the host's resources resolve. Keep the bundle
+Launching from the Hub checkout is the tested way (it is what
+OctoScript-App-Design-Flow's `tools/octo run` does); on macOS, a locally built
+`card-host` also ran from the app repository. Keep the bundle
 unsigned for this check: `card-host` verifies no publisher keys and refuses
 signed manifests even with `--allow-unsigned`. Use an unsigned development
 copy when revisiting an already signed release. All `card-host` flags and the
@@ -209,6 +214,11 @@ checks separately. Keep the review packet out of the bundle: including it
 changes the digest and can introduce development-only content.
 
 ## 6. Sign and submit
+
+To see the app in a shell before submitting, publish it into a local catalog
+with a throwaway anchor and point the OctoSense desktop shell's `OCTOSENSE_HUB` and
+`OCTOSENSE_HUB_ANCHOR` at it
+([rehearsal steps](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally)).
 
 Follow [Signing](PUBLISHING.md#signing) and [Submitting](PUBLISHING.md#submitting).
 Stamp before signing, verify with the publisher's public key, and change the

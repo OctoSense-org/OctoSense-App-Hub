@@ -10,10 +10,10 @@ description = "Shared Card preparation and a native validation worker"
 octosense-app-hub = { path = "../app-hub" }
 octosense-app-policy = { path = "../app-policy", features = ["splash"] }
 octosense-app-runtime = { path = "../app-runtime" }
-makepad-widgets = { git = "https://github.com/OctoSense-org/makepad.git", rev = "cd812acde910e9c4523f83509356450eb8edf908" }
-octoscript-makepad = { git = "https://github.com/OctoSense-org/Octoscript-Makepad.git", rev = "4fe5cc50b828a6dba10cc003b7e3b055a23b83b1" }
-octoscript-render = { git = "https://github.com/OctoSense-org/Octoscript-Makepad.git", rev = "4fe5cc50b828a6dba10cc003b7e3b055a23b83b1" }
-octoscript-widgets = { git = "https://github.com/OctoSense-org/Octoscript-Makepad.git", rev = "4fe5cc50b828a6dba10cc003b7e3b055a23b83b1" }
+makepad-widgets = { git = "https://github.com/OctoSense-org/makepad.git", rev = "a5a3cf5b0dbd1b56c25defe6d98479f25843e770" }
+octoscript-makepad = { git = "https://github.com/OctoSense-org/Octoscript-Makepad.git", rev = "b90be8f5248c70b300dba746811c904673da7f02" }
+octoscript-render = { git = "https://github.com/OctoSense-org/Octoscript-Makepad.git", rev = "b90be8f5248c70b300dba746811c904673da7f02" }
+octoscript-widgets = { git = "https://github.com/OctoSense-org/Octoscript-Makepad.git", rev = "b90be8f5248c70b300dba746811c904673da7f02" }
 serde_json = "1"
 blake3 = "1"
 rand_core = { version = "0.9", features = ["os_rng"] }

@@ -7,9 +7,11 @@
 | 想找 | 仓库 |
 | --- | --- |
 | 如何开发应用：快速上手、脚本 API、脚本应用模板、设计流程、示例 | [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) |
-| AppCard 助手运行时与 L0 卡片语言 | [OctoSense-System-Apps `apps/appcard`](https://github.com/OctoSense-org/OctoSense-System-Apps/tree/main/apps/appcard) |
-| 第一方系统应用（新闻、相册、地图、相机、邮件） | [OctoSense-System-Apps](https://github.com/OctoSense-org/OctoSense-System-Apps) |
+| AppCard 助手运行时（在 Shell 中需 `--features app-appcard` 才启用）与 L0 卡片语言 | [OctoSense `apps/appcard`](https://github.com/OctoSense-org/OctoSense/tree/main/apps/appcard) |
+| 第一方系统应用（新闻、相册、地图、相机、邮件、AI providers）及其宿主服务（`mail`、`llm`） | [OctoSense `apps/`](https://github.com/OctoSense-org/OctoSense/tree/main/apps) |
 | 应用包格式、准入检查、签名、提交与商店 | 本仓库 |
+
+**要开发应用？** 请从 [OctoSense-org 主页](https://github.com/OctoSense-org)的“请按顺序先阅读”列表开始（先读 OctoScript-App-Design-Flow 的 `AGENTS.md`，再读其 `docs/QUICKSTART.md`）。你只需要把本仓库作为兄弟目录克隆下来，用于构建 `hub` 和 `card-host`，以及提交应用（在这里开 issue，见[提交](docs/PUBLISHING.md#submitting)）。不要修改 `catalog.json`、`index/` 或 `artifacts/`。
 
 | 路径 | 说明 |
 | --- | --- |
@@ -22,11 +24,13 @@
 | `docs/ICONS.md` | 规范图标的归属、导出约束与视觉审查。 |
 | `docs/DEVELOPMENT.md` | 应用编写指南所在的仓库、交付路径，以及 `card-host` 及其远程控制路由。 |
 | `templates/app/` | 卡片应用仓库脚手架，包含元数据、示例图标和链接好的 Agent 指引。 |
-| `crates/app-policy` | 签名清单与商店信息、准入，以及解析为隔离环境设置和 Agent 会话配置（ADR 0002）。 |
+| `crates/app-policy` | 签名清单与商店信息、准入，以及解析为隔离环境设置和 Agent 会话配置（ADR 0002）；应用自带的 Agent（`tools.json`、`AGENT.md`、技能）加载为 `AgentBundle`；原生模块的工具清单共用同一套 `tools.json` 解析与检查（`ToolManifest::load`）。 |
 | `crates/app-hub` | 索引、签名目录、准入检查、Agent 扫描、设备端客户端和 `hub` 命令（ADR 0003）。 |
 | `crates/appstore` | 作为 OctoSense 模块的商店；把已安装应用作为独立客户端运行的 `card` 模块；系统应用（`os.` 前缀 id）；以及宿主服务及其面板。 |
 | `crates/appstore-app` | 作为独立应用的商店（`appstore`）。 |
 | `crates/card-host` | 隔离运行单个应用包（卡片应用或脚本应用）的参考宿主（`card-host`）。 |
+| `crates/card-studio` | 在隐藏的 `card-host --remote` 中按速览卡片、手机和桌面尺寸渲染卡片，运行测量检查，并准备视觉评审请求（`card-studio`，ADR 0002 第 7 节）。 |
+| `skills/card-studio` | 基于 `card-studio` 的 octos 技能：`card_render`、`card_critique_payload`。 |
 | `crates/app-host` | 单窗口宿主，可把任意 OctoSense AppModule 作为独立应用运行。 |
 | `crates/app-hub-app` | 每个 OctoSense Shell 都会链接的集成：原生商店模块、`card` 运行模块、由 `OCTOSENSE_SYSTEM_APPS` 指定的系统应用、已安装应用和图标（[README](crates/app-hub-app/README.md)）。 |
 
@@ -62,4 +66,4 @@ appstore
 | --- | --- | --- | --- | --- | --- | --- |
 | _暂无_ | | | | | | |
 
-曾用于跑通发布流程的相机卡片已于 2026 年 9 月 20 日移除：相机是随 ROM 出厂的系统应用（与日历、新闻、相册一样），不是商店应用。它的仓库仍保留在 [ymote/camera-card](https://github.com/ymote/camera-card)，作为可发布应用包的完整示例。
+曾用于跑通发布流程的相机卡片已于 2026 年 9 月 20 日移除：相机是随 Shell 出厂的系统应用（与新闻、相册一样），不是商店应用。它的仓库仍保留在 [ymote/camera-card](https://github.com/ymote/camera-card)，作为可发布应用包的完整示例。

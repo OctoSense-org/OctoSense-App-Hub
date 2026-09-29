@@ -10,9 +10,11 @@ publisher's repository.
 | Looking for | Repository |
 | --- | --- |
 | How to build an app: quickstart, script API, script-app template, design flows, examples | [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) |
-| The AppCard assistant runtime and the L0 card language | [OctoSense-System-Apps `apps/appcard`](https://github.com/OctoSense-org/OctoSense-System-Apps/tree/main/apps/appcard) |
-| The first-party system apps (News, Photos, Maps, Camera, Mail) | [OctoSense-System-Apps](https://github.com/OctoSense-org/OctoSense-System-Apps) |
+| The AppCard assistant runtime (opt-in in the shells, `--features app-appcard`) and the L0 card language | [OctoSense `apps/appcard`](https://github.com/OctoSense-org/OctoSense/tree/main/apps/appcard) |
+| The first-party system apps (News, Photos, Maps, Camera, Mail, AI providers) and their host services (`mail`, `llm`) | [OctoSense `apps/`](https://github.com/OctoSense-org/OctoSense/tree/main/apps) |
 | The bundle format, the gate, signing, submission and the store | this repository |
+
+**Building an app?** Start at the [OctoSense-org profile](https://github.com/OctoSense-org)'s "read these first" list (OctoScript-App-Design-Flow's `AGENTS.md`, then its `docs/QUICKSTART.md`). You need this repository only as a sibling checkout to build `hub` and `card-host`, and to submit (an issue here, see [Submitting](docs/PUBLISHING.md#submitting)). Clone it; do not edit `catalog.json`, `index/` or `artifacts/`.
 
 | Path | What it is |
 | --- | --- |
@@ -26,11 +28,13 @@ publisher's repository.
 | `docs/ICONS.md` | Canonical icon ownership, export constraints and visual review. |
 | `docs/DEVELOPMENT.md` | Where authoring lives, delivery paths, and `card-host` with its remote-control routes. |
 | `templates/app/` | Card app repository scaffold with metadata, example icon and linked agent instructions. |
-| `crates/app-policy` | The signed manifest and listing, admission, and resolution into an isolate's settings and an agent session profile (ADR 0002). |
+| `crates/app-policy` | The signed manifest and listing, admission, and resolution into an isolate's settings and an agent session profile (ADR 0002); an app's own agent (`tools.json`, `AGENT.md`, skills) loaded as an `AgentBundle`; the `tools.json` parser and checks that native modules' tool manifests share (`ToolManifest::load`). |
 | `crates/app-hub` | The index, the signed catalog, the gate, the agent scan, the device client and the `hub` command (ADR 0003). |
 | `crates/appstore` | The store as an OctoSense module, the `card` module that runs an installed app as its own client, system apps (`os.` ids) and host services with their sheets. |
 | `crates/appstore-app` | The store as a standalone app (`appstore`). |
 | `crates/card-host` | The reference contained host for one bundle, card or script app (`card-host`). |
+| `crates/card-studio` | Renders a card in a hidden `card-host --remote` at glance, phone and desktop sizes, runs the measured checks and prepares the vision critique (`card-studio`, ADR 0002 section 7). |
+| `skills/card-studio` | The octos skill over `card-studio`: `card_render`, `card_critique_payload`. |
 | `crates/app-host` | A one-window host that runs any OctoSense AppModule as a standalone app. |
 | `crates/app-hub-app` | The shell integration every OctoSense shell links: the native store module, the `card` runner module, the system apps named by `OCTOSENSE_SYSTEM_APPS`, installed apps and icons ([README](crates/app-hub-app/README.md)). |
 
@@ -82,7 +86,7 @@ stores on their next verified catalog refresh.
 | _none yet_ | | | | | | |
 
 The camera card that exercised the pipeline was removed on 20 Sep 2026:
-Camera is a system app that ships with the ROM (like Calendar, News and
-Photos), not a store app. Its repository stays at
+Camera is a system app that ships with the shells (like News and Photos),
+not a store app. Its repository stays at
 [ymote/camera-card](https://github.com/ymote/camera-card) as a worked
 example of a publishable bundle.

@@ -189,6 +189,7 @@ fn generate(output: &Path) -> Result<Value, String> {
         entries.push(Entry {
             manifest,
             listing: Some(listing),
+            tools: Vec::new(),
             artifact,
             publisher: "local-fixture-publisher".into(),
             publisher_key: publisher.public_hex(),

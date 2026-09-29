@@ -442,29 +442,36 @@ impl AppStoreView {
 /// that vocabulary. Process-wide by the runtime's design (see ADR 0002's
 /// open question on per-app vocabulary); registered once, whichever host
 /// links the store or the card module.
+///
+/// Once per THREAD, not per process: makepad keeps the isolate-mod list in a
+/// thread-local (`register_splash_isolate_mod`), so a process-wide `Once`
+/// left every thread but the first registrant without `DesignSurface`,
+/// `KitButton` and `sys` (a host UI has one thread; parallel tests do not).
 pub(crate) fn register_card_vocabulary() {
-    use std::sync::Once;
-    static ONCE: Once = Once::new();
-    ONCE.call_once(|| {
-        fn design(vm: &mut ScriptVm) {
-            octoscript_widgets::design::script_mod(vm);
-        }
-        fn kit(vm: &mut ScriptVm) {
-            octoscript_widgets::kit::script_mod(vm);
-        }
-        fn tap(vm: &mut ScriptVm) {
-            octoscript_widgets::tap::script_mod(vm);
-        }
-        makepad_widgets::widget_async::register_splash_isolate_mod(design);
-        makepad_widgets::widget_async::register_splash_isolate_mod(kit);
-        makepad_widgets::widget_async::register_splash_isolate_mod(tap);
-        // `sys`: places, routes, weather and the other live-data helpers a
-        // script app reads, every fetch held to the app's host list, the
-        // device's location to its `location` grant. It also carries
-        // `agent.notify`, which an app under a policy may call only with the
-        // `agent` grant.
-        makepad_widgets::widget_async::register_splash_isolate_mod(makepad_widgets::splash::register_agent_module);
-    });
+    thread_local! {
+        static REGISTERED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    }
+    if REGISTERED.with(|done| done.replace(true)) {
+        return;
+    }
+    fn design(vm: &mut ScriptVm) {
+        octoscript_widgets::design::script_mod(vm);
+    }
+    fn kit(vm: &mut ScriptVm) {
+        octoscript_widgets::kit::script_mod(vm);
+    }
+    fn tap(vm: &mut ScriptVm) {
+        octoscript_widgets::tap::script_mod(vm);
+    }
+    makepad_widgets::widget_async::register_splash_isolate_mod(design);
+    makepad_widgets::widget_async::register_splash_isolate_mod(kit);
+    makepad_widgets::widget_async::register_splash_isolate_mod(tap);
+    // `sys`: places, routes, weather and the other live-data helpers a
+    // script app reads, every fetch held to the app's host list, the
+    // device's location to its `location` grant. It also carries
+    // `agent.notify`, which an app under a policy may call only with the
+    // `agent` grant.
+    makepad_widgets::widget_async::register_splash_isolate_mod(makepad_widgets::splash::register_agent_module);
 }
 
 /// Lower a bundle to isolate source. Nothing outside the bundle is read. A
@@ -711,4 +718,40 @@ impl ServiceExecutor for AppStoreExecutor {
     fn cancel(&mut self, _cx: &mut Cx, _call_id: &str) {}
     fn subscribe(&mut self, _cx: &mut Cx, _sub_id: &str, _topic: &str, _filter: Option<&str>) {}
     fn unsubscribe(&mut self, _cx: &mut Cx, _sub_id: &str) {}
+}
+
+#[cfg(test)]
+mod card_vocabulary_tests {
+    use super::*;
+
+    /// A card isolate allocated on this thread names the kit after the Card
+    /// runner registers, whether or not another thread registered first.
+    fn card_isolate_names_the_kit() -> Vec<String> {
+        let mut cx = Cx::new(Box::new(|_, _| {}));
+        cx.with_vm(makepad_widgets::script_mod);
+        cx.with_vm(|vm| cardapp::CARD_MODULE.register(vm));
+        let card = cx.alloc_splash_vm_with_network(false);
+        let errors = cx.with_script_vm_id_trusted(card, |vm| {
+            vm.bx.captured_errors = Some(Vec::new());
+            let value = script_eval!(vm, {use mod.prelude.widgets.* DesignSurface{title := Label{text: "Trail Notes"}}});
+            let root = WidgetRef::script_from_value(vm, value);
+            let mut errors: Vec<String> = vm.take_errors().into_iter().map(|e| format!("{e:?}")).collect();
+            if root.label(vm.cx_mut(), ids!(title)).text() != "Trail Notes" {
+                errors.push("DesignSurface did not build its title".into());
+            }
+            errors
+        });
+        cx.free_splash_vm(card);
+        errors
+    }
+
+    #[test]
+    fn every_thread_that_registers_the_card_runner_gets_the_kit() {
+        // makepad's isolate-mod list is per thread: registering on one thread
+        // must not stop a second thread from registering its own.
+        let first = std::thread::spawn(card_isolate_names_the_kit).join().unwrap();
+        assert_eq!(first, Vec::<String>::new());
+        let second = std::thread::spawn(card_isolate_names_the_kit).join().unwrap();
+        assert_eq!(second, Vec::<String>::new());
+    }
 }

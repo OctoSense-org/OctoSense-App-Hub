@@ -43,7 +43,7 @@ my-app/
 Produce the card, data and kit with the
 [image-to-card flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md)
 in OctoScript-App-Design-Flow. Do not hand-write L0 unless asked; the language
-is specified in [L0](https://github.com/OctoSense-org/OctoSense-System-Apps/blob/main/apps/appcard/a2app-l0/framework/l0.md).
+is specified in [L0](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md).
 
 A **script app** is a Splash program with its own state, handlers, storage and
 requests, evaluated as it is.
@@ -57,6 +57,18 @@ my-app/
   screenshots/       at least one PNG the listing names     (required)
 ```
 
+Either kind may also ship **its own agent** (ADR 0002): a tool manifest, the
+agent's instructions and skills, next to `manifest.json`. See
+[The app's agent and tools](#the-apps-agent-and-tools).
+
+```
+my-app/
+  tools.json                     the app's tools, typed, with risk levels   (optional)
+  AGENT.md                       the agent's instructions                   (optional)
+  skills/<name>/SKILL.md         an octos skill, data only                  (optional)
+  skills/<name>/manifest.json    its manifest                               (with SKILL.md)
+```
+
 Write it with the
 [script-app flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/script-app/FLOW.md)
 and the [script API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md),
@@ -65,7 +77,7 @@ The program names its own artwork through the `{{assets}}` placeholder
 (`http_resource("{{assets}}/assets/logo.png")`): the host replaces it with a
 loopback origin that serves this bundle and nothing else, and adds only that
 origin to the app's hosts. The first-party
-[system apps](https://github.com/OctoSense-org/OctoSense-System-Apps)
+[system apps](https://github.com/OctoSense-org/OctoSense/tree/main/apps)
 (`apps/<name>/bundle/`) are complete examples; their `os.` ids are reserved,
 so a store copy needs an id of its own.
 
@@ -76,24 +88,30 @@ review packets outside the submitted bundle.
 
 | Rule | What is refused |
 | --- | --- |
-| Card/data assets stay local | Any `http://`, `https://`, `file://` or `../` in Card/data/text source. Ship artwork in the bundle. |
-| Script network is declared | A `.splash` program may reach only declared HTTPS hosts, unless it requests `images` or `web`, which allow public HTTPS hosts. Name bundled assets with `{{assets}}`. Plain HTTP and local/parent paths are refused. |
-| Allowed file types only | Anything other than `.card .json .l0 .octoscript .splash .svg .png .jpg .jpeg .webp .ttf .otf .txt .md`. |
+| Assets are local | Any `http://`, `https://`, `file://` or `../` in a `.card`, `.l0`, `.octoscript`, `.json`, `.txt` or `.md` file (`manifest.json`, `listing.json` and the agent files excepted). Ship the asset in the bundle and reference it by a bundle-relative path such as `assets/icon.svg`. |
+| Script apps and agent files reach only declared hosts | In a `.splash` file, `tools.json`, the agent's instructions or anything under `skills/`: any `http://`, `file://` or `../`; and any `https://` address whose host is not in `network.hosts`, unless the app requests `images` or `web`, which allow any public https host. Name bundle artwork through `{{assets}}`. |
+| Allowed file types only | Anything other than `.card .json .l0 .octoscript .splash .svg .png .jpg .jpeg .webp .ttf .otf .txt .md`. No other scripts, archives or binaries. |
 | Size and shape | Payload over 8 MiB, manifest over 64 KiB, more than 2,048 entries, depth over 32, text over 1 MiB or Card source over 256 KiB. |
 | Runnable entry | A Card needs `page.card` and its kit closure; a script app needs `main.splash`. Structural checks do not execute either entry. `hub test` performs native preparation/lifecycle. |
 | Artwork | Corrupt PNG/JPEG/WebP, images over 4096×4096 or 64 MiB decoded, malformed/active SVG or external SVG resources. Icons must be square; bitmap icons are at most 1 MiB and 1024×1024. |
-| No secrets | App source declaring password or one-time-code input. Host services own those sheets. |
-| System ids are reserved | An id starting with `os.`; system apps ship with the device. |
-
+| No secrets | A `.card`, `.l0`, `.octoscript` or `.splash` file declaring `is_password: true` or a `TextInputContentType` of `Password`, `NewPassword` or `OneTimeCode`. Apps never collect secrets; see [host services](#host-services-and-sheets). |
+| System ids are reserved | An id starting with `os.`. Those belong to system apps that ship with the device, and no device installs one from a store. |
 | No symlinks | Any symlink in the bundle. |
 | Digest matches | A manifest whose `integrity.bundle_blake3` does not match the directory. Run `hub stamp` after any change. |
 | Manifest is exact | Unknown fields, an unknown capability, a `schema` other than 1, an id outside `[a-z0-9.-]{1,64}` not starting with `.`. |
 | Hosts are bare | A host with a scheme, path, port, wildcard or credentials. `api.example.com` is right; `https://api.example.com/v1` and `*.example.com` are refused. |
 | Hosts need `net` | Listing hosts without requesting the `net` capability. |
+| Research has a scope | `research` or `crawl` without a top-level `research` scope; a scope without either capability; a scope that octos's `Scope::from_grant` would refuse (a language that is not a BCP-47 tag, a region that is not two letters, a category outside `news`, `general`, `science`, `it`, `social`, `max_results` of 0, an unknown field); a domain pattern that is not a bare domain; the toolbox's old field names (`languages`, `allowed_domains`, `denied_domains`, `recency_hours`). |
+| Crawl limits need `crawl` | `crawl` without `max_depth` and `max_pages` above 0, or crawl limits without `crawl`. |
 | Version is new | Re-publishing a version already in the catalog. |
 | Listing present and complete | No `listing.json`; no icon or no screenshot; an unknown category, platform or age rating; a non-https privacy policy; or an icon or screenshot the listing names that is not in the bundle. |
 | Publisher continuity | An update signed by a different key than the one on record for this app. |
 | Public release signature | An unsigned first release or update; `--allow-unsigned` is a local development check only. Publisher and signature key IDs must agree. |
+| Tools are the app's own | In `tools.json`: a tool outside the app's namespace (the last segment of its id); a namespace that is not `[a-z0-9_]{1,24}`; a duplicate name, or two names the broker would spell the same; a missing `risk` or `implemented_by`; an unknown field; a schema outside the supported subset, over 8 KB or nested deeper than 8; an input that is not an object; more than 64 tools or a file over 64 KB; `confirm: "app"` on a tool the host service implements. |
+| Local-only data stays local | A `shareable` tool of an app whose `agent.model.local_only` is true, unless it declares `"private_data": false`. |
+| Agent files are declared text | An `AGENT.md` that `agent.instructions` does not name, or a `skills/<name>/` that `agent.skills` does not; instructions over 32 KB, not UTF-8, holding control characters, a leading `#!`, `<script`, `<iframe>`, `javascript:` or similar; agent files without an `agent`. |
+| Skills are data only | A skill manifest declaring `tools`, `binaries`, `sha256`, `mcp_servers`, `hooks` or other executable fields; a file in a skill other than `.md`, `.json`, `.txt`; a manifest `name` other than its directory; a `uses` entry that is neither one of the app's tools nor in `agent.tools`. |
+| Background needs triggers | `agent.background: true` without a schedule or an event; a schedule that is not five cron fields; an event outside the app's namespace; an unknown model need or tier. |
 
 `hub check <bundle> --json` emits the same structural report as the library:
 stable check codes, file/property paths and a typed resource inventory. Schema
@@ -173,9 +191,117 @@ they install.
 | `microphone` | Record sound with a camera video. | Use the microphone |
 | `library` | Offer captures to the system photo library, where other apps can see them; without it, captures stay in the app's storage. | Save to your photo library, where other apps can see it |
 | `mail` | Read and send mail through the host's mail service, from accounts the person signs in to on the host's sheet. | Read and send mail from accounts you sign in to on the device |
+| `llm` | See and arrange the assistant's LLM providers through the host's `llm` service; keys are typed, shown and scanned only on the host's sheets. The service answers only `os.` system apps (AI providers), so a store app gains nothing from it. | Manage the assistant's AI providers, whose keys stay with the device |
+| `news` | Read the host's `news` service: items the device collects on a schedule from its feeds and topic feeds, and their text. The app does not fetch arbitrary sites through it. | Read news the device collects from its feeds and topics |
+| `glance` | Publish cards to the glance screen through the host's `glance` service (`glance.publish`, `glance.withdraw`, `glance.list`). A card is an L0 card the host checks and lowers before storing it; the host caps its size, rate-limits publishing, keeps a few cards per app and expires them. The publisher is always the calling app: it sees, replaces and withdraws only its own cards, and a card opens only that app. | Show cards on your glance screen |
+| `research` | Search through the system toolbox (`search`, `deep_research`) within the manifest's [`research` scope](#the-research-scope): languages, regions, domains, recency, categories and results per search. The host runs each search and refuses or narrows a call outside the scope; the app never fetches the sites itself, so it needs no `net` for it. | Search *what the scope allows*, for example "Search news in English and Chinese, from the last 7 days" |
+| `crawl` | Crawl a site through the system toolbox (`deep_crawl`): follow links up to the scope's `max_depth` and read up to its `max_pages` a crawl, inside its domain lists. **More reach than `research`**, which reads only search results: ask for it only when a screen needs whole sites, and prefer a `domains_allow` list. Neither capability implies the other. | Crawl websites, following links up to *depth* deep and reading up to *pages* pages a crawl, *on which sites*, which reaches more than searching |
+| `model` | Make bounded one-shot model calls through the host's `model` service (`model.complete`). The app names a model class (`fast` or `strong`) and a JSON Schema; the host picks the model from the person's own AI providers, sends the app's inputs there, checks the reply against the schema (URLs refused unless the app asks for them) and keeps a per-app daily rate and token budget. No tools, memory or history; the app never sees the provider, model id or key. Not `llm`, which only manages providers. | Send what you give it to the AI provider you configured, within a daily budget |
 
 Location, camera and clipboard are each a separate consent; none implies
 another.
+
+### The research scope
+
+`research` and `crawl` share one scope, the manifest's top-level `research`
+object. Its schema is exactly octos's `octos_research::toolbox::Scope`
+(octos `crates/octos-research/src/toolbox.rs`), the single source of truth for
+an app's research permission: the gate checks it with the same rules as
+`Scope::from_grant`, pins it, and the host hands the same JSON to the toolbox
+(OctoSense `crates/toolbox/src/scope.rs` parses it). App Hub mirrors the
+struct in `crates/app-policy/src/research.rs` because the policy crate links
+no octos code; the two change together.
+
+```json
+{
+  "capabilities": ["research", "crawl"],
+  "research": {
+    "langs": ["en", "zh"],
+    "regions": ["US", "CN"],
+    "domains_allow": [],
+    "domains_deny": ["example-spam.com"],
+    "max_age_days": 7,
+    "categories": ["news"],
+    "max_results": 20,
+    "max_depth": 2,
+    "max_pages": 20
+  }
+}
+```
+
+| Field | Meaning | Rule |
+| --- | --- | --- |
+| `langs` | BCP-47 languages the app may search in | each a language tag (`en`, `zh-CN`, `zh-Hant`); normalised |
+| `regions` | ISO 3166-1 alpha-2 regions | two letters; upper-cased |
+| `domains_allow` | only these domains (and their subdomains) | a bare domain: `example.com`, `.example.com` or `*.example.com`; no scheme, path or port |
+| `domains_deny` | never these domains | as above |
+| `max_age_days` | the oldest material, in days back from now | a whole number of days |
+| `categories` | metasearch categories | `news`, `general`, `science`, `it`, `social` |
+| `max_results` | most results per search | above 0; default 20 |
+| `max_depth`, `max_pages` | the `crawl` limits: link depth and pages of one crawl | both above 0 with `crawl`; both 0 (or absent) without it |
+
+An empty list or an absent field means no limit, and `{}` is a scope with no
+limits (the store then says "Search the web in any language, from any time").
+Unknown fields are refused. The bare-domain rule is App Hub's and is stricter
+than octos, which compares patterns as strings: `https://example.com/` would
+match no site, so in `domains_deny` it would deny nothing the person was told
+it denies. A scope in the toolbox's old shape (`languages`,
+`allowed_domains`, `denied_domains`, `recency_hours`, and `max_pages` as
+articles per run) is refused with the fields to rename; it is not converted,
+because rounding hours up to days would widen the grant.
+
+The store shows the scope in plain words, derived from the manifest:
+
+| Scope | The store's privacy summary says |
+| --- | --- |
+| `research`, `{"langs":["en","zh"],"categories":["news"],"max_age_days":7}` | Searches news in English and Chinese, from the last 7 days |
+| `research`, `{}` | Searches the web in any language, from any time |
+| `research`, `{"langs":["zh-TW"],"regions":["TW"],"categories":["news","it"],"max_age_days":1,"domains_allow":["cna.com.tw"]}` | Searches news and technology in Chinese (TW), region TW, from the last day, only on cna.com.tw |
+| `crawl`, `{"max_depth":2,"max_pages":50}` | Crawls websites, following links up to 2 deep and reading up to 50 pages a crawl, on any site: this reaches more of the web than searching |
+| `crawl`, `{"domains_allow":["docs.rs"],"max_depth":1,"max_pages":10}` | Crawls websites, following links up to 1 deep and reading up to 10 pages a crawl, only on docs.rs: this reaches more of the web than searching |
+
+The person or the store may grant a narrower scope than the one requested;
+never a wider one.
+
+**Where these are served today (2026-09-27):** the OctoSense shells serve
+`mail`; `llm`, `news` and `glance` only to `os.` system apps; and no shell
+registers a `model` service yet (the OctoSense side is still to come), so a
+`model.complete` call answers `no service answers "model" on this device`
+(run in `card-host` at `e8601b8`). The shells also pin App Hub `46d67e51`,
+which does not know `news`, `glance` or `model`. No shell serves `research`
+or `crawl` yet: OctoSense's toolbox (`crates/toolbox`) parses the scope but
+the shells do not link it, and OctoSense and Rinx adopt this App Hub through
+the Rinx-first pin split (OctoSense pins only tagged Rinx releases).
+
+**Host services by exact name** (`crates/app-policy/src/services.rs`). A host
+that offers the Matrix account (Rinx) or the device's assistant (Octos) serves
+these to a bundle that requests them. Each name is its own consent, checked
+exactly: a prefix such as `octos.` or `matrix.`, or any name not listed here,
+is an unknown capability and the manifest is refused. Admission is not
+dispatch: the host also intersects the request with the services it supports,
+its policy and the person's per-instance grant (for Matrix, the rooms they
+allow), and checks that lease on every call. A host that does not offer a
+requested service shows the app as unavailable with the reason.
+
+**Where these are served today (2026-09-27):** only by Rinx's mini-app host,
+for bundles a person imports into Rinx. The OctoSense shells' Card runner
+registers no `octos` or `matrix` service: it installs and opens such an app,
+and every call answers `no service answers "octos" on this device` (the
+dispatch in `crates/appstore/src/services.rs`). See OctoSense
+[`docs/ai-services.md`](https://github.com/OctoSense-org/OctoSense/blob/main/docs/ai-services.md).
+
+| Capability | Grants | The store says |
+| --- | --- | --- |
+| `octos.session.open` | Open the app's own conversation with the host's assistant. The host binds it to this app and the current account; the app never names a profile, provider or workspace. | Open its own conversation with the assistant |
+| `octos.session.history` | Read that conversation's history. Does not allow starting a turn. | Read its own conversations with the assistant |
+| `octos.turn.start` | Send a request the assistant works on, under the host's AI settings and tool limits. The model provider and its keys stay with the host. | Ask the assistant to work for it, using the device's AI settings |
+| `octos.turn.interrupt` | Stop a turn this app started. | Stop assistant work it started |
+| `matrix.*` (45 names) | One Matrix operation each, on the person's current account, in the rooms they allow: reads such as `matrix.read_messages`, `matrix.room_members`, `matrix.profile`; actions such as `matrix.send_message`, `matrix.react`, `matrix.join`. The exact list is `KNOWN_CAPABILITIES`. | One plain line per name, for example "Read messages in rooms you allow" |
+
+Sending room data to the assistant needs both the Matrix read grant and the
+assistant grant. No `octos.*` service chooses a model provider, submits a key
+or reaches the kernel's raw protocol.
+
 
 **Network**: `net` plus an exact host list. The list is enforced on every path
 out of the isolate: the network module, artwork loading and data fetches. An
@@ -194,7 +320,188 @@ not exist in this schema; do not add it. `tools` may name only what the host
 offers contained apps: `ledger.read`, `ledger.write`, `net.fetch`,
 `storage.read`, `storage.write`, `card.render`. Iterations clamp to 8, tokens
 to 200 000. The agent's workspace is the app's own storage jail and its hosts are
-the app's hosts; it cannot be given more than the app.
+the app's hosts; it cannot be given more than the app. The agent's own
+tools, instructions, skills, model requirements and triggers are below.
+
+## The app's agent and tools
+
+> **Status (2026-09-27):** the gate admits, checks and pins everything in this
+> section, and the store shows its lines. **No shell loads or runs it yet**:
+> OctoSense [ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0002-event-driven-app-agents.md)
+> is Proposed, the kernel's host-registered tools are
+> [octos#2567](https://github.com/octos-org/octos/pull/2567) (open), and no
+> host offers the generic `agent.tools` names to contained apps. The OctoSense
+> shells pin App Hub `46d67e51`, which predates `model`, `background`,
+> `triggers`, `instructions`, `skills` and the `news` and `glance`
+> capabilities, so today they refuse a manifest that uses any of them (the
+> "host older than them" below).
+
+An app that wants an assistant of its own (ADR 0002 §3, §4) ships it in the
+bundle. Every file is under the bundle digest, so the agent that runs is the
+one that was reviewed; a shell loads it with `AgentBundle::load`
+(`crates/app-policy/src/agent.rs`), which refuses a bundle whose digest does
+not match and everything the gate refuses.
+
+`tools.json` is the one tool manifest for every app. A native module ships the
+same file as a module resource, pinned by the shell build. The app-peers broker
+(OctoSense `crates/app-peers`) loads it with
+`ToolManifest::load(json, <module id>, ToolHost::Native, local_only)`, which
+runs the same checks, and builds its `ToolDef`s from it. The module's Rust code
+only implements executors keyed by tool name. For a native module the
+namespace is the module id; for a contained app it is the last segment of the
+app id. The risk levels are the broker's, so one approval gate serves both.
+
+The News example, complete, is
+[`crates/app-policy/tests/fixtures/news-agent`](../crates/app-policy/tests/fixtures/news-agent).
+
+### `tools.json`: the app's tools
+
+```json
+{
+  "schema": 1,
+  "tools": [
+    {
+      "name": "news.list",
+      "description": "List collected stories, newest first, optionally for one topic or since a time.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "topic": { "type": "string" },
+          "since": { "type": "string", "format": "date-time" },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": { "items": { "type": "array", "items": { "type": "object" } } },
+        "required": ["items"]
+      },
+      "risk": "read",
+      "background": true,
+      "shareable": true,
+      "private_data": false,
+      "implemented_by": "host-service"
+    },
+    { "name": "news.read",         "risk": "read", "…": "…" },
+    { "name": "news.topics.get",   "risk": "read", "…": "…" },
+    { "name": "news.topics.set",   "risk": "act",  "…": "…" },
+    { "name": "news.digest.write", "risk": "act",  "…": "…" }
+  ]
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `name` | `<namespace>.<tool>`, the namespace being the last segment of the app's id (`os.news` and `dev.example.news` are both `news`). Segments are `[a-z0-9_]`; the broker sees the rest with dots as underscores (`topics_get`, at most 32 characters). |
+| `description` | What it does and when to use it, for a model; at most 1024 characters. |
+| `input_schema`, `output_schema` | JSON Schema, this subset only: `type title description properties required items enum const default minimum maximum minLength maxLength minItems maxItems additionalProperties format pattern`. No `$ref`, no `anyOf`/`oneOf`/`allOf`, no conditionals. The input is an object. |
+| `risk` | `read` (looks), `act` (changes the app's own state) or `destructive` (sends, posts, shares, buys, deletes: anything past the app). Required. The broker's `Read`/`Act`/`Destructive` spelling is accepted. |
+| `background` | May run in a run the person did not start. Default false. |
+| `shareable` | Other callers (the system agent, other apps' agents, the person's assistant) may be granted it. Default false. |
+| `private_data` | The result carries the person's private data. A shareable tool of a `local_only` app must say `false`. |
+| `implemented_by` | `host-service` (the app's native host service, which holds data, devices, network or secrets) or `app` (the app's own script, for tools that only reshape its data). |
+| `confirm` | Who asks the person before a destructive call: `host` (the default: the host's approval path) or `app` (the app's own confirmation sheet). Independent of `risk`, and never inferred from it. `app` is allowed only for a tool the app implements itself (`implemented_by: "app"`) or a native module's tool. |
+
+**Whether a call needs the person comes from the risk; whose surface asks comes
+from `confirm`.** Read and act run unattended. A destructive tool always waits
+for the person:
+
+| `risk: "destructive"` with | Person present | Person absent |
+| --- | --- | --- |
+| `confirm: "host"` (default) | The host's approval path asks. | An approval request in the app's conversation. |
+| `confirm: "app"` | The app's own confirmation sheet is the only confirmation (for example Rinx's `send_message`); the host does not ask again. | An approval request in the app's conversation. |
+
+The person is never asked twice for one call. A destructive tool may still say
+`background: true`: the gate records a warning, and the tool only runs after
+approval. `confirm: "app"` on a tool that is not destructive confirms nothing,
+and the gate warns about it. The gate report, the review packet and the store
+lines all state whose confirmation each destructive tool uses.
+
+An app may ship `tools.json` without an agent: its tools then serve other
+callers, such as the person's assistant, but no agent of its own.
+
+### The manifest's `agent`
+
+```json
+"agent": {
+  "profile": "workspace-write-never-ask",
+  "tools": [],
+  "max_iterations": 8,
+  "token_budget": 120000,
+  "model": {
+    "needs": ["tool_calling", "long_context", "multilingual"],
+    "tier": "standard",
+    "local_only": false,
+    "per_task": {
+      "triage": { "needs": ["tool_calling"], "tier": "fast" },
+      "synthesis": { "needs": ["tool_calling", "reasoning", "long_context"], "tier": "strong" }
+    }
+  },
+  "background": true,
+  "triggers": { "schedule": ["0 7 * * *", "0 19 * * *"], "events": ["news.items.new"] },
+  "instructions": "AGENT.md",
+  "skills": ["news-digest"]
+}
+```
+
+- `tools` stays the generic host tools (above). The app's own tools come from
+  `tools.json`; the agent gets both and nothing else.
+- `model` states needs, never a provider or model name: `needs` from
+  `tool_calling vision long_context reasoning structured_output multilingual`,
+  `tier` one of `fast standard strong` (default `standard`), `local_only` for
+  data that must not leave the person's devices (app-wide; a task cannot relax
+  it), and `per_task` for named tasks (`[a-z_]{1,32}`, at most 8) that
+  `AGENT.md` refers to. The host picks a model from the person's providers.
+- `background` asks to run while the app is closed. It is a request: the
+  person grants it per app, and it requires `triggers`.
+- `triggers.schedule` is five-field cron in local time; `triggers.events` are
+  the app's own host-service events, in its namespace (`news.items.new`).
+- `instructions` names the agent's instructions (`AGENT.md`); `skills` names
+  each `skills/<name>/` directory. Undeclared agent files are refused.
+
+These fields are optional additions to schema 1. A manifest without them
+reads, and signs, exactly as before; a host older than them refuses a manifest
+that uses them (unknown fields are refused), which is the safe direction.
+
+### `AGENT.md` and skills
+
+`AGENT.md` is the agent's role and instructions: what to do on each trigger,
+what matters in the app's data, the rubric for its output, and its rules for
+memory. Text only (32 KB, UTF-8, no HTML scripts or `#!`); the system agent may
+add a local overlay but never edits it.
+
+A skill is an octos skill directory with `SKILL.md` and `manifest.json`,
+installed into this app's peer workspace only. For a contained app it is data
+only: its manifest holds `name` (its directory), `version`, `description`,
+`uses` (the tools it calls, each one of the app's tools or in `agent.tools`)
+and optionally `prompts.include`; `.md`, `.json` and `.txt` files only.
+
+```json
+{
+  "name": "news-digest",
+  "version": "1.0.0",
+  "description": "Write a cited morning or evening digest from collected stories.",
+  "uses": ["news.list", "news.read", "news.digest.write"]
+}
+```
+
+### What the store shows
+
+Derived from the manifest and `tools.json`, beside the other permissions:
+
+- "Its assistant may work while the app is closed, on a schedule and when new
+  data arrives; only if you allow it, and you can turn it off."
+- "Can ask to mail.send: nothing of this runs until you approve it." (host
+  confirmation)
+- "Asks you on its own screen before rinx.send_message; when you are away, it
+  waits for your approval in the app's conversation." (`confirm: "app"`)
+- "Offers news.list to other assistants you allow." (and, for a shareable tool
+  with `private_data: true`, that it can pass private data)
+- "Its assistant uses only models that run on your own devices."
+
+The catalog entry carries the reviewed `tools.json` so a store can show these
+before install; the review packet carries the agent files with a question on
+them.
 
 ## The listing
 
@@ -283,9 +590,9 @@ and the gate refuses a bundle that declares one. Service state (accounts,
 secrets, caches) lives in `<app data>/.host`, outside every app's jail.
 
 Mail is the worked example: the
-[Mail bundle](https://github.com/OctoSense-org/OctoSense-System-Apps/tree/main/apps/mail/bundle)
+[Mail bundle](https://github.com/OctoSense-org/OctoSense/tree/main/apps/mail/bundle)
 requests `mail`, and its
-[host service](https://github.com/OctoSense-org/OctoSense-System-Apps/tree/main/apps/mail/host-service)
+[host service](https://github.com/OctoSense-org/OctoSense/tree/main/apps/mail/host-service)
 signs in on its own sheet. A store app can request `mail` only where the
 shell links a mail service.
 
@@ -436,7 +743,8 @@ app appeared in, or with the findings to fix.
 - Reference any server, CDN or local path from a card, or an undeclared host
   from a script app. Bundle the asset.
 - Request `prompt`, `location`, `camera`, `microphone`, `clipboard`, `library`,
-  `images`, `web` or `mail` unless a screen needs it; each is shown to the
+  `images`, `web`, `mail`, `news`, `glance`, `model`, `research` or `crawl` unless a screen needs it (and never `llm`, which
+  serves only system apps); each is shown to the
   person as a separate line.
 - Ask for a password, PIN or code in the app. A host service asks on its own
   sheet.

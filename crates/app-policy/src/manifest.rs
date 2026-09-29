@@ -5,7 +5,9 @@
 //! [`crate::policy`] resolves against the host's ceilings. Unknown fields are
 //! refused rather than ignored, so a manifest written for a newer host does
 //! not silently run with less containment than it asked for.
+use crate::research::ResearchScope;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// Legacy schema used by existing templates. The versioned reader supports 1 and 2.
 pub const SCHEMA: u32 = 1;
@@ -42,6 +44,91 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // person signs in to on the host's own sheet. The app never holds the
     // password or the connection.
     "mail",
+    // See and arrange the assistant's LLM providers through the host's llm
+    // service. Keys are typed, shown as a QR and scanned only on the host's
+    // own sheets; the app sees masked status, never a key.
+    "llm",
+    // Read the host's news service: feeds and topic feeds it collects on a
+    // schedule into the app's store, and the items' text. The app never
+    // fetches arbitrary sites itself through it.
+    "news",
+    // Publish cards to the glance screen through the host's glance service:
+    // L0 cards the shell checks, caps, rate-limits and expires, keyed to the
+    // app itself. The app sees only its own cards and a card opens only it.
+    "glance",
+    // Make bounded one-shot model calls through the host's model service
+    // (`model.complete`): the app names a model class ("fast" or "strong")
+    // and a JSON Schema; the host picks the model from the person's own
+    // providers, validates the reply against the schema and keeps a per-app
+    // daily budget. No tools, memory or history; the app never sees the
+    // provider, model id or key. The app's inputs go to the AI provider the
+    // person configured. Not `llm`, which manages providers for os.* apps.
+    "model",
+    // Search through the system toolbox (`search`, `deep_research`), within
+    // the manifest's `research` scope: languages, regions, domains, recency,
+    // categories and results per search. The host runs the search and
+    // checks every call against the scope; the app never fetches the sites
+    // itself. The scope's schema is octos's `Scope` (see [`crate::research`]).
+    "research",
+    // Crawl a site through the system toolbox (`deep_crawl`): follow links
+    // up to the scope's `max_depth` and read up to its `max_pages` a crawl,
+    // inside its domain lists. More reach than `research`, which only reads
+    // search results; neither implies the other.
+    "crawl",
+    // Host services reached by exact name (see [`crate::services`]). Each is
+    // a separate consent: a host adapter checks the exact name, the person's
+    // per-instance grant and its own ceilings on every request. A prefix is
+    // never a grant: `octos.` or `matrix.` alone is an unknown capability,
+    // and history access does not imply starting a turn.
+    "matrix.account_info",
+    "matrix.device",
+    "matrix.dm_find",
+    "matrix.dm_open",
+    "matrix.event",
+    "matrix.favorite",
+    "matrix.ignored_users",
+    "matrix.invite",
+    "matrix.invite_respond",
+    "matrix.invites",
+    "matrix.join",
+    "matrix.low_priority",
+    "matrix.mark_unread",
+    "matrix.older_messages",
+    "matrix.permalink",
+    "matrix.pin",
+    "matrix.pinned_events",
+    "matrix.power_levels",
+    "matrix.profile",
+    "matrix.react",
+    "matrix.read_messages",
+    "matrix.read_receipt",
+    "matrix.read_receipts",
+    "matrix.reply",
+    "matrix.room_info",
+    "matrix.room_members",
+    "matrix.room_preview",
+    "matrix.room_threads",
+    "matrix.rooms_info",
+    "matrix.rooms_list",
+    "matrix.rooms_messages",
+    "matrix.rooms_search",
+    "matrix.rooms_send",
+    "matrix.search_room",
+    "matrix.search_rooms",
+    "matrix.send_message",
+    "matrix.space_info",
+    "matrix.space_rooms",
+    "matrix.spaces",
+    "matrix.successor",
+    "matrix.thread_replies",
+    "matrix.thread_reply",
+    "matrix.typing",
+    "matrix.unread",
+    "matrix.user_profile",
+    "octos.session.open",
+    "octos.session.history",
+    "octos.turn.start",
+    "octos.turn.interrupt",
 ];
 
 /// The permission profiles an app's agent session may ask for. Full access is
@@ -88,6 +175,11 @@ pub struct AppManifest {
     pub compute: Compute,
     /// Absent means the app gets no agent at all, which is the default.
     pub agent: Option<AgentSpec>,
+    /// The scope of the `research` and `crawl` capabilities: octos's
+    /// `Scope`, exactly (see [`crate::research`]). Required with either
+    /// capability and refused without both. Skipped when absent, so a
+    /// manifest written before it existed signs exactly as it did.
+    pub research: Option<ResearchScope>,
     contract: Option<crate::compatibility::ManifestContract>,
 }
 
@@ -115,6 +207,12 @@ struct ManifestV1 {
     /// Absent means the app gets no agent at all, which is the default.
     #[serde(default)]
     pub agent: Option<AgentSpec>,
+    /// The scope of the `research` and `crawl` capabilities: octos's
+    /// `Scope`, exactly (see [`crate::research`]). Required with either
+    /// capability and refused without both. Skipped when absent, so a
+    /// manifest written before it existed signs exactly as it did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub research: Option<ResearchScope>,
 }
 
 
@@ -142,6 +240,12 @@ struct ManifestV2 {
     /// Absent means the app gets no agent at all, which is the default.
     #[serde(default)]
     pub agent: Option<AgentSpec>,
+    /// The scope of the `research` and `crawl` capabilities: octos's
+    /// `Scope`, exactly (see [`crate::research`]). Required with either
+    /// capability and refused without both. Skipped when absent, so a
+    /// manifest written before it existed signs exactly as it did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub research: Option<ResearchScope>,
     release_number: u64,
     runtime: crate::compatibility::RuntimeRequirements,
     requires: Vec<String>,
@@ -153,8 +257,8 @@ impl<'de> Deserialize<'de> for AppManifest {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = crate::wire::value(deserializer)?;
         let manifest = match value.get("schema").and_then(serde_json::Value::as_u64) {
-            Some(1) => { let w: ManifestV1 = serde_json::from_value(value).map_err(serde::de::Error::custom)?; Self { schema: w.schema, id: w.id, version: w.version, name: w.name, integrity: w.integrity, capabilities: w.capabilities, network: w.network, storage: w.storage, compute: w.compute, agent: w.agent, contract: None } },
-            Some(2) => { let w: ManifestV2 = serde_json::from_value(value).map_err(serde::de::Error::custom)?; Self { schema: w.schema, id: w.id, version: w.version, name: w.name, integrity: w.integrity, capabilities: w.capabilities, network: w.network, storage: w.storage, compute: w.compute, agent: w.agent, contract: Some(crate::compatibility::ManifestContract { release_number: w.release_number, runtime: w.runtime, requires: w.requires, entrypoints: w.entrypoints, data_schema: w.data_schema }) } },
+            Some(1) => { let w: ManifestV1 = serde_json::from_value(value).map_err(serde::de::Error::custom)?; Self { schema: w.schema, id: w.id, version: w.version, name: w.name, integrity: w.integrity, capabilities: w.capabilities, network: w.network, storage: w.storage, compute: w.compute, agent: w.agent, research: w.research, contract: None } },
+            Some(2) => { let w: ManifestV2 = serde_json::from_value(value).map_err(serde::de::Error::custom)?; Self { schema: w.schema, id: w.id, version: w.version, name: w.name, integrity: w.integrity, capabilities: w.capabilities, network: w.network, storage: w.storage, compute: w.compute, agent: w.agent, research: w.research, contract: Some(crate::compatibility::ManifestContract { release_number: w.release_number, runtime: w.runtime, requires: w.requires, entrypoints: w.entrypoints, data_schema: w.data_schema }) } },
             schema => return Err(serde::de::Error::custom(format!("unsupported manifest schema {}", schema.map(|s| s.to_string()).unwrap_or_else(|| "(missing or invalid)".into())))),
         };
         manifest.validate_schema().map_err(serde::de::Error::custom)?;
@@ -165,8 +269,8 @@ impl Serialize for AppManifest {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.validate_schema().map_err(serde::ser::Error::custom)?;
         match &self.contract {
-            None => ManifestV1 { schema: self.schema, id: self.id.clone(), version: self.version.clone(), name: self.name.clone(), integrity: self.integrity.clone(), capabilities: self.capabilities.clone(), network: self.network.clone(), storage: self.storage.clone(), compute: self.compute.clone(), agent: self.agent.clone() }.serialize(serializer),
-            Some(c) => ManifestV2 { schema: self.schema, id: self.id.clone(), version: self.version.clone(), name: self.name.clone(), integrity: self.integrity.clone(), capabilities: self.capabilities.clone(), network: self.network.clone(), storage: self.storage.clone(), compute: self.compute.clone(), agent: self.agent.clone(), release_number: c.release_number, runtime: c.runtime.clone(), requires: c.requires.clone(), entrypoints: c.entrypoints.clone(), data_schema: c.data_schema }.serialize(serializer),
+            None => ManifestV1 { schema: self.schema, id: self.id.clone(), version: self.version.clone(), name: self.name.clone(), integrity: self.integrity.clone(), capabilities: self.capabilities.clone(), network: self.network.clone(), storage: self.storage.clone(), compute: self.compute.clone(), agent: self.agent.clone(), research: self.research.clone() }.serialize(serializer),
+            Some(c) => ManifestV2 { schema: self.schema, id: self.id.clone(), version: self.version.clone(), name: self.name.clone(), integrity: self.integrity.clone(), capabilities: self.capabilities.clone(), network: self.network.clone(), storage: self.storage.clone(), compute: self.compute.clone(), agent: self.agent.clone(), research: self.research.clone(), release_number: c.release_number, runtime: c.runtime.clone(), requires: c.requires.clone(), entrypoints: c.entrypoints.clone(), data_schema: c.data_schema }.serialize(serializer),
         }
     }
 }
@@ -239,6 +343,128 @@ pub struct AgentSpec {
     /// Tokens the session may spend per request.
     #[serde(default)]
     pub token_budget: Option<u64>,
+    /// What the agent needs from a model, never which model (ADR 0002 §3).
+    /// The host picks one from the person's providers that meets it.
+    ///
+    /// Every field added after the first release of schema 1 is skipped when
+    /// it holds its default, so a manifest written before it existed
+    /// serialises, and therefore signs, exactly as it did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<ModelSpec>,
+    /// The agent may run while the app is closed, woken by `triggers`. A
+    /// request: the person grants or refuses it per app, and it requires at
+    /// least one trigger.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub background: bool,
+    /// What wakes the agent besides the person (ADR 0002 §2).
+    #[serde(default, skip_serializing_if = "Triggers::is_empty")]
+    pub triggers: Triggers,
+    /// The bundle-relative path of the agent's instructions, conventionally
+    /// [`crate::agent::AGENT_FILE`]. Named here so the file is declared, not
+    /// merely present; the digest pins its bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
+    /// The skills the bundle ships under `skills/<name>/`. Installed into
+    /// this app's peer workspace only, and data-only for a contained app.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skills: Vec<String>,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+/// What a task needs from a model. Closed: a need that is not here cannot be
+/// matched by any host, so adding one is a change here and in the host's
+/// model selection, together.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ModelNeed {
+    /// Structured tool calls. An agent with any tools needs this.
+    ToolCalling,
+    /// Image input, for example to critique a rendered card.
+    Vision,
+    /// A long context window (the host decides what "long" means today).
+    LongContext,
+    /// A reasoning (thinking) model.
+    Reasoning,
+    /// Reliable JSON output against a schema.
+    StructuredOutput,
+    /// Reads and writes more than one language well.
+    Multilingual,
+}
+
+/// Every [`ModelNeed`], as the manifest spells it.
+pub const KNOWN_MODEL_NEEDS: &[&str] =
+    &["tool_calling", "vision", "long_context", "reasoning", "structured_output", "multilingual"];
+
+/// How capable (and costly) a model the task deserves. The host maps a tier
+/// to the person's providers; policy may lower it (budget, battery).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ModelTier {
+    Fast,
+    #[default]
+    Standard,
+    Strong,
+}
+
+/// The model an app's agent needs. Never a provider or a model name: the
+/// app cannot know which ones the person configured, and never sees keys.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ModelSpec {
+    #[serde(default)]
+    pub needs: Vec<ModelNeed>,
+    #[serde(default)]
+    pub tier: ModelTier,
+    /// Only a model that runs on the device (or the person's own machine)
+    /// may see this app's data. App-wide: a task cannot relax it.
+    #[serde(default)]
+    pub local_only: bool,
+    /// Different requirements for named tasks, for example a fast model for
+    /// `triage` and a strong one for `synthesis`. Task names are the app's
+    /// own (`[a-z_]{1,32}`); `AGENT.md` says which task a step is.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub per_task: BTreeMap<String, TaskModel>,
+}
+
+/// One task's model requirements. `local_only` is deliberately absent: it
+/// holds for the whole app.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskModel {
+    #[serde(default)]
+    pub needs: Vec<ModelNeed>,
+    #[serde(default)]
+    pub tier: ModelTier,
+}
+
+/// What wakes an app's agent without the person asking.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Triggers {
+    /// Five-field cron expressions (minute hour day-of-month month
+    /// day-of-week), in the device's local time: `"0 7 * * *"`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub schedule: Vec<String>,
+    /// Events from the app's own host service, in the app's namespace:
+    /// `"news.items.new"`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub events: Vec<String>,
+}
+
+impl Triggers {
+    pub fn is_empty(&self) -> bool {
+        self.schedule.is_empty() && self.events.is_empty()
+    }
+}
+
+/// The namespace an app's tools and events live in: the last segment of its
+/// id (`os.news` and `dev.example.news` are both `news`). Peers are per app,
+/// so two apps with the same short id never share a tool registry.
+pub fn short_id(app_id: &str) -> &str {
+    app_id.rsplit('.').next().unwrap_or(app_id)
 }
 
 impl AppManifest {
@@ -254,8 +480,23 @@ impl AppManifest {
 
     /// Parse a manifest, refusing unknown fields and a foreign schema.
     pub fn parse(json: &str) -> Result<Self, String> {
-        let manifest: AppManifest = serde_json::from_str(json).map_err(|e| format!("manifest is not valid: {e}"))?;
+        let manifest: AppManifest = serde_json::from_str(json).map_err(|e| {
+            // A research scope in the toolbox's old shape gets the fields to
+            // rename, not only serde's "unknown field".
+            serde_json::from_str::<serde_json::Value>(json)
+                .ok()
+                .and_then(|v| v.get("research").and_then(crate::research::old_shape_advice))
+                .unwrap_or_else(|| format!("manifest is not valid: {e}"))
+        })?;
         Ok(manifest)
+    }
+
+    /// The research scope as the host grants it (normalised), for the words
+    /// a store shows. A scope the host would refuse is shown as written; an
+    /// absent one as `{}`.
+    pub fn shown_research_scope(&self) -> ResearchScope {
+        let scope = self.research.clone().unwrap_or_default();
+        scope.validated().unwrap_or(scope)
     }
 
     /// The bytes a signature covers: the manifest without its own signature,
