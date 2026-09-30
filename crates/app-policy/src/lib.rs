@@ -51,8 +51,8 @@ pub use containers::{IsolateSettings, Provenance, SessionProfile};
 pub use entry::{script_source, ASSETS_PLACEHOLDER, SCRIPT_ENTRY};
 pub use listing::{agent_permission_lines, kernel_tool_words, privacy_summary, Listing, Publisher, LISTING_FILE};
 pub use manifest::{
-    short_id, AgentSpec, AppManifest, ModelNeed, ModelSpec, ModelTier, ProfileMode, TaskModel, Triggers, KNOWN_CAPABILITIES,
-    KNOWN_MODEL_NEEDS, SCHEMA,
+    check_reserved_id, short_id, AgentSpec, AgentWorkspace, AppManifest, ModelNeed, ModelSpec, ModelTier, ProfileMode, TaskModel, Triggers, KNOWN_CAPABILITIES,
+    KNOWN_MODEL_NEEDS, RESERVED_NAMES, SCHEMA,
 };
 pub use policy::{is_kernel_tool_name, AgentPolicy, AppPolicy, HostLimits, KERNEL_TOOLS};
 pub use research::{crawl_words, search_words, ResearchScope, RESEARCH_CATEGORIES};

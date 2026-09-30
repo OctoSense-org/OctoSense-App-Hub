@@ -130,7 +130,9 @@ contained runtime before it is a Hub app.
 ## 3. Complete identity, permissions and artwork
 
 Edit `bundle/manifest.json`: choose a stable app id, release version and name.
-Ids under `os.` are reserved for system apps and are refused. Add only the
+Ids under `os.` are reserved for system apps and are refused, and so is an
+id that is, or ends in, a native app's id or a host name (`terminal`,
+`com.example.rinx`; the list is in the [gate table](PUBLISHING.md)). Add only the
 capabilities the implemented app needs; `net` also needs exact hosts. The
 [manifest reference](PUBLISHING.md#the-manifest) lists every field and
 capability.

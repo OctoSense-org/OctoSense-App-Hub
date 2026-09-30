@@ -186,3 +186,20 @@ fn the_review_packet_shows_the_agent_files_and_asks_about_them() {
     assert!(packet.questions.iter().any(|q| q.contains("agent_files") && q.contains("confirm \"app\"")));
     assert!(packet.grants.iter().any(|g| g.contains("may work while the app is closed")), "{:?}", packet.grants);
 }
+
+#[test]
+fn the_gate_refuses_a_native_apps_id() {
+    let dir = scratch("native-id");
+    let path = dir.join(MANIFEST_FILE);
+    let mut manifest: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    manifest["id"] = json!("terminal");
+    std::fs::write(&path, manifest.to_string()).unwrap();
+    stamp(&dir);
+    let report = check_bundle(&dir, &limits(), &RefuseAllSignatures, None).unwrap();
+    let identity: Vec<_> = report.findings.iter().filter(|f| f.check == "identity").collect();
+    assert!(
+        identity.iter().any(|f| f.severity == Severity::Refusal && f.detail.contains("reserved")),
+        "{:?}",
+        report.findings
+    );
+}

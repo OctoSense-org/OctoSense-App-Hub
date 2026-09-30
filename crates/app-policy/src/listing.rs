@@ -6,7 +6,7 @@
 //! the bundle, and the store shows it beside the permissions, never instead
 //! of them. What the store says an app may do always comes from the resolved
 //! manifest; the listing cannot claim otherwise.
-use crate::agent::{Confirm, Risk, ToolSpec};
+use crate::agent::{Risk, Supervision, ToolSpec};
 use crate::manifest::AppManifest;
 use serde::{Deserialize, Serialize};
 
@@ -258,19 +258,23 @@ pub fn agent_permission_lines(manifest: &AppManifest, tools: &[ToolSpec]) -> Vec
     let names = |risk: Option<Risk>, pick: &dyn Fn(&ToolSpec) -> bool| -> Vec<&str> {
         tools.iter().filter(|t| risk.is_none_or(|r| t.risk == r) && pick(t)).map(|t| t.name.as_str()).collect()
     };
-    let destructive = names(Some(Risk::Destructive), &|t| t.confirm == Confirm::Host);
+    let destructive = names(None, &|t| t.supervision() == Supervision::HostApproval);
     if !destructive.is_empty() {
         lines.push(format!(
             "Can ask to {}: nothing of this runs until you approve it.",
             destructive.join(", ")
         ));
     }
-    let app_confirmed = names(Some(Risk::Destructive), &|t| t.confirm == Confirm::App);
+    let app_confirmed = names(None, &|t| t.supervision() == Supervision::AppConfirmation);
     if !app_confirmed.is_empty() {
         lines.push(format!(
             "Asks you on its own screen before {}; when you are away, it waits for your approval in the app's conversation.",
             app_confirmed.join(", ")
         ));
+    }
+    let every_time = names(None, &|t| t.supervision().needs_person() && !t.auto_approvable);
+    if !every_time.is_empty() {
+        lines.push(format!("You approve every call of {} yourself: no standing rule can.", every_time.join(", ")));
     }
     let shared = names(None, &|t| t.shareable);
     if !shared.is_empty() {
