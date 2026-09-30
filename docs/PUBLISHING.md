@@ -226,15 +226,18 @@ The store shows the scope in plain words, derived from the manifest:
 The person or the store may grant a narrower scope than the one requested;
 never a wider one.
 
-**Where these are served today (2026-09-27):** the OctoSense shells serve
-`mail`; `llm`, `news` and `glance` only to `os.` system apps; and no shell
-registers a `model` service yet (the OctoSense side is still to come), so a
-`model.complete` call answers `no service answers "model" on this device`
-(run in `card-host` at `e8601b8`). The shells also pin App Hub `46d67e51`,
-which does not know `news`, `glance` or `model`. No shell serves `research`
-or `crawl` yet: OctoSense's toolbox (`crates/toolbox`) parses the scope but
-the shells do not link it, and OctoSense and Rinx adopt this App Hub through
-the Rinx-first pin split (OctoSense pins only tagged Rinx releases).
+**Where these are served (2026-09-30, OctoSense `main` `7082ff5`, which pins
+App Hub `0f332112`):** the OctoSense shells serve `mail` and `model` to any
+app granted them (`model` since [OctoSense#95](https://github.com/OctoSense-org/OctoSense/pull/95), within the host's
+per-app budget), `glance` to any contained app granted it
+([OctoSense#86](https://github.com/OctoSense-org/OctoSense/pull/86)), and `llm` and `news` only to `os.` system apps.
+`card-host` serves none of them: a call there answers `no service answers
+"<family>" on this device`. No shell serves `research` or `crawl` to an app's
+agent yet: OctoSense links its toolbox (`crates/toolbox`) only with the
+`toolbox-peers` feature, which the shipped shells leave off
+([OctoSense#64](https://github.com/OctoSense-org/OctoSense/issues/64)).
+OctoSense pins this App Hub itself; Rinx, pinned by tagged release, resolves
+to the same revision through OctoSense's `[patch]`.
 
 **Host services by exact name** (`crates/app-policy/src/services.rs`). A host
 that offers the Matrix account (Rinx) or the device's assistant (Octos) serves
@@ -246,12 +249,18 @@ its policy and the person's per-instance grant (for Matrix, the rooms they
 allow), and checks that lease on every call. A host that does not offer a
 requested service shows the app as unavailable with the reason.
 
-**Where these are served today (2026-09-27):** only by Rinx's mini-app host,
-for bundles a person imports into Rinx. The OctoSense shells' Card runner
-registers no `octos` or `matrix` service: it installs and opens such an app,
-and every call answers `no service answers "octos" on this device` (the
-dispatch in `crates/appstore/src/services.rs`). See OctoSense
-[`docs/ai-services.md`](https://github.com/OctoSense-org/OctoSense/blob/main/docs/ai-services.md).
+**Where these are served (2026-09-30):** the OctoSense shells serve `octos.*`
+to contained apps where the shell hosts a kernel (not iOS). The first call
+waits for the person to allow the app's agent (`Waiting for the person to
+allow this app's agent (OctoSense asks the first time)`); after that the app
+talks to its own peer, `card.<app id>` ([OctoSense#106](https://github.com/OctoSense-org/OctoSense/pull/106),
+[#120](https://github.com/OctoSense-org/OctoSense/pull/120), [#184](https://github.com/OctoSense-org/OctoSense/pull/184); `OCTOSENSE_CONTAINED_APPS=1` asks nobody,
+`0` turns it off). Rinx's mini-app host serves `octos.*` and `matrix.*` to
+bundles a person imports into Rinx; no OctoSense shell serves `matrix.*` to a
+contained app. `card-host` serves neither: every call answers `no service
+answers "octos" on this device` (the dispatch in
+`crates/appstore/src/services.rs`). See OctoSense
+[architecture § Agents](https://github.com/OctoSense-org/OctoSense/blob/main/docs/architecture.md#2-agents).
 
 | Capability | Grants | The store says |
 | --- | --- | --- |
@@ -303,16 +312,24 @@ tools, instructions, skills, model requirements and triggers are below.
 
 ## The app's agent and tools
 
-> **Status (2026-09-27):** the gate admits, checks and pins everything in this
-> section, and the store shows its lines. **No shell loads or runs it yet**:
-> OctoSense [ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0002-event-driven-app-agents.md)
-> is Proposed, the kernel's host-registered tools are
-> [octos#2567](https://github.com/octos-org/octos/pull/2567) (open), and no
-> host offers the generic `agent.tools` names to contained apps. The OctoSense
-> shells pin App Hub `46d67e51`, which predates `model`, `background`,
-> `triggers`, `instructions`, `skills` and the `news` and `glance`
-> capabilities, so today they refuse a manifest that uses any of them (the
-> "host older than them" below).
+> **Status (2026-09-30):** the gate admits, checks and pins everything in this
+> section, and the store shows its lines. The OctoSense shells (`main`
+> `7082ff5`, which pins App Hub `0f332112`) give an app that declares an
+> `agent` or `octos.*`, or ships `tools.json`, its own peer once the person
+> allows it: they load the bundle with `AgentBundle::load`, register its
+> `tools.json` tools with the peer (the kernel side is
+> [octos#2567](https://github.com/octos-org/octos/pull/2567), merged), keep
+> the generic `agent.tools` names this gate admits (`ask_user_question`), run
+> `implemented_by: "host-service"` tools on the app's own host services, and
+> let the person talk to the agent in the shell's "Ask <app>" panel
+> ([OctoSense#145](https://github.com/OctoSense-org/OctoSense/pull/145), [#184](https://github.com/OctoSense-org/OctoSense/pull/184)). Not yet: `AGENT.md` and
+> `skills/` are not installed into the peer, `model` and `tier` choose no
+> model, triggers and `background` do not fire, and `implemented_by: "app"`
+> tools are refused (OctoSense
+> [ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0002-event-driven-app-agents.md)
+> is still Proposed, amended by ADR 0004). A field newer than the shells' App
+> Hub pin is refused there until the pin moves (the "host older than them"
+> below).
 
 An app that wants an assistant of its own (ADR 0002 §3, §4) ships it in the
 bundle. Every file is under the bundle digest, so the agent that runs is the
