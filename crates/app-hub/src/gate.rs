@@ -130,6 +130,9 @@ pub fn check_bundle(
             format!("{} is under os., which is reserved for system apps that ship with the device", manifest.id),
         ));
     }
+    // Native apps' ids and the host's own names (app-policy's
+    // RESERVED_NAMES) are refused by the agent review below (as "identity")
+    // and by the policy.
 
     // ---- contents -------------------------------------------------------
     let mut total = 0u64;
@@ -213,16 +216,21 @@ pub fn check_bundle(
         });
     }
     if let Some(agent) = &agent_review.bundle {
-        for tool in agent.tools.iter().filter(|t| t.risk == octosense_app_policy::Risk::Destructive) {
-            // Recorded, not refused: a destructive tool is allowed, and the
-            // host always asks before it runs, whoever calls it.
+        for tool in agent.tools.iter().filter(|t| t.supervision().needs_person()) {
+            // Recorded, not refused: a destructive or outward tool is
+            // allowed, and the host always asks before it runs, whoever
+            // calls it.
             let who = match tool.confirm {
                 octosense_app_policy::Confirm::Host => "the host's approval",
                 octosense_app_policy::Confirm::App => "the app's own confirmation sheet (an approval request when the person is away)",
             };
             findings.push(Finding::warn(
                 "tools",
-                format!("{} is destructive: every call waits for {who}", tool.name),
+                format!(
+                    "{} is {}: every call waits for {who}",
+                    tool.name,
+                    if tool.risk == octosense_app_policy::Risk::Destructive { "destructive" } else { "outward" }
+                ),
             ));
         }
     }

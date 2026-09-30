@@ -143,6 +143,9 @@ impl AppPolicy {
 /// Resolve a parsed manifest against this host.
 pub fn resolve(manifest: &AppManifest, limits: &HostLimits) -> Result<AppPolicy, String> {
     check_id(&manifest.id)?;
+    if manifest.storage.cache_max_bytes == Some(0) {
+        return Err(format!("app {}: storage.cache_max_bytes must be positive", manifest.id));
+    }
     if manifest.version.trim().is_empty() {
         return Err("manifest version is empty".into());
     }
@@ -369,7 +372,7 @@ fn check_id(id: &str) -> Result<(), String> {
     if id.starts_with('.') || id.contains("..") {
         return Err(format!("app id {id:?} may not navigate the filesystem"));
     }
-    Ok(())
+    crate::manifest::check_reserved_id(id)
 }
 
 /// A bare host: no scheme, no path, no port, no wildcard. The service adds

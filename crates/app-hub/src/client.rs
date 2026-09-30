@@ -230,6 +230,9 @@ impl Store {
         if app_id.starts_with("os.") {
             return Err(format!("{app_id} names a system app, which no store may install"));
         }
+        // Nor a native app's id or the host's own names: the jail, and on
+        // the device its tools and consent, are keyed by the id.
+        octosense_app_policy::check_reserved_id(app_id)?;
         let entry = self.entry(app_id).ok_or_else(|| format!("{app_id} is not in the catalog"))?;
         if let crate::index::Status::Withdrawn(reason) = &entry.status {
             return Err(format!("{app_id} has been withdrawn: {reason}"));

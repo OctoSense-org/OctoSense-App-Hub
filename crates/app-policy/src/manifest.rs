@@ -223,12 +223,41 @@ pub struct Network {
     pub hosts: Vec<String>,
 }
 
+/// The `storage` block (OctoSense ADR 0004 §11). The host lays out the
+/// app's folders from it (OctoSense's `app_storage::spec`, which reads the
+/// same fields); App Hub admits it and clamps `max_bytes`. `external`
+/// (a path outside the jail) is for reviewed native apps only, so a script
+/// manifest that names it is refused like any unknown field. The fields
+/// added after `max_bytes` are skipped when unset, so a manifest signed
+/// before they existed signs exactly as it did.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Storage {
     /// Whole-jail ceiling the app asks for. Clamped to the host's maximum.
     #[serde(default)]
     pub max_bytes: Option<u64>,
+    /// Data per account, one agent per account; `false` (the default) is one
+    /// `device` folder.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub accounts: bool,
+    /// What the app's agent may read from disk: its account's folder (the
+    /// default) or nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_workspace: Option<AgentWorkspace>,
+    /// Ceiling for the jail's `cache/`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_max_bytes: Option<u64>,
+}
+
+/// `storage.agent_workspace`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AgentWorkspace {
+    /// The account's folder.
+    #[default]
+    Account,
+    /// No files: tools only.
+    None,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -381,6 +410,45 @@ impl Triggers {
 /// so two apps with the same short id never share a tool registry.
 pub fn short_id(app_id: &str) -> &str {
     app_id.rsplit('.').next().unwrap_or(app_id)
+}
+
+/// Names no script app may take, as its id or as its namespace
+/// ([`short_id`]). A host keys an app's jail, storage folders, tool
+/// declarations, executor and consent by its id, and its tools by its
+/// namespace, so a store app named `terminal` (or `com.example.terminal`,
+/// whose tools would be `terminal.*`) would stand in for the Terminal.
+///
+/// - The native apps OctoSense ships (its `native-apps.json`; OctoSense
+///   checks this list against that file): `apphub`, `appcard`, `reference`,
+///   `rinx`, `sheets`, `terminal`.
+/// - What the shell itself acts as, or owns tools under: `system` (the
+///   system agent as a caller), `toolbox` and `workflow` (the system
+///   toolbox), `dev` (developer mode's `dev.run`), `agents`
+///   (`agents.list`), `octos`, `shell`, and `card` and `os`, the peer and
+///   system-app prefixes.
+///
+/// System apps' own namespaces (`os.news` is `news`) are not in it: a store
+/// app may share one, and a host resolves another app's tool by its owner,
+/// not by its name.
+pub const RESERVED_NAMES: &[&str] = &[
+    "agents", "apphub", "appcard", "card", "dev", "octos", "os", "reference", "rinx", "sheets", "shell", "system", "terminal",
+    "toolbox", "workflow",
+];
+
+/// Refuse an app id that is, or whose namespace is, a [`RESERVED_NAMES`]
+/// entry. Every script app passes through it: [`crate::policy::resolve`],
+/// the agent review ([`crate::AgentBundle::load`]) and the store's gate.
+pub fn check_reserved_id(app_id: &str) -> Result<(), String> {
+    let namespace = short_id(app_id);
+    if RESERVED_NAMES.contains(&app_id) {
+        return Err(format!("app id {app_id:?} is reserved: it names a native app or the host itself"));
+    }
+    if RESERVED_NAMES.contains(&namespace) {
+        return Err(format!(
+            "app id {app_id:?} ends in {namespace:?}, which is reserved: its tools would be {namespace}.*, a native app's or the host's"
+        ));
+    }
+    Ok(())
 }
 
 impl AppManifest {

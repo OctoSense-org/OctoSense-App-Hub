@@ -186,13 +186,33 @@ pub struct ToolSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub private_data: Option<bool>,
     pub implemented_by: ImplementedBy,
-    /// Whose surface confirms a destructive call. Omitted means the host.
+    /// Whose surface confirms a destructive or outward call. Omitted means
+    /// the host.
     #[serde(default, skip_serializing_if = "is_host_confirm")]
     pub confirm: Confirm,
+    /// The call reaches outside the device (sends, posts, shares): like a
+    /// destructive one, it runs only after the person approves it, live or
+    /// by a standing rule (OctoSense ADR 0004 §7, §8). Omitted means `false`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub outward: bool,
+    /// A standing rule ("allow for an hour") may approve it. `false` for
+    /// permanent deletion, payments, sharing outside the device, account and
+    /// security changes: each call then needs the person live (ADR 0004 §8).
+    /// Omitted means `true`.
+    #[serde(default = "yes", skip_serializing_if = "is_true")]
+    pub auto_approvable: bool,
 }
 
 fn is_host_confirm(confirm: &Confirm) -> bool {
     *confirm == Confirm::Host
+}
+
+fn yes() -> bool {
+    true
+}
+
+fn is_true(value: &bool) -> bool {
+    *value
 }
 
 impl ToolSpec {
@@ -208,10 +228,11 @@ impl ToolSpec {
     }
 
     pub fn supervision(&self) -> Supervision {
-        match (self.risk, self.confirm) {
-            (Risk::Read | Risk::Act, _) => Supervision::Unattended,
-            (Risk::Destructive, Confirm::Host) => Supervision::HostApproval,
-            (Risk::Destructive, Confirm::App) => Supervision::AppConfirmation,
+        let needs_person = self.risk == Risk::Destructive || (self.outward && self.risk != Risk::Read);
+        match (needs_person, self.confirm) {
+            (false, _) => Supervision::Unattended,
+            (true, Confirm::Host) => Supervision::HostApproval,
+            (true, Confirm::App) => Supervision::AppConfirmation,
         }
     }
 
@@ -337,14 +358,17 @@ impl ToolManifest {
                             "{name} says confirm \"app\" but is implemented by the host service: only a tool the app implements itself, or a native module's tool, may confirm on the app's own sheet"
                         ),
                     ));
-                } else if tool.risk == Risk::Destructive {
+                } else if tool.supervision().needs_person() {
                     issues.push(Issue::warn(
                         "tools",
                         format!("{name} confirms on the app's own sheet: with the person present that sheet is the only confirmation; with the person absent it becomes an approval request in the app's conversation"),
                     ));
                 } else {
-                    issues.push(Issue::warn("tools", format!("{name} says confirm \"app\" but is not destructive, so nothing is confirmed")));
+                    issues.push(Issue::warn("tools", format!("{name} says confirm \"app\" but is neither destructive nor outward, so nothing is confirmed")));
                 }
+            }
+            if tool.outward && tool.risk == Risk::Read {
+                issues.push(Issue::refuse("tools", format!("{name} is outward but its risk is read: a call that reaches outside the device is at least act")));
             }
             if local_only && tool.shareable && tool.private_data != Some(false) {
                 issues.push(Issue::refuse(
@@ -642,6 +666,13 @@ pub fn read_tools(bundle: &Path) -> Result<Option<ToolManifest>, String> {
 pub fn review(bundle: &Path, manifest: &AppManifest) -> Review {
     let mut issues = Vec::new();
     let spec = manifest.agent.as_ref();
+
+    // ---- identity ------------------------------------------------------------
+    // A host keys the agent's tools, executor and consent by the app's id and
+    // namespace: a reserved one would stand in for a native app or the host.
+    if let Err(e) = crate::manifest::check_reserved_id(&manifest.id) {
+        issues.push(Issue::refuse("identity", e));
+    }
 
     // ---- tools.json --------------------------------------------------------
     let tools = match read_tools(bundle) {

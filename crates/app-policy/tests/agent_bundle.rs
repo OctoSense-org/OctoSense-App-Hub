@@ -539,7 +539,7 @@ fn a_contained_app_confirms_only_the_tools_it_implements_itself() {
     });
     let review = review(&dir, &manifest);
     assert_eq!(review.refusals().count(), 0, "{:?}", review.issues);
-    assert!(review.warnings().any(|w| w.detail.contains("news.list says confirm \"app\" but is not destructive")));
+    assert!(review.warnings().any(|w| w.detail.contains("news.list says confirm \"app\" but is neither destructive nor outward")));
 }
 
 #[test]
@@ -574,4 +574,60 @@ fn a_native_modules_tools_json_loads_with_the_same_checks() {
     assert!(err.contains("rinx.rooms.list is shareable but the app's model is local_only"), "{err}");
     let err = ToolManifest::load(&json.replace("\"risk\":\"read\"", "\"risk\":\"low\""), "rinx", ToolHost::Native, false).unwrap_err();
     assert!(err.contains("unknown variant `low`"), "{err}");
+}
+
+#[test]
+fn a_native_apps_id_or_namespace_or_the_hosts_own_name_is_refused() {
+    // OctoSense keys a script app's jail, storage folders, tools, executor
+    // and consent by its id, and its tools by its namespace: `terminal`
+    // (or `com.example.terminal`, whose tools are `terminal.*`) would stand
+    // in for the Terminal, `system` for the system agent.
+    for id in ["terminal", "rinx", "apphub", "com.example.terminal", "dev.example.rinx", "system", "toolbox", "org.example.dev"] {
+        let dir = scratch(&format!("reserved-{id}"));
+        let manifest = stamp(&dir, |m| m["id"] = json!(id));
+        refused_with(&dir, &manifest, "reserved");
+        let err = AgentBundle::load(&dir, &manifest).unwrap_err();
+        assert!(err.contains("reserved"), "{id}: {err}");
+    }
+    for id in ["os.news", "dev.example.news", "org.example.terminal-notes"] {
+        assert!(check_reserved_id(id).is_ok(), "{id}");
+    }
+    for native in ["apphub", "appcard", "reference", "rinx", "sheets", "terminal"] {
+        assert!(RESERVED_NAMES.contains(&native), "{native}");
+    }
+}
+
+#[test]
+fn an_outward_tool_waits_for_the_person_and_may_forbid_standing_rules() {
+    let dir = scratch("outward");
+    edit_tools(&dir, |t| {
+        t["tools"].as_array_mut().unwrap().push(json!({
+            "name": "news.share", "description": "Share a story with a contact.",
+            "input_schema": {"type":"object","properties":{}}, "output_schema": {"type":"object","properties":{}},
+            "risk": "act", "outward": true, "auto_approvable": false, "shareable": false, "implemented_by": "host-service"
+        }));
+    });
+    let manifest = stamp(&dir, |_| {});
+    let review = review(&dir, &manifest);
+    assert_eq!(review.refusals().count(), 0, "{:?}", review.issues);
+    let bundle = review.bundle.unwrap();
+    let share = bundle.tool("news.share").unwrap();
+    assert!(share.outward && !share.auto_approvable);
+    assert_eq!(share.supervision(), Supervision::HostApproval, "outward, so the person approves it");
+    assert!(!share.runs_unattended_in_background());
+    // Omitted, the fields are false and true, and are not written back.
+    let list = bundle.tool("news.list").unwrap();
+    assert!(!list.outward && list.auto_approvable);
+    let written = serde_json::to_value(list).unwrap();
+    assert!(written.get("outward").is_none() && written.get("auto_approvable").is_none(), "{written}");
+    let lines = agent_permission_lines(&manifest, &bundle.tools);
+    assert!(lines.iter().any(|l| l.contains("news.share") && l.contains("until you approve")), "{lines:?}");
+    assert!(lines.iter().any(|l| l.contains("every call of news.share")), "{lines:?}");
+
+    // A call that reaches outside the device is never a read.
+    edit_tools(&dir, |t| {
+        let last = t["tools"].as_array().unwrap().len() - 1;
+        t["tools"][last]["risk"] = json!("read");
+    });
+    refused_with(&dir, &manifest, "news.share is outward but its risk is read");
 }

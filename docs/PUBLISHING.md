@@ -93,6 +93,7 @@ review packets outside the submitted bundle.
 | Allowed file types only | Anything other than `.card .json .l0 .octoscript .splash .svg .png .jpg .jpeg .webp .ttf .otf .txt .md`. No other scripts, archives or binaries. |
 | No secrets | A `.card`, `.l0`, `.octoscript` or `.splash` file declaring `is_password: true` or a `TextInputContentType` of `Password`, `NewPassword` or `OneTimeCode`. Apps never collect secrets; see [host services](#host-services-and-sheets). |
 | System ids are reserved | An id starting with `os.`. Those belong to system apps that ship with the device, and no device installs one from a store. |
+| Native and host names are reserved | An id, or an id's last segment (its tool namespace), that is a native app's id or a name the host acts under: `agents`, `apphub`, `appcard`, `card`, `dev`, `octos`, `os`, `reference`, `rinx`, `sheets`, `shell`, `system`, `terminal`, `toolbox`, `workflow`. The device keys an app's storage, tools and consent by its id, so `terminal` or `com.example.terminal` would stand in for the Terminal. |
 | Size | A bundle over 8 MB. |
 | No symlinks | Any symlink in the bundle. |
 | Digest matches | A manifest whose `integrity.bundle_blake3` does not match the directory. Run `hub stamp` after any change. |
@@ -271,7 +272,17 @@ empty list with `net` reaches nothing. Hosts match exactly: listing
 `example.com` does not allow `api.example.com`.
 
 **Id**: `[a-z0-9.-]{1,64}`, not starting with `.`, never containing `..`.
-Ids under `os.` are reserved for system apps.
+Ids under `os.` are reserved for system apps. Neither the id nor its last
+segment may be a native app's id or one of the host's own names (the list is
+in the gate table above, and in app-policy's `RESERVED_NAMES`).
+
+**Storage** (the same block as OctoSense's `native-apps.json`, ADR 0004 §11):
+`max_bytes` (the jail's ceiling), `accounts` (`true`: data and one agent per
+account; default one `device` folder), `agent_workspace` (`account`, the
+default: the agent reads the account's folder; `none`: tools only) and
+`cache_max_bytes` (a positive ceiling for `cache/`). `external` (a path
+outside the jail) is for reviewed native apps only and is refused here, like
+any unknown field.
 
 **Quotas** are requests; the host clamps them to its ceilings (storage 16 MB,
 20 000 000 instructions, 64 MB heap). Ask for less than the ceiling when you can.
@@ -367,20 +378,22 @@ The News example, complete, is
 | `shareable` | Other callers (the system agent, other apps' agents, the person's assistant) may be granted it. Default false. |
 | `private_data` | The result carries the person's private data. A shareable tool of a `local_only` app must say `false`. |
 | `implemented_by` | `host-service` (the app's native host service, which holds data, devices, network or secrets) or `app` (the app's own script, for tools that only reshape its data). |
-| `confirm` | Who asks the person before a destructive call: `host` (the default: the host's approval path) or `app` (the app's own confirmation sheet). Independent of `risk`, and never inferred from it. `app` is allowed only for a tool the app implements itself (`implemented_by: "app"`) or a native module's tool. |
+| `outward` | The call reaches outside the device (sends, posts, shares). It then waits for the person like a destructive one. Default false; refused on a `read` tool. |
+| `auto_approvable` | A standing rule ("allow for an hour") may approve a call. Say `false` for permanent deletion, payments, sharing outside the device, account and security changes: each call then needs the person live. Default true. |
+| `confirm` | Who asks the person before a destructive or outward call: `host` (the default: the host's approval path) or `app` (the app's own confirmation sheet). Independent of `risk`, and never inferred from it. `app` is allowed only for a tool the app implements itself (`implemented_by: "app"`) or a native module's tool. |
 
-**Whether a call needs the person comes from the risk; whose surface asks comes
-from `confirm`.** Read and act run unattended. A destructive tool always waits
-for the person:
+**Whether a call needs the person comes from the risk and `outward`; whose
+surface asks comes from `confirm`.** Read and act run unattended. A destructive
+tool, and an outward one, always waits for the person:
 
-| `risk: "destructive"` with | Person present | Person absent |
+| `risk: "destructive"` (or `outward: true`) with | Person present | Person absent |
 | --- | --- | --- |
 | `confirm: "host"` (default) | The host's approval path asks. | An approval request in the app's conversation. |
 | `confirm: "app"` | The app's own confirmation sheet is the only confirmation (for example Rinx's `send_message`); the host does not ask again. | An approval request in the app's conversation. |
 
 The person is never asked twice for one call. A destructive tool may still say
 `background: true`: the gate records a warning, and the tool only runs after
-approval. `confirm: "app"` on a tool that is not destructive confirms nothing,
+approval. `confirm: "app"` on a tool that is neither destructive nor outward confirms nothing,
 and the gate warns about it. The gate report, the review packet and the store
 lines all state whose confirmation each destructive tool uses.
 
@@ -462,6 +475,8 @@ Derived from the manifest and `tools.json`, beside the other permissions:
   confirmation)
 - "Asks you on its own screen before rinx.send_message; when you are away, it
   waits for your approval in the app's conversation." (`confirm: "app"`)
+- "You approve every call of pay.transfer yourself: no standing rule can."
+  (`auto_approvable: false`)
 - "Offers news.list to other assistants you allow." (and, for a shareable tool
   with `private_data: true`, that it can pass private data)
 - "Its assistant uses only models that run on your own devices."

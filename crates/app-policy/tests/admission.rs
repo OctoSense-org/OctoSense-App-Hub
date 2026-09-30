@@ -454,3 +454,42 @@ fn the_store_says_the_research_scope_in_plain_words() {
         "{lines:?}"
     );
 }
+
+// ----------------------------------------------------------------- storage
+
+#[test]
+fn the_storage_block_carries_accounts_the_agent_workspace_and_a_cache_ceiling() {
+    // OctoSense ADR 0004 §11: the same block as native-apps.json, less
+    // `external`, which only a reviewed native app may declare.
+    let body = r#""storage":{"max_bytes":4096,"accounts":true,"agent_workspace":"none","cache_max_bytes":2048}"#;
+    let manifest = AppManifest::parse(&manifest_with(body)).unwrap();
+    assert!(manifest.storage.accounts);
+    assert_eq!(manifest.storage.agent_workspace, Some(AgentWorkspace::None));
+    assert_eq!(manifest.storage.cache_max_bytes, Some(2048));
+    assert_eq!(resolve(body).unwrap().storage_bytes, 4096);
+    assert!(AppManifest::parse(&manifest_with(r#""storage":{"agent_workspace":"account"}"#)).is_ok());
+
+    let err = resolve(r#""storage":{"external":["home:rw"]}"#).unwrap_err();
+    assert!(err.contains("unknown field `external`"), "{err}");
+    let err = resolve(r#""storage":{"agent_workspace":"everything"}"#).unwrap_err();
+    assert!(err.contains("manifest is not valid"), "{err}");
+    let err = resolve(r#""storage":{"cache_max_bytes":0}"#).unwrap_err();
+    assert!(err.contains("cache_max_bytes must be positive"), "{err}");
+}
+
+#[test]
+fn a_manifest_without_the_new_storage_fields_signs_as_before() {
+    let with = AppManifest::parse(&manifest_with(r#""storage":{"max_bytes":4096}"#)).unwrap();
+    let bytes = String::from_utf8(with.signing_bytes().unwrap()).unwrap();
+    assert!(bytes.contains(r#""storage":{"max_bytes":4096}"#), "{bytes}");
+}
+
+#[test]
+fn a_native_apps_id_is_refused_at_resolve() {
+    let json = manifest_with("").replace(r#""id":"weather""#, r#""id":"terminal""#);
+    let err = admit_and_resolve(&json, BUNDLE, &open_limits(), &RefuseAllSignatures).unwrap_err();
+    assert!(err.contains("reserved"), "{err}");
+    let json = manifest_with("").replace(r#""id":"weather""#, r#""id":"com.example.rinx""#);
+    let err = admit_and_resolve(&json, BUNDLE, &open_limits(), &RefuseAllSignatures).unwrap_err();
+    assert!(err.contains("reserved"), "{err}");
+}
