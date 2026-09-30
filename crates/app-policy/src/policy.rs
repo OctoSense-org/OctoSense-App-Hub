@@ -96,7 +96,9 @@ pub struct AppPolicy {
     pub storage_bytes: u64,
     pub instruction_budget: u64,
     pub memory_bytes: u64,
-    /// May the app cause a prompt the person has to answer.
+    /// The `prompt` capability: may the app ask the person questions of its
+    /// own. A service's sheet (Mail's sign-in) does not need it; whether any
+    /// sheet may appear is the surface's call (`IsolateSettings::host_prompts`).
     pub may_prompt: bool,
     /// None when the manifest asked for no agent.
     pub agent: Option<AgentPolicy>,

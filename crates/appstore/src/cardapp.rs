@@ -173,6 +173,12 @@ impl AppModule for CardModule {
                 let heap = splash.borrow_mut().and_then(|mut s| s.isolate_heap_key(cx));
                 if let Some(heap) = heap {
                     makepad_widgets::camera_preview::release_isolate_devices(cx, heap);
+                    crate::services::cancel_heap(heap);
+                }
+                // The sheet's own requests (a sign-in form's) end with it.
+                let sheet = closing.splash(cx, ids!(sheet));
+                if let Some(heap) = sheet.borrow_mut().and_then(|mut s| s.isolate_heap_key(cx)) {
+                    crate::services::cancel_heap(heap);
                 }
             }),
         }
