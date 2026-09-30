@@ -119,6 +119,30 @@ Expected after implementation: all listed suites pass with zero failures. The re
 - [x] Concurrent/retried publishes cannot lose entries or expose incomplete artifacts.
 - [x] Recovery preserves monotonic trust history; signing jobs do not execute submission code.
 
+## Shell consumer
+
+The shells must end Card instances running a release the catalog revoked. This was ported to OctoSense `crates/shell/src/lib.rs` on 2026-09-27 and then dropped with that integration branch. Re-add it when this plan lands on App Hub main, next to `installed_app_changed`, and drain it in `handle_signal` after `take_completed_installs()`:
+
+```rust
+#[cfg(any(feature = "app-hub", native_mobile))]
+fn close_revoked_release(&mut self, cx: &mut Cx, revoked: &octosense_app_hub_app::catalog::RevokedRelease) {
+    let launch_id = apps::installed_launch_id(&revoked.app_id);
+    let clients: Vec<_> = self.state.as_ref().into_iter()
+        .flat_map(|state| state.clients.iter())
+        .filter_map(|(&client, slot)| {
+            (slot.app == launch_id
+                && self.module_host.get(client)
+                    .and_then(|instance| octosense_app_hub_app::running_release(&instance.root))
+                    .is_some_and(|running| revoked.matches(&running)))
+                .then_some(client)
+        })
+        .collect();
+    for client in clients { self.request_close(cx, client); }
+}
+// in handle_signal:
+for revoked in octosense_app_hub_app::take_revoked_releases() { self.close_revoked_release(cx, &revoked); }
+```
+
 ## Rollout, migration and recovery
 
 First run renewal against a local mirror/test anchor; validate a dry-run transaction before configuring the production signer. Deployment and credential/provider selection are explicit later execution decisions.

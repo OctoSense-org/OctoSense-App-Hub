@@ -114,6 +114,12 @@ Launch preparation copies at most 8 MiB of payload plus a 64 KiB manifest, 2,048
 - [x] Explicit withdrawal targets the correct release; running revoked instances are handled consistently.
 - [x] Mobile install staging/data-preservation and consent tests remain green.
 
+## Shell consumer
+
+The shell side of verifying a launch off the UI thread is kept only in the archived, private OctoSense-mobile repository. It is on branch `feat/app-store-foundations`, commit `b3b7de0`, in `src/main.rs`.
+- **What it does:** `launch_app_after_validation` runs `catalog::prepare_launch_from_environment` on a worker. It opens the app only if the returned `LaunchApproval::still_current()` still holds, and it ignores duplicate launches that are still pending.
+- **Where it goes:** port it to OctoSense `crates/shell/src/lib.rs`, where `launch_app` still calls the synchronous `try_may_open_from_environment`, when this plan lands on App Hub main.
+
 ## Rollout, migration and recovery
 
 Ship as a compatible client fix before introducing channels. Release shared Hub changes and update the mobile pinned Hub revision before claiming device coverage.
