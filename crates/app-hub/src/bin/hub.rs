@@ -180,7 +180,7 @@ fn run() -> Result<(), String> {
             let (removed, kept): (Vec<_>, Vec<_>) = catalog
                 .entries
                 .drain(..)
-                .partition(|e| e.app_id() == app_id && version.as_deref().map_or(true, |v| e.version() == v));
+                .partition(|e| e.app_id() == app_id && version.as_deref().is_none_or(|v| e.version() == v));
             catalog.entries = kept;
             if removed.is_empty() {
                 return Err(format!("{app_id}{} is not in the catalog", version.map(|v| format!(" {v}")).unwrap_or_default()));

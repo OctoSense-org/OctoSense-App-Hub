@@ -235,7 +235,7 @@ impl Store {
             return Err(format!("{app_id} has been withdrawn: {reason}"));
         }
         let digest = digest_dir(staged)?;
-        if digest.to_ascii_lowercase() != entry.manifest.integrity.bundle_blake3.to_ascii_lowercase() {
+        if !digest.eq_ignore_ascii_case(&entry.manifest.integrity.bundle_blake3) {
             return Err(format!(
                 "the downloaded bundle hashes to {digest}, the catalog says {}",
                 entry.manifest.integrity.bundle_blake3

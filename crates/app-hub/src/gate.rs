@@ -103,7 +103,7 @@ pub fn check_bundle(
     let mut findings = Vec::new();
 
     // ---- integrity ------------------------------------------------------
-    if digest.to_ascii_lowercase() != manifest.integrity.bundle_blake3.to_ascii_lowercase() {
+    if !digest.eq_ignore_ascii_case(&manifest.integrity.bundle_blake3) {
         findings.push(Finding::refuse(
             "digest",
             format!("the bundle hashes to {digest}, the manifest claims {}", manifest.integrity.bundle_blake3),
@@ -246,7 +246,7 @@ pub fn check_bundle(
                 ));
             }
         }
-        if let Some(previous_entry) = catalog.entries.iter().filter(|e| e.app_id() == manifest.id).next_back() {
+        if let Some(previous_entry) = catalog.entries.iter().rfind(|e| e.app_id() == manifest.id) {
             let declared = manifest.integrity.signature.as_ref().map(|s| s.key_id.as_str());
             match declared {
                 Some(key_id) if key_id == previous_entry.publisher => {}

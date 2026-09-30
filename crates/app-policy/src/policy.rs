@@ -9,6 +9,21 @@ use crate::manifest::{short_id, AgentSpec, AppManifest, ModelSpec, ProfileMode, 
 use crate::research::ResearchScope;
 use std::collections::BTreeSet;
 
+/// The octos kernel tools a contained app's agent may keep (a plain name in
+/// `agent.tools`; the host's own tools are dotted, `net.fetch`). Only
+/// `ask_user_question`: a question to the person, shown and answered on the
+/// device's own surfaces, with no side effect of its own. Every other kernel
+/// tool (shell, files, the web, memory, peers, spawning) stays out of reach
+/// whatever a host offers: [`resolve`] refuses it, and so does the gate's
+/// review of the agent ([`crate::agent::review`]).
+pub const KERNEL_TOOLS: &[&str] = &["ask_user_question"];
+
+/// Whether `tool` names an octos kernel tool rather than a host tool
+/// (`net.fetch`) or another app's (`mail.send`): a plain name.
+pub fn is_kernel_tool_name(tool: &str) -> bool {
+    !tool.contains('.')
+}
+
 /// The host's own ceilings. An app may ask for less and get it; asking for
 /// more is clamped, not refused, because a bundle built for a roomier device
 /// should still run here — just smaller.
@@ -20,7 +35,8 @@ pub struct HostLimits {
     pub max_iterations: u32,
     pub max_token_budget: u64,
     /// Tools this host offers to contained apps at all. Shell, process and
-    /// arbitrary-path file tools are absent from this list by design.
+    /// arbitrary-path file tools are absent from this list by design; of the
+    /// kernel's own tools only [`KERNEL_TOOLS`] may ever be here.
     pub offered_tools: Vec<String>,
     /// Whether a bundle must carry a signature to be admitted.
     pub require_signature: bool,
@@ -29,7 +45,8 @@ pub struct HostLimits {
 impl Default for HostLimits {
     /// Phone-sized defaults: the isolate jail's own ceiling for storage, a
     /// budget that cannot spin the UI thread for a second, and a tool list
-    /// holding only what a card app legitimately needs.
+    /// holding only what a card app legitimately needs: the host tools, and
+    /// the kernel's `ask_user_question`.
     fn default() -> Self {
         HostLimits {
             max_storage_bytes: 16 * 1024 * 1024,
@@ -39,6 +56,7 @@ impl Default for HostLimits {
             max_token_budget: 200_000,
             offered_tools: ["ledger.read", "ledger.write", "net.fetch", "storage.read", "storage.write", "card.render"]
                 .iter()
+                .chain(KERNEL_TOOLS)
                 .map(|s| s.to_string())
                 .collect(),
             require_signature: true,
@@ -214,6 +232,12 @@ fn resolve_research(
 fn resolve_agent(app_id: &str, spec: &AgentSpec, limits: &HostLimits) -> Result<AgentPolicy, String> {
     let mut tools = BTreeSet::new();
     for tool in &spec.tools {
+        if is_kernel_tool_name(tool) && !KERNEL_TOOLS.contains(&tool.as_str()) {
+            return Err(format!(
+                "app {app_id} requests the octos kernel tool {tool:?}; a contained app's agent may keep only {}",
+                KERNEL_TOOLS.join(", ")
+            ));
+        }
         if !limits.offered_tools.iter().any(|offered| offered == tool) {
             return Err(format!("app {app_id} requests tool {tool:?}, which this host does not offer contained apps"));
         }

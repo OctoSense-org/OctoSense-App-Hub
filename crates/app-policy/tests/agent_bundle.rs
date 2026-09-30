@@ -103,6 +103,22 @@ fn the_news_example_loads_as_an_agent_bundle() {
     assert!(get.runs_unattended_in_background());
 }
 
+/// The gate's review (and so `AgentBundle::load`) keeps `ask_user_question`
+/// as the agent's one kernel tool and refuses any other.
+#[test]
+fn the_agent_keeps_ask_user_question_and_no_other_kernel_tool() {
+    let dir = scratch("kernel-tools");
+    let manifest = stamp(&dir, |m| m["agent"]["tools"] = json!(["ask_user_question"]));
+    let bundle = AgentBundle::load(&dir, &manifest).unwrap().expect("an agent");
+    assert_eq!(bundle.kernel_tools(), ["ask_user_question"]);
+    assert!(bundle.tool_names().contains(&"ask_user_question".to_string()));
+    for tool in ["shell", "web_search", "peer_send_input"] {
+        let manifest = stamp(&dir, |m| m["agent"]["tools"] = json!(["ask_user_question", tool]));
+        refused_with(&dir, &manifest, &format!("octos kernel tool {tool:?}"));
+        assert!(AgentBundle::load(&dir, &manifest).is_err(), "{tool}");
+    }
+}
+
 #[test]
 fn the_policy_carries_the_model_background_and_triggers() {
     let dir = scratch("policy");

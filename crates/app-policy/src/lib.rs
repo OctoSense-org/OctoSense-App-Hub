@@ -49,12 +49,12 @@ pub use assets::{rewrite_assets, AssetServer, StaticAssets};
 pub use bundle::{digest_dir, MANIFEST_FILE};
 pub use containers::{IsolateSettings, Provenance, SessionProfile};
 pub use entry::{script_source, ASSETS_PLACEHOLDER, SCRIPT_ENTRY};
-pub use listing::{agent_permission_lines, privacy_summary, Listing, Publisher, LISTING_FILE};
+pub use listing::{agent_permission_lines, kernel_tool_words, privacy_summary, Listing, Publisher, LISTING_FILE};
 pub use manifest::{
     short_id, AgentSpec, AppManifest, ModelNeed, ModelSpec, ModelTier, ProfileMode, TaskModel, Triggers, KNOWN_CAPABILITIES,
     KNOWN_MODEL_NEEDS, SCHEMA,
 };
-pub use policy::{AgentPolicy, AppPolicy, HostLimits};
+pub use policy::{is_kernel_tool_name, AgentPolicy, AppPolicy, HostLimits, KERNEL_TOOLS};
 pub use research::{crawl_words, search_words, ResearchScope, RESEARCH_CATEGORIES};
 pub use services::{is_host_service, service_words, MATRIX_ACTIONS, OCTOS_SERVICES};
 pub use verify::{admit, admit_digest, bundle_digest, RefuseAllSignatures, SignatureVerifier};
