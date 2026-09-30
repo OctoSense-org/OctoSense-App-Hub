@@ -148,3 +148,11 @@
 - Plan 12 Task 2 verification: all 16 Hub-service tests pass, the nine existing release-transaction tests pass, and service Clippy passes with only pre-existing App Hub dependency lint categories allowed. No catalog was signed or published by the API.
 - Plan 12 Task 2 checkpoint `eeb575a` was pushed. Task 3 began with a failing restart/lease regression. Job leases now persist hashed per-attempt tokens and expire after five minutes; stale workers cannot replace the result. Evidence and status transition to `awaiting_review` or `rejected` are one transaction and repeat completion is idempotent. Three expired attempts move the submission to explicit `failed` (the new crash test caught an early-return rollback, which was fixed). This only verifies the state machine; no trusted validator runner or worker credential exchange is wired yet.
 - Task 3 lease slice verification: all 18 Hub-service tests pass. Service Clippy passes with only the previously recorded lint categories from its unchanged App Hub dependency allowed. No HTTP route exposes the internal lease/result methods.
+
+## 2026-09-30 re-scope
+
+- Plans 06, 11 and 12 were audited against the current mains and removed. The removal took out the `app-runtime` crate, the Card event channel and saved Card state in `CardSession`, and the `hub-service` crate and its API docs.
+- `CardSession` now lowers a Card once, taking the design lowering or the kit lowering for plain L0 cards, for installed hosts, `card-host` and the validator alike.
+- Plan 07 is re-scoped to what main lacks, to be implemented from main.
+- The shell-side consumers of plans 02 and 04 are recorded in those plans.
+

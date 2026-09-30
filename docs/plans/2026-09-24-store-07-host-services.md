@@ -8,9 +8,19 @@
 
 **Tech Stack:** Rust, serde/JSON, the existing Hub policy/client, Makepad/Octoscript where applicable; additional service/storage adapters follow the [shared design](2026-09-24-app-store-design.md).
 
-**Status:** In progress. The existing Splash request bridge is drained by installed/reference hosts; bounded pending replies, timeouts and close cancellation are being added. Storage/network/device conformance and a versioned support matrix remain. **Priority:** P0. **Phase:** B — Application platform. **Relative size:** L (complexity, not a delivery-date estimate).
+**Status:** Re-scoped on 2026-09-30 (see the [roadmap](2026-09-24-app-store-roadmap.md#re-scope-of-2026-09-30)).
 
-**Prerequisites:** [05 — Versioned runtime contracts and release compatibility](2026-09-24-store-05-runtime-compatibility.md); [06 — Card application lifecycle, state and effects](2026-09-24-store-06-card-application-runtime.md)
+**Already on main:** the makepad isolate enforces the closed capability list, exact `network.hosts`, public-https `images`/`web` with SSRF refusal, socket and server refusal, and the storage jail and quota.
+
+**Obsolete:** the `app-runtime` service broker, the `storage.kv` contract, the `splash_host.rs` edit and the OctoSense-mobile paths.
+
+**Remaining, implemented from App Hub main as their own PRs:**
+1. Host requests that always settle. Every request answers or times out, and a pending request is cancelled when its isolate closes. Pending requests, arguments and replies are bounded. Malformed arguments are refused. A service keeps a request alive while it holds a sheet up for the person.
+2. `may_prompt` on `ServiceCall`, taken from the surface: foreground Cards may raise a service sheet; glance tiles and agent tool calls may not. It is not taken from the `prompt` capability.
+3. A capability matrix generated from what each shell registers, so the documentation cannot drift.
+4. Android networking that refuses redirects, like the Apple and Windows backends. **Priority:** P0. **Phase:** B — Application platform. **Relative size:** L (complexity, not a delivery-date estimate).
+
+**Prerequisites:** none on main (it builds on main's isolate policy).
 
 **Review coverage:** R07, R09 in the [roadmap coverage matrix](2026-09-24-app-store-roadmap.md#review-coverage).
 

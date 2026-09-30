@@ -40,8 +40,6 @@ pub struct App {
     #[rust]
     assets: Option<octosense_app_policy::AssetServer>,
     #[rust]
-    session: Option<octosense_app_validator::CardSession>,
-    #[rust]
     app_id: String,
     #[rust]
     host_dir: PathBuf,
@@ -109,17 +107,16 @@ fn policy_for(args: &Args) -> Result<AppPolicy, String> {
 
 /// Open the bundle through the Card session installed hosts use: a script
 /// app runs its own program, a native kit pack takes the measured-design
-/// lowering, and a plain L0 card takes the kit lowering with its host-owned
-/// event channel. Nothing is read from outside the bundle.
+/// lowering, and a plain L0 card takes the kit lowering. Nothing is read from
+/// outside the bundle.
 ///
 /// Nodes get inspectable ids (`beauty_0_1_…`) so `/snap` can name every
 /// node. An L0 card also logs one `card-host: realize {json}` line (see
 /// [`realize_report`]), so a harness reading the log — card-studio does —
 /// gets the lint result, the realize report and each source's `$state`,
 /// whether or not the card then lowers.
-fn open_card(bundle: &Path, asset_origin: &str, storage: Option<(&Path, u64)>)
-    -> Result<octosense_app_validator::CardSession, String> {
-    let session = octosense_app_validator::CardSession::open_inspectable(bundle, asset_origin, storage);
+fn open_card(bundle: &Path, asset_origin: &str) -> Result<octosense_app_validator::CardSession, String> {
+    let session = octosense_app_validator::CardSession::open_inspectable(bundle, asset_origin);
     if bundle.join(octosense_app_policy::SCRIPT_ENTRY).is_file() {
         return session;
     }
@@ -129,10 +126,7 @@ fn open_card(bundle: &Path, asset_origin: &str, storage: Option<(&Path, u64)>)
     octosense_app_policy::rewrite_assets(&mut data, asset_origin);
     let mut report = realize_report(&card, &data);
     match &session {
-        Ok(session) => {
-            let lowering = if session.needs_event_channel() { "l0-kit" } else { "design" };
-            report["lowering"] = serde_json::Value::String(lowering.into());
-        }
+        Ok(session) => report["lowering"] = serde_json::Value::String(session.lowering().name().into()),
         Err(e) => report["lower_error"] = serde_json::Value::String(e.clone()),
     }
     log!("card-host: realize {report}");
@@ -265,18 +259,13 @@ impl App {
         settings.hosts.push(server.allowlist_entry());
         let origin = server.origin().to_string();
         self.assets = Some(server);
-        let state = policy.allows("storage").then(|| octosense_app_validator::state_path(&args.app_data, &policy.app_id));
-        let storage = state.as_deref().map(|path| (path, policy.storage_bytes));
-        let session = match open_card(&args.bundle, &origin, storage) {
+        let session = match open_card(&args.bundle, &origin) {
             Ok(session) => session,
             Err(e) => {
                 error!("card-host: the card did not lower: {e}");
                 return;
             }
         };
-        if session.needs_event_channel() {
-            settings.capabilities.push("agent.notify".into());
-        }
         let splash = self.ui.splash(cx, ids!(card));
         let applied = octosense_app_policy::splash_adapter::apply(&splash, cx, &settings);
         log!(
@@ -301,7 +290,6 @@ impl App {
         }
 
         splash.set_text(cx, &session.source);
-        self.session = Some(session);
     }
 }
 
@@ -329,21 +317,6 @@ impl AppMain for App {
         // Host services (a sheet the service raises, answers from its
         // workers), exactly as the Card runner does.
         let (card, sheet) = (self.ui.splash(cx, ids!(card)), self.ui.splash(cx, ids!(sheet)));
-        if let Event::Actions(actions) = event {
-            for action in actions {
-                if let SplashAction::Notify { event_id, payload } = action.cast() {
-                    let changed = self.session.as_mut().map(|session| session.dispatch_notify(&event_id, &payload));
-                    match changed {
-                        Some(Ok(Some(source))) => card.set_text(cx, &source),
-                        Some(Err(e)) => {
-                            error!("card-host: Card event failed: {e}");
-                            break;
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
         octosense_appstore::services::pump(cx, &self.app_id, &self.host_dir, &card, &sheet);
     }
 }

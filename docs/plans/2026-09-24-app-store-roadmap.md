@@ -6,7 +6,17 @@
 
 **Deliverables:** 26 individual implementation plans, a [shared architecture/execution guide](2026-09-24-app-store-design.md), explicit dependencies, review coverage and stage acceptance gates.
 
-**Status:** Implementation in progress. Plans **01–05 are verified locally** across Hub and the active Home consumer; native/device rollout remains. Plans **06–07 are in progress**: portable Card events, restart snapshots and bounded host requests are implemented, while effects and device conformance remain. Plans 08–26 have not been completed. No deployment is claimed.
+**Status:** Implementation in progress. Plans **01–05 are verified locally** across Hub and the active Home consumer; native/device rollout remains. Plan **07 is re-scoped** (below). Plans 08–10 and 13–26 have not been completed. No deployment is claimed.
+
+## Re-scope of 2026-09-30
+
+Plans 06, 07, 11 and 12 were audited against the mains of App Hub, OctoSense, makepad and OctoScript-App-Design-Flow. Plans 06, 11 and 12 are removed, together with their code on this branch: the `app-runtime` crate, the Card event channel and saved Card state in `CardSession`, and the `hub-service` crate.
+
+- **06 — Card lifecycle, state and effects: removed.** Script apps (`main.splash`, App Hub `b530e64`) became the app shape a day after this plan was written. They have handlers, state, jailed storage and budgets. Main defines a card app as presentation, and the L0 spec treats card state as disposable (`OctoScript docs/ui-profile-l0.md` §5.8/§5.12). What remains of 06 applies to script apps and belongs to 07 (bounded host requests) and 02 (code outside the writable jail).
+- **11 — Publisher accounts** and **12 — Upload and submission API: removed for now.** Main publishes through GitHub submission issues and a maintainer running `hub publish`; ADR 0001 keeps that entry point until after the contest. The service can be re-planned from this branch's history (`0d20d5f`..`c4cc112`) when volume outgrows one maintainer.
+- **07 — Host services: re-scoped** to what main lacks: bounded, surface-aware host requests; a generated capability matrix; Android redirect refusal. The isolate already enforces the capability gate, exact hosts, public-https `images`/`web`, socket refusal and the storage jail.
+
+Plans that list 06, 11 or 12 as a prerequisite (07, 08, 09, 10, 13, 14, 16, 17, 20, 21, 24 and others) must be re-planned against the current mains before work starts.
 
 ## Priority order
 
@@ -21,10 +31,7 @@ P0 = required for a dependable invited free-Card pilot. P1 = required for the br
 | 3 | P0 | [03 — Runnable bundle admission and actionable validation](2026-09-24-store-03-bundle-admission.md) | Do not distribute apps that cannot run. | 01 | M |
 | 4 | P0 | [04 — Atomic catalog publication, renewal and signing operations](2026-09-24-store-04-catalog-release-operations.md) | Keep the store fresh, complete and recoverable. | 01 | M |
 | 5 | P0 | [05 — Versioned runtime contracts and release compatibility](2026-09-24-store-05-runtime-compatibility.md) | Establish compatibility before publishing an SDK contract. | 02 | L |
-| 6 | P0 | [06 — Card application lifecycle, state and effects](2026-09-24-store-06-card-application-runtime.md) | Enable useful apps with logic and durable state. | 03, 05 | L |
-| 7 | P0 | [07 — Host services, capability matrix and structured network policy](2026-09-24-store-07-host-services.md) | Make permissions correspond to tested services. | 05, 06 | L |
-| 8 | P0 | [11 — Publisher authentication, namespace ownership and registry](2026-09-24-store-11-publisher-accounts.md) | Create verified ownership for outside developers. | 01, 05 | L |
-| 9 | P0 | [12 — Immutable artifact upload and submission API](2026-09-24-store-12-submission-api.md) | Create the actual artifact/submission path. | 03, 04, 11 | L |
+| 7 | P0 | [07 — Host services, capability matrix and structured network policy](2026-09-24-store-07-host-services.md) | Make permissions correspond to tested services (re-scoped 2026-09-30). | 05 | M |
 | 10 | P0 | [13 — Review decisions, publisher feedback and abuse handling](2026-09-24-store-13-review-and-moderation.md) | Bind approval to evidence and give publishers feedback. | 03, 11, 12 | L |
 | 11 | P0 | [09 — Installable SDK, pinned runtimes and runnable starters](2026-09-24-store-09-sdk-and-starters.md) | Remove framework setup and provide working examples. | 05, 06, 07 | L |
 | 12 | P0 | [10 — Development loop, signed device preview and editor tooling](2026-09-24-store-10-development-and-testing.md) | Make development, testing and signed device preview simple. | 03, 06, 07, 09 | L |

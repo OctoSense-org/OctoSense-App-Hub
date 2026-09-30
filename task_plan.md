@@ -16,10 +16,10 @@ Goal: implement the reviewed App Hub roadmap in dependency order, prioritizing f
 10. Implement runnable bundle admission (plan 03) — Hub and native validator verified locally, including script apps after the upstream refresh.
 11. Implement catalog release operations (plan 04) — Hub code verified locally; deployment remains unactivated.
 12. Implement runtime compatibility (plan 05) — Hub/shared shell and refreshed Home consumer verified locally: v1/v2 signing fixtures, compatibility selection/reasons, separate reader caches, operator v2 publication and cross-schema publisher continuity. Native device validation and rollout remain.
-13. Implement Card application lifecycle and state (plan 06) — in progress: native L0 event path and same-schema state restart verified; effects, migration and device input remain.
-14. Implement host service contracts (plan 07) — in progress: bounded existing request bridge, timeouts and prompt refusal verified; service and device conformance remain.
-15. Begin publisher identity and submission work (plans 11–13) once the shared foundations are stable — plan 11 in progress: transactional identity/ownership registry, GitHub device adapter, signing-key enrollment and HTTP journeys verified locally; public-provider conformance and submission integration remain.
-16. Implement immutable upload and submission lifecycle (plan 12) — in progress: private upload, signed idempotent submissions and restart-safe validation leases verified; trusted runner, status, review and publication linkage remain.
+13. Card application lifecycle and state (plan 06) — removed 2026-09-30: script apps on main cover it; code and plan deleted.
+14. Host service contracts (plan 07) — re-scoped 2026-09-30 to bounded surface-aware requests, a generated capability matrix and Android redirect refusal, implemented as separate PRs from main.
+15. Publisher identity (plan 11) — removed 2026-09-30: main uses GitHub submission issues; recoverable from history `0d20d5f`..`c4cc112`.
+16. Upload and submission lifecycle (plan 12) — removed 2026-09-30 with plan 11.
 17. Continue remaining plans in dependency order — pending.
 
 Implementation worktree: `/Users/guofoo/git/octosense/app-hub-store-work`, branch `feat/app-store-foundations`.
