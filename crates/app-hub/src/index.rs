@@ -113,8 +113,17 @@ impl Entry {
             });
         }
         if let Some(agent) = &self.manifest.agent {
-            let tools = if agent.tools.is_empty() { "no tools".to_string() } else { agent.tools.join(", ") };
+            let host_tools: Vec<&str> =
+                agent.tools.iter().map(String::as_str).filter(|t| octosense_app_policy::kernel_tool_words(t).is_none()).collect();
+            let tools = if host_tools.is_empty() { "no tools".to_string() } else { host_tools.join(", ") };
             lines.push(format!("Run an assistant for this app ({tools}), inside this app's own data only"));
+            // The kernel tools it keeps, in plain words ("Ask you
+            // questions"), once even when `prompt` says the same.
+            for words in agent.tools.iter().filter_map(|t| octosense_app_policy::kernel_tool_words(t)) {
+                if !lines.iter().any(|l| l == words) {
+                    lines.push(words.to_string());
+                }
+            }
         }
         lines.extend(octosense_app_policy::agent_permission_lines(&self.manifest, &self.tools));
         if lines.is_empty() {
@@ -237,6 +246,7 @@ mod tests {
             assert_ne!(line, &format!("Use {capability}"), "{capability} has no plain-words line");
         }
         assert!(lines.contains(&"Search news in English and Chinese, from the last 7 days".to_string()), "{lines:?}");
+        assert!(lines.contains(&"Ask you questions".to_string()), "prompt: {lines:?}");
         assert!(
             lines.contains(
                 &"Crawl websites, following links up to 2 deep and reading up to 20 pages a crawl, on any site, which reaches more than searching"
@@ -244,5 +254,36 @@ mod tests {
             ),
             "{lines:?}"
         );
+    }
+
+    /// An agent that keeps `ask_user_question` is told as asking you
+    /// questions (once, even with `prompt`), not by the tool's name.
+    #[test]
+    fn an_agent_that_asks_questions_is_told_so() {
+        let entry = |capabilities: serde_json::Value| Entry {
+            artifact: String::new(),
+            manifest: AppManifest::parse(
+                &serde_json::json!({
+                    "schema": 1, "id": "dev.example.app", "version": "1", "name": "App",
+                    "integrity": {"bundle_blake3": ""}, "capabilities": capabilities,
+                    "agent": {"profile": "read-only", "tools": ["ask_user_question"]}
+                })
+                .to_string(),
+            )
+            .unwrap(),
+            listing: None,
+            tools: Vec::new(),
+            publisher: String::new(),
+            publisher_key: String::new(),
+            source: Source { repository: String::new(), commit: String::new() },
+            status: Status::Offered,
+            admitted: String::new(),
+        };
+        let lines = entry(serde_json::json!([])).permissions_summary();
+        assert!(lines.contains(&"Run an assistant for this app (no tools), inside this app's own data only".to_string()), "{lines:?}");
+        assert!(lines.contains(&"Ask you questions".to_string()), "{lines:?}");
+        assert!(!lines.iter().any(|l| l.contains("ask_user_question")), "{lines:?}");
+        let lines = entry(serde_json::json!(["prompt"])).permissions_summary();
+        assert_eq!(lines.iter().filter(|l| *l == "Ask you questions").count(), 1, "{lines:?}");
     }
 }

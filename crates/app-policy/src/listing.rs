@@ -134,6 +134,16 @@ impl Listing {
     }
 }
 
+/// What an octos kernel tool a contained agent may keep
+/// ([`crate::policy::KERNEL_TOOLS`]) lets it do, in the store's plain words
+/// (`None`: not such a tool).
+pub fn kernel_tool_words(tool: &str) -> Option<&'static str> {
+    match tool {
+        "ask_user_question" => Some("Ask you questions"),
+        _ => None,
+    }
+}
+
 /// The privacy summary a store shows, derived from the manifest rather than
 /// written by the publisher: the app cannot understate what it does.
 pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
@@ -206,10 +216,16 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
         lines.push("Opens or reads its own conversations with the device's assistant, but cannot ask it to work.".to_string());
     }
     match &manifest.agent {
-        Some(agent) => lines.push(format!(
-            "Runs an assistant limited to this app's own data{}.",
-            if agent.tools.is_empty() { String::new() } else { format!(" with {}", agent.tools.join(", ")) }
-        )),
+        Some(agent) => {
+            let host_tools: Vec<&str> = agent.tools.iter().map(String::as_str).filter(|t| kernel_tool_words(t).is_none()).collect();
+            lines.push(format!(
+                "Runs an assistant limited to this app's own data{}.",
+                if host_tools.is_empty() { String::new() } else { format!(" with {}", host_tools.join(", ")) }
+            ));
+            for words in agent.tools.iter().filter_map(|t| kernel_tool_words(t)) {
+                lines.push(format!("Its assistant may {}.", words.to_lowercase()));
+            }
+        }
         None => lines.push("Runs no assistant.".to_string()),
     }
     if manifest.agent.as_ref().and_then(|a| a.model.as_ref()).is_some_and(|m| m.local_only) {

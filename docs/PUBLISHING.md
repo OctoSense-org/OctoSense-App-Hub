@@ -280,7 +280,12 @@ Ids under `os.` are reserved for system apps.
 of `read-only`, `workspace-write`, `workspace-write-never-ask`. Full access does
 not exist in this schema; do not add it. `tools` may name only what the host
 offers contained apps: `ledger.read`, `ledger.write`, `net.fetch`,
-`storage.read`, `storage.write`, `card.render`. Iterations clamp to 8, tokens
+`storage.read`, `storage.write`, `card.render`, and one octos kernel tool,
+`ask_user_question` (the agent asks the person a question on the device's own
+surfaces; it has no side effect of its own; the store says "Ask you
+questions"). No other kernel tool (shell, files, the web, memory, peers) may
+be named, whatever a host offers (`KERNEL_TOOLS` in
+`crates/app-policy/src/policy.rs`). Iterations clamp to 8, tokens
 to 200 000. The agent's workspace is the app's own storage jail and its hosts are
 the app's hosts; it cannot be given more than the app. The agent's own
 tools, instructions, skills, model requirements and triggers are below.

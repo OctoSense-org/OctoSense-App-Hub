@@ -166,7 +166,38 @@ fn full_access_is_not_expressible_in_a_manifest() {
 #[test]
 fn an_agent_may_only_use_tools_the_host_offers_contained_apps() {
     let err = resolve(r#""agent":{"profile":"read-only","tools":["shell"]}"#).unwrap_err();
+    assert!(err.contains("may keep only ask_user_question"), "{err}");
+    let err = resolve(r#""agent":{"profile":"read-only","tools":["mail.send"]}"#).unwrap_err();
     assert!(err.contains("does not offer contained apps"), "{err}");
+}
+
+/// Of the octos kernel's own tools, a contained app's agent may keep only
+/// `ask_user_question` (a question to the person, no side effect). Every
+/// other kernel tool is refused, even by a host that lists it.
+#[test]
+fn an_agent_may_keep_ask_user_question_and_no_other_kernel_tool() {
+    assert_eq!(KERNEL_TOOLS, ["ask_user_question"]);
+    let policy = resolve(r#""agent":{"profile":"read-only","tools":["ask_user_question","net.fetch"]}"#).unwrap();
+    assert_eq!(policy.agent.unwrap().tools.into_iter().collect::<Vec<_>>(), ["ask_user_question", "net.fetch"]);
+    let generous = HostLimits {
+        offered_tools: ["ask_user_question", "shell", "read_file", "web_fetch", "peer_send_input", "spawn", "save_memory"].iter().map(|s| s.to_string()).collect(),
+        ..open_limits()
+    };
+    for tool in ["shell", "read_file", "web_fetch", "peer_send_input", "spawn", "save_memory", "ask_user_questions", "Ask_user_question"] {
+        let body = format!(r#""agent":{{"profile":"read-only","tools":["{tool}"]}}"#);
+        let err = admit_and_resolve(&manifest_with(&body), BUNDLE, &generous, &RefuseAllSignatures).unwrap_err();
+        assert!(err.contains("may keep only ask_user_question"), "{tool}: {err}");
+    }
+    // A system app's ceilings offer it too.
+    let system = HostLimits::system();
+    assert!(system.offered_tools.iter().any(|t| t == "ask_user_question"));
+    let body = r#""agent":{"profile":"read-only","tools":["ask_user_question"]}"#;
+    assert!(admit_and_resolve(&manifest_with(body), BUNDLE, &system, &RefuseAllSignatures).is_ok());
+    // The store says it in plain words.
+    let manifest = AppManifest::parse(&manifest_with(body)).unwrap();
+    let lines = privacy_summary(&manifest);
+    assert!(lines.contains(&"Its assistant may ask you questions.".to_string()), "{lines:?}");
+    assert!(lines.contains(&"Runs an assistant limited to this app's own data.".to_string()), "{lines:?}");
 }
 
 #[test]

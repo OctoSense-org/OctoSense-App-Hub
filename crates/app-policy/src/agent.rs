@@ -571,6 +571,17 @@ impl AgentBundle {
         Ok(review.bundle)
     }
 
+    /// The octos kernel tools its agent keeps: the plain names of
+    /// `agent.tools`, only ever [`crate::policy::KERNEL_TOOLS`] (the review
+    /// refuses any other). A shell hands exactly these to the app's peer.
+    pub fn kernel_tools(&self) -> Vec<String> {
+        self.generic_tools
+            .iter()
+            .filter(|t| crate::policy::is_kernel_tool_name(t) && crate::policy::KERNEL_TOOLS.contains(&t.as_str()))
+            .cloned()
+            .collect()
+    }
+
     /// Every tool the agent may call: its app's own, then the generic ones.
     pub fn tool_names(&self) -> Vec<String> {
         self.tools.iter().map(|t| t.name.clone()).chain(self.generic_tools.iter().cloned()).collect()
@@ -705,6 +716,19 @@ pub fn review(bundle: &Path, manifest: &AppManifest) -> Review {
 
     // ---- the agent as a whole --------------------------------------------------
     if let Some(spec) = spec {
+        // Of the kernel's own tools a contained agent keeps only
+        // `ask_user_question` (a question to the person, no side effect).
+        for tool in spec.tools.iter().filter(|t| crate::policy::is_kernel_tool_name(t)) {
+            if !crate::policy::KERNEL_TOOLS.contains(&tool.as_str()) {
+                issues.push(Issue::refuse(
+                    "agent",
+                    format!(
+                        "agent.tools names the octos kernel tool {tool:?}; a contained app's agent may keep only {}",
+                        crate::policy::KERNEL_TOOLS.join(", ")
+                    ),
+                ));
+            }
+        }
         if spec.background && tools.iter().any(|t| t.risk == Risk::Destructive) {
             issues.push(Issue::warn(
                 "agent",
