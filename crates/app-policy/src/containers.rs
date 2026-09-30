@@ -21,7 +21,10 @@ pub struct IsolateSettings {
     pub allow_net: bool,
     /// Whole-jail ceiling in bytes.
     pub storage_quota: u64,
-    /// May this isolate raise a prompt.
+    /// May this isolate's surface raise a prompt: a service's sheet over the
+    /// app. The surface decides, not the manifest: true for an app in the
+    /// foreground, which is what these settings describe; a host running the
+    /// app in the background (a home-screen tile) sets it false.
     pub host_prompts: bool,
     /// Cumulative script instructions for the app's session.
     pub instruction_budget: u64,
@@ -74,7 +77,7 @@ impl AppPolicy {
             // not handed over at all: less surface, same behaviour.
             allow_net: self.allows("net") && !self.hosts.is_empty(),
             storage_quota: self.storage_bytes,
-            host_prompts: self.may_prompt,
+            host_prompts: true,
             instruction_budget: self.instruction_budget,
             memory_bytes: self.memory_bytes,
             jail_root: self.jail_root(app_data_root),

@@ -143,7 +143,7 @@ they install.
 | --- | --- | --- |
 | `storage` | Read and write inside the app's own storage jail. | Keep its own data on this device |
 | `net` | Requests to the hosts in `network.hosts`, and no others. | Reach only: *hosts* |
-| `prompt` | Raise a prompt the person answers. | Ask you questions |
+| `prompt` | Ask the person questions of its own. A service's sheet (Mail's sign-in) does not need it. | Ask you questions |
 | `ledger.read` | Read the shared ledger; writing is always the app's own rows. | Read your shared data |
 | `location` | The device's location. | Use your location |
 | `camera` | The camera. | Use the camera |
@@ -562,6 +562,27 @@ requests `mail`, and its
 [host service](https://github.com/OctoSense-org/OctoSense/tree/main/apps/mail/host-service)
 signs in on its own sheet. A store app can request `mail` only where the
 shell links a mail service.
+
+**Every request settles.** A call answers exactly once, with the service's
+data or an error the app can act on:
+
+- **Timeouts.** A call that waits longer than its service allows (60 seconds
+  unless the service asks for more) answers `the host service timed out`. The
+  clock stops while the service's sheet is up, because the person is still
+  typing, and it starts again when the sheet closes.
+- **Limits.** At most 32 calls from one app wait at a time. Further calls
+  answer `too many host requests are waiting` until some have answered.
+- **Sizes.** Arguments over 1 MiB are refused, and so is arguments text that
+  is not valid JSON. An answer over 4 MiB becomes an error.
+- **Closing.** When the app closes, its waiting calls end with it, and no late
+  answer reaches the next copy of the app.
+
+**The surface decides whether a sheet may appear.** An app in the foreground
+may have a service raise a sheet over it. The same app shown as a home-screen
+tile, or a call an assistant makes as a tool, may not: the service is told
+(`may_prompt` is false), and a sheet it raises anyway is refused with
+`this surface cannot raise a prompt; open the app to continue`. This does not
+depend on the `prompt` capability, which is about the app's own questions.
 
 ## Commands
 

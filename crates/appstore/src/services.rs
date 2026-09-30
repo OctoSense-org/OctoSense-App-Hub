@@ -24,11 +24,40 @@
 //! Answers can come later, from a worker thread: [`Replier::send`] queues the
 //! result and wakes the UI, and the runner delivers it to the isolate that
 //! asked on its next event.
+//!
+//! **Every request settles.** Each one answers exactly once: with the
+//! service's reply, or with an error when it waited longer than its service
+//! allows ([`DEFAULT_TIMEOUT`], or [`HostService::timeout`]). A request whose
+//! service raised a sheet waits for the person instead, and its clock starts
+//! again when the sheet closes. A host drops an isolate's requests and
+//! answers when the isolate closes ([`cancel_heap`]), so nothing reaches a
+//! replacement. The requests waiting, their arguments and their answers are
+//! bounded, and malformed arguments are refused rather than read as `null`.
+//!
+//! **The surface decides about sheets.** Every call carries `may_prompt`,
+//! the isolate's surface permission: an app in the foreground may have a
+//! service raise a sheet over it; a home-screen tile or an agent's tool call
+//! may not, and a service that tries is answered with a refusal.
 use makepad_widgets::makepad_platform::SignalToUI;
 use makepad_widgets::{Cx, SplashRef};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
+/// How long a request may wait for its service, unless the service says
+/// otherwise ([`HostService::timeout`]).
+pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
+/// Requests one isolate may have waiting at once, and all isolates together.
+pub const MAX_PENDING_PER_ISOLATE: usize = 32;
+pub const MAX_PENDING: usize = 256;
+/// The largest arguments a request carries, and the largest answer.
+pub const MAX_ARGS_BYTES: usize = 1 << 20;
+pub const MAX_REPLY_BYTES: usize = 4 << 20;
+/// An answer nobody takes (its isolate went away without closing) is dropped
+/// after this long.
+pub const REPLY_TTL: Duration = Duration::from_secs(120);
 
 /// One request from an app (or from a service's sheet over it).
 #[derive(Clone, Debug)]
@@ -41,6 +70,11 @@ pub struct ServiceCall {
     /// It came from the service's own sheet, which the person typed into,
     /// not from the app.
     pub from_sheet: bool,
+    /// May the service raise a sheet for this call: true for an app in the
+    /// foreground, false for a background surface (a home-screen tile, an
+    /// agent's tool call). A service that needs the person should refuse
+    /// early without it; a sheet raised anyway is refused for it.
+    pub may_prompt: bool,
     /// A directory only the host can reach, for the service's own state
     /// (accounts, secrets, caches): outside every app's jail.
     pub host_dir: PathBuf,
@@ -60,14 +94,151 @@ pub struct Replier {
     req_id: u64,
 }
 
-static REPLIES: Mutex<Vec<(usize, u64, Result<String, String>)>> = Mutex::new(Vec::new());
+/// An answer waiting for its isolate: heap, request, result, and when it
+/// was queued.
+type QueuedReply = (usize, u64, Result<String, String>, Instant);
+
+static REPLIES: Mutex<Vec<QueuedReply>> = Mutex::new(Vec::new());
+
+/// A request its service has not answered yet.
+struct Pending {
+    app_id: String,
+    timeout: Duration,
+    /// None while a sheet the service raised for it is up.
+    deadline: Option<Instant>,
+}
+
+static PENDING: Mutex<Option<HashMap<(usize, u64), Pending>>> = Mutex::new(None);
+
+fn with_pending<R>(f: impl FnOnce(&mut HashMap<(usize, u64), Pending>) -> R) -> R {
+    f(PENDING.lock().unwrap().get_or_insert_with(HashMap::new))
+}
+
+fn queue_reply(heap_key: usize, req_id: u64, result: Result<String, String>) {
+    REPLIES.lock().unwrap().push((heap_key, req_id, result, Instant::now()));
+    SignalToUI::set_ui_signal();
+}
 
 impl Replier {
+    /// Answer the request. An answer after the request timed out, or after
+    /// its isolate closed, or a second answer, goes nowhere.
     pub fn send(self, result: Result<Value, String>) {
-        let result = result.map(|value| value.to_string());
-        REPLIES.lock().unwrap().push((self.heap_key, self.req_id, result));
-        SignalToUI::set_ui_signal();
+        if with_pending(|pending| pending.remove(&(self.heap_key, self.req_id))).is_none() {
+            return;
+        }
+        let result = result.map(|value| value.to_string()).and_then(|json| {
+            if json.len() > MAX_REPLY_BYTES {
+                Err(format!("the service's answer exceeds {} MiB", MAX_REPLY_BYTES >> 20))
+            } else {
+                Ok(json)
+            }
+        });
+        queue_reply(self.heap_key, self.req_id, result);
     }
+}
+
+/// Start waiting for one request's answer, or refuse it when too many wait.
+fn track(heap_key: usize, req_id: u64, app_id: &str, timeout: Duration) -> Result<(), String> {
+    start_sweeper();
+    with_pending(|pending| {
+        let mine = pending.keys().filter(|(heap, _)| *heap == heap_key).count();
+        if mine >= MAX_PENDING_PER_ISOLATE || pending.len() >= MAX_PENDING {
+            return Err("too many host requests are waiting; try again when some have answered".into());
+        }
+        let deadline = Some(Instant::now() + timeout);
+        pending.insert((heap_key, req_id), Pending { app_id: app_id.to_string(), timeout, deadline });
+        Ok(())
+    })
+}
+
+/// Answer, with a timeout, every request of the matching isolates whose
+/// deadline passed by `now`.
+fn expire_pending(now: Instant, heaps: impl Fn(usize) -> bool) {
+    let expired: Vec<(usize, u64)> = with_pending(|pending| {
+        let keys: Vec<_> = pending
+            .iter()
+            .filter(|((heap, _), entry)| heaps(*heap) && entry.deadline.is_some_and(|deadline| deadline <= now))
+            .map(|(key, _)| *key)
+            .collect();
+        for key in &keys {
+            pending.remove(key);
+        }
+        keys
+    });
+    for (heap_key, req_id) in expired {
+        queue_reply(heap_key, req_id, Err("the host service timed out".into()));
+    }
+}
+
+/// Drop answers of the matching isolates that nobody took within [`REPLY_TTL`].
+fn purge_replies(now: Instant, heaps: impl Fn(usize) -> bool) {
+    REPLIES.lock().unwrap().retain(|(heap, _, _, queued)| !(heaps(*heap) && now.duration_since(*queued) > REPLY_TTL));
+}
+
+/// A sheet is up for this request: it waits for the person, not the clock.
+/// A sheet it replaced no longer holds its own request.
+fn hold_for_sheet(heap_key: usize, req_id: u64, app_id: &str) {
+    let now = Instant::now();
+    with_pending(|pending| {
+        for (key, entry) in pending.iter_mut() {
+            if entry.app_id == app_id && entry.deadline.is_none() && *key != (heap_key, req_id) {
+                entry.deadline = Some(now + entry.timeout);
+            }
+        }
+        if let Some(entry) = pending.get_mut(&(heap_key, req_id)) {
+            entry.deadline = None;
+        }
+    });
+}
+
+/// The sheet over `app_id` closed: its requests wait on the clock again.
+fn resume_after_sheet(app_id: &str, now: Instant) {
+    with_pending(|pending| {
+        for entry in pending.values_mut() {
+            if entry.app_id == app_id && entry.deadline.is_none() {
+                entry.deadline = Some(now + entry.timeout);
+            }
+        }
+    });
+}
+
+/// Time requests out while no event arrives. Without threads (the web), the
+/// hosts' pumps do it on their next event.
+fn start_sweeper() {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        static STARTED: std::sync::Once = std::sync::Once::new();
+        STARTED.call_once(|| {
+            let spawned = std::thread::Builder::new().name("host-requests".into()).spawn(|| loop {
+                std::thread::sleep(Duration::from_millis(250));
+                let now = Instant::now();
+                expire_pending(now, |_| true);
+                purge_replies(now, |_| true);
+            });
+            if let Err(e) = spawned {
+                makepad_widgets::error!("host services: cannot start the request timer: {e}");
+            }
+        });
+    }
+}
+
+/// Forget an isolate that is closing: its waiting requests and its queued
+/// answers. A late answer for it goes nowhere, and never to a replacement.
+pub fn cancel_heap(heap_key: usize) {
+    with_pending(|pending| pending.retain(|(heap, _), _| *heap != heap_key));
+    REPLIES.lock().unwrap().retain(|(heap, _, _, _)| *heap != heap_key);
+}
+
+/// A request's arguments, or why it is refused before any service sees it.
+fn request_args(service: &str, args_json: &str) -> Result<Value, String> {
+    let named = service.len() <= 256 && service.split_once('.').is_some_and(|(family, method)| !family.is_empty() && !method.is_empty());
+    if !named {
+        return Err(format!("{service:?} is not a family.method service name"));
+    }
+    if args_json.len() > MAX_ARGS_BYTES {
+        return Err(format!("the request's arguments exceed {} MiB", MAX_ARGS_BYTES >> 20));
+    }
+    serde_json::from_str(args_json).map_err(|e| format!("the request's arguments are not valid JSON: {e}"))
 }
 
 /// What a service may ask of the runner that called it.
@@ -81,6 +252,11 @@ pub trait ServiceHost {
 pub trait HostService: Send {
     /// The capability family this service answers: `mail`.
     fn family(&self) -> &'static str;
+    /// How long a call may wait for its answer. A sheet the service raises
+    /// holds its call open, whatever this says.
+    fn timeout(&self, _call: &ServiceCall) -> Duration {
+        DEFAULT_TIMEOUT
+    }
     fn call(&mut self, call: ServiceCall, reply: Replier, host: &mut dyn ServiceHost);
 }
 
@@ -100,19 +276,27 @@ pub fn has_service(family: &str) -> bool {
 }
 
 /// Hand one request to the service for its family. No service: the app hears
-/// so, rather than waiting forever.
+/// so, rather than waiting forever; a service that never answers times out.
 pub fn dispatch(call: ServiceCall, heap_key: usize, req_id: u64, host: &mut dyn ServiceHost) {
-    let reply = Replier { heap_key, req_id };
     let family = call.service.split('.').next().unwrap_or("").to_string();
+    let mut services = SERVICES.lock().unwrap();
+    let service = services.iter().position(|s| s.family() == family);
+    let timeout = service.map(|i| services[i].timeout(&call)).unwrap_or(DEFAULT_TIMEOUT);
+    if let Err(refusal) = track(heap_key, req_id, &call.app_id, timeout) {
+        drop(services);
+        queue_reply(heap_key, req_id, Err(refusal));
+        return;
+    }
+    let reply = Replier { heap_key, req_id };
     // What the person types on a sheet reaches only the sheet's methods,
     // whatever the service does: an app calling one is refused here.
     if call.method().starts_with("sheet.") && !call.from_sheet {
+        drop(services);
         reply.send(Err(format!("{} is for the host's sheet, not an app", call.service)));
         return;
     }
-    let mut services = SERVICES.lock().unwrap();
-    match services.iter_mut().find(|s| s.family() == family) {
-        Some(service) => service.call(call, reply, host),
+    match service {
+        Some(i) => services[i].call(call, reply, host),
         None => {
             drop(services);
             reply.send(Err(format!("no service answers {family:?} on this device")));
@@ -123,22 +307,33 @@ pub fn dispatch(call: ServiceCall, heap_key: usize, req_id: u64, host: &mut dyn 
 /// The answers ready for these isolates, taken off the queue.
 pub fn take_replies_for(heap_keys: &[usize]) -> Vec<(usize, u64, Result<String, String>)> {
     let mut replies = REPLIES.lock().unwrap();
-    let (mine, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut *replies).into_iter().partition(|(heap, _, _)| heap_keys.contains(heap));
+    let (mine, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut *replies).into_iter().partition(|(heap, _, _, _)| heap_keys.contains(heap));
     *replies = rest;
-    mine
+    mine.into_iter().map(|(heap, req_id, result, _)| (heap, req_id, result)).collect()
 }
 
-/// The sheet changes a service asked for during one dispatch, applied after.
-#[derive(Default)]
+/// The sheet changes a service asked for during one dispatch, applied after,
+/// for the request being dispatched.
 struct SheetOps {
     change: Option<Option<String>>,
+    app_id: String,
+    heap_key: usize,
+    req_id: u64,
+    may_prompt: bool,
 }
 
 impl ServiceHost for SheetOps {
     fn open_sheet(&mut self, body: String) {
+        if !self.may_prompt {
+            Replier { heap_key: self.heap_key, req_id: self.req_id }
+                .send(Err("this surface cannot raise a prompt; open the app to continue".into()));
+            return;
+        }
+        hold_for_sheet(self.heap_key, self.req_id, &self.app_id);
         self.change = Some(Some(body));
     }
     fn close_sheet(&mut self) {
+        resume_after_sheet(&self.app_id, Instant::now());
         self.change = Some(None);
     }
 }
@@ -151,6 +346,7 @@ static PENDING_CLOSE: Mutex<Vec<String>> = Mutex::new(Vec::new());
 /// Close the sheet over `app_id`, from a service's worker (a sign-in that
 /// finished).
 pub fn close_sheet_later(app_id: &str) {
+    resume_after_sheet(app_id, Instant::now());
     PENDING_CLOSE.lock().unwrap().push(app_id.to_string());
     SignalToUI::set_ui_signal();
 }
@@ -203,15 +399,35 @@ pub fn pump(cx: &mut Cx, app_id: &str, host_dir: &std::path::Path, card: &Splash
     if heaps.is_empty() {
         return;
     }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let now = Instant::now();
+        expire_pending(now, |_| true);
+        purge_replies(now, |_| true);
+    }
     for request in makepad_widgets::splash_host::take_splash_host_requests_for(&heaps) {
+        let args = match request_args(&request.service, &request.args_json) {
+            Ok(args) => args,
+            Err(refusal) => {
+                queue_reply(request.heap_key, request.req_id, Err(refusal));
+                continue;
+            }
+        };
         let call = ServiceCall {
             app_id: app_id.to_string(),
             service: request.service.clone(),
-            args: serde_json::from_str(&request.args_json).unwrap_or(Value::Null),
+            args,
             from_sheet: Some(request.heap_key) == sheet_heap,
+            may_prompt: request.may_prompt,
             host_dir: host_dir.to_path_buf(),
         };
-        let mut ops = SheetOps::default();
+        let mut ops = SheetOps {
+            change: None,
+            app_id: app_id.to_string(),
+            heap_key: request.heap_key,
+            req_id: request.req_id,
+            may_prompt: request.may_prompt,
+        };
         dispatch(call, request.heap_key, request.req_id, &mut ops);
         if let Some(change) = ops.change {
             apply_sheet(cx, sheet, change);
@@ -238,6 +454,7 @@ pub fn pump(cx: &mut Cx, app_id: &str, host_dir: &std::path::Path, card: &Splash
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
 
     struct Echo;
     impl HostService for Echo {
@@ -266,7 +483,50 @@ mod tests {
     }
 
     fn call(service: &str) -> ServiceCall {
-        ServiceCall { app_id: "os.demo".into(), service: service.into(), args: Value::Null, from_sheet: false, host_dir: std::env::temp_dir() }
+        ServiceCall {
+            app_id: "os.demo".into(),
+            service: service.into(),
+            args: Value::Null,
+            from_sheet: false,
+            may_prompt: true,
+            host_dir: std::env::temp_dir(),
+        }
+    }
+
+    /// Answers later, or never: the service keeps each request's replier.
+    struct Holds {
+        family: &'static str,
+        timeout: Option<Duration>,
+        sheet: bool,
+        held: Arc<Mutex<Vec<Replier>>>,
+    }
+    impl HostService for Holds {
+        fn family(&self) -> &'static str {
+            self.family
+        }
+        fn timeout(&self, _call: &ServiceCall) -> Duration {
+            self.timeout.unwrap_or(DEFAULT_TIMEOUT)
+        }
+        fn call(&mut self, _call: ServiceCall, reply: Replier, host: &mut dyn ServiceHost) {
+            if self.sheet {
+                host.open_sheet("Label{text: \"sign in\"}".into());
+            }
+            self.held.lock().unwrap().push(reply);
+        }
+    }
+
+    fn holds(family: &'static str, timeout: Option<Duration>, sheet: bool) -> Arc<Mutex<Vec<Replier>>> {
+        let held = Arc::new(Mutex::new(Vec::new()));
+        register_host_service(Box::new(Holds { family, timeout, sheet, held: held.clone() }));
+        held
+    }
+
+    fn sheet_ops(app_id: &str, heap_key: usize, req_id: u64, may_prompt: bool) -> SheetOps {
+        SheetOps { change: None, app_id: app_id.into(), heap_key, req_id, may_prompt }
+    }
+
+    fn later(by: Duration) -> Instant {
+        Instant::now() + by
     }
 
     #[test]
@@ -294,5 +554,116 @@ mod tests {
         from_sheet.from_sheet = true;
         dispatch(from_sheet, 7012, 1, &mut host);
         assert!(take_replies_for(&[7012])[0].2.as_ref().unwrap().contains("\"sheet\":true"));
+    }
+
+
+    #[test]
+    fn a_request_nobody_answers_times_out() {
+        let _held = holds("quiet", None, false);
+        dispatch(call("quiet.read"), 7101, 1, &mut Host::default());
+        assert!(take_replies_for(&[7101]).is_empty(), "still waiting");
+        expire_pending(later(DEFAULT_TIMEOUT + Duration::from_secs(1)), |h| h == 7101);
+        let answer = take_replies_for(&[7101]);
+        assert_eq!(answer.len(), 1);
+        assert!(answer[0].2.as_ref().unwrap_err().contains("timed out"), "{answer:?}");
+    }
+
+    #[test]
+    fn an_answer_after_the_timeout_is_dropped() {
+        let held = holds("late", None, false);
+        dispatch(call("late.read"), 7102, 1, &mut Host::default());
+        expire_pending(later(DEFAULT_TIMEOUT + Duration::from_secs(1)), |h| h == 7102);
+        assert_eq!(take_replies_for(&[7102]).len(), 1, "the timeout");
+        held.lock().unwrap().pop().unwrap().send(Ok(Value::Null));
+        assert!(take_replies_for(&[7102]).is_empty(), "one answer per request");
+    }
+
+    #[test]
+    fn a_service_may_ask_for_more_time() {
+        let _held = holds("slow", Some(Duration::from_secs(300)), false);
+        dispatch(call("slow.think"), 7103, 1, &mut Host::default());
+        expire_pending(later(DEFAULT_TIMEOUT + Duration::from_secs(1)), |h| h == 7103);
+        assert!(take_replies_for(&[7103]).is_empty(), "within the service's own time");
+        expire_pending(later(Duration::from_secs(301)), |h| h == 7103);
+        assert!(take_replies_for(&[7103])[0].2.as_ref().unwrap_err().contains("timed out"));
+    }
+
+    #[test]
+    fn closing_an_isolate_drops_its_requests_and_its_answers() {
+        let held = holds("closing", None, false);
+        dispatch(call("closing.read"), 7104, 1, &mut Host::default());
+        dispatch(call("closing.read"), 7104, 2, &mut Host::default());
+        held.lock().unwrap().pop().unwrap().send(Ok(Value::Null)); // answered, not yet taken
+        cancel_heap(7104);
+        assert!(take_replies_for(&[7104]).is_empty(), "a queued answer goes with the isolate");
+        held.lock().unwrap().pop().unwrap().send(Ok(Value::Null));
+        expire_pending(later(DEFAULT_TIMEOUT + Duration::from_secs(1)), |h| h == 7104);
+        assert!(take_replies_for(&[7104]).is_empty(), "nothing reaches a replacement isolate");
+    }
+
+    #[test]
+    fn a_background_surface_cannot_raise_a_sheet() {
+        let _held = holds("signin_bg", None, true);
+        let mut ops = sheet_ops("os.demo", 7105, 1, false);
+        let mut background = call("signin_bg.add");
+        background.may_prompt = false;
+        dispatch(background, 7105, 1, &mut ops);
+        assert!(ops.change.is_none(), "no sheet over a tile");
+        let answer = take_replies_for(&[7105]);
+        assert_eq!(answer.len(), 1);
+        assert!(answer[0].2.as_ref().unwrap_err().contains("cannot raise a prompt"), "{answer:?}");
+    }
+
+    #[test]
+    fn a_sheet_holds_its_request_open_until_it_closes() {
+        let _held = holds("signin_fg", None, true);
+        let mut ops = sheet_ops("os.sheet-holder", 7106, 1, true);
+        let mut foreground = call("signin_fg.add");
+        foreground.app_id = "os.sheet-holder".into();
+        dispatch(foreground, 7106, 1, &mut ops);
+        assert!(matches!(ops.change, Some(Some(_))), "the sheet is up");
+        expire_pending(later(Duration::from_secs(3600)), |h| h == 7106);
+        assert!(take_replies_for(&[7106]).is_empty(), "the person is still typing");
+        ops.close_sheet();
+        expire_pending(later(DEFAULT_TIMEOUT + Duration::from_secs(1)), |h| h == 7106);
+        assert!(take_replies_for(&[7106])[0].2.as_ref().unwrap_err().contains("timed out"), "a closed sheet restarts the clock");
+    }
+
+    #[test]
+    fn one_isolate_cannot_queue_unbounded_requests() {
+        let _held = holds("flood", None, false);
+        for req in 0..MAX_PENDING_PER_ISOLATE as u64 {
+            dispatch(call("flood.read"), 7107, req, &mut Host::default());
+        }
+        assert!(take_replies_for(&[7107]).is_empty());
+        dispatch(call("flood.read"), 7107, 999, &mut Host::default());
+        let refused = take_replies_for(&[7107]);
+        assert_eq!(refused.len(), 1);
+        assert!(refused[0].2.as_ref().unwrap_err().contains("too many"), "{refused:?}");
+        cancel_heap(7107);
+    }
+
+    #[test]
+    fn malformed_or_oversized_arguments_are_refused_not_passed_on_as_null() {
+        assert!(request_args("mail.list", "{").unwrap_err().contains("not valid JSON"));
+        assert!(request_args("mail.list", &format!("\"{}\"", "x".repeat(MAX_ARGS_BYTES))).unwrap_err().contains("1 MiB"));
+        assert!(request_args("mail", "{}").unwrap_err().contains("family.method"));
+        assert_eq!(request_args("mail.list", "null").unwrap(), Value::Null);
+    }
+
+    #[test]
+    fn an_oversized_answer_becomes_an_error() {
+        let held = holds("big", None, false);
+        dispatch(call("big.read"), 7108, 1, &mut Host::default());
+        held.lock().unwrap().pop().unwrap().send(Ok(Value::String("x".repeat(MAX_REPLY_BYTES))));
+        assert!(take_replies_for(&[7108])[0].2.as_ref().unwrap_err().contains("4 MiB"));
+    }
+
+    #[test]
+    fn answers_nobody_collects_expire() {
+        register_host_service(Box::new(Echo));
+        dispatch(call("echo.read"), 7109, 1, &mut Host::default());
+        purge_replies(later(REPLY_TTL + Duration::from_secs(1)), |h| h == 7109);
+        assert!(take_replies_for(&[7109]).is_empty(), "an isolate that went away without closing leaves nothing behind");
     }
 }

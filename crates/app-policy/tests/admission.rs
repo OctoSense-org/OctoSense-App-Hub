@@ -251,6 +251,16 @@ fn the_isolate_and_the_session_come_from_the_same_declaration() {
 }
 
 #[test]
+fn the_surface_not_the_prompt_capability_decides_whether_a_service_may_raise_a_sheet() {
+    // Mail raises its own sign-in sheet without asking for `prompt`, which
+    // names an app's own questions. A foreground isolate may prompt; a host
+    // running the app in the background turns that off itself.
+    let policy = resolve(r#""capabilities":["storage","mail"]"#).unwrap();
+    assert!(!policy.may_prompt, "the capability is still what the manifest asked for");
+    assert!(policy.isolate_settings(Path::new("/data/apps")).host_prompts);
+}
+
+#[test]
 fn a_directory_bundle_is_admitted_by_its_precomputed_digest() {
     let digest = bundle_digest(BUNDLE);
     let policy =
