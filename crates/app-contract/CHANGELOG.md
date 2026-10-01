@@ -21,7 +21,12 @@ New in the contract:
 
 - `requires` and `schema_minor` in the manifest, `KNOWN_FEATURES` (empty)
   and `SCHEMA_MINOR` (0): a manifest requiring an unknown feature is refused
-  ("needs a newer host").
-- The manifest's structs and enums, `ResearchScope` and `AppPolicy` are
-  `#[non_exhaustive]`; `AppPolicy` serialises.
+  ("needs a newer host"); a manifest for a newer `1.x` is read with its
+  unknown (optional) fields ignored and listed by
+  `AppManifest::ignored_fields`.
+- Every public struct and enum is `#[non_exhaustive]` (except the unit
+  marker `RefuseAllSignatures`); `HostLimits` gains `with_*` builders and
+  `Signature` gains `new`.
+- `AppPolicy` carries the whole storage block (`StorageGrant`) and
+  serialises.
 - The fixture corpus (`tests/fixtures/`).

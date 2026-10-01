@@ -1,6 +1,7 @@
 {
   "digest": "1fa910d469952cd687eb5cf4797746e77fa86891c1b56a712880d57f0a9052e3",
   "entry": "script",
+  "ignored_fields": [],
   "limits": "system",
   "policy": {
     "app_id": "os.youtube",
@@ -18,6 +19,12 @@
     "may_prompt": false,
     "memory_bytes": 134217728,
     "research": null,
+    "storage": {
+      "accounts": false,
+      "agent_workspace": "account",
+      "cache_max_bytes": null,
+      "max_bytes": 67108864
+    },
     "storage_bytes": 67108864,
     "version": "1.0.0"
   },

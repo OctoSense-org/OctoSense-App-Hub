@@ -23,6 +23,7 @@ that would need it is not additive and belongs in `2.0`.
 | `source` | Where the package comes from. |
 | `limits` | The host ceilings it is resolved under: `system` (`HostLimits::system()`), `default` (`HostLimits::default()`) or `unsigned` (the default, with `require_signature` off). |
 | `digest` | `digest_dir(package)`. |
+| `ignored_fields` | `AppManifest::ignored_fields()`: empty unless the manifest was written for a newer `1.x`. |
 | `signing_blake3` | `bundle_digest` of the manifest's canonical signing bytes. |
 | `entry` | `script` when the package has a `main.splash` (`script_source`), else `card`. |
 | `policy` | The resolved `AppPolicy` as JSON. A later `1.x` may add fields; every pinned one must hold. |

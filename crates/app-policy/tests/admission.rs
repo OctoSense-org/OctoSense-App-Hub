@@ -13,7 +13,7 @@ fn manifest_with(body: &str) -> String {
 }
 
 fn open_limits() -> HostLimits {
-    HostLimits { require_signature: false, ..HostLimits::default() }
+    HostLimits::default().with_require_signature(false)
 }
 
 fn resolve(body: &str) -> Result<AppPolicy, String> {
@@ -179,10 +179,7 @@ fn an_agent_may_keep_ask_user_question_and_no_other_kernel_tool() {
     assert_eq!(KERNEL_TOOLS, ["ask_user_question"]);
     let policy = resolve(r#""agent":{"profile":"read-only","tools":["ask_user_question","net.fetch"]}"#).unwrap();
     assert_eq!(policy.agent.unwrap().tools.into_iter().collect::<Vec<_>>(), ["ask_user_question", "net.fetch"]);
-    let generous = HostLimits {
-        offered_tools: ["ask_user_question", "shell", "read_file", "web_fetch", "peer_send_input", "spawn", "save_memory"].iter().map(|s| s.to_string()).collect(),
-        ..open_limits()
-    };
+    let generous = open_limits().with_offered_tools(["ask_user_question", "shell", "read_file", "web_fetch", "peer_send_input", "spawn", "save_memory"]);
     for tool in ["shell", "read_file", "web_fetch", "peer_send_input", "spawn", "save_memory", "ask_user_questions", "Ask_user_question"] {
         let body = format!(r#""agent":{{"profile":"read-only","tools":["{tool}"]}}"#);
         let err = admit_and_resolve(&manifest_with(&body), BUNDLE, &generous, &RefuseAllSignatures).unwrap_err();

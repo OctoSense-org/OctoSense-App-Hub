@@ -36,7 +36,7 @@
 //! );
 //! let manifest = parse(&manifest).unwrap();
 //! admit(&manifest, bundle, &RefuseAllSignatures).unwrap();
-//! let limits = HostLimits { require_signature: false, ..HostLimits::default() };
+//! let limits = HostLimits::default().with_require_signature(false);
 //! let policy = policy::resolve(&manifest, &limits).unwrap();
 //! assert!(policy.allows_host("api.weather.example"));
 //! assert!(!policy.allows_host("example.com"));
@@ -48,30 +48,54 @@
 //!
 //! - **Additive only.** New types, functions, optional manifest fields and
 //!   enum variants; nothing is removed or renamed, and no existing field,
-//!   default or rule changes meaning. The manifest's structs and enums, the
-//!   research scope and [`AppPolicy`] are `#[non_exhaustive]` so that they
-//!   can grow. Anything else is `2.0`, decided in an ADR. CI runs `cargo
-//!   semver-checks` against the latest published `1.x` on every change.
-//! - **The parser stays strict.** Every manifest struct refuses fields it
-//!   does not know (`deny_unknown_fields`), so a manifest written for a
-//!   newer host never runs under looser rules on an older one.
-//! - **Required features are named.** A field added in `1.x` that restricts
-//!   or changes what an app gets is a *feature*: a manifest that uses it
-//!   lists it in `requires`, and a host whose [`KNOWN_FEATURES`] lacks it
-//!   refuses the app with "needs a newer host: <feature>". `1.0.0` knows no
-//!   features.
-//! - **`schema` stays `1`** for the whole `1.x` line; `schema_minor`
-//!   (default 0, [`SCHEMA_MINOR`] in this build) records which additions a
-//!   manifest uses. Both new fields are left out of a manifest's canonical
-//!   signing bytes when empty, so every manifest signed before them signs
-//!   exactly as it did.
+//!   default or rule changes meaning. Anything else is `2.0`, decided in an
+//!   ADR. CI runs `cargo semver-checks` against the latest published `1.x`
+//!   on every change.
+//! - **Every public struct and enum is `#[non_exhaustive]`** (the one
+//!   exception is the unit marker [`RefuseAllSignatures`]), so adding a
+//!   field or a variant is a minor change. Build what you need with
+//!   [`HostLimits::default`] / [`HostLimits::system`] and the `with_*`
+//!   methods, [`Signature::new`], [`parse`] for manifests and
+//!   [`policy::resolve`] for policies; match enums with a `_` arm.
+//! - **Unknown manifest fields are classified, not ignored.** Every field
+//!   added in `1.x` is either *optional* (a host that does not know it may
+//!   run the app without it: it only adds information or asks for less) or
+//!   *required* (it restricts or changes what the app gets). A manifest
+//!   that uses a required field names its feature in `requires`. Parsing
+//!   ([`parse`]) applies, in this order:
+//!   1. `schema` must be [`SCHEMA`] (`1` for the whole `1.x` line).
+//!   2. Every `requires` entry must be in [`KNOWN_FEATURES`], at every
+//!      `schema_minor`; otherwise the app is refused with
+//!      `app <id> needs a newer host: <feature>`. `1.0.0` knows none.
+//!   3. A manifest whose `schema_minor` (default 0) is at most
+//!      [`SCHEMA_MINOR`] (`0` in `1.0.0`) is read strictly: an unknown
+//!      field at any level refuses it, exactly as before `requires`
+//!      existed.
+//!   4. A manifest whose `schema_minor` is above [`SCHEMA_MINOR`] was
+//!      written for a newer `1.x`. Its unknown fields, at any level
+//!      (top level, `network`, `storage`, `agent`, `agent.model`, …), are
+//!      optional by rule 2, so they are ignored and reported by
+//!      [`AppManifest::ignored_fields`] for the host to log. Fields this
+//!      build knows are still checked as always, and a `research` object in
+//!      the old toolbox shape is still refused.
+//!
+//!   So an older host never runs an app under weaker rules than its author
+//!   wrote, and a newer optional field never breaks an older host. The
+//!   ignored fields stay part of the manifest's signing bytes, so a newer
+//!   manifest's signature still verifies; a field added in `1.x` must
+//!   therefore be skipped when serialising its default and must serialise
+//!   exactly as it is written.
+//! - **Both new fields are invisible to older manifests.** `requires` and
+//!   `schema_minor` are left out of the canonical signing bytes when empty,
+//!   so every manifest signed before them signs exactly as it did.
 //! - **Behaviour is pinned by fixtures.** `tests/fixtures/` holds real
-//!   manifests and packages with their digest and resolved [`AppPolicy`];
-//!   every `1.x` release must accept all of them with the same results, and
-//!   the corpus is append-only within `1.x`.
+//!   manifests and packages with their digest, signing bytes, ignored
+//!   fields and resolved [`AppPolicy`]; every `1.x` release must reproduce
+//!   all of them, and the corpus is append-only within `1.x`.
 pub mod assets;
 pub mod bundle;
 pub mod entry;
+mod lenient;
 pub mod manifest;
 pub mod policy;
 pub mod research;
@@ -85,6 +109,6 @@ pub use manifest::{
     ModelTier, Network, ProfileMode, Signature, Storage, TaskModel, Triggers, KNOWN_CAPABILITIES, KNOWN_FEATURES,
     KNOWN_MODEL_NEEDS, RESERVED_NAMES, SCHEMA, SCHEMA_MINOR,
 };
-pub use policy::{resolve, AppPolicy, HostLimits};
+pub use policy::{resolve, AppPolicy, HostLimits, StorageGrant};
 pub use research::ResearchScope;
 pub use verify::{admit, admit_digest, bundle_digest, RefuseAllSignatures, SignatureVerifier};

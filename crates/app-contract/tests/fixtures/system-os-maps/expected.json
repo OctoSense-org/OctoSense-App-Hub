@@ -1,6 +1,7 @@
 {
   "digest": "344da151a156f25004e39370b9fb201a9da3c1d44b354c8d50195c01585d923b",
   "entry": "script",
+  "ignored_fields": [],
   "limits": "system",
   "policy": {
     "app_id": "os.maps",
@@ -22,6 +23,12 @@
     "may_prompt": false,
     "memory_bytes": 134217728,
     "research": null,
+    "storage": {
+      "accounts": false,
+      "agent_workspace": "account",
+      "cache_max_bytes": null,
+      "max_bytes": 67108864
+    },
     "storage_bytes": 67108864,
     "version": "1.0.0"
   },

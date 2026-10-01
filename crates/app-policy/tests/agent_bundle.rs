@@ -67,7 +67,7 @@ fn refused_with(dir: &Path, manifest: &AppManifest, needle: &str) {
 }
 
 fn open_limits() -> HostLimits {
-    HostLimits { require_signature: false, ..HostLimits::default() }
+    HostLimits::default().with_require_signature(false)
 }
 
 // ------------------------------------------------------------------- loading

@@ -224,6 +224,11 @@ pub struct AppManifest {
     /// `0`, the default, is the `1.0.0` grammar. Skipped when 0.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub schema_minor: u32,
+    /// Fields of a newer-minor manifest this build did not know and
+    /// ignored, with their values ([`AppManifest::ignored_fields`]). Never
+    /// part of a manifest this build parses strictly.
+    #[serde(skip)]
+    ignored: Vec<crate::lenient::Ignored>,
 }
 
 fn is_zero(value: &u32) -> bool {
@@ -246,11 +251,20 @@ pub struct Integrity {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct Signature {
     /// Which key signed it, as the host knows the key.
     pub key_id: String,
     /// Lowercase hex signature bytes.
     pub value: String,
+}
+
+impl Signature {
+    /// A signature by `key_id` with hex `value`, as a signing tool attaches
+    /// it to `integrity.signature`.
+    pub fn new(key_id: impl Into<String>, value: impl Into<String>) -> Self {
+        Signature { key_id: key_id.into(), value: value.into() }
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -502,21 +516,79 @@ pub fn check_reserved_id(app_id: &str) -> Result<(), String> {
 }
 
 impl AppManifest {
-    /// Parse a manifest, refusing unknown fields and a foreign schema.
+    /// Parse a manifest.
+    ///
+    /// - `schema` must be [`SCHEMA`], and every `requires` entry must be in
+    ///   [`KNOWN_FEATURES`], at every `schema_minor`.
+    /// - A manifest whose `schema_minor` is at most [`SCHEMA_MINOR`] is read
+    ///   strictly: an unknown field, at any level, refuses it.
+    /// - A manifest written for a newer `1.x` (`schema_minor` above
+    ///   [`SCHEMA_MINOR`]) is read with its unknown fields ignored, at any
+    ///   level: by the growth rule they are optional, because a field that
+    ///   restricts or changes what the app gets must be named in `requires`.
+    ///   The ignored fields are reported by [`AppManifest::ignored_fields`].
     pub fn parse(json: &str) -> Result<Self, String> {
-        let manifest: AppManifest = serde_json::from_str(json).map_err(|e| {
-            // A research scope in the toolbox's old shape gets the fields to
-            // rename, not only serde's "unknown field".
-            serde_json::from_str::<serde_json::Value>(json)
-                .ok()
-                .and_then(|v| v.get("research").and_then(crate::research::old_shape_advice))
-                .unwrap_or_else(|| format!("manifest is not valid: {e}"))
-        })?;
+        let manifest = match serde_json::from_str::<AppManifest>(json) {
+            Ok(manifest) => manifest,
+            Err(strict) => Self::parse_newer(json).unwrap_or_else(|| {
+                // A research scope in the toolbox's old shape gets the fields
+                // to rename, not only serde's "unknown field".
+                Err(serde_json::from_str::<serde_json::Value>(json)
+                    .ok()
+                    .and_then(|v| v.get("research").and_then(crate::research::old_shape_advice))
+                    .unwrap_or_else(|| format!("manifest is not valid: {strict}")))
+            })?,
+        };
         if manifest.schema != SCHEMA {
             return Err(format!("manifest schema {} is not {}", manifest.schema, SCHEMA));
         }
         manifest.check_requires()?;
         Ok(manifest)
+    }
+
+    /// The lenient read of a manifest written for a newer `1.x`, or `None`
+    /// when the manifest is not one (it is then refused as the strict read
+    /// refused it).
+    fn parse_newer(json: &str) -> Option<Result<Self, String>> {
+        let value: serde_json::Value = serde_json::from_str(json).ok()?;
+        let minor = value.get("schema_minor")?.as_u64()?;
+        if value.get("schema")?.as_u64()? != u64::from(SCHEMA) || minor <= u64::from(SCHEMA_MINOR) {
+            return None;
+        }
+        // Required features first: a newer field this build would ignore
+        // must never be one the author marked as required.
+        if let Some(requires) = value.get("requires").and_then(|r| r.as_array()) {
+            let id = value.get("id").and_then(|i| i.as_str()).unwrap_or("?");
+            let unknown: Vec<&str> =
+                requires.iter().filter_map(|f| f.as_str()).filter(|f| !KNOWN_FEATURES.contains(f)).collect();
+            if !unknown.is_empty() {
+                return Some(Err(format!("app {id} needs a newer host: {}", unknown.join(", "))));
+            }
+        }
+        // A scope in the toolbox's old shape is a mistake, not a newer
+        // field: ignoring `languages` would widen the grant.
+        if let Some(advice) = value.get("research").and_then(crate::research::old_shape_advice) {
+            return Some(Err(advice));
+        }
+        Some(
+            crate::lenient::from_value::<AppManifest>(value)
+                .map(|(mut manifest, ignored)| {
+                    manifest.ignored = ignored;
+                    manifest
+                })
+                .map_err(|e| format!("manifest is not valid: {e}")),
+        )
+    }
+
+    /// The fields of a manifest written for a newer `1.x` that this build
+    /// does not know and ignored, as dotted paths (`network.proxy`,
+    /// `agent.model.per_task.triage.budget`), for a host to log. Always
+    /// empty for a manifest at or below [`SCHEMA_MINOR`], which is refused
+    /// instead. Sorted.
+    pub fn ignored_fields(&self) -> Vec<String> {
+        let mut fields: Vec<String> = self.ignored.iter().map(|(path, _)| path.join(".")).collect();
+        fields.sort();
+        fields
     }
 
     /// Refuse a manifest that requires a feature this build does not know:
@@ -544,7 +616,9 @@ impl AppManifest {
     pub fn signing_bytes(&self) -> Result<Vec<u8>, String> {
         let mut bare = self.clone();
         bare.integrity.signature = None;
-        let value = serde_json::to_value(&bare).map_err(|e| e.to_string())?;
+        let mut value = serde_json::to_value(&bare).map_err(|e| e.to_string())?;
+        // A newer manifest was signed with the fields this build ignored.
+        crate::lenient::restore(&mut value, &self.ignored);
         Ok(canonical(&value).into_bytes())
     }
 }

@@ -10,7 +10,7 @@ use serde_json::{json, Map, Value};
 use std::path::{Path, PathBuf};
 
 /// Every key an `expected.json` holds once it is complete.
-const ACCEPTED_KEYS: &[&str] = &["source", "limits", "digest", "signing_blake3", "entry", "policy"];
+const ACCEPTED_KEYS: &[&str] = &["source", "limits", "digest", "ignored_fields", "signing_blake3", "entry", "policy"];
 const REFUSED_KEYS: &[&str] = &["source", "limits", "digest", "refused"];
 
 fn fixtures() -> Vec<PathBuf> {
@@ -28,7 +28,7 @@ fn limits(name: &str) -> HostLimits {
     match name {
         "system" => HostLimits::system(),
         "default" => HostLimits::default(),
-        "unsigned" => HostLimits { require_signature: false, ..HostLimits::default() },
+        "unsigned" => HostLimits::default().with_require_signature(false),
         other => panic!("unknown limits {other:?}: use system, default or unsigned"),
     }
 }
@@ -49,6 +49,7 @@ fn observe(package: &Path, limits: &HostLimits) -> Map<String, Value> {
             seen.insert("refused".into(), json!(error));
         }
         Ok((manifest, policy)) => {
+            seen.insert("ignored_fields".into(), json!(manifest.ignored_fields()));
             let signing = manifest.signing_bytes().expect("an admitted manifest has signing bytes");
             seen.insert("signing_blake3".into(), json!(bundle_digest(&signing)));
             let entry = match script_source(package, "http://127.0.0.1:1/") {
@@ -140,5 +141,21 @@ fn a_shipped_digest_is_the_digest_of_the_package() {
         } else {
             assert_eq!(manifest.integrity.bundle_blake3, digest, "{name}");
         }
+    }
+}
+
+#[test]
+fn no_fixture_at_this_minor_has_ignored_fields() {
+    // Older manifests (no schema_minor, no requires) read exactly as they
+    // did: strictly, with nothing ignored.
+    for dir in fixtures() {
+        let text = std::fs::read_to_string(dir.join("package").join(MANIFEST_FILE)).unwrap();
+        let Ok(manifest) = parse(&text) else { continue };
+        if manifest.schema_minor > SCHEMA_MINOR {
+            continue;
+        }
+        assert!(manifest.ignored_fields().is_empty(), "{}", dir.display());
+        let strict: Result<AppManifest, _> = serde_json::from_str(&text);
+        assert!(strict.is_ok(), "{} reads strictly", dir.display());
     }
 }

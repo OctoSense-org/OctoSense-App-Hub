@@ -98,7 +98,7 @@ fn policy_for(args: &Args) -> Result<AppPolicy, String> {
     let limits = if args.system {
         HostLimits::system()
     } else {
-        HostLimits { require_signature: !args.allow_unsigned, ..HostLimits::default() }
+        HostLimits::default().with_require_signature(!args.allow_unsigned)
     };
     // The digest is computed from the directory, so the manifest's claim is
     // checked against what is actually there.

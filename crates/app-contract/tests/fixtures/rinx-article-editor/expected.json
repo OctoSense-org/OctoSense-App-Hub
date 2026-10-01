@@ -1,6 +1,7 @@
 {
   "digest": "47c95ab7e15b3727ddee7bcc4b6fbead423fae6a91098a4c6bd7280aa189c342",
   "entry": "card",
+  "ignored_fields": [],
   "limits": "unsigned",
   "policy": {
     "app_id": "org.octosense.article-editor",
@@ -16,6 +17,12 @@
     "may_prompt": false,
     "memory_bytes": 67108864,
     "research": null,
+    "storage": {
+      "accounts": false,
+      "agent_workspace": "account",
+      "cache_max_bytes": null,
+      "max_bytes": 16777216
+    },
     "storage_bytes": 16777216,
     "version": "2.0.0"
   },

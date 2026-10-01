@@ -8,7 +8,7 @@ package:
 | Part | Items |
 | --- | --- |
 | Manifest | `AppManifest` and its parts, `SCHEMA`, `MANIFEST_FILE`, `parse` |
-| Policy | `policy::resolve`, `HostLimits`, `AppPolicy` (capabilities, network hosts, storage, budgets, research scope) |
+| Policy | `policy::resolve`, `HostLimits`, `AppPolicy` (capabilities, network hosts, the storage block as `StorageGrant`, budgets, research scope) |
 | Integrity | `digest_dir`, `bundle_digest`, `admit`, `admit_digest`, `SignatureVerifier`, `RefuseAllSignatures` |
 | Running a package | `SCRIPT_ENTRY`, `script_source`, `ASSETS_PLACEHOLDER`, `AssetServer`, `StaticAssets`, `rewrite_assets` |
 
@@ -29,7 +29,7 @@ use octosense_app_contract::{admit_digest, digest_dir, parse, policy, HostLimits
 fn open(package: &std::path::Path) -> Result<octosense_app_contract::AppPolicy, String> {
     let manifest = parse(&std::fs::read_to_string(package.join(MANIFEST_FILE)).map_err(|e| e.to_string())?)?;
     admit_digest(&manifest, &digest_dir(package)?, &RefuseAllSignatures)?;
-    policy::resolve(&manifest, &HostLimits { require_signature: false, ..HostLimits::default() })
+    policy::resolve(&manifest, &HostLimits::default().with_require_signature(false))
 }
 ```
 
@@ -39,30 +39,54 @@ Within `1.x` the contract only grows (ADR 0005 section 2):
 
 - **Additive only.** New types, functions, optional manifest fields and enum
   variants. Nothing is removed or renamed, and no existing field, default
-  or rule changes meaning. The manifest's structs and enums, the research
-  scope and `AppPolicy` are `#[non_exhaustive]` so that they can grow.
-  Anything else is `2.0`, decided in an ADR.
-- **The parser stays strict.** Every manifest struct refuses fields it does
-  not know, so a manifest written for a newer host never runs under looser
-  rules on an older one.
-- **Required features are named.** A field added in `1.x` that restricts or
-  changes what an app gets is a *feature*. A manifest that uses one lists
-  it in `requires`:
+  or rule changes meaning. Anything else is `2.0`, decided in an ADR.
+- **Every public struct and enum is `#[non_exhaustive]`** (except the unit
+  marker `RefuseAllSignatures`), so adding a field or variant is a minor
+  change. Build values with the provided constructors instead of struct
+  literals, and match enums with a `_` arm:
 
-  ```json
-  { "schema": 1, "schema_minor": 1, "requires": ["<feature>"], ... }
+  ```rust
+  use octosense_app_contract::{HostLimits, Signature};
+  let limits = HostLimits::default().with_require_signature(false);
+  let signature = Signature::new("release", "aabb");
   ```
 
-  A host whose `KNOWN_FEATURES` lacks a listed feature refuses the app:
-  `app <id> needs a newer host: <feature>`. `1.0.0` knows no features.
-- **`schema` stays `1`** for the whole `1.x` line. `schema_minor` (default
-  0; `SCHEMA_MINOR` is the newest this build knows) records which additions
-  a manifest uses. Both fields are left out of the canonical signing bytes
-  when empty, so a manifest signed before they existed signs as it did.
+  Manifests come from `parse`, policies from `policy::resolve`.
+- **Unknown manifest fields are classified, not ignored.** A field added in
+  `1.x` is *optional* (a host may run the app without it: it only adds
+  information or asks for less) or *required* (it restricts or changes
+  what the app gets). A manifest that uses a required field lists its
+  feature in `requires`. `parse` applies, in order:
+
+  1. `schema` must be `1`, for the whole `1.x` line.
+  2. Every `requires` entry must be in `KNOWN_FEATURES`, at every
+     `schema_minor`. Otherwise: `app <id> needs a newer host: <feature>`.
+     `1.0.0` knows no features.
+  3. `schema_minor` (default 0) at most `SCHEMA_MINOR` (0 in `1.0.0`): the
+     manifest is read strictly, and an unknown field at any level refuses
+     it.
+  4. `schema_minor` above `SCHEMA_MINOR`: the manifest was written for a
+     newer `1.x`. Its unknown fields, at any level, are optional by rule 2,
+     so they are ignored, and `AppManifest::ignored_fields()` lists them
+     (`network.retry`, `agent.model.temperature`) for the host to log.
+     Known fields are checked as always.
+
+  ```json
+  { "schema": 1, "schema_minor": 2, "requires": ["<feature>"], ... }
+  ```
+
+  An older host therefore never runs an app under weaker rules than its
+  author wrote, and a newer optional field never breaks an older host.
+  Ignored fields stay in the manifest's signing bytes, so a newer signed
+  manifest still verifies. A field added in `1.x` must be skipped when it
+  holds its default, and must serialise exactly as written.
+- **Older manifests are unchanged.** `requires` and `schema_minor` are left
+  out of the canonical signing bytes when empty, so a manifest signed before
+  they existed signs as it did.
 - **Behaviour is pinned by fixtures.** [`tests/fixtures/`](tests/fixtures/README.md)
-  holds real manifests and packages with their digest and resolved
-  `AppPolicy`. Every `1.x` must reproduce all of them; the corpus is
-  append-only.
+  holds real manifests and packages with their digest, signing bytes,
+  ignored fields and resolved `AppPolicy`. Every `1.x` must reproduce all
+  of them; the corpus is append-only.
 
 ## Checks and releases
 

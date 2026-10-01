@@ -1,6 +1,7 @@
 {
   "digest": "c2047fbb78284519ebf1fa636c65042283b219a5539b38af9ff39bd7af552c3c",
   "entry": "script",
+  "ignored_fields": [],
   "limits": "system",
   "policy": {
     "app_id": "os.news",
@@ -26,6 +27,12 @@
     "may_prompt": false,
     "memory_bytes": 134217728,
     "research": null,
+    "storage": {
+      "accounts": false,
+      "agent_workspace": "account",
+      "cache_max_bytes": null,
+      "max_bytes": 67108864
+    },
     "storage_bytes": 67108864,
     "version": "1.0.0"
   },

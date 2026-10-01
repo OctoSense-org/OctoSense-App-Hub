@@ -23,6 +23,7 @@ use std::sync::Arc;
 /// (`photos/01.png`).
 pub type StaticAssets = &'static [(&'static str, &'static [u8])];
 
+#[non_exhaustive]
 pub struct AssetServer {
     origin: String,
     port: u16,

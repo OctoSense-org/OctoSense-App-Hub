@@ -12,7 +12,7 @@
 //! hosts that run app agents (App Hub's `octosense-app-policy`); this crate
 //! parses the `agent` block as part of the manifest and grants nothing from
 //! it.
-use crate::manifest::{AppManifest, KNOWN_CAPABILITIES};
+use crate::manifest::{AgentWorkspace, AppManifest, KNOWN_CAPABILITIES};
 use crate::research::ResearchScope;
 use serde::Serialize;
 use std::collections::BTreeSet;
@@ -24,7 +24,18 @@ use std::collections::BTreeSet;
 /// `max_iterations`, `max_token_budget` and `offered_tools` are ceilings for
 /// an app's agent session. [`resolve`] does not read them; a host that runs
 /// app agents does, with the same limits value.
+///
+/// Build one from [`HostLimits::default`] or [`HostLimits::system`] and the
+/// `with_*` methods; the struct is `#[non_exhaustive]`, so a later `1.x` can
+/// add a ceiling without breaking anyone:
+///
+/// ```
+/// use octosense_app_contract::HostLimits;
+/// let limits = HostLimits::default().with_require_signature(false).with_max_storage_bytes(1 << 20);
+/// assert!(!limits.require_signature);
+/// ```
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct HostLimits {
     pub max_storage_bytes: u64,
     pub max_instruction_budget: u64,
@@ -86,6 +97,52 @@ impl HostLimits {
             ..HostLimits::default()
         }
     }
+
+    /// Whether a bundle must carry a signature to be admitted.
+    pub fn with_require_signature(mut self, require: bool) -> Self {
+        self.require_signature = require;
+        self
+    }
+
+    /// The whole-jail storage ceiling, in bytes.
+    pub fn with_max_storage_bytes(mut self, bytes: u64) -> Self {
+        self.max_storage_bytes = bytes;
+        self
+    }
+
+    /// The ceiling on a session's cumulative script instructions.
+    pub fn with_max_instruction_budget(mut self, instructions: u64) -> Self {
+        self.max_instruction_budget = instructions;
+        self
+    }
+
+    /// The ceiling on an isolate's heap, in bytes.
+    pub fn with_max_memory_bytes(mut self, bytes: u64) -> Self {
+        self.max_memory_bytes = bytes;
+        self
+    }
+
+    /// The ceiling on an app agent's model turns per request.
+    pub fn with_max_iterations(mut self, iterations: u32) -> Self {
+        self.max_iterations = iterations;
+        self
+    }
+
+    /// The ceiling on an app agent's tokens per request.
+    pub fn with_max_token_budget(mut self, tokens: u64) -> Self {
+        self.max_token_budget = tokens;
+        self
+    }
+
+    /// The tools this host offers contained apps' agents, replacing the list.
+    pub fn with_offered_tools<I, T>(mut self, tools: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<String>,
+    {
+        self.offered_tools = tools.into_iter().map(Into::into).collect();
+        self
+    }
 }
 
 /// What the app may do. Produced only by [`resolve`].
@@ -103,8 +160,12 @@ pub struct AppPolicy {
     /// the `net` capability says.
     pub hosts: BTreeSet<String>,
     /// The app's whole storage jail, in bytes: the `storage` block's
-    /// `max_bytes`, clamped to the host's ceiling.
+    /// `max_bytes`, clamped to the host's ceiling. The same as
+    /// `storage.max_bytes`.
     pub storage_bytes: u64,
+    /// The whole `storage` block as granted (OctoSense ADR 0004 §11), so a
+    /// host lays out the app's folders without reading the manifest again.
+    pub storage: StorageGrant,
     /// Cumulative script instructions for the app's session.
     pub instruction_budget: u64,
     /// Heap ceiling for the app's isolate.
@@ -117,6 +178,25 @@ pub struct AppPolicy {
     /// octos's `Scope::from_grant` does: the grant the host hands the
     /// toolbox. `Some` exactly when the app requests either capability.
     pub research: Option<ResearchScope>,
+}
+
+/// The manifest's `storage` block as granted. `external` (a path outside
+/// the jail) is for reviewed native apps only and is not part of a script
+/// app's manifest, so it is not here either.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
+pub struct StorageGrant {
+    /// The whole-jail ceiling: `max_bytes`, clamped to the host's ceiling.
+    pub max_bytes: u64,
+    /// Data per account, one agent per account; `false` is one `device`
+    /// folder.
+    pub accounts: bool,
+    /// What the app's agent may read from disk: its account's folder (the
+    /// default when the manifest says nothing) or nothing.
+    pub agent_workspace: AgentWorkspace,
+    /// The ceiling for the jail's `cache/`, as declared (positive; the cache
+    /// lives inside the jail, so `max_bytes` bounds it too).
+    pub cache_max_bytes: Option<u64>,
 }
 
 impl AppPolicy {
@@ -167,6 +247,7 @@ pub fn resolve(manifest: &AppManifest, limits: &HostLimits) -> Result<AppPolicy,
     }
 
     let research = resolve_research(&manifest.id, &capabilities, manifest.research.as_ref())?;
+    let storage_bytes = clamp(manifest.storage.max_bytes, limits.max_storage_bytes);
 
     Ok(AppPolicy {
         app_id: manifest.id.clone(),
@@ -175,7 +256,13 @@ pub fn resolve(manifest: &AppManifest, limits: &HostLimits) -> Result<AppPolicy,
         may_prompt: capabilities.contains("prompt"),
         capabilities,
         hosts,
-        storage_bytes: clamp(manifest.storage.max_bytes, limits.max_storage_bytes),
+        storage_bytes,
+        storage: StorageGrant {
+            max_bytes: storage_bytes,
+            accounts: manifest.storage.accounts,
+            agent_workspace: manifest.storage.agent_workspace.unwrap_or_default(),
+            cache_max_bytes: manifest.storage.cache_max_bytes,
+        },
         instruction_budget: clamp(manifest.compute.instruction_budget, limits.max_instruction_budget),
         memory_bytes: clamp(manifest.compute.memory_bytes, limits.max_memory_bytes),
         research,

@@ -1,6 +1,7 @@
 {
   "digest": "78577bc28c749948c019b24514c7e6965ea8e57684620b32ed90850ccd3f65ce",
   "entry": "script",
+  "ignored_fields": [],
   "limits": "unsigned",
   "policy": {
     "app_id": "matrix-octos-script",
@@ -17,6 +18,12 @@
     "may_prompt": false,
     "memory_bytes": 33554432,
     "research": null,
+    "storage": {
+      "accounts": false,
+      "agent_workspace": "account",
+      "cache_max_bytes": null,
+      "max_bytes": 16777216
+    },
     "storage_bytes": 16777216,
     "version": "1.0.0"
   },

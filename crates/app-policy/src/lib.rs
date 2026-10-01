@@ -28,7 +28,7 @@
 //!         "network":{{"hosts":["api.weather.example"]}}}}"#,
 //!     octosense_app_policy::bundle_digest(bundle)
 //! );
-//! let limits = HostLimits { require_signature: false, ..HostLimits::default() };
+//! let limits = HostLimits::default().with_require_signature(false);
 //! let policy = admit_and_resolve(&manifest, bundle, &limits, &RefuseAllSignatures).unwrap();
 //! assert!(policy.allows_host("api.weather.example"));
 //! assert!(!policy.allows_host("example.com"));

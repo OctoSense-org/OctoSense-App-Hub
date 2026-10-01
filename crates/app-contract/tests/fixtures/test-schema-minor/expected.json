@@ -1,6 +1,7 @@
 {
   "digest": "729bc3dfe1ef9ae2e49cb86f82db670adc09282c4aaadc65d58ed804d6255c26",
   "entry": "card",
+  "ignored_fields": [],
   "limits": "unsigned",
   "policy": {
     "app_id": "weather",
@@ -13,6 +14,12 @@
     "may_prompt": false,
     "memory_bytes": 67108864,
     "research": null,
+    "storage": {
+      "accounts": false,
+      "agent_workspace": "account",
+      "cache_max_bytes": null,
+      "max_bytes": 16777216
+    },
     "storage_bytes": 16777216,
     "version": "1.0.0"
   },
