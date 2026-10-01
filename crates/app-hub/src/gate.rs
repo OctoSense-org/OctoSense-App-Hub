@@ -460,7 +460,7 @@ mod tests {
             )
             .unwrap()
         };
-        let limits = HostLimits { require_signature: false, ..HostLimits::default() };
+        let limits = HostLimits::default().with_require_signature(false);
         let identity = |dir: &Path| {
             check_bundle(dir, &limits, &octosense_app_policy::RefuseAllSignatures, None)
                 .unwrap()

@@ -24,7 +24,8 @@
 | `docs/ICONS.md` | 规范图标的归属、导出约束与视觉审查。 |
 | `docs/DEVELOPMENT.md` | 应用编写指南所在的仓库、交付路径，以及 `card-host` 及其远程控制路由。 |
 | `templates/app/` | 卡片应用仓库脚手架，包含元数据、示例图标和链接好的 Agent 指引。 |
-| `crates/app-policy` | 签名清单与商店信息、准入，以及解析为隔离环境设置和 Agent 会话配置（ADR 0002）；应用自带的 Agent（`tools.json`、`AGENT.md`、技能）加载为 `AgentBundle`；原生模块的工具清单共用同一套 `tools.json` 解析与检查（`ToolManifest::load`）。 |
+| `crates/app-contract` | 应用契约，即 crates.io 上的 `octosense-app-contract`（OctoSense ADR 0005）：清单、应用获得的策略、包完整性校验与运行包所需的内容。应用和宿主按版本依赖它；在 `1.x` 内只做增量变更（[README](crates/app-contract/README.md)）。 |
+| `crates/app-policy` | 签名清单与商店信息、准入，以及解析为隔离环境设置和 Agent 会话配置（ADR 0002）；应用自带的 Agent（`tools.json`、`AGENT.md`、技能）加载为 `AgentBundle`；原生模块的工具清单共用同一套 `tools.json` 解析与检查（`ToolManifest::load`）。并重新导出应用契约。 |
 | `crates/app-hub` | 索引、签名目录、准入检查、Agent 扫描、设备端客户端和 `hub` 命令（ADR 0003）。 |
 | `crates/appstore` | 作为 OctoSense 模块的商店；把已安装应用作为独立客户端运行的 `card` 模块；系统应用（`os.` 前缀 id）；以及宿主服务及其面板。 |
 | `crates/appstore-app` | 作为独立应用的商店（`appstore`）。 |

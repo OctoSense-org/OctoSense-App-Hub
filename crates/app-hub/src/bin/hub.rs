@@ -246,7 +246,7 @@ fn gate_for(bundle: &Path, argv: &[String], allow_unsigned: bool, catalog: Optio
         let (id, public) = pair.split_once('=').ok_or("--publisher-key expects id=hexkey")?;
         keys = keys.with(id, public);
     }
-    let limits = HostLimits { require_signature: !allow_unsigned, ..HostLimits::default() };
+    let limits = HostLimits::default().with_require_signature(!allow_unsigned);
     let previous = match catalog {
         Some(path) if Path::new(&path).exists() => Some(read_catalog(Path::new(&path))?),
         _ => None,

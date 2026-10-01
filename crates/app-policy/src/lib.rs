@@ -1,5 +1,12 @@
 //! ADR 0002 phase 1: one declaration, two containers.
 //!
+//! The manifest, the app-facing policy, the integrity checks and running a
+//! package are the app contract, `octosense-app-contract` (OctoSense ADR
+//! 0005), re-exported here as [`contract`] and item by item, so existing
+//! paths keep working. This crate adds what only App Hub and the shell
+//! need: the app's agent, the two containers, listings, research words and
+//! the host service registry.
+//!
 //! An app that arrives after the build ships a bundle and a manifest. This
 //! crate is the only thing that turns that manifest into what the app gets:
 //! the settings for its splash isolate, and the profile for its octos agent
@@ -21,12 +28,14 @@
 //!         "network":{{"hosts":["api.weather.example"]}}}}"#,
 //!     octosense_app_policy::bundle_digest(bundle)
 //! );
-//! let limits = HostLimits { require_signature: false, ..HostLimits::default() };
+//! let limits = HostLimits::default().with_require_signature(false);
 //! let policy = admit_and_resolve(&manifest, bundle, &limits, &RefuseAllSignatures).unwrap();
 //! assert!(policy.allows_host("api.weather.example"));
 //! assert!(!policy.allows_host("example.com"));
 //! assert!(policy.agent.is_none(), "an app gets no agent unless it asks");
 //! ```
+pub use octosense_app_contract as contract;
+
 pub mod agent;
 pub mod assets;
 pub mod bundle;
@@ -52,7 +61,7 @@ pub use entry::{script_source, ASSETS_PLACEHOLDER, SCRIPT_ENTRY};
 pub use listing::{agent_permission_lines, kernel_tool_words, privacy_summary, Listing, Publisher, LISTING_FILE};
 pub use manifest::{
     check_reserved_id, short_id, AgentSpec, AgentWorkspace, AppManifest, ModelNeed, ModelSpec, ModelTier, ProfileMode, TaskModel, Triggers, KNOWN_CAPABILITIES,
-    KNOWN_MODEL_NEEDS, RESERVED_NAMES, SCHEMA,
+    KNOWN_FEATURES, KNOWN_MODEL_NEEDS, RESERVED_NAMES, SCHEMA, SCHEMA_MINOR,
 };
 pub use policy::{is_kernel_tool_name, AgentPolicy, AppPolicy, HostLimits, KERNEL_TOOLS};
 pub use research::{crawl_words, search_words, ResearchScope, RESEARCH_CATEGORIES};

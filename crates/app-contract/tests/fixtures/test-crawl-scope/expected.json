@@ -1,0 +1,41 @@
+{
+  "digest": "729bc3dfe1ef9ae2e49cb86f82db670adc09282c4aaadc65d58ed804d6255c26",
+  "entry": "card",
+  "ignored_fields": [],
+  "limits": "unsigned",
+  "policy": {
+    "app_id": "weather",
+    "capabilities": [
+      "crawl",
+      "research"
+    ],
+    "display_name": "Weather",
+    "hosts": [],
+    "instruction_budget": 20000000,
+    "may_prompt": false,
+    "memory_bytes": 67108864,
+    "research": {
+      "categories": [
+        "news"
+      ],
+      "langs": [
+        "en",
+        "zh"
+      ],
+      "max_age_days": 7,
+      "max_depth": 2,
+      "max_pages": 20,
+      "max_results": 20
+    },
+    "storage": {
+      "accounts": false,
+      "agent_workspace": "account",
+      "cache_max_bytes": null,
+      "max_bytes": 16777216
+    },
+    "storage_bytes": 16777216,
+    "version": "1.0.0"
+  },
+  "signing_blake3": "d4cd80b8df53e5c2d88439953ea67ec44810b3c4b2689755aa22445b48de5608",
+  "source": "App Hub app-policy admission tests: research and crawl"
+}

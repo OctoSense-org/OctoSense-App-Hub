@@ -23,7 +23,7 @@ native code. An app that needs new native runtime code must be integrated
 into a shell release; see the
 [delivery paths](DEVELOPMENT.md#choose-the-appropriate-delivery-path).
 
-The entry file decides the kind (`crates/app-policy/src/entry.rs`): a bundle
+The entry file decides the kind (`crates/app-contract/src/entry.rs`): a bundle
 with `main.splash` at its root is a **script app**; otherwise it is a
 **card app** and runs `page.card`.
 
@@ -138,7 +138,8 @@ the store shows the person exactly what was requested, in plain words, before
 they install.
 
 **Capabilities** (closed list, `KNOWN_CAPABILITIES` in
-`crates/app-policy/src/manifest.rs`). Anything else is refused.
+`crates/app-contract/src/manifest.rs`, the app contract). Anything else is
+refused.
 
 | Capability | Grants | The store says |
 | --- | --- | --- |
@@ -172,7 +173,7 @@ object. Its schema is exactly octos's `octos_research::toolbox::Scope`
 an app's research permission: the gate checks it with the same rules as
 `Scope::from_grant`, pins it, and the host hands the same JSON to the toolbox
 (OctoSense `crates/toolbox/src/scope.rs` parses it). App Hub mirrors the
-struct in `crates/app-policy/src/research.rs` because the policy crate links
+struct in `crates/app-contract/src/research.rs` because the app contract links
 no octos code; the two change together.
 
 ```json

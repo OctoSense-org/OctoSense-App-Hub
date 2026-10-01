@@ -1,13 +1,17 @@
-//! Resolving a manifest into what the app actually gets.
+//! Resolving a manifest into what the app and its agent actually get.
 //!
-//! Every rule here fails closed: an unknown capability, a host that is not a
-//! bare host name, a tool the host does not offer, a quota above the host's
-//! ceiling. A manifest asks; the host decides; the app is never consulted
-//! again. This is the only place that produces [`AppPolicy`], and the two
+//! What the app may do (capabilities, hosts, storage, budgets, research
+//! scope) is the app contract's [`octosense_app_contract::policy::resolve`]
+//! (ADR 0005); every rule there fails closed. This module adds the app's
+//! agent, which only hosts that run app agents resolve: a tool the host does
+//! not offer, a kernel tool, a malformed trigger are refused here. The host
+//! [`AppPolicy`] holds the contract's policy and the agent's, and the two
 //! containers are derived from it, never set by hand.
-use crate::manifest::{short_id, AgentSpec, AppManifest, ModelSpec, ProfileMode, Triggers, KNOWN_CAPABILITIES};
-use crate::research::ResearchScope;
+use crate::manifest::{short_id, AgentSpec, AppManifest, ModelSpec, ProfileMode, Triggers};
 use std::collections::BTreeSet;
+use std::ops::Deref;
+
+pub use octosense_app_contract::policy::HostLimits;
 
 /// The octos kernel tools a contained app's agent may keep (a plain name in
 /// `agent.tools`; the host's own tools are dotted, `net.fetch`). Only
@@ -24,88 +28,26 @@ pub fn is_kernel_tool_name(tool: &str) -> bool {
     !tool.contains('.')
 }
 
-/// The host's own ceilings. An app may ask for less and get it; asking for
-/// more is clamped, not refused, because a bundle built for a roomier device
-/// should still run here — just smaller.
-#[derive(Clone, Debug)]
-pub struct HostLimits {
-    pub max_storage_bytes: u64,
-    pub max_instruction_budget: u64,
-    pub max_memory_bytes: u64,
-    pub max_iterations: u32,
-    pub max_token_budget: u64,
-    /// Tools this host offers to contained apps at all. Shell, process and
-    /// arbitrary-path file tools are absent from this list by design; of the
-    /// kernel's own tools only [`KERNEL_TOOLS`] may ever be here.
-    pub offered_tools: Vec<String>,
-    /// Whether a bundle must carry a signature to be admitted.
-    pub require_signature: bool,
-}
-
-impl Default for HostLimits {
-    /// Phone-sized defaults: the isolate jail's own ceiling for storage, a
-    /// budget that cannot spin the UI thread for a second, and a tool list
-    /// holding only what a card app legitimately needs: the host tools, and
-    /// the kernel's `ask_user_question`.
-    fn default() -> Self {
-        HostLimits {
-            max_storage_bytes: 16 * 1024 * 1024,
-            max_instruction_budget: 20_000_000,
-            max_memory_bytes: 64 * 1024 * 1024,
-            max_iterations: 8,
-            max_token_budget: 200_000,
-            offered_tools: ["ledger.read", "ledger.write", "net.fetch", "storage.read", "storage.write", "card.render"]
-                .iter()
-                .chain(KERNEL_TOOLS)
-                .map(|s| s.to_string())
-                .collect(),
-            require_signature: true,
-        }
-    }
-}
-
-impl HostLimits {
-    /// Ceilings for a system app: a bundle that ships inside the build, like
-    /// News or Photos, contained like any installed app but living for as
-    /// long as the person keeps it open. An installed card's budget is sized
-    /// for a card; an app that is used for an hour needs room for an hour.
-    /// A system app is part of the signed build, so it is admitted by its
-    /// digest alone.
-    pub fn system() -> Self {
-        HostLimits {
-            max_storage_bytes: 64 * 1024 * 1024,
-            max_instruction_budget: 4_000_000_000,
-            max_memory_bytes: 128 * 1024 * 1024,
-            require_signature: false,
-            ..HostLimits::default()
-        }
-    }
-}
-
-/// What the app gets. Produced only by [`resolve`].
+/// What the app and its agent get. Produced only by [`resolve`].
+///
+/// The app's part is the contract's [`octosense_app_contract::AppPolicy`],
+/// reached through [`AppPolicy::app`] or, field by field, through `Deref`
+/// (`policy.capabilities`, `policy.allows_host(..)`), so code written when
+/// both were one struct reads the same.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AppPolicy {
-    pub app_id: String,
-    pub version: String,
-    pub display_name: String,
-    /// Granted capabilities, sorted and deduplicated.
-    pub capabilities: BTreeSet<String>,
-    /// Exactly the hosts the app may reach. Empty means no network, whatever
-    /// the `net` capability says.
-    pub hosts: BTreeSet<String>,
-    pub storage_bytes: u64,
-    pub instruction_budget: u64,
-    pub memory_bytes: u64,
-    /// The `prompt` capability: may the app ask the person questions of its
-    /// own. A service's sheet (Mail's sign-in) does not need it; whether any
-    /// sheet may appear is the surface's call (`IsolateSettings::host_prompts`).
-    pub may_prompt: bool,
+    /// What the app may do: capabilities, hosts, storage, budgets, research.
+    pub app: octosense_app_contract::AppPolicy,
     /// None when the manifest asked for no agent.
     pub agent: Option<AgentPolicy>,
-    /// The scope of `research` and `crawl`, validated and normalised as
-    /// octos's `Scope::from_grant` does: the grant the host hands the
-    /// toolbox. `Some` exactly when the app requests either capability.
-    pub research: Option<ResearchScope>,
+}
+
+impl Deref for AppPolicy {
+    type Target = octosense_app_contract::AppPolicy;
+
+    fn deref(&self) -> &Self::Target {
+        &self.app
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -128,110 +70,15 @@ pub struct AgentPolicy {
     pub skills: BTreeSet<String>,
 }
 
-impl AppPolicy {
-    /// Whether a granted capability covers this action. The single question
-    /// every host service asks before doing work on an app's behalf.
-    pub fn allows(&self, capability: &str) -> bool {
-        self.capabilities.contains(capability)
-    }
-
-    /// Whether the app may reach this host. Requires the capability AND the
-    /// entry: a granted `net` with an empty list reaches nothing.
-    pub fn allows_host(&self, host: &str) -> bool {
-        self.allows("net") && self.hosts.contains(host)
-    }
-}
-
-/// Resolve a parsed manifest against this host.
+/// Resolve a parsed manifest against this host: the contract's rules for
+/// the app, then the agent's.
 pub fn resolve(manifest: &AppManifest, limits: &HostLimits) -> Result<AppPolicy, String> {
-    check_id(&manifest.id)?;
-    if manifest.storage.cache_max_bytes == Some(0) {
-        return Err(format!("app {}: storage.cache_max_bytes must be positive", manifest.id));
-    }
-    if manifest.version.trim().is_empty() {
-        return Err("manifest version is empty".into());
-    }
-    if limits.require_signature && manifest.integrity.signature.is_none() {
-        return Err(format!("app {} is unsigned and this host requires a signature", manifest.id));
-    }
-
-    let mut capabilities = BTreeSet::new();
-    for capability in &manifest.capabilities {
-        if !KNOWN_CAPABILITIES.contains(&capability.as_str()) {
-            return Err(format!("app {} requests unknown capability {:?}", manifest.id, capability));
-        }
-        capabilities.insert(capability.clone());
-    }
-
-    let mut hosts = BTreeSet::new();
-    for host in &manifest.network.hosts {
-        check_host(host)?;
-        hosts.insert(host.to_ascii_lowercase());
-    }
-    // A host list without the capability is a manifest mistake, not a silent
-    // grant: refuse it so the author notices before the app ships.
-    if !hosts.is_empty() && !capabilities.contains("net") {
-        return Err(format!("app {} lists hosts but does not request the net capability", manifest.id));
-    }
-
-    let research = resolve_research(&manifest.id, &capabilities, manifest.research.as_ref())?;
-
+    let app = octosense_app_contract::policy::resolve(manifest, limits)?;
     let agent = match &manifest.agent {
         None => None,
         Some(spec) => Some(resolve_agent(&manifest.id, spec, limits)?),
     };
-
-    Ok(AppPolicy {
-        app_id: manifest.id.clone(),
-        version: manifest.version.clone(),
-        display_name: manifest.name.clone(),
-        may_prompt: capabilities.contains("prompt"),
-        capabilities,
-        hosts,
-        storage_bytes: clamp(manifest.storage.max_bytes, limits.max_storage_bytes),
-        instruction_budget: clamp(manifest.compute.instruction_budget, limits.max_instruction_budget),
-        memory_bytes: clamp(manifest.compute.memory_bytes, limits.max_memory_bytes),
-        agent,
-        research,
-    })
-}
-
-/// The `research` scope against the `research` and `crawl` capabilities.
-/// The scope says what the capabilities reach, so neither goes without the
-/// other: a capability without a scope would reach whatever the host
-/// defaults to, which the store could not show, and a scope without a
-/// capability is a mistake the author should see. Crawl limits need `crawl`,
-/// because octos grants crawling from the limits alone.
-fn resolve_research(
-    app_id: &str,
-    capabilities: &BTreeSet<String>,
-    scope: Option<&ResearchScope>,
-) -> Result<Option<ResearchScope>, String> {
-    let research = capabilities.contains("research");
-    let crawl = capabilities.contains("crawl");
-    let Some(scope) = scope else {
-        if research || crawl {
-            let cap = if research { "research" } else { "crawl" };
-            return Err(format!(
-                "app {app_id} requests {cap} but declares no research scope; add a top-level \"research\" object (octos's scope; {{}} means no limits)"
-            ));
-        }
-        return Ok(None);
-    };
-    if !research && !crawl {
-        return Err(format!("app {app_id} declares a research scope but requests neither the research nor the crawl capability"));
-    }
-    let scope = scope.validated().map_err(|e| format!("app {app_id} {e}"))?;
-    if crawl && !scope.crawls() {
-        return Err(format!(
-            "app {app_id} requests crawl, so its research scope needs max_depth and max_pages above 0 (got {} and {})",
-            scope.max_depth, scope.max_pages
-        ));
-    }
-    if !crawl && (scope.max_depth > 0 || scope.max_pages > 0) {
-        return Err(format!("app {app_id} sets crawl limits (max_depth, max_pages) but does not request the crawl capability"));
-    }
-    Ok(Some(scope))
+    Ok(AppPolicy { app, agent })
 }
 
 fn resolve_agent(app_id: &str, spec: &AgentSpec, limits: &HostLimits) -> Result<AgentPolicy, String> {
@@ -358,45 +205,6 @@ fn check_triggers(app_id: &str, triggers: &Triggers) -> Result<(), String> {
                 "app {app_id} event {event:?} must be {namespace}.<name>: the app's own events, lowercase, at most 64 characters"
             ));
         }
-    }
-    Ok(())
-}
-
-/// An id is a path component of the app's jail, so it may not be empty, may
-/// not navigate, and may not surprise a filesystem.
-fn check_id(id: &str) -> Result<(), String> {
-    if id.is_empty() || id.len() > 64 {
-        return Err(format!("app id {id:?} must be 1 to 64 characters"));
-    }
-    if !id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '.') {
-        return Err(format!("app id {id:?} may hold only lowercase letters, digits, '-' and '.'"));
-    }
-    if id.starts_with('.') || id.contains("..") {
-        return Err(format!("app id {id:?} may not navigate the filesystem"));
-    }
-    crate::manifest::check_reserved_id(id)
-}
-
-/// A bare host: no scheme, no path, no port, no wildcard. The service adds
-/// HTTPS; the app never names a scheme, so it cannot ask for plain HTTP.
-fn check_host(host: &str) -> Result<(), String> {
-    if host.is_empty() || host.len() > 253 {
-        return Err(format!("host {host:?} must be 1 to 253 characters"));
-    }
-    if host.contains("://") || host.contains('/') {
-        return Err(format!("host {host:?} must be a bare host name, with no scheme or path"));
-    }
-    if host.contains('*') {
-        return Err(format!("host {host:?} may not use a wildcard"));
-    }
-    if host.contains(':') {
-        return Err(format!("host {host:?} may not name a port"));
-    }
-    if !host.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.') {
-        return Err(format!("host {host:?} holds a character a host name may not"));
-    }
-    if host.starts_with('.') || host.ends_with('.') || host.contains("..") {
-        return Err(format!("host {host:?} is not a well-formed host name"));
     }
     Ok(())
 }

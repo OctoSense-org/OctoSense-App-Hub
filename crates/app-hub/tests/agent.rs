@@ -39,7 +39,7 @@ fn stamp(dir: &Path) {
 }
 
 fn limits() -> HostLimits {
-    HostLimits { require_signature: false, ..HostLimits::default() }
+    HostLimits::default().with_require_signature(false)
 }
 
 /// Findings of the checks this change adds, plus the policy and assets

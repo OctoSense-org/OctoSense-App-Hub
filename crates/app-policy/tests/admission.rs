@@ -13,7 +13,7 @@ fn manifest_with(body: &str) -> String {
 }
 
 fn open_limits() -> HostLimits {
-    HostLimits { require_signature: false, ..HostLimits::default() }
+    HostLimits::default().with_require_signature(false)
 }
 
 fn resolve(body: &str) -> Result<AppPolicy, String> {
@@ -179,10 +179,7 @@ fn an_agent_may_keep_ask_user_question_and_no_other_kernel_tool() {
     assert_eq!(KERNEL_TOOLS, ["ask_user_question"]);
     let policy = resolve(r#""agent":{"profile":"read-only","tools":["ask_user_question","net.fetch"]}"#).unwrap();
     assert_eq!(policy.agent.unwrap().tools.into_iter().collect::<Vec<_>>(), ["ask_user_question", "net.fetch"]);
-    let generous = HostLimits {
-        offered_tools: ["ask_user_question", "shell", "read_file", "web_fetch", "peer_send_input", "spawn", "save_memory"].iter().map(|s| s.to_string()).collect(),
-        ..open_limits()
-    };
+    let generous = open_limits().with_offered_tools(["ask_user_question", "shell", "read_file", "web_fetch", "peer_send_input", "spawn", "save_memory"]);
     for tool in ["shell", "read_file", "web_fetch", "peer_send_input", "spawn", "save_memory", "ask_user_questions", "Ask_user_question"] {
         let body = format!(r#""agent":{{"profile":"read-only","tools":["{tool}"]}}"#);
         let err = admit_and_resolve(&manifest_with(&body), BUNDLE, &generous, &RefuseAllSignatures).unwrap_err();
@@ -366,7 +363,7 @@ fn research_is_its_own_capability_with_octos_scope() {
     // Not crawling, not the app's own network, not the news service.
     assert!(!policy.allows("crawl") && !policy.allows("net") && !policy.allows("news"));
     assert!(policy.hosts.is_empty());
-    let scope = policy.research.expect("the scope is granted with the capability");
+    let scope = policy.app.research.expect("the scope is granted with the capability");
     // Normalised as octos's Scope::from_grant does.
     assert_eq!(scope.langs, ["en", "zh-CN"]);
     assert_eq!(scope.regions, ["US"]);
@@ -424,7 +421,7 @@ fn crawl_needs_its_limits_and_the_limits_need_crawl() {
     assert!(policy.allows("crawl"));
     assert!(!policy.allows("research"), "crawl does not imply research");
     assert_eq!(policy.capabilities.len(), 1);
-    assert!(policy.research.unwrap().crawls());
+    assert!(policy.app.research.unwrap().crawls());
     for limits in [r#""max_depth":2"#, r#""max_pages":40"#, r#""max_depth":0,"max_pages":40"#, ""] {
         let err = resolve(&format!(r#""capabilities":["crawl"],"research":{{{limits}}}"#)).unwrap_err();
         assert!(err.contains("needs max_depth and max_pages above 0"), "{limits}: {err}");
@@ -502,4 +499,22 @@ fn a_native_apps_id_is_refused_at_resolve() {
     let json = manifest_with("").replace(r#""id":"weather""#, r#""id":"com.example.rinx""#);
     let err = admit_and_resolve(&json, BUNDLE, &open_limits(), &RefuseAllSignatures).unwrap_err();
     assert!(err.contains("reserved"), "{err}");
+}
+
+// ---------------------------------------------------------------- contract
+
+#[test]
+fn the_app_part_is_the_contracts_policy() {
+    let body = r#""capabilities":["storage","net"],"network":{"hosts":["api.weather.example"]},"agent":{"profile":"read-only"}"#;
+    let policy = resolve(body).unwrap();
+    let manifest = AppManifest::parse(&manifest_with(body)).unwrap();
+    assert_eq!(policy.app, contract::policy::resolve(&manifest, &open_limits()).unwrap());
+    assert!(policy.agent.is_some(), "the agent is the host's part");
+}
+
+#[test]
+fn the_default_tools_offer_every_kernel_tool_a_contained_agent_may_keep() {
+    for tool in KERNEL_TOOLS {
+        assert!(HostLimits::default().offered_tools.iter().any(|t| t == tool), "{tool}");
+    }
 }

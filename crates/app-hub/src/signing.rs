@@ -135,9 +135,6 @@ impl SignatureVerifier for PublisherKeys {
 pub fn sign_manifest(key: &HubKey, manifest: &mut AppManifest, key_id: &str) -> Result<(), String> {
     manifest.integrity.signature = None;
     let bytes = manifest.signing_bytes()?;
-    manifest.integrity.signature = Some(octosense_app_policy::manifest::Signature {
-        key_id: key_id.to_string(),
-        value: key.sign_hex(&bytes),
-    });
+    manifest.integrity.signature = Some(octosense_app_policy::manifest::Signature::new(key_id, key.sign_hex(&bytes)));
     Ok(())
 }
