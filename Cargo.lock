@@ -1172,6 +1172,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "octosense-app-contract"
+version = "1.0.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "octosense-app-host"
 version = "0.1.0"
 dependencies = [
@@ -1212,8 +1221,8 @@ dependencies = [
 name = "octosense-app-policy"
 version = "0.1.0"
 dependencies = [
- "blake3",
  "makepad-widgets",
+ "octosense-app-contract",
  "serde",
  "serde_json",
 ]

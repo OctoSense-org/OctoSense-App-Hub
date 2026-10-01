@@ -1,5 +1,8 @@
 # The OctoSense app hub: the crates behind the catalog in this repository.
 #
+#   app-contract  the app contract (OctoSense ADR 0005), published to
+#                 crates.io: manifest, app policy, integrity, running a
+#                 package; depends on crates.io crates only
 #   app-policy    the signed manifest and listing; admission; resolution into
 #                 an isolate's settings and an agent session profile (ADR 0002)
 #   app-hub       the index, the signed catalog, the gate, the scan, the device
@@ -17,6 +20,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/app-contract",
     "crates/app-policy",
     "crates/app-hub",
     "crates/appstore",

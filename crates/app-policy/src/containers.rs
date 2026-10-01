@@ -63,6 +63,25 @@ pub struct Provenance {
     pub app_version: String,
 }
 
+impl IsolateSettings {
+    /// The isolate settings for an app's contract policy: exactly what the
+    /// policy grants, in the isolate's knobs.
+    pub fn for_app(policy: &octosense_app_contract::AppPolicy, app_data_root: &Path) -> IsolateSettings {
+        IsolateSettings {
+            capabilities: policy.capabilities.iter().cloned().collect(),
+            // A granted `net` with no hosts reaches nothing, so the module is
+            // not handed over at all: less surface, same behaviour.
+            allow_net: policy.allows("net") && !policy.hosts.is_empty(),
+            storage_quota: policy.storage_bytes,
+            host_prompts: true,
+            instruction_budget: policy.instruction_budget,
+            memory_bytes: policy.memory_bytes,
+            jail_root: app_data_root.join(&policy.app_id),
+            hosts: policy.hosts.iter().cloned().collect(),
+        }
+    }
+}
+
 impl AppPolicy {
     /// The app's jail: one directory per app under the host's data root.
     pub fn jail_root(&self, app_data_root: &Path) -> PathBuf {
@@ -71,18 +90,7 @@ impl AppPolicy {
 
     /// The settings for this app's isolate.
     pub fn isolate_settings(&self, app_data_root: &Path) -> IsolateSettings {
-        IsolateSettings {
-            capabilities: self.capabilities.iter().cloned().collect(),
-            // A granted `net` with no hosts reaches nothing, so the module is
-            // not handed over at all: less surface, same behaviour.
-            allow_net: self.allows("net") && !self.hosts.is_empty(),
-            storage_quota: self.storage_bytes,
-            host_prompts: true,
-            instruction_budget: self.instruction_budget,
-            memory_bytes: self.memory_bytes,
-            jail_root: self.jail_root(app_data_root),
-            hosts: self.hosts.iter().cloned().collect(),
-        }
+        IsolateSettings::for_app(&self.app, app_data_root)
     }
 
     /// The agent session for this app, when it asked for one. The workspace
