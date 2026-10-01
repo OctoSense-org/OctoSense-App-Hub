@@ -31,6 +31,15 @@ members = [
     "crates/card-studio",
 ]
 
+# The app contract (OctoSense ADR 0005): every crate here depends on it by
+# version (`octosense-app-contract = "1"`), the way apps and the shell do, so
+# a consumer that takes App Hub from git links the crates.io copy and only
+# one copy of the contract exists in its build. App Hub itself develops
+# against the local crate. A [patch] in this workspace never applies to
+# consumers.
+[patch.crates-io]
+octosense-app-contract = { path = "crates/app-contract" }
+
 # Builds resolve the pinned sources from the prepared sibling checkouts, as
 # the OctoSense launcher workspace does.
 [patch."https://github.com/OctoSense-org/makepad.git"]
