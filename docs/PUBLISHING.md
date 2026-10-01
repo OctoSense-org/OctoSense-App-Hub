@@ -237,8 +237,11 @@ per-app budget), `glance` to any contained app granted it
 agent yet: OctoSense links its toolbox (`crates/toolbox`) only with the
 `toolbox-peers` feature, which the shipped shells leave off
 ([OctoSense#64](https://github.com/OctoSense-org/OctoSense/issues/64)).
-OctoSense pins this App Hub itself; Rinx, pinned by tagged release, resolves
-to the same revision through OctoSense's `[patch]`.
+OctoSense pins this App Hub itself. Rinx, pinned by tagged release, no longer
+depends on App Hub (since v1.1.0): App Hub, the shells and Rinx all take the
+app contract from crates.io by version (`octosense-app-contract = "1"`,
+OctoSense [ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)),
+so a build links one copy of it and needs no `[patch]` to line them up.
 
 **Host services by exact name** (`crates/app-policy/src/services.rs`). A host
 that offers the Matrix account (Rinx) or the device's assistant (Octos) serves
