@@ -1,0 +1,26 @@
+{
+  "digest": "729bc3dfe1ef9ae2e49cb86f82db670adc09282c4aaadc65d58ed804d6255c26",
+  "entry": "card",
+  "limits": "unsigned",
+  "policy": {
+    "app_id": "weather",
+    "capabilities": [
+      "glance",
+      "matrix.read_messages",
+      "matrix.send_message",
+      "model",
+      "octos.session.history",
+      "octos.session.open"
+    ],
+    "display_name": "Weather",
+    "hosts": [],
+    "instruction_budget": 20000000,
+    "may_prompt": false,
+    "memory_bytes": 67108864,
+    "research": null,
+    "storage_bytes": 16777216,
+    "version": "1.0.0"
+  },
+  "signing_blake3": "ad5b8ff7e5ceca4f1090b94d4ae21fb9f9da7ec5dc7c8f7b788148493d0661fc",
+  "source": "App Hub app-policy admission tests: matrix, octos, glance and model services"
+}

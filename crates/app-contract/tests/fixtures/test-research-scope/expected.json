@@ -1,0 +1,34 @@
+{
+  "digest": "729bc3dfe1ef9ae2e49cb86f82db670adc09282c4aaadc65d58ed804d6255c26",
+  "entry": "card",
+  "limits": "unsigned",
+  "policy": {
+    "app_id": "weather",
+    "capabilities": [
+      "research"
+    ],
+    "display_name": "Weather",
+    "hosts": [],
+    "instruction_budget": 20000000,
+    "may_prompt": false,
+    "memory_bytes": 67108864,
+    "research": {
+      "categories": [
+        "news"
+      ],
+      "langs": [
+        "en",
+        "zh-CN"
+      ],
+      "max_age_days": 7,
+      "max_results": 20,
+      "regions": [
+        "US"
+      ]
+    },
+    "storage_bytes": 16777216,
+    "version": "1.0.0"
+  },
+  "signing_blake3": "1ff12e3ea64287e739828ca88e6bec73614d2e6bd99c7ef572d4e18523698e91",
+  "source": "App Hub app-policy admission tests: research with octos's scope, normalised"
+}
