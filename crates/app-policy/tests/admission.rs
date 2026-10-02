@@ -258,6 +258,23 @@ fn the_surface_not_the_prompt_capability_decides_whether_a_service_may_raise_a_s
 }
 
 #[test]
+fn an_app_gets_its_storage_only_when_it_asks_for_it() {
+    // `storage` is the app's own files: `fs.*`, camera captures, local
+    // files a widget reads. Without the grant the isolate has no storage
+    // root at all, so every one of them answers "storage not available".
+    let root = Path::new("/data/apps");
+    let without = resolve(r#""capabilities":["net"],"network":{"hosts":["api.example.com"]}"#).unwrap();
+    assert_eq!(without.isolate_settings(root).storage_root(), None);
+    assert_eq!(without.isolate_settings(root).granted_storage_quota(), 0);
+    let with = resolve(r#""capabilities":["storage"]"#).unwrap();
+    let settings = with.isolate_settings(root);
+    assert_eq!(settings.storage_root(), Some(settings.jail_root.clone()));
+    assert!(settings.storage_quota > 0);
+    assert_eq!(settings.granted_storage_quota(), settings.storage_quota);
+    assert_eq!(settings.jail_root, root.join("forecast"));
+}
+
+#[test]
 fn a_directory_bundle_is_admitted_by_its_precomputed_digest() {
     let digest = bundle_digest(BUNDLE);
     let policy =

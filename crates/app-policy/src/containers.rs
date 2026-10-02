@@ -36,6 +36,22 @@ pub struct IsolateSettings {
     pub hosts: Vec<String>,
 }
 
+impl IsolateSettings {
+    /// The isolate's storage, its `fs` root: the jail, only when the app
+    /// was granted `storage`. Without it the isolate has none, so `fs.*`,
+    /// camera captures and the local files a widget reads all answer
+    /// "storage not available".
+    pub fn storage_root(&self) -> Option<PathBuf> {
+        self.capabilities.iter().any(|c| c == "storage").then(|| self.jail_root.clone())
+    }
+
+    /// The quota the isolate gets: the resolved one with its storage, none
+    /// without.
+    pub fn granted_storage_quota(&self) -> u64 {
+        if self.storage_root().is_some() { self.storage_quota } else { 0 }
+    }
+}
+
 /// What the kernel is asked for: a session that can reach no more than the
 /// app itself can. Serialises into the shape the kernel's profile takes.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
