@@ -7,6 +7,12 @@ OctoSense adds app agents and host services. Use this workspace's
 [consumer's Cargo manifest](https://github.com/OctoSense-org/OctoSense/blob/main/Cargo.toml),
 to identify the source versions used by your build.
 
+For a first run, identify your app form below, then use
+[§2](#2-run-the-right-host). Follow its bundle through admission, mounting
+and a service reply in §§3–5. [§6](#6-what-declaring-an-app-agent-actually-enables)
+adds a conversation to that app; the crate inventory is in
+[§7](#7-source-reference).
+
 ## 1. What runs where
 
 An **app** provides a user interface and data. An **agent** is a model-driven
@@ -32,6 +38,9 @@ Octoscript parser and `octoscript-makepad` lowering, then reaches Makepad.
 A native Rust module can also embed Splash UI; its Rust implementation is
 still compiled into its host.
 
+An **isolate** is the app's separate script execution environment. Its storage
+**jail** is the directory tree available to its sandboxed file operations.
+
 ```mermaid
 flowchart LR
     Author[Design Flow tools/octo] --> Gate[hub: stamp/check/scan]
@@ -49,43 +58,62 @@ flowchart LR
 The last two boxes are supplied by the shell. Standalone `card-host` has a
 pump but registers no host services.
 
-## 2. Read the crates in this order
+<a id="7-run-the-right-host"></a>
 
-1. [`app-contract/src/lib.rs`](../crates/app-contract/src/lib.rs): the
-   shared, versioned data contract. `AppManifest` describes requests;
-   `AppPolicy` describes grants. The shell uses these declarations when
-   preparing an authorized octos session.
-2. [`app-policy/src/policy.rs`](../crates/app-policy/src/policy.rs): resolve
-   the app contract plus agent requests against `HostLimits`.
-3. [`app-policy/src/agent.rs`](../crates/app-policy/src/agent.rs): validate
-   `tools.json`, instructions and skills; construct an `AgentBundle`.
-4. [`app-hub/src/gate.rs`](../crates/app-hub/src/gate.rs): produce the same
-   admission report for local development and publication.
-5. [`app-hub/src/client.rs`](../crates/app-hub/src/client.rs): the device's
-   `Store`, catalog verification, installation and permission to run.
-6. [`appstore/src/cardapp.rs`](../crates/appstore/src/cardapp.rs): mount a
-   verified app in its own shell client.
-7. [`appstore/src/services.rs`](../crates/appstore/src/services.rs): route
-   script host requests and deliver replies.
+## 2. Run the right host
 
-The remaining crates and supporting directories complete the delivery path:
+First prepare sibling sources using Design Flow's
+[native workspace instructions](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/NATIVE-WORKSPACE.md).
+This workspace's [`Cargo.toml`](../Cargo.toml) patches paths to `../makepad`,
+`../octoscript-makepad` and `../octoscript`. Missing siblings can prevent even
+Cargo metadata or a policy-only test from resolving. A consumer's top-level
+patches determine its actual versions; do not mix arbitrary latest engines
+with a different consumer's runtime lock.
 
-| Path | Role and next file |
-| --- | --- |
-| [`card-host`](../crates/card-host/src/main.rs) | Standalone contained bundle runner; argument parsing leads to `host::run` |
-| [`app-host`](../crates/app-host/src/lib.rs) | One-window host for a compiled Rust `AppModule` |
-| [`app-hub-app`](../crates/app-hub-app/README.md) | Shell integration: native store, Card runner, packed system apps and icons |
-| [`appstore-app`](../crates/appstore-app/src/lib.rs) | Standalone `appstore` executable using `AppHostView` |
-| [`card-studio`](../crates/card-studio/src/main.rs) | Hidden `card-host` captures at glance, phone and desktop sizes; measured checks and critique payload |
-| [`skills/card-studio`](../skills/card-studio/SKILL.md) | octos skill exposing card rendering and critique preparation |
-| [`templates/app`](../templates/app/README.md) | Card-app scaffold with bundle metadata and contributor instructions |
+From App Hub. **Validation status: build, GUI and device execution unverified.**
 
-OctoSense consumes a git revision of App Hub selected by its `Cargo.toml`.
-OctoSense, App Hub and Rinx request `octosense-app-contract = "1"` from
-crates.io; the consumer lock records the resolved release. This workspace
-alone patches that dependency to `crates/app-contract` for development.
-Cargo applies patches from the top-level workspace, so that local patch
-is not inherited by a shell consuming App Hub as a dependency.
+```sh
+cargo build --release -p octosense-card-host -p octosense-app-hub
+cargo run -p octosense-app-hub --bin hub -- help
+cargo test -p octosense-app-contract -p octosense-app-policy -p octosense-app-hub
+cargo test -p octosense-card-host --test cli
+```
+
+Run a disposable unsigned development bundle:
+
+```sh
+MAKEPAD_HIDE_WINDOWS=1 MAKEPAD_REMOTE=8141 cargo run --release \
+  -p octosense-card-host -- --bundle /absolute/path/my-app/bundle \
+  --app-data /absolute/path/my-app/.local-state --allow-unsigned --stamp
+```
+
+That command stays in the foreground. In another terminal:
+
+```sh
+curl -s http://127.0.0.1:8141/snap
+curl -s http://127.0.0.1:8141/quit
+```
+
+`--stamp` writes the manifest; use a development copy. This host uses
+`RefuseAllSignatures`, so `--allow-unsigned` does not make a signed manifest
+verifiable. Use the store path to test signatures. `--system` changes
+admission limits for first-party bundles; it does not register Mail, models
+or octos. Run shell integration to test those services.
+
+For a native module, the standalone app binary registers `AppHostView` and
+calls `open_in(module, open_json)`. In [`app-host`](../crates/app-host/src/lib.rs),
+`create` validates arguments, allocates a Splash VM, supplies scoped
+storage/viewport/reply handles and calls the Rust module. Event and draw
+calls enter its VM. Its `ServiceExecutor` is retained but never called by
+an assistant; upstream bus messages are drained. Running the same module
+inside OctoSense adds the broker and agent integration.
+
+To exercise distribution without publishing, use the documented
+[fixture/preview commands](../crates/app-hub-app/README.md#exercise-installation-without-publishing-apps).
+The fixture generates a local catalog and isolated environment settings;
+only the full shell opens installed apps as clients. Native app, desktop,
+Home APK and ROM build commands belong to the
+[OctoSense README](https://github.com/OctoSense-org/OctoSense/blob/main/README.md).
 
 ## 3. From a manifest to a contained UI
 
@@ -192,6 +220,37 @@ octos side uses async scheduling, explained in the
 
 ## 6. What declaring an app agent actually enables
 
+### Follow a request for saved notes
+
+The `mail.list` call in §5 is a UI-to-service request: it needs no model.
+Now consider a different request, “Summarize my saved notes,” sent to an
+app agent. Assume the app has stored those notes in its account workspace
+and the person has allowed its agent in the OctoSense shell.
+
+1. A person opens desktop `Ask <app>` and sends the request. The shell
+   selects that app's peer—the agent identity—and its human conversation.
+   An app-owned chat can instead enter through `octos.turn.start`, using
+   the host-request transport from §5 to reach the shell's agent service.
+2. The model can request the shell's bounded `files.list/read/search`
+   tools on Unix. These read the exposed account folder; merely declaring
+   `tools.json` does not make every UI record readable.
+3. Tool results return to the model, which produces an answer for the
+   originating human conversation. If the system assistant delegated the
+   same question, it uses the app peer's separate system conversation and
+   gathers that conversation's result instead.
+4. A follow-up requiring another app's operation must pass that tool's
+   admission, sharing and execution checks. For example, adding
+   `mail.send` to `agent.tools` fails default admission; it is not a working
+   cross-app recipe.
+
+This example ties together three separate decisions: admission grants what
+the app may request, the shell supplies tools that can actually execute,
+and the active conversation determines where the answer returns.
+Standalone `card-host` stops before this agent path because it has no
+registered services or agent runtime.
+
+### Declarations and executable tools
+
 `AgentBundle::load` checks the digest again and validates the declaration.
 `tools.json` describes tool names, schemas, risk, sharing, confirmation and
 implementation ownership. A contained app's namespace is its id's last
@@ -233,6 +292,8 @@ set: its `ai-providers` namespace fails the tool-name rule. The shell's
 [`script_apps` tests](https://github.com/OctoSense-org/OctoSense/blob/main/crates/shell/src/host_tools/script_apps.rs)
 record these exact tool rosters.
 
+### Conversation routing and data access
+
 The shell supplies the desktop `Ask <app>` panel, app-owned `octos.*` UI
 and supported L0 card chat. See the
 [shell chat surfaces](https://github.com/OctoSense-org/OctoSense/blob/c3011a2057ec59738b79466f48ff2ad8d0e60130/docs/architecture-walkthrough.md#6-where-a-person-talks-and-where-the-answer-goes)
@@ -257,60 +318,49 @@ grant and an executable owner route, plus approval where required.
 Contained app agents cannot call `peer_send_input` or acquire system-agent
 privileges through this tool route.
 
-## 7. Run the right host
+<a id="2-read-the-crates-in-this-order"></a>
 
-First prepare sibling sources using Design Flow's
-[native workspace instructions](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/NATIVE-WORKSPACE.md).
-This workspace's [`Cargo.toml`](../Cargo.toml) patches paths to `../makepad`,
-`../octoscript-makepad` and `../octoscript`. Missing siblings can prevent even
-Cargo metadata or a policy-only test from resolving. A consumer's top-level
-patches determine its actual versions; do not mix arbitrary latest engines
-with a different consumer's runtime lock.
+## 7. Source reference
 
-From App Hub. **Validation status: build, GUI and device execution unverified.**
+Use this index to revisit the path traced above. The first seven files
+cover admission through reply delivery; the table covers other hosts and
+authoring support.
 
-```sh
-cargo build --release -p octosense-card-host -p octosense-app-hub
-cargo run -p octosense-app-hub --bin hub -- help
-cargo test -p octosense-app-contract -p octosense-app-policy -p octosense-app-hub
-cargo test -p octosense-card-host --test cli
-```
+1. [`app-contract/src/lib.rs`](../crates/app-contract/src/lib.rs): the
+   shared, versioned data contract. `AppManifest` describes requests;
+   `AppPolicy` describes grants. The shell uses these declarations when
+   preparing an authorized octos session.
+2. [`app-policy/src/policy.rs`](../crates/app-policy/src/policy.rs): resolve
+   the app contract plus agent requests against `HostLimits`.
+3. [`app-policy/src/agent.rs`](../crates/app-policy/src/agent.rs): validate
+   `tools.json`, instructions and skills; construct an `AgentBundle`.
+4. [`app-hub/src/gate.rs`](../crates/app-hub/src/gate.rs): produce the same
+   admission report for local development and publication.
+5. [`app-hub/src/client.rs`](../crates/app-hub/src/client.rs): the device's
+   `Store`, catalog verification, installation and permission to run.
+6. [`appstore/src/cardapp.rs`](../crates/appstore/src/cardapp.rs): mount a
+   verified app in its own shell client.
+7. [`appstore/src/services.rs`](../crates/appstore/src/services.rs): route
+   script host requests and deliver replies.
 
-Run a disposable unsigned development bundle:
+The remaining crates and supporting directories complete the delivery path:
 
-```sh
-MAKEPAD_HIDE_WINDOWS=1 MAKEPAD_REMOTE=8141 cargo run --release \
-  -p octosense-card-host -- --bundle /absolute/path/my-app/bundle \
-  --app-data /absolute/path/my-app/.local-state --allow-unsigned --stamp
-```
+| Path | Role and next file |
+| --- | --- |
+| [`card-host`](../crates/card-host/src/main.rs) | Standalone contained bundle runner; argument parsing leads to `host::run` |
+| [`app-host`](../crates/app-host/src/lib.rs) | One-window host for a compiled Rust `AppModule` |
+| [`app-hub-app`](../crates/app-hub-app/README.md) | Shell integration: native store, Card runner, packed system apps and icons |
+| [`appstore-app`](../crates/appstore-app/src/lib.rs) | Standalone `appstore` executable using `AppHostView` |
+| [`card-studio`](../crates/card-studio/src/main.rs) | Hidden `card-host` captures at glance, phone and desktop sizes; measured checks and critique payload |
+| [`skills/card-studio`](../skills/card-studio/SKILL.md) | octos skill exposing card rendering and critique preparation |
+| [`templates/app`](../templates/app/README.md) | Card-app scaffold with bundle metadata and contributor instructions |
 
-That command stays in the foreground. In another terminal:
-
-```sh
-curl -s http://127.0.0.1:8141/snap
-curl -s http://127.0.0.1:8141/quit
-```
-
-`--stamp` writes the manifest; use a development copy. This host uses
-`RefuseAllSignatures`, so `--allow-unsigned` does not make a signed manifest
-verifiable. Use the store path to test signatures. `--system` changes
-admission limits for first-party bundles; it does not register Mail, models
-or octos. Run shell integration to test those services.
-
-For a native module, the standalone app binary registers `AppHostView` and
-calls `open_in(module, open_json)`. In [`app-host`](../crates/app-host/src/lib.rs),
-`create` validates arguments, allocates a Splash VM, supplies scoped
-storage/viewport/reply handles and calls the Rust module. Event and draw
-calls enter its VM. Its `ServiceExecutor` is retained but never called by
-an assistant; upstream bus messages are drained. Running the same module
-inside OctoSense adds the broker and agent integration.
-
-To exercise distribution without publishing, use the documented
-[fixture/preview commands](../crates/app-hub-app/README.md#exercise-installation-without-publishing-apps).
-The fixture generates a local catalog and isolated environment settings;
-only the full shell opens installed apps as clients. Native app, desktop,
-Home APK and ROM build commands belong to the
-[OctoSense README](https://github.com/OctoSense-org/OctoSense/blob/main/README.md).
+OctoSense consumes a git revision of App Hub selected by its `Cargo.toml`.
+OctoSense, App Hub and Rinx request `octosense-app-contract = "1"` from
+crates.io; the consumer lock records the resolved release. This workspace
+alone patches that dependency to `crates/app-contract` for development.
+Cargo applies patches from the top-level workspace, so that local patch
+is not inherited by a shell consuming App Hub as a dependency.
 
 ## 8. Debug by boundary
 

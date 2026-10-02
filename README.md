@@ -48,11 +48,12 @@ octosense-app-hub --bin hub` is the publishing tool.
 
 ## Code walkthrough
 
-Read [docs/CODE-WALKTHROUGH.md](docs/CODE-WALKTHROUGH.md) for the package-to-UI
-call chain, native `AppModule` versus Splash/L0 apps, exact development
-commands, storage and host-service reply routing, and the boundary between
-agent declarations and working shell peers/tools. Contributor instructions
-are in [AGENTS.md](AGENTS.md).
+Start with [the walkthrough's host and launch choices](docs/CODE-WALKTHROUGH.md#2-run-the-right-host),
+then trace a bundle into its UI and a host-service reply back to its callback.
+A saved-notes request connects app-agent conversations, account storage and
+tool grants. The walkthrough distinguishes native `AppModule`, Splash and
+L0 apps, with the crate inventory at the end. Contributor instructions are
+in [AGENTS.md](AGENTS.md).
 
 ## Trust anchor
 

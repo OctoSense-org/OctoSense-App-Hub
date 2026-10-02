@@ -26,6 +26,9 @@ owns authoring workflows.
   `card-host` CLI tests for arguments, relevant service tests for lifecycle
   changes. Documentation-only changes need source/link/command checks;
   report unavailable builds or devices explicitly.
+- In walkthroughs, lead with a launch path, then trace one request to its
+  reply. Define routing terms at first use and keep source inventories after
+  the main path. Preserve prerequisites and capability limits in examples.
 - Keep English and Chinese README summaries aligned. Preserve historical
   evidence and label source-reviewed commands separately from commands run.
 - Use hidden windows for automated GUI checks, a distinct bridge port and

@@ -40,10 +40,10 @@
 
 ## 代码导读
 
-[代码导读（英文）](docs/CODE-WALKTHROUGH.md) 从包验证、商店安装追踪到 UI 挂载，
-区分原生 `AppModule`、Splash 脚本和 Octoscript L0 卡片，并说明运行命令、存储、
-宿主服务应答，以及应用 Agent 的声明与 Shell 中实际可执行的 Peer 和工具之间的边界。
-仓库协作规则见 [AGENTS.md](AGENTS.md)。
+先看[代码导读中的宿主选择与启动命令（英文）](docs/CODE-WALKTHROUGH.md#2-run-the-right-host)，
+再追踪应用包如何进入 UI，以及宿主服务的应答如何回到回调函数。“总结已保存的笔记”
+这一请求串起应用 Agent 的对话、账户存储与工具授权。导读区分原生 `AppModule`、
+Splash 脚本和 L0 卡片，并把 crate 索引放在最后。仓库协作规则见 [AGENTS.md](AGENTS.md)。
 
 ## 信任锚
 
