@@ -23,6 +23,11 @@ ed25519-dalek = { version = "3", features = ["rand_core"] }
 rand_core = { version = "0.9", features = ["os_rng"] }
 hex = "0.4"
 base64 = "0.22"
+# Structural admission (admission.rs): decode artwork within limits, parse
+# SVG, and check a card's L0 source, the same crate card-host renders with.
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
+roxmltree = "0.21.1"
+octoscript-ui-l0 = { git = "https://github.com/OctoSense-org/Octoscript.git", rev = "5991dfae9344589e732b2605b530f788e8bbcd11" }
 ureq = "3"
 
 [[bin]]

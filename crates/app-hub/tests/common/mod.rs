@@ -17,6 +17,8 @@ impl Fixture {
         fs::create_dir(&root).unwrap();
         let bundle = root.join("bundle");
         fs::create_dir(&bundle).unwrap();
+        // A script app: the runnable entry the gate requires.
+        fs::write(bundle.join("main.splash"), "Label{text: \"Example\"}").unwrap();
         fs::write(bundle.join("icon.svg"), r##"<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" fill="#146"/></svg>"##).unwrap();
         // A real, decodable 1x1 PNG; visual quality is tested separately.
         use base64::Engine;
@@ -32,6 +34,16 @@ impl Fixture {
         let mut fixture = Self { root, bundle, publisher, manifest };
         fixture.sign();
         fixture
+    }
+
+    /// The same app as an L0 card (`page.card`, its data and its kit).
+    pub fn card(&mut self) {
+        fs::remove_file(self.bundle.join("main.splash")).unwrap();
+        fs::create_dir_all(self.bundle.join("kit/native/light")).unwrap();
+        fs::write(self.bundle.join("page.card"), include_str!("../fixtures/card/page.card")).unwrap();
+        fs::write(self.bundle.join("page.data.json"), include_str!("../fixtures/card/page.data.json")).unwrap();
+        fs::write(self.bundle.join("kit/native/light/kit.json"), include_str!("../fixtures/card/kit/native/light/kit.json")).unwrap();
+        self.sign();
     }
 
     pub fn write_manifest(&self) {
