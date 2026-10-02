@@ -2,13 +2,14 @@
 
 [English](README.md) | 简体中文
 
-这里是为 OctoSense 发布的应用索引、每个 OctoSense 商店都会读取的签名目录、App Hub 为每个已准入应用包保存的副本，以及运行 hub 和商店的代码。这里不存放任何应用代码，每个应用都留在其发布者自己的仓库中。
+这里是为 OctoSense 发布的应用索引、每个 OctoSense 商店都会读取的签名目录、App Hub 为每个已准入应用包保存的副本，以及运行 hub 和商店的代码。发布者的应用源码留在各自仓库中；本仓库也包含商店 UI、运行宿主、模板和测试夹具。
 
 | 想找 | 仓库 |
 | --- | --- |
 | 如何开发应用：快速上手、脚本 API、脚本应用模板、设计流程、示例 | [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) |
-| AppCard 助手运行时（在 Shell 中需 `--features app-appcard` 才启用）与 L0 卡片语言 | [OctoSense `apps/appcard`](https://github.com/OctoSense-org/OctoSense/tree/main/apps/appcard) |
+| AppCard 助手运行时（在 Shell 中需 `--features app-appcard` 才启用） | [OctoSense `apps/appcard`](https://github.com/OctoSense-org/OctoSense/tree/main/apps/appcard) |
 | 第一方系统应用（新闻、相册、地图、相机、邮件、AI providers）及其宿主服务（`mail`、`llm`） | [OctoSense `apps/`](https://github.com/OctoSense-org/OctoSense/tree/main/apps) |
+| L0 解析器/检查器及其 Makepad 转换/渲染层 | [Octoscript](https://github.com/OctoSense-org/Octoscript) 与 [Octoscript-Makepad](https://github.com/OctoSense-org/Octoscript-Makepad) |
 | 应用包格式、准入检查、签名、提交与商店 | 本仓库 |
 
 **要开发应用？** 请从 [OctoSense-org 主页](https://github.com/OctoSense-org)的“请按顺序先阅读”列表开始（先读 OctoScript-App-Design-Flow 的 `AGENTS.md`，再读其 `docs/QUICKSTART.md`）。你只需要把本仓库作为兄弟目录克隆下来，用于构建 `hub` 和 `card-host`，以及提交应用（在这里开 issue，见[提交](docs/PUBLISHING.md#submitting)）。不要修改 `catalog.json`、`index/` 或 `artifacts/`。
@@ -36,6 +37,18 @@
 | `crates/app-hub-app` | 每个 OctoSense Shell 都会链接的集成：原生商店模块、`card` 运行模块、由 `OCTOSENSE_SYSTEM_APPS` 指定的系统应用、已安装应用和图标（[README](crates/app-hub-app/README.md)）。 |
 
 这些 crate 基于固定版本的 OctoSense Makepad 与 Octoscript 分支构建，和启动器工作区一样，从同级检出目录（`../makepad`、`../octoscript-makepad`、`../octoscript`）解析依赖。`cargo test --workspace` 以无界面方式运行策略、准入检查、签名和商店测试；`cargo run -p octosense-app-hub --bin hub` 是发布工具。
+
+## 面向 Rust 初学者的代码导读
+
+[代码导读（英文）](docs/CODE-WALKTHROUGH.md) 从包验证、商店安装追踪到 UI 挂载，
+区分原生 `AppModule`、Splash 脚本和 Octoscript L0 卡片，并说明运行命令、存储、
+宿主服务回包，以及 Agent 声明与 Shell 中真实可运行的 Peer/工具之间的边界。
+仓库协作规则见 [AGENTS.md](AGENTS.md)。
+
+`card-host` 执行隔离策略，但不注册宿主服务，也不启动 octos 内核。
+应用 Agent 对话需在完整 OctoSense Shell 中验证。Peer 身份、会话上下文和 Tokio
+调度由 Shell/内核负责；App Hub 提供策略与 UI 请求/应答传输。
+发布者应用源码位于各自仓库；本仓库也包含商店 UI、运行宿主、模板和测试夹具。
 
 ## 信任锚
 
