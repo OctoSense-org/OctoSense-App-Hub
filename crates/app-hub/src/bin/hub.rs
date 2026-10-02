@@ -246,7 +246,14 @@ fn gate_for(bundle: &Path, argv: &[String], allow_unsigned: bool, catalog: Optio
         let (id, public) = pair.split_once('=').ok_or("--publisher-key expects id=hexkey")?;
         keys = keys.with(id, public);
     }
-    let limits = HostLimits { require_signature: !allow_unsigned, ..HostLimits::default() };
+    let limits = if argv.iter().any(|a| a == "--system-app") {
+        // Developing a system app: the same limits `card-host --system`
+        // runs it under. The store never publishes it; this only checks
+        // the bundle.
+        HostLimits::system()
+    } else {
+        HostLimits { require_signature: !allow_unsigned, ..HostLimits::default() }
+    };
     let previous = match catalog {
         Some(path) if Path::new(&path).exists() => Some(read_catalog(Path::new(&path))?),
         _ => None,

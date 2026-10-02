@@ -5,14 +5,14 @@ hub — the OctoSense app hub command (ADR 0003)
   hub certify --anchor <f> --working <f>   anchor certifies a working key
   hub stamp <bundle>                    write the bundle's digest into its manifest
   hub sign-manifest <bundle> --key <f> --key-id <id>
-  hub check <bundle> [--catalog <f>] [--allow-unsigned] [--publisher-key id=hex]
+  hub check <bundle> [--catalog <f>] [--allow-unsigned] [--publisher-key id=hex] [--system-app]
   hub publish <bundle> --catalog <f> --key <f> --anchor-cert <hex>
               --publisher <id> [--repo <url>] [--commit <sha>] [--out <dir>]
   hub withdraw <app> --version <v> --reason <text> --catalog <f> --key <f> --anchor-cert <hex>
   hub remove <app> [--version <v>] --catalog <f> --key <f> --anchor-cert <hex> [--out <dir>]
               (drops the entry, its index file and its artifacts; for a
               publish that should never have been offered — withdraw otherwise)
-  hub scan <bundle> [--reviewer <cmd>] [--packet <out.json>]
+  hub scan <bundle> [--reviewer <cmd>] [--packet <out.json>] [--system-app]
   hub verify <catalog> --anchor <hex>
 
 publish also accepts --reviewer <cmd> (the agent scan; a reject stops the
@@ -22,3 +22,7 @@ publish, human-review stops it until --reviewed) and writes
 check is the gate: a publisher runs it before submitting, the hub runs the
 same code after. publish re-runs it, copies the bundle into the artifact
 store and signs the catalog.
+
+--system-app checks a system-app bundle (an os. id) the way card-host
+--system runs it: system limits, admitted by digest. The store never
+publishes it; this only checks the bundle while developing one.

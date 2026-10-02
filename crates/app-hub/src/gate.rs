@@ -124,10 +124,18 @@ pub fn check_bundle(
     // ---- identity ------------------------------------------------------
     // Ids under `os.` are the system apps' (appstore::system): every device
     // refuses to install one from a store, so the hub refuses to offer one.
-    if manifest.id.starts_with("os.") {
+    // A host that runs system apps (they ship inside the build) admits them
+    // by digest: `hub check --system-app` is that host, for developing one.
+    if manifest.id.starts_with("os.") && !limits.admit_system_apps {
         findings.push(Finding::refuse(
             "identity",
             format!("{} is under os., which is reserved for system apps that ship with the device", manifest.id),
+        ));
+    }
+    if limits.admit_system_apps && !manifest.id.starts_with("os.") {
+        findings.push(Finding::warn(
+            "identity",
+            format!("{} is not under os.; system-app limits would not apply to it on a device", manifest.id),
         ));
     }
 
@@ -453,8 +461,8 @@ mod tests {
             .unwrap()
         };
         let limits = HostLimits { require_signature: false, ..HostLimits::default() };
-        let identity = |dir: &Path| {
-            check_bundle(dir, &limits, &octosense_app_policy::RefuseAllSignatures, None)
+        let identity = |dir: &Path, limits: &HostLimits| {
+            check_bundle(dir, limits, &octosense_app_policy::RefuseAllSignatures, None)
                 .unwrap()
                 .findings
                 .into_iter()
@@ -462,9 +470,10 @@ mod tests {
                 .count()
         };
         write("os.mail");
-        assert_eq!(identity(&dir), 1, "os. ids belong to system apps");
+        assert_eq!(identity(&dir, &limits), 1, "os. ids belong to system apps");
+        assert_eq!(identity(&dir, &HostLimits::system()), 0, "a host that runs system apps admits os. ids");
         write("dev.example.mail");
-        assert_eq!(identity(&dir), 0);
+        assert_eq!(identity(&dir, &limits), 0);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

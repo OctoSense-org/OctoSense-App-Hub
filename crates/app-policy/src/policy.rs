@@ -24,6 +24,10 @@ pub struct HostLimits {
     pub offered_tools: Vec<String>,
     /// Whether a bundle must carry a signature to be admitted.
     pub require_signature: bool,
+    /// Whether ids under `os.` pass the identity check. A host that runs
+    /// system apps (they ship inside the build) admits them by digest; the
+    /// hub's store gate never does.
+    pub admit_system_apps: bool,
 }
 
 impl Default for HostLimits {
@@ -42,6 +46,7 @@ impl Default for HostLimits {
                 .map(|s| s.to_string())
                 .collect(),
             require_signature: true,
+            admit_system_apps: false,
         }
     }
 }
@@ -59,6 +64,7 @@ impl HostLimits {
             max_instruction_budget: 4_000_000_000,
             max_memory_bytes: 128 * 1024 * 1024,
             require_signature: false,
+            admit_system_apps: true,
             ..HostLimits::default()
         }
     }
