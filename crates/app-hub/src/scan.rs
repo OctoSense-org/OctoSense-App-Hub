@@ -237,7 +237,7 @@ mod tests {
             r#"{"schema":1,"id":"dev.example.app","version":"1","name":"App","integrity":{"bundle_blake3":""}}"#,
         )
         .unwrap();
-        let report = GateReport { app_id: "dev.example.app".into(), version: "1".into(), digest: String::new(), findings: vec![], policy: None };
+        let report = GateReport { app_id: "dev.example.app".into(), version: "1".into(), digest: String::new(), findings: vec![], policy: None, admitted_manifest: Vec::new() };
         let packet = packet(&dir, &report).expect("a bundle with no page.card still gets a packet");
         assert_eq!(packet.entry, SCRIPT_ENTRY);
         assert!(packet.card_source.contains("hello"));

@@ -103,8 +103,9 @@ pub use octoscript_widgets;
 
 /// The hub anchor this build trusts (ADR 0003 §4). Shipped in the binary;
 /// the hub's working key is certified by it, so rotating that key needs no
-/// release. `OCTOSENSE_HUB_ANCHOR` overrides it for development only.
-pub const DEFAULT_ANCHOR: &str = "6000284a069ba7cada2925094074e8e0baae07e25d1b7fc31f396c993f363e11";
+/// release. `OCTOSENSE_HUB_ANCHOR` overrides it for development only. The
+/// `hub` tool checks catalog history against the same constant.
+pub use octosense_app_hub::DEFAULT_ANCHOR;
 
 /// The hub this build reads by default: the OctoSense organisation's hub,
 /// served from its repository. `OCTOSENSE_HUB` overrides it (a mirror

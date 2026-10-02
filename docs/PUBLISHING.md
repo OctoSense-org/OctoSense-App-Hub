@@ -104,7 +104,7 @@ review packets outside the submitted bundle.
 | Crawl limits need `crawl` | `crawl` without `max_depth` and `max_pages` above 0, or crawl limits without `crawl`. |
 | Version is new | Re-publishing a version already in the catalog. |
 | Listing present and complete | No `listing.json`; no icon or no screenshot; an unknown category, platform or age rating; a non-https privacy policy; or an icon or screenshot the listing names that is not in the bundle. |
-| Publisher continuity | An update signed by a different key than the one on record for this app. |
+| Publisher continuity | An update, or a new app from a publisher already on record, not signed by the key the catalog records for that publisher; a `--publisher-key` that disagrees with the recorded key; catalog history that disagrees with itself. |
 | Tools are the app's own | In `tools.json`: a tool outside the app's namespace (the last segment of its id); a namespace that is not `[a-z0-9_]{1,24}`; a duplicate name, or two names the broker would spell the same; a missing `risk` or `implemented_by`; an unknown field; a schema outside the supported subset, over 8 KB or nested deeper than 8; an input that is not an object; more than 64 tools or a file over 64 KB; `confirm: "app"` on a tool the host service implements. |
 | Local-only data stays local | A `shareable` tool of an app whose `agent.model.local_only` is true, unless it declares `"private_data": false`. |
 | Agent files are declared text | An `AGENT.md` that `agent.instructions` does not name, or a `skills/<name>/` that `agent.skills` does not; instructions over 32 KB, not UTF-8, holding control characters, a leading `#!`, `<script`, `<iframe>`, `javascript:` or similar; agent files without an `agent`. |
@@ -629,7 +629,7 @@ locally is the report the hub acts on. Build it from this repository with
 | Command | What it does |
 | --- | --- |
 | `hub stamp <bundle>` | Write the bundle's digest into `manifest.json`. Rerun after every change. |
-| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file>]` | The gate. Prints PASSED or REFUSED, each finding, and what the app will be granted; exits non-zero on a refusal. |
+| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]]` | The gate. Prints PASSED or REFUSED, each finding, and what the app will be granted; exits non-zero on a refusal. |
 | `hub scan <bundle> [--packet <out.json>] [--reviewer <cmd>]` | Stage two: the review packet (manifest, listing, grants, the entry's source, and the reviewer's questions), optionally handed to a reviewer command. Runs only on a bundle the gate passes. |
 | `hub keygen <key file>` | Make a signing key; prints its public half. |
 | `hub pubkey <key file>` | Print a key's public half. |
@@ -639,6 +639,9 @@ locally is the report the hub acts on. Build it from this repository with
 manifest: if the grants are wider than the app visibly needs, reduce the
 manifest. Use `--catalog <catalog.json>` to check version and publisher
 continuity against a published catalog (this repository's `catalog.json`).
+The catalog counts as history only once it verifies against the hub's anchor
+(the one in the [README](../README.md#trust-anchor) unless `--anchor <hex>`
+names another, for a development hub).
 Keep `review.json` outside the bundle; it is a review artifact, not app
 content.
 
@@ -689,6 +692,17 @@ hub check bundle --publisher-key "$APP_PUBLISHER_ID=$APP_PUBLISHER_PUBLIC_KEY"
 Signing is optional for a first submission and required for updates once a
 key is on record: the hub refuses an update signed by a different key, or not
 signed, once a key is on record for the app.
+
+The key on record is the one in the published catalog, never one a submission
+supplies. Once a release signed by your key is published, every later version
+of that app, and every new app you publish under the same publisher id, must
+be signed by that key: a `--publisher-key` with another key under your id is
+refused, and the hub does not need you to supply your key again. Your
+publisher id is your signature's key id (`hub publish --publisher` must equal
+it). An app first published unsigned gets its key on record with its first
+signed update. There is no key-replacement flag: a lost or rotated key, or
+history that disagrees with itself, needs the hub's maintainer. Keep your
+signing key safe.
 
 The signature covers the manifest, including `integrity.bundle_blake3`, so:
 

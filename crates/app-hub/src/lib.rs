@@ -17,6 +17,7 @@ pub mod client;
 pub mod gate;
 pub mod index;
 pub mod pack;
+pub mod publishers;
 pub mod remote;
 pub mod scan;
 pub mod signing;
@@ -27,4 +28,11 @@ pub use remote::{today, Remote};
 pub use scan::{packet, scan, Packet, Route, Verdict};
 pub use gate::{check_bundle, entry_for, Finding, GateReport, Severity};
 pub use index::{Catalog, Entry, Source, Status, WorkingKey, CATALOG_SCHEMA};
+pub use publishers::{verify_continuity, CatalogPublishers, PublisherBinding, PublisherRegistry};
 pub use signing::{sign_manifest, verify_catalog, HubKey, PublisherKeys};
+
+/// The hub anchor OctoSense stores trust (ADR 0003 §4): the hub's working
+/// key is certified by it, so rotating that key needs no store release.
+/// `hub check` and `hub publish` authenticate an existing catalog against it
+/// unless `--anchor` names another (a development hub).
+pub const DEFAULT_ANCHOR: &str = "6000284a069ba7cada2925094074e8e0baae07e25d1b7fc31f396c993f363e11";

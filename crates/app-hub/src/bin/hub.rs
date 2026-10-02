@@ -5,15 +5,20 @@
 //! hub certify --anchor <key> --working <key>
 //! hub stamp <bundle>                      # write the bundle digest into its manifest
 //! hub sign-manifest <bundle> --key <key> --key-id <id>
-//! hub check <bundle> [--catalog <file>] [--allow-unsigned] [--publisher-key id=hex]
+//! hub check <bundle> [--catalog <file> [--anchor <hex>]] [--allow-unsigned] [--publisher-key id=hex]
 //! hub publish <bundle> --catalog <file> --key <working> --anchor-cert <hex>
-//!             --publisher <id> --repo <url> --commit <sha> [--out <dir>]
+//!             --publisher <id> --repo <url> --commit <sha> [--out <dir>] [--anchor <hex>]
 //! hub verify <catalog> --anchor <hex>
 //! ```
 //!
 //! `check` is the gate: a developer runs it before submitting and sees the
 //! same report the hub's job produces. `publish` runs the gate again, copies
 //! the bundle into the artifact store and signs the catalog.
+//!
+//! An existing `--catalog` is history only once it verifies against the
+//! anchor (`--anchor`, default [`DEFAULT_ANCHOR`]): its entries decide which
+//! key each known publisher signs with, and a `--publisher-key` cannot
+//! replace one.
 use octosense_app_hub::*;
 use octosense_app_hub::scan::Route;
 use octosense_app_policy::{AppManifest, HostLimits};
@@ -99,16 +104,29 @@ fn run() -> Result<(), String> {
             let commit = flag("commit").unwrap_or_default();
             let out = PathBuf::from(flag("out").unwrap_or_else(|| ".".into()));
 
-            let mut catalog = read_catalog(&catalog_path).unwrap_or_else(|_| Catalog::new(0, &today(), Vec::new()));
+            let mut catalog = if catalog_path.exists() {
+                trusted_catalog(&catalog_path, &argv)?
+            } else {
+                Catalog::new(0, &today(), Vec::new())
+            };
             // The publisher's public key travels in the signed catalog, so a
             // device can check their signature without asking the hub again.
-            let publisher_key = argv
+            // A known publisher's is the recorded one; an unsigned release
+            // records none.
+            let signed = AppManifest::parse(&std::fs::read_to_string(bundle.join(octosense_app_policy::MANIFEST_FILE)).map_err(|e| e.to_string())?)?
+                .integrity
+                .signature
+                .is_some();
+            let recorded = CatalogPublishers::from_catalog(&catalog)?
+                .binding(&publisher)
+                .map(|binding| binding.public_key_hex.clone());
+            let supplied = argv
                 .windows(2)
                 .filter(|w| w[0] == "--publisher-key")
                 .filter_map(|w| w[1].split_once('=').map(|(id, key)| (id.to_string(), key.to_string())))
                 .find(|(id, _)| id == &publisher)
-                .map(|(_, key)| key)
-                .unwrap_or_default();
+                .map(|(_, key)| key);
+            let publisher_key = if signed { recorded.or(supplied).unwrap_or_default() } else { String::new() };
             let entry = entry_for(&bundle, &report, &publisher, &publisher_key, &repository, &commit, &today())?;
             // The artifact store keeps its own copy: review binds to bytes.
             let artifact = out.join(&entry.artifact);
@@ -248,10 +266,25 @@ fn gate_for(bundle: &Path, argv: &[String], allow_unsigned: bool, catalog: Optio
     }
     let limits = HostLimits::default().with_require_signature(!allow_unsigned);
     let previous = match catalog {
-        Some(path) if Path::new(&path).exists() => Some(read_catalog(Path::new(&path))?),
+        Some(path) if Path::new(&path).exists() => Some(trusted_catalog(Path::new(&path), argv)?),
         _ => None,
     };
+    // Known publishers verify against their recorded keys; a conflicting
+    // --publisher-key stays beside the recorded one and both are refused.
+    // History that disagrees with itself is the gate's continuity finding.
+    if let Some(Ok(registry)) = previous.as_ref().map(CatalogPublishers::from_catalog) {
+        keys = registry.trusted_keys(keys);
+    }
     check_bundle(bundle, &limits, &keys, previous.as_ref())
+}
+
+/// The catalog at `path`, once it verifies against the trusted anchor.
+fn trusted_catalog(path: &Path, argv: &[String]) -> Result<Catalog, String> {
+    let catalog = read_catalog(path)?;
+    let anchor = argv.windows(2).find(|w| w[0] == "--anchor").map(|w| w[1].as_str()).unwrap_or(DEFAULT_ANCHOR);
+    verify_catalog(&catalog, anchor)
+        .map_err(|e| format!("could not authenticate {} against the hub anchor {anchor}: {e}", path.display()))?;
+    Ok(catalog)
 }
 
 fn load_key(path: &str) -> Result<HubKey, String> {
