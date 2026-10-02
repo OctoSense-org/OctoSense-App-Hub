@@ -485,10 +485,11 @@ pub fn short_id(app_id: &str) -> &str {
 /// - The native apps OctoSense ships (its `native-apps.json`; OctoSense
 ///   checks this list against that file): `apphub`, `appcard`, `reference`,
 ///   `rinx`, `sheets`, `terminal`, and the Makepad apps it has made native
-///   apps: `calculator`, `clock`, `notes`, `reminders`, `weather`. Their
-///   tools (`notes.search`, `calculator.eval`, …) are granted to the system
-///   agent by name, so no store app may declare them. A Makepad app is
-///   reserved here when OctoSense makes it native, not before.
+///   apps: `calculator`, `clock`, `notes`, `reminders`, `weather`, and the
+///   desktop-only `browser` and `task`. Their tools (`notes.search`,
+///   `calculator.eval`, `browser.tabs`, …) are named by OctoSense's grants,
+///   so no store app may declare them. A Makepad app is reserved here when
+///   OctoSense makes it native, not before.
 /// - What the shell itself acts as, or owns tools under: `system` (the
 ///   system agent as a caller), `toolbox` and `workflow` (the system
 ///   toolbox), `dev` (developer mode's `dev.run`), `agents`
@@ -499,8 +500,8 @@ pub fn short_id(app_id: &str) -> &str {
 /// app may share one, and a host resolves another app's tool by its owner,
 /// not by its name.
 pub const RESERVED_NAMES: &[&str] = &[
-    "agents", "apphub", "appcard", "calculator", "card", "clock", "dev", "notes", "octos", "os", "reference", "reminders",
-    "rinx", "sheets", "shell", "system", "terminal", "toolbox", "weather", "workflow",
+    "agents", "apphub", "appcard", "browser", "calculator", "card", "clock", "dev", "notes", "octos", "os", "reference",
+    "reminders", "rinx", "sheets", "shell", "system", "task", "terminal", "toolbox", "weather", "workflow",
 ];
 
 /// Refuse an app id that is, or whose namespace is, a [`RESERVED_NAMES`]

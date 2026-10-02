@@ -11,6 +11,8 @@ within `1.x` it only grows.
   app with one of those ids, or one as its namespace (`com.example.notes`),
   is now refused as reserved. The tests' example app is `forecast` (it was
   `weather`).
+- `RESERVED_NAMES` gains `browser` and `task`: OctoSense's desktop-only
+  native Browser and Task Manager.
 
 ## 1.0.0
 

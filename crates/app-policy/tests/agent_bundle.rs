@@ -592,7 +592,7 @@ fn a_native_apps_id_or_namespace_or_the_hosts_own_name_is_refused() {
     for id in ["os.news", "dev.example.news", "org.example.terminal-notes"] {
         assert!(check_reserved_id(id).is_ok(), "{id}");
     }
-    for native in ["apphub", "appcard", "reference", "rinx", "sheets", "terminal", "calculator", "clock", "notes", "reminders", "weather"] {
+    for native in ["apphub", "appcard", "reference", "rinx", "sheets", "terminal", "calculator", "clock", "notes", "reminders", "weather", "browser", "task"] {
         assert!(RESERVED_NAMES.contains(&native), "{native}");
     }
 }
