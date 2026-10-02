@@ -4,14 +4,16 @@ English | [简体中文](README.zh-CN.md)
 
 The index of apps published for OctoSense, the signed catalog every OctoSense
 store reads, the hub's own copy of each admitted bundle, and the code that
-runs the hub and the store. No app code lives here; each app stays in its
-publisher's repository.
+runs the hub and the store. Publisher app source stays in each publisher's
+repository; this repository also contains the store UI, runtime hosts,
+templates and test fixtures.
 
 | Looking for | Repository |
 | --- | --- |
 | How to build an app: quickstart, script API, script-app template, design flows, examples | [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) |
-| The AppCard assistant runtime (opt-in in the shells, `--features app-appcard`) and the L0 card language | [OctoSense `apps/appcard`](https://github.com/OctoSense-org/OctoSense/tree/main/apps/appcard) |
+| The AppCard assistant runtime (opt-in in the shells, `--features app-appcard`) | [OctoSense `apps/appcard`](https://github.com/OctoSense-org/OctoSense/tree/main/apps/appcard) |
 | The first-party system apps (News, Photos, Maps, Camera, Mail, AI providers) and their host services (`mail`, `llm`) | [OctoSense `apps/`](https://github.com/OctoSense-org/OctoSense/tree/main/apps) |
+| The L0 parser/checker and its Makepad lowering/renderer | [Octoscript](https://github.com/OctoSense-org/Octoscript) and [Octoscript-Makepad](https://github.com/OctoSense-org/OctoScript-Makepad) |
 | The bundle format, the gate, signing, submission and the store | this repository |
 
 **Building an app?** Start at the [OctoSense-org profile](https://github.com/OctoSense-org)'s "read these first" list (OctoScript-App-Design-Flow's `AGENTS.md`, then its `docs/QUICKSTART.md`). You need this repository only as a sibling checkout to build `hub` and `card-host`, and to submit (an issue here, see [Submitting](docs/PUBLISHING.md#submitting)). Clone it; do not edit `catalog.json`, `index/` or `artifacts/`.
@@ -43,6 +45,15 @@ resolved from sibling checkouts (`../makepad`, `../octoscript-makepad`,
 `../octoscript`) as the launcher workspace does. `cargo test --workspace`
 runs the policy, gate, signing and store tests headless; `cargo run -p
 octosense-app-hub --bin hub` is the publishing tool.
+
+## Code walkthrough
+
+Start with [the walkthrough's host and launch choices](docs/CODE-WALKTHROUGH.md#2-run-the-right-host),
+then trace a bundle into its UI and a host-service reply back to its callback.
+A saved-notes request connects app-agent conversations, account storage and
+tool grants. The walkthrough distinguishes native `AppModule`, Splash and
+L0 apps, with the crate inventory at the end. Contributor instructions are
+in [AGENTS.md](AGENTS.md).
 
 ## Trust anchor
 

@@ -2,13 +2,14 @@
 
 [English](README.md) | 简体中文
 
-这里是为 OctoSense 发布的应用索引、每个 OctoSense 商店都会读取的签名目录、App Hub 为每个已准入应用包保存的副本，以及运行 hub 和商店的代码。这里不存放任何应用代码，每个应用都留在其发布者自己的仓库中。
+这里是为 OctoSense 发布的应用索引、每个 OctoSense 商店都会读取的签名目录、App Hub 为每个已准入应用包保存的副本，以及运行 hub 和商店的代码。发布者的应用源码留在各自仓库中；本仓库也包含商店 UI、运行宿主、模板和测试夹具。
 
 | 想找 | 仓库 |
 | --- | --- |
 | 如何开发应用：快速上手、脚本 API、脚本应用模板、设计流程、示例 | [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) |
-| AppCard 助手运行时（在 Shell 中需 `--features app-appcard` 才启用）与 L0 卡片语言 | [OctoSense `apps/appcard`](https://github.com/OctoSense-org/OctoSense/tree/main/apps/appcard) |
+| AppCard 助手运行时（在 Shell 中需 `--features app-appcard` 才启用） | [OctoSense `apps/appcard`](https://github.com/OctoSense-org/OctoSense/tree/main/apps/appcard) |
 | 第一方系统应用（新闻、相册、地图、相机、邮件、AI providers）及其宿主服务（`mail`、`llm`） | [OctoSense `apps/`](https://github.com/OctoSense-org/OctoSense/tree/main/apps) |
+| L0 解析器/检查器及其 Makepad 转换/渲染层 | [Octoscript](https://github.com/OctoSense-org/Octoscript) 与 [Octoscript-Makepad](https://github.com/OctoSense-org/OctoScript-Makepad) |
 | 应用包格式、准入检查、签名、提交与商店 | 本仓库 |
 
 **要开发应用？** 请从 [OctoSense-org 主页](https://github.com/OctoSense-org)的“请按顺序先阅读”列表开始（先读 OctoScript-App-Design-Flow 的 `AGENTS.md`，再读其 `docs/QUICKSTART.md`）。你只需要把本仓库作为兄弟目录克隆下来，用于构建 `hub` 和 `card-host`，以及提交应用（在这里开 issue，见[提交](docs/PUBLISHING.md#submitting)）。不要修改 `catalog.json`、`index/` 或 `artifacts/`。
@@ -36,6 +37,13 @@
 | `crates/app-hub-app` | 每个 OctoSense Shell 都会链接的集成：原生商店模块、`card` 运行模块、由 `OCTOSENSE_SYSTEM_APPS` 指定的系统应用、已安装应用和图标（[README](crates/app-hub-app/README.md)）。 |
 
 这些 crate 基于固定版本的 OctoSense Makepad 与 Octoscript 分支构建，和启动器工作区一样，从同级检出目录（`../makepad`、`../octoscript-makepad`、`../octoscript`）解析依赖。`cargo test --workspace` 以无界面方式运行策略、准入检查、签名和商店测试；`cargo run -p octosense-app-hub --bin hub` 是发布工具。
+
+## 代码导读
+
+先看[代码导读中的宿主选择与启动命令（英文）](docs/CODE-WALKTHROUGH.md#2-run-the-right-host)，
+再追踪应用包如何进入 UI，以及宿主服务的应答如何回到回调函数。“总结已保存的笔记”
+这一请求串起应用 Agent 的对话、账户存储与工具授权。导读区分原生 `AppModule`、
+Splash 脚本和 L0 卡片，并把 crate 索引放在最后。仓库协作规则见 [AGENTS.md](AGENTS.md)。
 
 ## 信任锚
 
