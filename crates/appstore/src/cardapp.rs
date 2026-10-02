@@ -68,6 +68,11 @@ impl CardAppView {
             },
             None => {
                 let anchor = std::env::var("OCTOSENSE_HUB_ANCHOR").unwrap_or_else(|_| crate::DEFAULT_ANCHOR.to_string());
+                // An install from before `.bundles` leaves the app's storage
+                // before it is checked and run.
+                if let Err(e) = octosense_app_hub::adopt_legacy_install(&root, &self.app_id) {
+                    return self.refuse(cx, &format!("Cannot open: {e}"));
+                }
                 let mut store = Store::new(&anchor, &root, HostLimits::default());
                 // The catalog the store last verified. Without one, nothing
                 // runs: an app the device cannot show was offered is not run

@@ -28,7 +28,7 @@ pub fn installed_icon_path(root: &Path, id: &str) -> Option<PathBuf> {
         return None;
     }
     let root = root.canonicalize().ok()?;
-    let bundle = root.join(id).join("bundle").canonicalize().ok()?;
+    let bundle = octosense_app_hub::installed_bundle_dir(&root, id).canonicalize().ok()?;
     if !bundle.starts_with(&root) { return None; }
     let listing = bundle.join("listing.json").canonicalize().ok()?;
     if !listing.starts_with(&bundle) { return None; }
@@ -68,7 +68,7 @@ pub fn read_installed_icon(root: &Path, id: &str) -> Option<IconData> {
 mod tests {
     use super::*;
     fn bundle(root: &Path, icon: &str) -> std::path::PathBuf {
-        let path = root.join("sample/bundle");
+        let path = octosense_app_hub::installed_bundle_dir(root, "sample");
         std::fs::create_dir_all(path.join("assets")).unwrap();
         std::fs::write(path.join("listing.json"), serde_json::json!({
             "schema":1, "description":"A sample", "category":"utilities",

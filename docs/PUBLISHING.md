@@ -766,10 +766,11 @@ app appeared in, or with the findings to fix.
 - An installed app runs as the release it is: the version installed, with
   that version's grants. A newer version on offer is an update the person
   may take; until they do, the installed version keeps opening.
-- Each launch checks the installed bundle against the catalog (the manifest
-  and the digest) and runs a copy of it, outside the app's storage. An app
-  that changes its own installed files is refused at its next launch until
-  it is reinstalled.
+- The installed bundle is kept outside the app's storage
+  (`<app data>/.bundles/<id>/`, beside the app's own `<app data>/<id>/`),
+  so an app cannot write to it. Each launch still checks it against the
+  catalog (the manifest and the digest) and runs a copy of it; a bundle
+  that no longer matches is refused until the app is reinstalled.
 - A version can be withdrawn with a reason. Installed copies of that version
   stop running on the device's next catalog fetch; other versions are not
   affected. Publish a fixed version rather than arguing with a withdrawal.

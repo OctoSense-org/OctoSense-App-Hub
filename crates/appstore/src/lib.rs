@@ -75,7 +75,12 @@ pub struct InstalledApp {
 /// Every app installed under `root`, read from each bundle's own manifest.
 pub fn installed_apps(root: &std::path::Path) -> Vec<InstalledApp> {
     let mut out = Vec::new();
-    let Ok(entries) = std::fs::read_dir(root) else { return out };
+    // Installs from before `.bundles` move out of their apps' storage here,
+    // where every shell first looks for them.
+    if let Err(e) = octosense_app_hub::adopt_legacy_installs(root) {
+        error!("store: {e}");
+    }
+    let Ok(entries) = std::fs::read_dir(root.join(octosense_app_hub::INSTALLS_DIR)) else { return out };
     for entry in entries.flatten() {
         let manifest = entry.path().join("bundle").join(octosense_app_policy::MANIFEST_FILE);
         let Ok(json) = std::fs::read_to_string(&manifest) else { continue };
@@ -621,5 +626,34 @@ mod card_vocabulary_tests {
         assert_eq!(first, Vec::<String>::new());
         let second = std::thread::spawn(card_isolate_names_the_kit).join().unwrap();
         assert_eq!(second, Vec::<String>::new());
+    }
+}
+
+#[cfg(test)]
+mod installed_apps_tests {
+    use super::*;
+
+    fn manifest(dir: &std::path::Path, id: &str) {
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(
+            dir.join(octosense_app_policy::MANIFEST_FILE),
+            serde_json::json!({"schema": 1, "id": id, "version": "1.0.0", "name": id, "integrity": {"bundle_blake3": ""}}).to_string(),
+        )
+        .unwrap();
+    }
+
+    /// The library lists installs under `.bundles`, and moves one made
+    /// before that layout out of its app's storage first.
+    #[test]
+    fn installed_apps_lists_installs_outside_the_apps_storage() {
+        let root = std::env::temp_dir().join(format!("appstore-installed-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        manifest(&octosense_app_hub::installed_bundle_dir(&root, "dev.example.new"), "dev.example.new");
+        manifest(&root.join("dev.example.old").join("bundle"), "dev.example.old");
+        let ids: Vec<String> = installed_apps(&root).into_iter().map(|a| a.id).collect();
+        assert_eq!(ids, ["dev.example.new", "dev.example.old"]);
+        assert!(!root.join("dev.example.old/bundle").exists(), "the old install left its app's storage");
+        assert!(octosense_app_hub::installed_bundle_dir(&root, "dev.example.old").join(octosense_app_policy::MANIFEST_FILE).is_file());
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

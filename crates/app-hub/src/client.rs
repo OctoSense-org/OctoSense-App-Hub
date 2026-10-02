@@ -15,6 +15,76 @@ use std::path::{Path, PathBuf};
 /// revocation never reaches.
 pub const CATALOG_FRESHNESS_DAYS: u64 = 14;
 
+/// Where installed bundles live: `<app data root>/.bundles`, beside the
+/// apps' storage. An app's storage is `<root>/<id>/` and it can write there,
+/// so its reviewed bytes are kept elsewhere. A name starting with `.` is
+/// never an app id, so this is no app's storage.
+pub const INSTALLS_DIR: &str = ".bundles";
+
+/// An app's installation: `bundle/`, and the staging an update uses.
+pub fn install_root(app_data_root: &Path, app_id: &str) -> PathBuf {
+    app_data_root.join(INSTALLS_DIR).join(app_id)
+}
+
+/// The installed bundle the store verifies and launches from.
+pub fn installed_bundle_dir(app_data_root: &Path, app_id: &str) -> PathBuf {
+    install_root(app_data_root, app_id).join("bundle")
+}
+
+/// Move every install made before [`INSTALLS_DIR`] out of its app's
+/// storage. Idempotent and cheap when there is nothing to move.
+pub fn adopt_legacy_installs(app_data_root: &Path) -> Result<(), String> {
+    let entries = match std::fs::read_dir(app_data_root) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(format!("cannot read {}: {e}", app_data_root.display())),
+    };
+    for entry in entries {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let name = entry.file_name();
+        let Some(id) = name.to_str() else { continue };
+        if id.starts_with('.') || !entry.file_type().map_err(|e| e.to_string())?.is_dir() {
+            continue;
+        }
+        adopt_legacy_install(app_data_root, id)?;
+    }
+    Ok(())
+}
+
+/// Move one app's install from its storage (`<root>/<id>/bundle`, the
+/// layout before [`INSTALLS_DIR`]) to [`installed_bundle_dir`]. An update
+/// interrupted in the old layout is settled first, as the store's recovery
+/// would; an install already in the new place wins over a stale old copy.
+/// Nothing found is followed through a symlink.
+pub fn adopt_legacy_install(app_data_root: &Path, app_id: &str) -> Result<(), String> {
+    let legacy = app_data_root.join(app_id);
+    let (bundle, previous, next) = (legacy.join("bundle"), legacy.join(".bundle-previous"), legacy.join(".bundle-next"));
+    let is_dir = |path: &Path| std::fs::symlink_metadata(path).is_ok_and(|m| m.is_dir());
+    let remove = |path: &Path| match std::fs::symlink_metadata(path) {
+        Ok(m) if m.is_dir() => std::fs::remove_dir_all(path),
+        Ok(_) => std::fs::remove_file(path),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e),
+    };
+    let fail = |what: &str, e: std::io::Error| format!("cannot move {app_id}'s install out of its storage ({what}): {e}");
+    remove(&next).map_err(|e| fail("an interrupted download", e))?;
+    if is_dir(&previous) && !is_dir(&bundle) {
+        remove(&bundle).map_err(|e| fail("a stray entry", e))?;
+        std::fs::rename(&previous, &bundle).map_err(|e| fail("the last complete bundle", e))?;
+    } else {
+        remove(&previous).map_err(|e| fail("a previous bundle", e))?;
+    }
+    if !is_dir(&bundle) {
+        return remove(&bundle).map_err(|e| fail("a stray entry", e));
+    }
+    let target = installed_bundle_dir(app_data_root, app_id);
+    if std::fs::symlink_metadata(&target).is_ok() {
+        return remove(&bundle).map_err(|e| fail("a stale copy", e));
+    }
+    std::fs::create_dir_all(install_root(app_data_root, app_id)).map_err(|e| fail("its new place", e))?;
+    std::fs::rename(&bundle, &target).map_err(|e| fail("the bundle", e))
+}
+
 /// Days from a catalog's `published` date (ISO 8601, date part) to `today`.
 /// None when either date does not parse: an unreadable date is stale.
 pub fn days_between(published: &str, today: &str) -> Option<u64> {
@@ -260,8 +330,9 @@ impl Store {
         }
     }
 
+    /// Outside the app's storage: [`installed_bundle_dir`].
     pub fn install_dir(&self, app_id: &str) -> PathBuf {
-        self.app_data_root.join(app_id).join("bundle")
+        installed_bundle_dir(&self.app_data_root, app_id)
     }
 
     /// The version installed for this app, read from its own copy of the
@@ -330,11 +401,13 @@ impl Store {
     }
 
     /// Remove an app and everything it stored. The jail goes with it: an
-    /// uninstall that leaves data behind is not an uninstall.
+    /// uninstall that leaves data behind is not an uninstall. So does its
+    /// installation, kept apart from the jail.
     pub fn remove(&self, app_id: &str) -> Result<(), String> {
-        let dir = self.app_data_root.join(app_id);
-        if dir.exists() {
-            std::fs::remove_dir_all(&dir).map_err(|e| format!("cannot remove {app_id}: {e}"))?;
+        for dir in [self.app_data_root.join(app_id), install_root(&self.app_data_root, app_id)] {
+            if dir.exists() {
+                std::fs::remove_dir_all(&dir).map_err(|e| format!("cannot remove {app_id}: {e}"))?;
+            }
         }
         Ok(())
     }
