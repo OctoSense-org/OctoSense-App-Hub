@@ -48,6 +48,10 @@ pub struct CardAppView {
     asset_server: Option<octosense_app_policy::AssetServer>,
     #[rust]
     host_dir: PathBuf,
+    /// An installed app's verified copy, outside its jail, which it runs
+    /// from; held for as long as it is open, then removed.
+    #[rust]
+    launch: Option<octosense_app_hub::PreparedLaunch>,
 }
 
 impl CardAppView {
@@ -72,8 +76,16 @@ impl CardAppView {
                 if let Err(e) = store.accept_catalog(&catalog) {
                     return self.refuse(cx, &format!("Cannot open {}: no verified catalog on this device ({e})", self.app_id));
                 }
-                match store.may_run(&self.app_id) {
-                    Ok(policy) => (policy, store.install_dir(&self.app_id), &[] as octosense_app_policy::StaticAssets),
+                // The installed release, verified against the catalog and run
+                // from a copy outside the app's jail: an app cannot rewrite
+                // the code it runs next time, and an update cannot change it
+                // while it runs.
+                match store.prepare_launch(&self.app_id) {
+                    Ok(prepared) => {
+                        let (policy, bundle) = (prepared.policy.clone(), prepared.bundle().to_path_buf());
+                        self.launch = Some(prepared);
+                        (policy, bundle, &[] as octosense_app_policy::StaticAssets)
+                    }
                     Err(e) => return self.refuse(cx, &format!("Cannot open: {e}")),
                 }
             }

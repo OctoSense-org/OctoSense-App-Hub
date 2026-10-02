@@ -7,7 +7,7 @@
 //! the entry never reaches a jail.
 use crate::index::{Catalog, Entry};
 use crate::signing::{verify_catalog, PublisherKeys};
-use octosense_app_policy::{digest_dir, policy, AppPolicy, HostLimits, SignatureVerifier};
+use octosense_app_policy::{digest_dir, AppPolicy, HostLimits, SignatureVerifier};
 use std::path::{Path, PathBuf};
 
 /// How stale a cached catalog may be before installs stop. Running apps are
@@ -39,6 +39,7 @@ pub fn days_between(published: &str, today: &str) -> Option<u64> {
     Some((b - a).max(0) as u64)
 }
 
+#[derive(Clone)]
 pub struct Store {
     /// The anchor this build trusts. Shipped in the binary.
     anchor_public_hex: String,
@@ -46,6 +47,21 @@ pub struct Store {
     app_data_root: PathBuf,
     limits: HostLimits,
     catalog: Option<Catalog>,
+}
+
+/// An installed release, verified and copied out of its jail, ready to
+/// run (`launch.rs`). Dropping it removes the copy.
+pub struct PreparedLaunch {
+    pub policy: AppPolicy,
+    pub manifest: octosense_app_policy::AppManifest,
+    snapshot: crate::launch::LaunchSnapshot,
+}
+
+impl PreparedLaunch {
+    /// The verified bytes to run: never the installed directory itself.
+    pub fn bundle(&self) -> &Path {
+        self.snapshot.bundle()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -73,6 +89,18 @@ pub struct Listing {
     /// where its icon and screenshots are fetched from before install.
     pub artifact: String,
     pub availability: Availability,
+    /// The installed release and an offered update, as separate facts.
+    pub lifecycle: AppAvailability,
+}
+
+/// Opening belongs to the installed release; an offered update is a separate
+/// fact and never changes what the installed release may do.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct AppAvailability {
+    pub installed_version: Option<String>,
+    pub can_open: bool,
+    pub update_version: Option<String>,
+    pub unavailable_reason: Option<String>,
 }
 
 impl Store {
@@ -138,11 +166,12 @@ impl Store {
             if out.iter().any(|l| l.app_id == entry.app_id()) {
                 continue;
             }
-            let installed = self.installed_version(entry.app_id());
-            let availability = match (&entry.status, installed) {
-                (crate::index::Status::Withdrawn(reason), _) => Availability::Withdrawn { reason: reason.clone() },
-                (_, Some(version)) => Availability::Installed { version },
-                (_, None) => Availability::Installable,
+            let lifecycle = self.app_availability(entry.app_id());
+            let availability = match (&lifecycle.installed_version, lifecycle.can_open, &entry.status) {
+                (Some(version), true, _) => Availability::Installed { version: version.clone() },
+                (Some(_), false, _) => Availability::Withdrawn { reason: lifecycle.unavailable_reason.clone().unwrap_or_default() },
+                (None, _, crate::index::Status::Withdrawn(reason)) => Availability::Withdrawn { reason: reason.clone() },
+                (None, _, _) => Availability::Installable,
             };
             out.push(Listing {
                 app_id: entry.app_id().to_string(),
@@ -154,6 +183,7 @@ impl Store {
                 about: entry.listing.clone(),
                 artifact: entry.artifact.clone(),
                 availability,
+                lifecycle,
             });
         }
         out
@@ -193,10 +223,41 @@ impl Store {
         keys
     }
 
-    /// The newest entry for an app: what the store offers and what an
-    /// installed copy is compared against.
+    /// The newest entry for an app: what the store offers to install or
+    /// update to. A launch uses [`Store::release`], the installed version's.
     pub fn entry(&self, app_id: &str) -> Option<&Entry> {
         self.catalog.as_ref()?.entries.iter().rev().find(|e| e.app_id() == app_id)
+    }
+
+    /// The catalog's entry for exactly this version of an app.
+    pub fn release(&self, app_id: &str, version: &str) -> Result<&Entry, String> {
+        let catalog = self.catalog.as_ref().ok_or("no catalog has been accepted")?;
+        let mut matches = catalog.entries.iter().filter(|e| e.app_id() == app_id && e.version() == version);
+        let entry = matches
+            .next()
+            .ok_or_else(|| format!("{app_id} {version} is not in the verified catalog; refresh the App Hub"))?;
+        if matches.next().is_some() {
+            return Err(format!("{app_id} {version} has ambiguous catalog entries; refresh the App Hub"));
+        }
+        Ok(entry)
+    }
+
+    /// Whether the installed release opens, and whether an update is on
+    /// offer. Hashes the installed bundle: interactive clients call it on a
+    /// worker.
+    pub fn app_availability(&self, app_id: &str) -> AppAvailability {
+        let installed_version = self.installed_version(app_id);
+        let launch = installed_version.as_ref().map(|_| self.may_run(app_id));
+        let update_version = self
+            .entry(app_id)
+            .filter(|e| e.status.is_offered() && installed_version.as_deref().is_some_and(|v| v != e.version()))
+            .map(|e| e.version().to_string());
+        AppAvailability {
+            installed_version,
+            can_open: launch.as_ref().is_some_and(|result| result.is_ok()),
+            update_version,
+            unavailable_reason: launch.and_then(Result::err),
+        }
     }
 
     pub fn install_dir(&self, app_id: &str) -> PathBuf {
@@ -206,8 +267,7 @@ impl Store {
     /// The version installed for this app, read from its own copy of the
     /// manifest rather than from anything the catalog says.
     pub fn installed_version(&self, app_id: &str) -> Option<String> {
-        let manifest = self.install_dir(app_id).join(octosense_app_policy::MANIFEST_FILE);
-        let json = std::fs::read_to_string(manifest).ok()?;
+        let json = crate::launch::read_manifest(&self.install_dir(app_id)).ok()?;
         octosense_app_policy::AppManifest::parse(&json).ok().map(|m| m.version)
     }
 
@@ -247,13 +307,16 @@ impl Store {
         let staged_manifest = std::fs::read_to_string(staged.join(octosense_app_policy::MANIFEST_FILE))
             .map_err(|e| format!("the bundle has no manifest: {e}"))?;
         let staged_manifest = octosense_app_policy::AppManifest::parse(&staged_manifest)?;
-        if staged_manifest.id != entry.manifest.id || staged_manifest.version != entry.manifest.version {
+        // All of it, not only the id and version: the permissions are in it.
+        if !same_manifest(&staged_manifest, &entry.manifest)? {
             return Err("the bundle's manifest is not the one the catalog admitted".into());
         }
         if let Some(signature) = &entry.manifest.integrity.signature {
             verifier.verify(&signature.key_id, &signature.value, &entry.manifest.signing_bytes()?)?;
         }
-        let policy = policy::resolve(&entry.manifest, &self.limits)?;
+        // And against the key the catalog records, whatever the caller passed.
+        let staged_json = serde_json::to_string(&staged_manifest).map_err(|e| e.to_string())?;
+        let policy = octosense_app_policy::admit_and_resolve_dir(&staged_json, &digest, &self.limits, &self.publisher_keys())?;
 
         let target = self.install_dir(app_id);
         if target.exists() {
@@ -276,24 +339,70 @@ impl Store {
         Ok(())
     }
 
-    /// May this installed app run right now? Checks the catalog's status, so
-    /// a withdrawal stops an app that is already on the device.
+    /// May this installed app run right now? The installed version must be
+    /// a release the catalog offers (a withdrawal of it stops it; a newer
+    /// version on offer does not), and its manifest and bytes must still be
+    /// the ones admitted. The policy is that release's own.
     pub fn may_run(&self, app_id: &str) -> Result<AppPolicy, String> {
-        let entry = self.entry(app_id).ok_or_else(|| format!("{app_id} is not in this catalog"))?;
+        let entry = self.installed_release(app_id)?;
+        let bundle = self.install_dir(app_id);
+        crate::launch::check_bounds(&bundle)?;
+        self.verify_release_bundle(entry, &bundle)
+    }
+
+    /// Verify the installed release and copy it out of the app's jail, for a
+    /// launch to run. Hashes and copies: interactive clients call it on a
+    /// worker, then [`Store::validate_prepared_launch`] before starting.
+    pub fn prepare_launch(&self, app_id: &str) -> Result<PreparedLaunch, String> {
+        let entry = self.installed_release(app_id)?;
+        let snapshot = crate::launch::LaunchSnapshot::copy(&self.install_dir(app_id), &self.app_data_root)?;
+        let policy = self.verify_release_bundle(entry, snapshot.bundle())?;
+        Ok(PreparedLaunch { policy, manifest: entry.manifest.clone(), snapshot })
+    }
+
+    /// Recheck a prepared launch against the catalog held now: the release
+    /// may have been withdrawn, or replaced, while it was being prepared.
+    pub fn validate_prepared_launch(&self, prepared: &PreparedLaunch) -> Result<(), String> {
+        let entry = self.release(&prepared.manifest.id, &prepared.manifest.version)?;
         if let crate::index::Status::Withdrawn(reason) = &entry.status {
-            return Err(format!("{app_id} was withdrawn: {reason}"));
+            return Err(format!("{} {} was withdrawn: {reason}", entry.app_id(), entry.version()));
+        }
+        if !same_manifest(&entry.manifest, &prepared.manifest)? {
+            return Err("the release changed while it was opening; try again".into());
+        }
+        if let Some(signature) = &entry.manifest.integrity.signature {
+            self.publisher_keys().verify(&signature.key_id, &signature.value, &entry.manifest.signing_bytes()?)?;
+        }
+        Ok(())
+    }
+
+    fn installed_release(&self, app_id: &str) -> Result<&Entry, String> {
+        if self.catalog.is_none() {
+            return Err("no catalog has been accepted".into());
         }
         let installed = self
             .installed_version(app_id)
-            .ok_or_else(|| format!("{app_id} is not installed"))?;
-        if installed != entry.version() {
-            return Err(format!(
-                "{app_id} {installed} is installed but the catalog offers {}; update before running",
-                entry.version()
-            ));
-        }
-        policy::resolve(&entry.manifest, &self.limits)
+            .ok_or_else(|| format!("{app_id} is not installed, or its manifest is unreadable"))?;
+        self.release(app_id, &installed)
     }
+
+    fn verify_release_bundle(&self, entry: &Entry, bundle: &Path) -> Result<AppPolicy, String> {
+        if let crate::index::Status::Withdrawn(reason) = &entry.status {
+            return Err(format!("{} {} was withdrawn: {reason}", entry.app_id(), entry.version()));
+        }
+        let text = crate::launch::read_manifest(bundle)?;
+        if !same_manifest(&octosense_app_policy::AppManifest::parse(&text)?, &entry.manifest)? {
+            return Err("the installed manifest is not the reviewed one; reinstall this app".into());
+        }
+        let digest = digest_dir(bundle)?;
+        octosense_app_policy::admit_and_resolve_dir(&text, &digest, &self.limits, &self.publisher_keys())
+            .map_err(|e| format!("{e}; reinstall this app"))
+    }
+}
+
+/// The same manifest, field for field.
+fn same_manifest(a: &octosense_app_policy::AppManifest, b: &octosense_app_policy::AppManifest) -> Result<bool, String> {
+    Ok(serde_json::to_value(a).map_err(|e| e.to_string())? == serde_json::to_value(b).map_err(|e| e.to_string())?)
 }
 
 fn copy_tree(from: &Path, to: &Path) -> Result<(), String> {

@@ -749,9 +749,16 @@ app appeared in, or with the findings to fix.
   catalog nobody signed is never shown.
 - The app runs in its own isolate with exactly the manifest's grants; a
   request outside them fails with an error, and the person sees why.
-- A version can be withdrawn with a reason. Installed copies stop running on
-  the device's next catalog fetch. Publish a fixed version rather than
-  arguing with a withdrawal.
+- An installed app runs as the release it is: the version installed, with
+  that version's grants. A newer version on offer is an update the person
+  may take; until they do, the installed version keeps opening.
+- Each launch checks the installed bundle against the catalog (the manifest
+  and the digest) and runs a copy of it, outside the app's storage. An app
+  that changes its own installed files is refused at its next launch until
+  it is reinstalled.
+- A version can be withdrawn with a reason. Installed copies of that version
+  stop running on the device's next catalog fetch; other versions are not
+  affected. Publish a fixed version rather than arguing with a withdrawal.
 
 ## Do not
 
