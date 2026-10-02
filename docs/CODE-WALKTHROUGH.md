@@ -1,23 +1,24 @@
-# App Hub code walkthrough for Rust beginners
+# App Hub code walkthrough
 
-This walkthrough follows App Hub `41bc959` and the sibling OctoSense source
-on 2026-10-01. It explains the code, not a claim that every command below
-has been run on every platform. Build, GUI and device commands below are
-**unverified in this documentation review**. Follow the source links when
-your checkout has a different revision.
+App Hub takes an app from a manifest and bundle to a verified installation
+and a contained UI. This walkthrough follows that path, then shows where
+OctoSense adds app agents and host services. Use this workspace's
+[`Cargo.toml`](../Cargo.toml) and [`Cargo.lock`](../Cargo.lock), and the
+[consumer's Cargo manifest](https://github.com/OctoSense-org/OctoSense/blob/main/Cargo.toml),
+to identify the source versions used by your build.
 
 ## 1. What runs where
 
 An **app** provides a user interface and data. An **agent** is a model-driven
 conversation that can request tools; a tool is a named operation with JSON
 arguments and a host implementation. A **peer** is the octos kernel's
-identity and routing boundary for an agent. None of these words means an
-operating-system process, Rust thread, or Tokio task.
+identity and routing boundary for an agent. These are logical roles; §5
+covers the threads and queues that carry their work.
 
 App Hub supplies package admission, distribution and hosting. OctoSense
 supplies the desktop/phone shells, app-agent peers and the octos runtime.
-Installing a bundle or parsing an `agent` declaration here does not start a
-model. The Python `tools/octo` in Design Flow is a development command;
+The shell starts model work after preparing an allowed app peer. The Python
+`tools/octo` in Design Flow is a development command;
 **octos** is the separate Rust agent kernel.
 
 | App form | What executes | Where to start |
@@ -26,8 +27,7 @@ model. The Python `tools/octo` in Design Flow is a development command;
 | Contained script app | `main.splash` is evaluated by Makepad's Script VM inside a Splash widget | [`entry.rs`](../crates/app-contract/src/entry.rs), [`card-host/src/host.rs`](../crates/card-host/src/host.rs) |
 | L0 card app | `page.card` plus data and a kit is parsed/realized/lowered to Makepad UI | `card_source` and `lower` in [`host.rs`](../crates/card-host/src/host.rs) |
 
-The project name OctoScript does not make `.splash` and `.card` the same
-language. Splash is the Makepad Script containment/UI path. L0 uses the
+Splash is the Makepad Script containment/UI path. L0 uses the
 Octoscript parser and `octoscript-makepad` lowering, then reaches Makepad.
 A native Rust module can also embed Splash UI; its Rust implementation is
 still compiled into its host.
@@ -53,8 +53,8 @@ pump but registers no host services.
 
 1. [`app-contract/src/lib.rs`](../crates/app-contract/src/lib.rs): the
    shared, versioned data contract. `AppManifest` describes requests;
-   `AppPolicy` describes grants. This crate parses an agent block but does
-   not create or authorize an octos session.
+   `AppPolicy` describes grants. The shell uses these declarations when
+   preparing an authorized octos session.
 2. [`app-policy/src/policy.rs`](../crates/app-policy/src/policy.rs): resolve
    the app contract plus agent requests against `HostLimits`.
 3. [`app-policy/src/agent.rs`](../crates/app-policy/src/agent.rs): validate
@@ -68,11 +68,24 @@ pump but registers no host services.
 7. [`appstore/src/services.rs`](../crates/appstore/src/services.rs): route
    script host requests and deliver replies.
 
-For a junior Rust reader: `Result<T, String>` means success containing `T`
-or an explanatory refusal; `?` propagates a refusal. `Option<T>` represents
-absence, such as no agent. Traits such as `HostService` and `AppModule`
-describe interfaces; `Box<dyn HostService>` stores implementations behind
-one interface. `Mutex` protects shared data, but does not create a worker.
+The remaining crates and supporting directories complete the delivery path:
+
+| Path | Role and next file |
+| --- | --- |
+| [`card-host`](../crates/card-host/src/main.rs) | Standalone contained bundle runner; argument parsing leads to `host::run` |
+| [`app-host`](../crates/app-host/src/lib.rs) | One-window host for a compiled Rust `AppModule` |
+| [`app-hub-app`](../crates/app-hub-app/README.md) | Shell integration: native store, Card runner, packed system apps and icons |
+| [`appstore-app`](../crates/appstore-app/src/lib.rs) | Standalone `appstore` executable using `AppHostView` |
+| [`card-studio`](../crates/card-studio/src/main.rs) | Hidden `card-host` captures at glance, phone and desktop sizes; measured checks and critique payload |
+| [`skills/card-studio`](../skills/card-studio/SKILL.md) | octos skill exposing card rendering and critique preparation |
+| [`templates/app`](../templates/app/README.md) | Card-app scaffold with bundle metadata and contributor instructions |
+
+OctoSense consumes a git revision of App Hub selected by its `Cargo.toml`.
+OctoSense, App Hub and Rinx request `octosense-app-contract = "1"` from
+crates.io; the consumer lock records the resolved release. This workspace
+alone patches that dependency to `crates/app-contract` for development.
+Cargo applies patches from the top-level workspace, so that local patch
+is not inherited by a shell consuming App Hub as a dependency.
 
 ## 3. From a manifest to a contained UI
 
@@ -99,9 +112,9 @@ Follow `policy_for` → `App::mount` in
    ordinary L0 kit cards fall back to kit lowering. The output enters
    `Splash::set_text` and the Makepad event/draw loop.
 
-A log saying `agent read-only` reports resolved metadata. This mount path
-does not construct an agent runtime. Likewise `AppPolicy::session_profile`
-is a serializable helper, not the shell's complete peer/storage setup.
+A log saying `agent read-only` reports resolved metadata.
+`AppPolicy::session_profile` serializes that policy; the shell builds the
+actual peer and account storage.
 
 ## 4. From publication to launch
 
@@ -109,27 +122,29 @@ is a serializable helper, not the shell's complete peer/storage setup.
 [`hub-usage.txt`](../crates/app-hub/src/bin/hub-usage.txt) is their syntax.
 `stamp` records a digest. `check` calls `check_bundle`: manifest admission,
 bundle constraints, listing, references, secret-field checks and agent-file
-review. A passing gate does not prove UI behavior or screenshot quality.
-`scan` prepares a review packet and optionally invokes a reviewer command
-([`scan.rs`](../crates/app-hub/src/scan.rs)); it is not the device's app agent.
+review. UI behavior and screenshot quality are checked by running the app
+and reviewing captures. `scan` prepares a review packet and optionally
+invokes a publishing reviewer command
+([`scan.rs`](../crates/app-hub/src/scan.rs)).
 
 `publish` rechecks admission, copies the reviewed bundle and writes a signed
 catalog. [`signing.rs`](../crates/app-hub/src/signing.rs) implements the
 anchor/working-key trust chain. [`pack.rs`](../crates/app-hub/src/pack.rs)
-encodes a bundle for transport. The catalog is distributed as files; a
-separate central always-running octos service is not required by this code.
+encodes a bundle for transport. The catalog and artifacts are static files,
+served by an HTTP origin or read from a local directory.
 
 On the device, `Origin` in
 [`appstore/src/source.rs`](../crates/appstore/src/source.rs) fetches a local
 directory or HTTP origin. `Store::accept_catalog` verifies the signature
 and rejects a sequence older than the catalog it already holds. Installation
 checks freshness and bundle bytes before writing
-`<app-data>/<app-id>/bundle`. The 14-day freshness window pauses new installs;
-it does not by itself stop already-installed apps.
+`<app-data>/<app-id>/bundle`. The 14-day freshness window applies to new installs.
+Already-installed apps remain subject to `may_run`.
 
 `CardAppView::start` reopens the last verified catalog and calls
 `Store::may_run` for installed apps. A withdrawn version is refused on a
-subsequent open using that catalog; this is not a live process-kill service.
+subsequent open using that catalog. An already-running instance keeps its
+current lifecycle until the host closes it.
 System apps instead come from
 [`system::prepare`](../crates/appstore/src/system.rs), which unpacks a
 compiled-in pack and applies system limits.
@@ -141,7 +156,7 @@ to pack the selected first-party bundles. Without that selection it ships
 no system apps. `APP_HUB_MODULE` is the newer native store UI;
 `CARD_MODULE` wraps the common Card runner. The standalone `appstore`
 binary uses `APPSTORE_MODULE` from `appstore` through `AppHostView`;
-the store preview and standalone store are not full shells.
+launching installed app clients is the full shell's responsibility.
 
 ## 5. A host-service request, line by line
 
@@ -149,8 +164,8 @@ Consider a granted app calling
 `host.request("mail.list", args, callback)`:
 
 1. Makepad's Splash host API checks the capability and queues a request
-   identified by `(heap_key, req_id)`. A heap identifies an isolate; it is
-   not a peer slug.
+   identified by `(heap_key, req_id)`. The heap key selects the originating
+   isolate, and the request id selects its callback.
 2. The runner calls `services::pump` on UI events. It avoids executing
    callbacks during drawing. It collects requests for this app and its
    visible host sheet only, parses arguments and builds `ServiceCall` with
@@ -171,10 +186,9 @@ may override the timeout. A host sheet suspends its request's deadline
 while waiting for the person. The sheet owns its isolate and password input;
 the app receives the service's result, not its credential.
 
-These queues use `Mutex` and a native `std::thread` timeout sweeper. App Hub
-does not map each service call or widget to a Tokio task. The octos side has
-its own async scheduling, explained in the
-[OctoSense walkthrough](https://github.com/OctoSense-org/OctoSense/blob/main/docs/architecture-walkthrough.md).
+These queues use `Mutex` and a native `std::thread` timeout sweeper. The
+octos side uses async scheduling, explained in the
+[OctoSense walkthrough](https://github.com/OctoSense-org/OctoSense/blob/docs/junior-architecture-walkthrough/docs/architecture-walkthrough.md).
 
 ## 6. What declaring an app agent actually enables
 
@@ -182,14 +196,13 @@ its own async scheduling, explained in the
 `tools.json` describes tool names, schemas, risk, sharing, confirmation and
 implementation ownership. A contained app's namespace is its id's last
 segment; a native module uses its module id. `shareable: true` means a tool
-can be granted to another caller, not that every agent gets it automatically.
+can be granted to another caller; the caller still needs that grant.
 
 `agent.tools` asks for tools from outside this manifest. Only
 `ask_user_question` is an allowed plain kernel-tool name in contained app
 policy. Dotted names must also be offered by the host. The default list is
-in `HostLimits`; arbitrary `mail.send`, peer or shell privileges are not
-granted just because the file names them. Host-level relay support is not
-evidence that a default store manifest can pass admission with those names.
+in `HostLimits`; default admission rejects names outside that list,
+including `mail.send`.
 
 | Layer | Present in this source | What still requires shell support |
 | --- | --- | --- |
@@ -209,27 +222,40 @@ supply the missing script dispatcher. The generic `CardExecutor` here also
 returns unavailable. Existing system apps supply Rust service handlers;
 a store bundle cannot add one simply by shipping JSON.
 
-In the shell, the person can use the desktop **Ask &lt;app&gt;** panel,
-an app's own `octos.*` UI, or supported L0 card chat. The phone's general
-per-app panel entry is not implemented at this snapshot. The system agent
+The system bundles demonstrate this split: News has read and notification
+tools; Mail has `mail.notify`; Calendar has event and card tools. Photos,
+Maps, Camera and YouTube declare their own `<namespace>.notify`, executed
+by the shell's shared
+[`glance_notice` service](https://github.com/OctoSense-org/OctoSense/blob/main/crates/shell/src/glance_notice.rs).
+These declarations add an agent and a notice route, not general access to
+camera controls or photo records. AI providers remains excluded from that
+set: its `ai-providers` namespace fails the tool-name rule. The shell's
+[`script_apps` tests](https://github.com/OctoSense-org/OctoSense/blob/main/crates/shell/src/host_tools/script_apps.rs)
+record these exact tool rosters.
+
+The shell supplies the desktop `Ask <app>` panel, app-owned `octos.*` UI
+and supported L0 card chat. See the
+[shell chat surfaces](https://github.com/OctoSense-org/OctoSense/blob/docs/junior-architecture-walkthrough/docs/architecture-walkthrough.md#6-where-a-person-talks-and-where-the-answer-goes)
+for their entry points. The system agent
 discovers permitted prepared peers and delegates using their actual peer
 slug. A system request and a human request can reach the same app peer with
 separate conversation lanes; the reply is routed back to its requester.
-They do not automatically get a shared transcript.
+Each lane owns its transcript; sharing contexts receive bounded recent
+history from the other lane, and the shell panel can display both.
 
 The app agent's data workspace is normally its account folder,
-`accounts/device/` for a single-account app. The shell exposes bounded read
-tools; the agent is not handed an unrestricted database or every file in
-the app's jail. App-owned records must be in the exposed workspace or
+`accounts/device/` for a single-account app. On Unix, the shell exposes bounded
+`files.list/read/search` tools when the person has consented and that workspace
+is available. App-owned records must be in the exposed workspace or
 accessible through an implemented tool. A Rust host service's `.host`
 state and secrets stay outside it. See
 [`app_storage`](https://github.com/OctoSense-org/OctoSense/tree/main/crates/shell/src/app_storage)
 and [`app-peers/storage.rs`](https://github.com/OctoSense-org/OctoSense/blob/main/crates/app-peers/src/storage.rs).
 
 Cross-app tools require the owner's declaration, `shareable`, the caller's
-grant and an executable owner route, plus approval where required. App
-agents are not unrestricted system agents: do not assume they can invoke
-`peer_send_input` or ask the system agent to bypass their permissions.
+grant and an executable owner route, plus approval where required.
+Contained app agents cannot call `peer_send_input` or acquire system-agent
+privileges through this tool route.
 
 ## 7. Run the right host
 
@@ -241,7 +267,7 @@ Cargo metadata or a policy-only test from resolving. A consumer's top-level
 patches determine its actual versions; do not mix arbitrary latest engines
 with a different consumer's runtime lock.
 
-From App Hub (commands source-checked, not built/run in this review):
+From App Hub. **Validation status: build, GUI and device execution unverified.**
 
 ```sh
 cargo build --release -p octosense-card-host -p octosense-app-hub
@@ -297,9 +323,3 @@ Home APK and ROM build commands belong to the
 | Agent tool appears but fails | Owner/grant/executor route in shell `host_tools`; JSON is not implementation |
 | Agent cannot see app records | Active account workspace and file placement, then storage read-tool limits |
 | App peer absent | Shell consent and peer preparation; `card-host` has no peer list |
-
-Verification in this review: `git diff --check`, changed-file relative-link
-checks and `cargo metadata --no-deps --offline --format-version 1` passed.
-Metadata without dependency resolution does not verify a build.
-No provider-backed conversation, GUI launch, signed install or device run
-is claimed by this walkthrough.

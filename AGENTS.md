@@ -1,6 +1,6 @@
 # Working on App Hub
 
-Read [README.md](README.md), the junior Rust
+Read [README.md](README.md), the
 [code walkthrough](docs/CODE-WALKTHROUGH.md), and the relevant crate before
 editing. This repository owns the app contract, admission, catalog/signing,
 store, contained runner and shared host-service transport. OctoSense owns
