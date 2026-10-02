@@ -131,6 +131,8 @@ script_mod! {
                         }
                     }
                     action := Primary{text: "Get"}
+                    // Beside Update: the installed release still opens.
+                    open := Plain{width: Fill text: "Open" visible: false}
                     caption := Meta{}
                 }
             }
@@ -812,6 +814,8 @@ impl AppHubView {
                 Row::Section(title) => item.label(cx, ids!(title)).set_text(cx, &title),
                 Row::App(entry) | Row::Detail(entry) => {
                     self.fill_entry(cx, &item, &entry);
+                    // Only the detail card has it; a list row's button is enough.
+                    item.widget(cx, ids!(open)).set_visible(cx, shows_open(&entry));
                     item.label(cx, ids!(caption)).set_text(
                         cx,
                         if entry.kind == CatalogKind::Preview {
@@ -918,7 +922,11 @@ impl AppHubView {
             };
             match row {
                 Row::App(entry) | Row::Detail(entry) | Row::Hero(entry) => {
-                    if item.button(cx, ids!(action)).clicked(actions) {
+                    if item.button(cx, ids!(open)).clicked(actions) {
+                        if shows_open(&entry) && !self.busy {
+                            self.send(Command::Open(entry.id.clone()));
+                        }
+                    } else if item.button(cx, ids!(action)).clicked(actions) {
                         self.activate(cx, scope, entry);
                     } else if item
                         .widget(cx, ids!(row))
@@ -1000,6 +1008,11 @@ fn can_activate(entry: &Entry) -> bool {
         EntryStatus::Unavailable(_) => false,
         EntryStatus::BuiltIn | EntryStatus::Installed => true,
     }
+}
+/// An update on offer leaves the installed release openable: the detail
+/// card offers Open beside Update. An installed app's own button says Open.
+fn shows_open(entry: &Entry) -> bool {
+    entry.status == EntryStatus::UpdateAvailable && entry.can_open
 }
 fn button_text(entry: &Entry) -> &str {
     if matches!(
@@ -1216,5 +1229,19 @@ mod tests {
         assert_eq!(button_text(&entry), "Refresh");
         entry.status = EntryStatus::Unavailable("Withdrawn".into());
         assert!(!can_activate(&entry));
+    }
+
+    #[test]
+    fn an_update_on_offer_shows_open_beside_update() {
+        let mut entry = catalog::preview_entries().remove(0);
+        entry.kind = CatalogKind::Live;
+        entry.status = EntryStatus::UpdateAvailable;
+        entry.can_open = true;
+        assert!(shows_open(&entry), "the installed release can be opened while the update waits");
+        entry.can_open = false;
+        assert!(!shows_open(&entry), "a release that cannot open offers only the update");
+        entry.status = EntryStatus::Installed;
+        entry.can_open = true;
+        assert!(!shows_open(&entry), "an installed app's own button already says Open");
     }
 }

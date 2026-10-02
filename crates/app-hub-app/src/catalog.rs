@@ -54,6 +54,9 @@ pub struct Entry {
     pub privacy: Vec<String>,
     pub kind: CatalogKind,
     pub status: EntryStatus,
+    /// The installed release opens. With [`EntryStatus::UpdateAvailable`],
+    /// the person may open it now and update later.
+    pub can_open: bool,
     pub consent: Option<InstallConsent>,
 }
 
@@ -236,7 +239,7 @@ impl Backend {
                 category: "utilities".into(), publisher: String::new(), version: installed.version,
                 release_notes: String::new(), screenshots: Vec::new(),
                 permissions: Vec::new(), privacy: Vec::new(), kind: CatalogKind::Live,
-                status: EntryStatus::Unavailable("Not offered by the current catalog".into()), consent: None,
+                status: EntryStatus::Unavailable("Not offered by the current catalog".into()), can_open: false, consent: None,
             })
         }).collect();
         CatalogSnapshot {
@@ -250,16 +253,23 @@ impl Backend {
     }
 
     fn present(&self, listing: Listing, can_install: bool) -> Entry {
-        let status = match listing.availability {
-            Availability::Installable => EntryStatus::Available,
-            Availability::Installed { version } if version != listing.version => {
-                EntryStatus::UpdateAvailable
-            }
-            Availability::Installed { .. } => match self.may_open(&listing.app_id) {
-                Ok(_) => EntryStatus::Installed,
+        // Opening is the installed release's; an update on offer is a separate
+        // fact, so one never hides the other.
+        let opens = match &listing.lifecycle.installed_version {
+            Some(_) => self.may_open(&listing.app_id),
+            None => Err("not installed".into()),
+        };
+        let can_open = opens.is_ok();
+        let status = match (&listing.lifecycle.installed_version, &listing.lifecycle.update_version) {
+            (Some(_), Some(_)) => EntryStatus::UpdateAvailable,
+            (Some(_), None) => match opens {
+                Ok(()) => EntryStatus::Installed,
                 Err(error) => EntryStatus::Unavailable(error),
             },
-            Availability::Withdrawn { reason } => EntryStatus::Unavailable(reason),
+            (None, _) => match listing.availability {
+                Availability::Withdrawn { reason } => EntryStatus::Unavailable(reason),
+                _ => EntryStatus::Available,
+            },
         };
         let consent = if can_install
             && matches!(
@@ -311,6 +321,7 @@ impl Backend {
             privacy: listing.privacy,
             kind: CatalogKind::Live,
             status,
+            can_open,
             consent,
         }
     }
@@ -464,7 +475,7 @@ pub fn preview_entries() -> Vec<Entry> {
         release_notes: String::new(), icon: None, screenshots: Vec::new(),
         permissions: vec!["Built-in app permissions are managed by OctoSense and the app itself.".into()],
         privacy: vec!["This preview is not a publisher privacy declaration.".into()],
-        kind: CatalogKind::Preview, status: EntryStatus::BuiltIn, consent: None,
+        kind: CatalogKind::Preview, status: EntryStatus::BuiltIn, can_open: false, consent: None,
     }).collect()
 }
 
@@ -1134,6 +1145,18 @@ mod tests {
         assert!(snapshot.library.is_empty());
         assert!(!app_root.join(".bundle-next").exists());
         assert!(!app_root.join("bundle").exists());
+    }
+
+    #[test]
+    fn an_update_on_offer_keeps_the_installed_release_openable() {
+        let fixture = Fixture::new();
+        let mut backend = fixture.install_first_version();
+        fixture.publish_today(2, vec![fixture.entry(), fixture.update()]);
+        let snapshot = backend.refresh();
+        let entry = snapshot.entries.iter().chain(&snapshot.library).find(|e| e.id == "test-app").unwrap();
+        assert_eq!(entry.status, EntryStatus::UpdateAvailable);
+        assert!(entry.can_open, "the installed release opens while its update is on offer");
+        assert!(backend.may_open("test-app").is_ok());
     }
 
     #[test]
