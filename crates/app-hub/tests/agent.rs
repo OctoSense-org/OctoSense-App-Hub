@@ -129,11 +129,29 @@ fn agent_files_may_name_only_the_apps_hosts() {
     assert!(found.iter().all(|(s, _)| *s == Severity::Warning), "a declared host is fine: {found:?}");
 }
 
+/// The store listing an entry needs: the gate admits nothing without one.
+fn list(dir: &Path) {
+    use base64::Engine;
+    std::fs::write(dir.join("icon.svg"), r##"<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" fill="#146"/></svg>"##).unwrap();
+    let png = base64::engine::general_purpose::STANDARD
+        .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=")
+        .unwrap();
+    std::fs::write(dir.join("screen.png"), png).unwrap();
+    std::fs::write(dir.join("listing.json"), json!({
+        "schema": 1, "description": "News with its own agent", "category": "news",
+        "screenshots": ["screen.png"], "icon": "icon.svg", "platforms": ["android"],
+        "publisher": {"name": "Example", "support": "https://example.test/support", "privacy_policy_url": "https://example.test/privacy"},
+        "age_rating": "all"
+    }).to_string()).unwrap();
+}
+
 #[test]
 fn the_catalog_entry_carries_the_tools_and_the_store_lines() {
     let dir = scratch("entry");
+    list(&dir);
     stamp(&dir);
     let report = check_bundle(&dir, &limits(), &RefuseAllSignatures, None).unwrap();
+    assert!(report.passed(), "{}", report.render());
     let entry = entry_for(&dir, &report, "p", "", "https://example.invalid/r", "c", "2026-09-27").unwrap();
     assert_eq!(entry.tools.len(), 5);
     let lines = entry.permissions_summary();
