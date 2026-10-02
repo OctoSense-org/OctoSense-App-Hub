@@ -3,7 +3,12 @@
 `octosense-app-contract` follows the rules in [README.md](README.md#stability):
 within `1.x` it only grows.
 
-## Unreleased
+## 1.1.0
+
+`RESERVED_NAMES` lists the native apps OctoSense ships (its
+`native-apps.json`), so it grows with them; the rule itself (an id or a
+namespace on the list is refused) is unchanged. A manifest that 1.0.0
+admitted with one of the new names as its id or namespace is refused.
 
 - `RESERVED_NAMES` gains `calculator`, `clock`, `notes`, `reminders` and
   `weather`: OctoSense ships those Makepad apps as native apps, and grants
