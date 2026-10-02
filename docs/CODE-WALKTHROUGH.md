@@ -188,7 +188,7 @@ the app receives the service's result, not its credential.
 
 These queues use `Mutex` and a native `std::thread` timeout sweeper. The
 octos side uses async scheduling, explained in the
-[OctoSense walkthrough](https://github.com/OctoSense-org/OctoSense/blob/docs/junior-architecture-walkthrough/docs/architecture-walkthrough.md).
+[OctoSense walkthrough](https://github.com/OctoSense-org/OctoSense/blob/c3011a2057ec59738b79466f48ff2ad8d0e60130/docs/architecture-walkthrough.md).
 
 ## 6. What declaring an app agent actually enables
 
@@ -235,7 +235,7 @@ record these exact tool rosters.
 
 The shell supplies the desktop `Ask <app>` panel, app-owned `octos.*` UI
 and supported L0 card chat. See the
-[shell chat surfaces](https://github.com/OctoSense-org/OctoSense/blob/docs/junior-architecture-walkthrough/docs/architecture-walkthrough.md#6-where-a-person-talks-and-where-the-answer-goes)
+[shell chat surfaces](https://github.com/OctoSense-org/OctoSense/blob/c3011a2057ec59738b79466f48ff2ad8d0e60130/docs/architecture-walkthrough.md#6-where-a-person-talks-and-where-the-answer-goes)
 for their entry points. The system agent
 discovers permitted prepared peers and delegates using their actual peer
 slug. A system request and a human request can reach the same app peer with
