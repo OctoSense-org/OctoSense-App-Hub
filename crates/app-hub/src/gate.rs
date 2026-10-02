@@ -17,7 +17,8 @@ const ALLOWED_EXTENSIONS: &[&str] = &["card", "json", "l0", "octoscript", "splas
 /// than this is either shipping something it should not, or should be split.
 pub const MAX_BUNDLE_BYTES: u64 = 8 * 1024 * 1024;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Severity {
     /// The bundle is not admitted.
     Refusal,
@@ -25,19 +26,25 @@ pub enum Severity {
     Warning,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Finding {
     pub severity: Severity,
     pub check: &'static str,
     pub detail: String,
+    /// Where in the bundle, when one file or property is at fault.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 
 impl Finding {
     fn refuse(check: &'static str, detail: impl Into<String>) -> Self {
-        Finding { severity: Severity::Refusal, check, detail: detail.into() }
+        Finding { severity: Severity::Refusal, check, detail: detail.into(), path: None }
     }
     fn warn(check: &'static str, detail: impl Into<String>) -> Self {
-        Finding { severity: Severity::Warning, check, detail: detail.into() }
+        Finding { severity: Severity::Warning, check, detail: detail.into(), path: None }
+    }
+    pub(crate) fn at(check: &'static str, path: impl Into<String>, detail: impl Into<String>) -> Self {
+        Finding { severity: Severity::Refusal, check, detail: detail.into(), path: Some(path.into()) }
     }
 }
 
@@ -49,11 +56,22 @@ pub struct GateReport {
     pub findings: Vec<Finding>,
     /// What the app would actually get, when the gate passed.
     pub policy: Option<AppPolicy>,
+    /// What the bundle's data and artwork reference, by JSON pointer.
+    pub resources: Vec<crate::admission::ResourceReference>,
     /// The manifest this report checked, so an entry is made from exactly it.
     pub(crate) admitted_manifest: Vec<u8>,
 }
 
 impl GateReport {
+    /// The report as `hub check --json` prints it.
+    pub fn json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "schema": 1, "stage": "structural", "passed": self.passed(),
+            "app_id": self.app_id, "version": self.version, "digest": self.digest,
+            "findings": self.findings, "resources": self.resources,
+        })
+    }
+
     pub fn passed(&self) -> bool {
         !self.findings.iter().any(|f| f.severity == Severity::Refusal)
     }
@@ -66,7 +84,8 @@ impl GateReport {
                 Severity::Refusal => "refused",
                 Severity::Warning => "warning",
             };
-            out.push_str(&format!("  [{mark}] {}: {}\n", finding.check, finding.detail));
+            let path = finding.path.as_ref().map(|p| format!(" ({p})")).unwrap_or_default();
+            out.push_str(&format!("  [{mark}] {}{path}: {}\n", finding.check, finding.detail));
         }
         if let Some(policy) = &self.policy {
             // The quota is resolved either way; the app gets storage only
@@ -106,11 +125,13 @@ pub fn check_bundle(
     verifier: &dyn SignatureVerifier,
     previous: Option<&Catalog>,
 ) -> Result<GateReport, String> {
+    // Metadata first: nothing is read or hashed beyond the limits.
+    let files = crate::admission::inventory(bundle)?;
     let manifest_path = bundle.join(octosense_app_policy::MANIFEST_FILE);
-    let manifest_json = std::fs::read_to_string(&manifest_path).map_err(|e| format!("{}: {e}", manifest_path.display()))?;
+    let manifest_json = crate::admission::read_text(&manifest_path, crate::admission::MAX_MANIFEST_BYTES)?;
     let manifest = AppManifest::parse(&manifest_json)?;
     let digest = digest_dir(bundle)?;
-    let mut findings = Vec::new();
+    let (mut findings, resources) = crate::admission::validate(bundle, &files);
 
     // ---- integrity ------------------------------------------------------
     if !digest.eq_ignore_ascii_case(&manifest.integrity.bundle_blake3) {
@@ -281,7 +302,7 @@ pub fn check_bundle(
     }
 
     let admitted_manifest = serde_json::to_vec(&manifest).map_err(|e| e.to_string())?;
-    Ok(GateReport { app_id: manifest.id, version: manifest.version, digest, findings, policy, admitted_manifest })
+    Ok(GateReport { app_id: manifest.id, version: manifest.version, digest, findings, policy, resources, admitted_manifest })
 }
 
 /// Every file in the bundle except the manifest, relative to its root.

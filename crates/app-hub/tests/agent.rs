@@ -129,9 +129,11 @@ fn agent_files_may_name_only_the_apps_hosts() {
     assert!(found.iter().all(|(s, _)| *s == Severity::Warning), "a declared host is fine: {found:?}");
 }
 
-/// The store listing an entry needs: the gate admits nothing without one.
+/// What an entry needs beyond the agent: an app to run, and the store
+/// listing the gate admits nothing without.
 fn list(dir: &Path) {
     use base64::Engine;
+    std::fs::write(dir.join("main.splash"), "Label{text: \"News\"}").unwrap();
     std::fs::write(dir.join("icon.svg"), r##"<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" fill="#146"/></svg>"##).unwrap();
     let png = base64::engine::general_purpose::STANDARD
         .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=")
