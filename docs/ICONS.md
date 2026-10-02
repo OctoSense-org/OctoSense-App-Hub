@@ -36,14 +36,14 @@ needs another format.
 | Declare an icon and include the referenced file | Hub admission gate |
 | Use a bundle-relative PNG/SVG path, without an absolute path, `..` or URL | Listing validator |
 | No symlinks; bundle contents within the 8 MiB limit | Hub admission gate |
-| Icon at most 1 MiB; positive square dimensions | OctoSense mobile installed-icon loader |
-| PNG no larger than 1024×1024; valid PNG bytes | Mobile loader/header check and image decoder |
-| SVG parses into drawable geometry with a square logical canvas | Mobile SVG loader |
+| Icon at most 1 MiB; positive square dimensions | Hub admission gate, and the OctoSense mobile installed-icon loader |
+| PNG no larger than 1024×1024; valid PNG bytes | Hub admission gate (decodes it), and the mobile loader |
+| SVG parses, with square numeric dimensions or `viewBox`; no script, foreign content or external `url()`/`@import` | Hub admission gate, and the mobile SVG loader |
 | Clear silhouette, suitable padding and readable contrast | Author's visual review |
 
-`hub check` currently checks the icon path, type and presence, **not decoded
-dimensions or visual quality**. A gate pass does not prove that an icon will
-render. The mobile bounds above describe its current installed-icon loader;
+`hub check` decodes the icon and checks the rules above, **not its visual
+quality**. A `<style>` block in an SVG is fine as long as it loads nothing
+from outside the file. A gate pass does not prove that an icon looks right. The mobile bounds above describe its current installed-icon loader;
 invalid artwork falls back to a generic icon. Test in the target shell.
 
 Sources: [listing parser](../crates/app-policy/src/listing.rs),
