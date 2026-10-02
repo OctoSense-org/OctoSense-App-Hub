@@ -3,6 +3,15 @@
 `octosense-app-contract` follows the rules in [README.md](README.md#stability):
 within `1.x` it only grows.
 
+## Unreleased
+
+- `RESERVED_NAMES` gains `calculator`, `clock`, `notes`, `reminders` and
+  `weather`: OctoSense ships those Makepad apps as native apps, and grants
+  their read tools (`notes.search`, …) to its system agent by name. A store
+  app with one of those ids, or one as its namespace (`com.example.notes`),
+  is now refused as reserved. The tests' example app is `forecast` (it was
+  `weather`).
+
 ## 1.0.0
 
 The contract as OctoSense ADR 0005 section 1 defines it, moved out of App

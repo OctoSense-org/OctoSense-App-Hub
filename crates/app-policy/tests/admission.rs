@@ -7,7 +7,7 @@ use std::path::Path;
 const BUNDLE: &[u8] = b"a card bundle";
 
 fn manifest_with(body: &str) -> String {
-    format!(r#"{{"schema":1,"id":"weather","version":"1.0.0","name":"Weather","integrity":{{"bundle_blake3":"{}"}}{}}}"#,
+    format!(r#"{{"schema":1,"id":"forecast","version":"1.0.0","name":"Forecast","integrity":{{"bundle_blake3":"{}"}}{}}}"#,
         bundle_digest(BUNDLE),
         if body.is_empty() { String::new() } else { format!(",{body}") })
 }
@@ -140,8 +140,8 @@ fn a_smaller_quota_is_honoured() {
 
 #[test]
 fn an_id_may_not_navigate_the_filesystem() {
-    for id in ["../escape", ".hidden", "Weather", "with space", ""] {
-        let json = manifest_with("").replace(r#""id":"weather""#, &format!(r#""id":"{id}""#));
+    for id in ["../escape", ".hidden", "Forecast", "with space", ""] {
+        let json = manifest_with("").replace(r#""id":"forecast""#, &format!(r#""id":"{id}""#));
         assert!(
             admit_and_resolve(&json, BUNDLE, &open_limits(), &RefuseAllSignatures).is_err(),
             "id {id:?} should be refused"
@@ -152,7 +152,7 @@ fn an_id_may_not_navigate_the_filesystem() {
 #[test]
 fn the_jail_is_one_directory_per_app() {
     let policy = resolve("").unwrap();
-    assert_eq!(policy.jail_root(Path::new("/data/apps")), Path::new("/data/apps/weather"));
+    assert_eq!(policy.jail_root(Path::new("/data/apps")), Path::new("/data/apps/forecast"));
 }
 
 // ------------------------------------------------------------------- agent
@@ -203,7 +203,7 @@ fn the_agents_workspace_is_the_apps_own_jail_and_nothing_else_is_readable() {
         "agent":{"profile":"workspace-write-never-ask","tools":["net.fetch"],"max_iterations":3}"#;
     let policy = resolve(body).unwrap();
     let session = policy.session_profile(Path::new("/data/apps")).unwrap();
-    assert_eq!(session.workspace, Path::new("/data/apps/weather"));
+    assert_eq!(session.workspace, Path::new("/data/apps/forecast"));
     assert!(session.read_allow_paths.is_empty());
     assert_eq!(session.mode, "workspace-write-never");
     assert_eq!(session.max_iterations, 3);
@@ -225,8 +225,8 @@ fn an_agents_budget_is_clamped_like_any_other_quota() {
 fn every_agent_session_carries_the_app_it_acts_for() {
     let policy = resolve(r#""agent":{"profile":"read-only"}"#).unwrap();
     let session = policy.session_profile(Path::new("/data/apps")).unwrap();
-    assert_eq!(session.session_id, "weather.agent");
-    assert_eq!(session.provenance.app_id, "weather");
+    assert_eq!(session.session_id, "forecast.agent");
+    assert_eq!(session.provenance.app_id, "forecast");
     assert_eq!(session.provenance.app_version, "1.0.0");
 }
 
@@ -262,7 +262,7 @@ fn a_directory_bundle_is_admitted_by_its_precomputed_digest() {
     let digest = bundle_digest(BUNDLE);
     let policy =
         admit_and_resolve_dir(&manifest_with(""), &digest, &open_limits(), &RefuseAllSignatures).unwrap();
-    assert_eq!(policy.app_id, "weather");
+    assert_eq!(policy.app_id, "forecast");
     // And a digest for different content is still refused.
     let err = admit_and_resolve_dir(&manifest_with(""), &bundle_digest(b"other"), &open_limits(), &RefuseAllSignatures)
         .unwrap_err();
@@ -493,10 +493,10 @@ fn a_manifest_without_the_new_storage_fields_signs_as_before() {
 
 #[test]
 fn a_native_apps_id_is_refused_at_resolve() {
-    let json = manifest_with("").replace(r#""id":"weather""#, r#""id":"terminal""#);
+    let json = manifest_with("").replace(r#""id":"forecast""#, r#""id":"terminal""#);
     let err = admit_and_resolve(&json, BUNDLE, &open_limits(), &RefuseAllSignatures).unwrap_err();
     assert!(err.contains("reserved"), "{err}");
-    let json = manifest_with("").replace(r#""id":"weather""#, r#""id":"com.example.rinx""#);
+    let json = manifest_with("").replace(r#""id":"forecast""#, r#""id":"com.example.rinx""#);
     let err = admit_and_resolve(&json, BUNDLE, &open_limits(), &RefuseAllSignatures).unwrap_err();
     assert!(err.contains("reserved"), "{err}");
 }

@@ -22,7 +22,7 @@
 //! use octosense_app_policy::{admit_and_resolve, HostLimits, RefuseAllSignatures};
 //! let bundle = b"the card bundle bytes";
 //! let manifest = format!(
-//!     r#"{{"schema":1,"id":"weather","version":"1.0.0","name":"Weather",
+//!     r#"{{"schema":1,"id":"forecast","version":"1.0.0","name":"Forecast",
 //!         "integrity":{{"bundle_blake3":"{}"}},
 //!         "capabilities":["storage","net"],
 //!         "network":{{"hosts":["api.weather.example"]}}}}"#,

@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "id": "weather",
+  "id": "forecast",
   "version": "1.0.0",
-  "name": "Weather",
+  "name": "Forecast",
   "integrity": {
     "bundle_blake3": "0000000000000000000000000000000000000000000000000000000000000000"
   }
