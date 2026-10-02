@@ -4,7 +4,7 @@
   "ignored_fields": [],
   "limits": "unsigned",
   "policy": {
-    "app_id": "weather",
+    "app_id": "forecast",
     "capabilities": [
       "glance",
       "matrix.read_messages",
@@ -13,7 +13,7 @@
       "octos.session.history",
       "octos.session.open"
     ],
-    "display_name": "Weather",
+    "display_name": "Forecast",
     "hosts": [],
     "instruction_budget": 20000000,
     "may_prompt": false,
@@ -28,6 +28,6 @@
     "storage_bytes": 16777216,
     "version": "1.0.0"
   },
-  "signing_blake3": "ad5b8ff7e5ceca4f1090b94d4ae21fb9f9da7ec5dc7c8f7b788148493d0661fc",
+  "signing_blake3": "f280c25c216fcef0320dde9530183dfd5f4ac8103baee7ba6acbf1f1e25ea501",
   "source": "App Hub app-policy admission tests: matrix, octos, glance and model services"
 }

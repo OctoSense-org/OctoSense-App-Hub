@@ -169,12 +169,12 @@ fn an_app_without_agent_or_tools_has_no_agent_bundle() {
 fn a_manifest_written_before_the_agent_additions_signs_the_same_way() {
     // The new fields are skipped at their defaults, so the canonical bytes a
     // publisher signed before they existed are the bytes computed now.
-    let legacy = r#"{"schema":1,"id":"weather","version":"1.0.0","name":"Weather","integrity":{"bundle_blake3":"00"},
+    let legacy = r#"{"schema":1,"id":"forecast","version":"1.0.0","name":"Forecast","integrity":{"bundle_blake3":"00"},
         "agent":{"profile":"read-only","tools":["ledger.read"],"max_iterations":2}}"#;
     let bytes = String::from_utf8(AppManifest::parse(legacy).unwrap().signing_bytes().unwrap()).unwrap();
     assert_eq!(
         bytes,
-        r#"{"agent":{"max_iterations":2,"profile":"read-only","token_budget":null,"tools":["ledger.read"]},"capabilities":[],"compute":{"instruction_budget":null,"memory_bytes":null},"id":"weather","integrity":{"bundle_blake3":"00","signature":null},"name":"Weather","network":{"hosts":[]},"schema":1,"storage":{"max_bytes":null},"version":"1.0.0"}"#
+        r#"{"agent":{"max_iterations":2,"profile":"read-only","token_budget":null,"tools":["ledger.read"]},"capabilities":[],"compute":{"instruction_budget":null,"memory_bytes":null},"id":"forecast","integrity":{"bundle_blake3":"00","signature":null},"name":"Forecast","network":{"hosts":[]},"schema":1,"storage":{"max_bytes":null},"version":"1.0.0"}"#
     );
 }
 
@@ -582,7 +582,7 @@ fn a_native_apps_id_or_namespace_or_the_hosts_own_name_is_refused() {
     // and consent by its id, and its tools by its namespace: `terminal`
     // (or `com.example.terminal`, whose tools are `terminal.*`) would stand
     // in for the Terminal, `system` for the system agent.
-    for id in ["terminal", "rinx", "apphub", "com.example.terminal", "dev.example.rinx", "system", "toolbox", "org.example.dev"] {
+    for id in ["terminal", "rinx", "apphub", "com.example.terminal", "dev.example.rinx", "system", "toolbox", "org.example.dev", "com.example.notes", "weather"] {
         let dir = scratch(&format!("reserved-{id}"));
         let manifest = stamp(&dir, |m| m["id"] = json!(id));
         refused_with(&dir, &manifest, "reserved");
@@ -592,7 +592,7 @@ fn a_native_apps_id_or_namespace_or_the_hosts_own_name_is_refused() {
     for id in ["os.news", "dev.example.news", "org.example.terminal-notes"] {
         assert!(check_reserved_id(id).is_ok(), "{id}");
     }
-    for native in ["apphub", "appcard", "reference", "rinx", "sheets", "terminal"] {
+    for native in ["apphub", "appcard", "reference", "rinx", "sheets", "terminal", "calculator", "clock", "notes", "reminders", "weather"] {
         assert!(RESERVED_NAMES.contains(&native), "{native}");
     }
 }

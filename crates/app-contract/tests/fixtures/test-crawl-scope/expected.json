@@ -4,12 +4,12 @@
   "ignored_fields": [],
   "limits": "unsigned",
   "policy": {
-    "app_id": "weather",
+    "app_id": "forecast",
     "capabilities": [
       "crawl",
       "research"
     ],
-    "display_name": "Weather",
+    "display_name": "Forecast",
     "hosts": [],
     "instruction_budget": 20000000,
     "may_prompt": false,
@@ -36,6 +36,6 @@
     "storage_bytes": 16777216,
     "version": "1.0.0"
   },
-  "signing_blake3": "d4cd80b8df53e5c2d88439953ea67ec44810b3c4b2689755aa22445b48de5608",
+  "signing_blake3": "7a20fbff13304c7557918b457dddccd19f955924767ce433be89a07057c502a2",
   "source": "App Hub app-policy admission tests: research and crawl"
 }

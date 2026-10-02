@@ -4,13 +4,13 @@
   "ignored_fields": [],
   "limits": "unsigned",
   "policy": {
-    "app_id": "weather",
+    "app_id": "forecast",
     "capabilities": [
       "net",
       "prompt",
       "storage"
     ],
-    "display_name": "Weather",
+    "display_name": "Forecast",
     "hosts": [
       "api.weather.example",
       "tiles.weather.example"
@@ -28,6 +28,6 @@
     "storage_bytes": 4096,
     "version": "1.0.0"
   },
-  "signing_blake3": "8ea8fb898043613c8661a5e5c2b26c13198212ba418d28d27a147c166d30c4eb",
+  "signing_blake3": "bdbd298db09ccf3a3a50d86bebc776b24ac0264c5b6a8373bd280aaf4e809636",
   "source": "App Hub app-policy admission tests: net, hosts (one mixed-case), prompt, a clamped budget"
 }

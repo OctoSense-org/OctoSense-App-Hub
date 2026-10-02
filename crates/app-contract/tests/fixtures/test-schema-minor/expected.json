@@ -4,11 +4,11 @@
   "ignored_fields": [],
   "limits": "unsigned",
   "policy": {
-    "app_id": "weather",
+    "app_id": "forecast",
     "capabilities": [
       "storage"
     ],
-    "display_name": "Weather",
+    "display_name": "Forecast",
     "hosts": [],
     "instruction_budget": 20000000,
     "may_prompt": false,
@@ -23,6 +23,6 @@
     "storage_bytes": 16777216,
     "version": "1.0.0"
   },
-  "signing_blake3": "371596ab5a46c3b131a6b910898d888d7d390cfbdec6a1399c40ac36e97b1092",
+  "signing_blake3": "d0de3c7e3b5c368b4794096e57d68586898a318888105f0e25517d909e56299a",
   "source": "ADR 0005 section 2: an explicit empty requires and schema_minor 0"
 }

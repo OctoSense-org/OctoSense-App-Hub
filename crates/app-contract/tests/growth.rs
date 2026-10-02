@@ -7,7 +7,7 @@ use octosense_app_contract::*;
 
 fn manifest_with(body: &str) -> String {
     format!(
-        r#"{{"schema":1,"id":"weather","version":"1.0.0","name":"Weather","integrity":{{"bundle_blake3":"00"}}{}}}"#,
+        r#"{{"schema":1,"id":"forecast","version":"1.0.0","name":"Forecast","integrity":{{"bundle_blake3":"00"}}{}}}"#,
         if body.is_empty() { String::new() } else { format!(",{body}") }
     )
 }
@@ -22,7 +22,7 @@ fn version_one_point_zero_knows_no_features_and_minor_zero() {
 #[test]
 fn an_unknown_required_feature_needs_a_newer_host() {
     let err = parse(&manifest_with(r#""requires":["storage.encrypted"]"#)).unwrap_err();
-    assert_eq!(err, "app weather needs a newer host: storage.encrypted");
+    assert_eq!(err, "app forecast needs a newer host: storage.encrypted");
     let err = parse(&manifest_with(r#""requires":["a","b"],"schema_minor":2"#)).unwrap_err();
     assert!(err.ends_with("needs a newer host: a, b"), "{err}");
 }
@@ -77,10 +77,10 @@ fn a_newer_minor_ignores_an_unknown_optional_field_and_reports_it() {
 fn a_newer_minor_with_an_unknown_required_feature_is_refused() {
     let err = parse(&manifest_with(r#""schema_minor":2,"requires":["net.proxy"],"network":{"hosts":[],"proxy":"p.example"}"#))
         .unwrap_err();
-    assert_eq!(err, "app weather needs a newer host: net.proxy");
+    assert_eq!(err, "app forecast needs a newer host: net.proxy");
     // Without unknown fields, the strict read reaches the same refusal.
     let err = parse(&manifest_with(r#""schema_minor":2,"requires":["net.proxy"]"#)).unwrap_err();
-    assert_eq!(err, "app weather needs a newer host: net.proxy");
+    assert_eq!(err, "app forecast needs a newer host: net.proxy");
 }
 
 #[test]

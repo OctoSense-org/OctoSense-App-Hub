@@ -8,12 +8,12 @@
   ],
   "limits": "unsigned",
   "policy": {
-    "app_id": "weather",
+    "app_id": "forecast",
     "capabilities": [
       "net",
       "storage"
     ],
-    "display_name": "Weather",
+    "display_name": "Forecast",
     "hosts": [
       "api.weather.example"
     ],
@@ -30,6 +30,6 @@
     "storage_bytes": 4096,
     "version": "1.1.0"
   },
-  "signing_blake3": "cc5a75db207e0854a71d029ff67136090e3d961f6c03bfc9fdfcfaf2b2587cea",
+  "signing_blake3": "659e01c4b0161afb3807473661342b7412a1ce1560353bd57b1321e698e5452e",
   "source": "ADR 0005 section 2: a manifest for a newer 1.x (schema_minor 2) with unknown optional fields at top level, in network and in storage"
 }
