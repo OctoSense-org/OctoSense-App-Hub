@@ -130,8 +130,10 @@ Follow `policy_for` → `App::mount` in
    instructions. Requests above ceilings are clamped.
 3. `isolate_settings` in
    [`containers.rs`](../crates/app-policy/src/containers.rs) chooses
-   `<app-data>/<manifest-id>` as the jail. An `AssetServer` serves bundle
-   artwork on a loopback port; only its own port is added to the allowlist.
+   `<app-data>/<manifest-id>` as the jail; the isolate gets it, and its
+   quota, only when the manifest declares `storage`. An `AssetServer`
+   serves bundle artwork on a loopback port; only its own port is added
+   to the allowlist.
 4. [`splash_adapter::apply`](../crates/app-policy/src/splash_adapter.rs)
    sets jail, quota, capabilities, prompt permission, host allowlist,
    instruction budget, heap limit and network access **before** evaluation.
