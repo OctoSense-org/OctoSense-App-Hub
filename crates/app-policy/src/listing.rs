@@ -196,6 +196,9 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
             ));
         }
     }
+    if manifest.capabilities.iter().any(|c| octosense_app_contract::palpo::SERVICES.contains(&c.as_str())) {
+        lines.push("Uses your signed-in Matrix identity for the Palpo operations you allow; passwords, access tokens and fleet configuration stay with the host. Server permissions still apply.".into());
+    }
     let matrix_reads = manifest
         .capabilities
         .iter()

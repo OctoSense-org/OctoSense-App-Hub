@@ -28,7 +28,7 @@ pub const SCHEMA_MINOR: u32 = 0;
 /// build honours. Empty in `1.0.0`: every feature added in `1.x` that
 /// restricts or changes what an app gets is added here, with the field
 /// that carries it, in the same release.
-pub const KNOWN_FEATURES: &[&str] = &[];
+pub const KNOWN_FEATURES: &[&str] = &["palpo-admin-v1"];
 
 /// Parse a manifest: [`AppManifest::parse`].
 pub fn parse(json: &str) -> Result<AppManifest, String> {
@@ -103,6 +103,36 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // per-instance grant and its own ceilings on every request. A prefix is
     // never a grant: `octos.` or `matrix.` alone is an unknown capability,
     // and history access does not imply starting a turn.
+    // Palpo operations are individual grants; they never imply server roles.
+    "palpo.intent.new",
+    "palpo.session.open",
+    "palpo.session.disconnect",
+    "palpo.catalog.list",
+    "palpo.projects.list",
+    "palpo.projects.create",
+    "palpo.requests.list",
+    "palpo.requests.create",
+    "palpo.fleets.list",
+    "palpo.fleets.register",
+    "palpo.fleets.install",
+    "palpo.fleets.set_state",
+    "palpo.fleets.migrate",
+    "palpo.fleets.queue",
+    "palpo.fleets.export",
+    "palpo.fleets.connect",
+    "palpo.agents.list",
+    "palpo.agents.register",
+    "palpo.agents.rename",
+    "palpo.agents.retire",
+    "palpo.activity.list",
+    "palpo.accounts.list",
+    "palpo.inbox.list",
+    "palpo.inbox.submit",
+    "palpo.inbox.get",
+    "palpo.inbox.decide",
+    "palpo.inbox.activate",
+    "palpo.inbox.seen",
+    "palpo.inbox.snooze",
     "matrix.account_info",
     "matrix.device",
     "matrix.dm_find",

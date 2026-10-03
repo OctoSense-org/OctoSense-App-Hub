@@ -112,3 +112,6 @@ pub use manifest::{
 pub use policy::{resolve, AppPolicy, HostLimits, StorageGrant};
 pub use research::ResearchScope;
 pub use verify::{admit, admit_digest, bundle_digest, RefuseAllSignatures, SignatureVerifier};
+
+/// Exact Palpo service grants and their consent language.
+pub mod palpo;

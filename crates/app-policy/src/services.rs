@@ -51,6 +51,7 @@ pub fn is_host_service(capability: &str) -> bool {
 /// What a store tells the person a service capability allows, in plain words.
 /// `None` for anything that is not an exact service name.
 pub fn service_words(capability: &str) -> Option<&'static str> {
+    if let Some(words) = octosense_app_contract::palpo::words(capability) { return Some(words); }
     Some(match capability {
         "matrix.account_info" => "See which Matrix account you are using",
         "matrix.device" => "See this device's Matrix session details",
