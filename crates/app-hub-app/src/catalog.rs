@@ -372,7 +372,7 @@ impl Backend {
                 &octosense_app_hub::today(),
             )?;
             publish_bundle(
-                &self.root.join(&consent.app_id),
+                &octosense_app_hub::install_root(&self.root, &consent.app_id),
                 &prepared_store.install_dir(&consent.app_id),
                 |from, to| std::fs::rename(from, to),
             )?;
@@ -557,16 +557,16 @@ fn persist_catalog(root: &Path, json: &str) -> Result<(), String> {
 }
 
 fn publish_bundle(
-    app_root: &Path,
+    install: &Path,
     prepared: &Path,
     mut rename: impl FnMut(&Path, &Path) -> std::io::Result<()>,
 ) -> Result<(), String> {
-    recover_bundle(app_root)?;
-    std::fs::create_dir_all(app_root)
-        .map_err(|e| format!("Could not create the app directory: {e}"))?;
-    let bundle = app_root.join("bundle");
-    let next = app_root.join(".bundle-next");
-    let previous = app_root.join(".bundle-previous");
+    recover_bundle(install)?;
+    std::fs::create_dir_all(install)
+        .map_err(|e| format!("Could not create the app's install directory: {e}"))?;
+    let bundle = install.join("bundle");
+    let next = install.join(".bundle-next");
+    let previous = install.join(".bundle-previous");
     rename(prepared, &next)
         .map_err(|e| format!("Could not prepare the verified installation: {e}"))?;
     if bundle.exists() {
@@ -592,10 +592,10 @@ fn publish_bundle(
     Ok(())
 }
 
-fn recover_bundle(app_root: &Path) -> Result<(), String> {
-    let bundle = app_root.join("bundle");
-    let previous = app_root.join(".bundle-previous");
-    let next = app_root.join(".bundle-next");
+fn recover_bundle(install: &Path) -> Result<(), String> {
+    let bundle = install.join("bundle");
+    let previous = install.join(".bundle-previous");
+    let next = install.join(".bundle-next");
     if previous.exists() {
         if bundle.exists() {
             // The final rename happened before interruption: keep the complete
@@ -615,8 +615,12 @@ fn recover_bundle(app_root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Installs from before `.bundles` move out of their apps' storage first,
+/// then every interrupted update under `.bundles` is settled.
 fn recover_installations(root: &Path) -> Result<(), String> {
-    let entries = match std::fs::read_dir(root) {
+    octosense_app_hub::adopt_legacy_installs(root)?;
+    let installs = root.join(octosense_app_hub::INSTALLS_DIR);
+    let entries = match std::fs::read_dir(&installs) {
         Ok(entries) => entries,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(error) => {
@@ -1007,7 +1011,7 @@ mod tests {
             Some("1")
         );
         assert_eq!(
-            std::fs::read_to_string(f.root().join("test-app/bundle/main.splash")).unwrap(),
+            std::fs::read_to_string(octosense_app_hub::installed_bundle_dir(&f.root(), "test-app").join("main.splash")).unwrap(),
             "text Hello"
         );
         assert_eq!(
@@ -1023,9 +1027,10 @@ mod tests {
         let update = f.update();
         let prepared = f.path.join("hub").join(update.artifact);
         let app_root = f.root().join("test-app");
+        let install = octosense_app_hub::install_root(&f.root(), "test-app");
         let mut injected = false;
-        let result = publish_bundle(&app_root, &prepared, |from, to| {
-            if from == app_root.join(".bundle-next") && to == app_root.join("bundle") {
+        let result = publish_bundle(&install, &prepared, |from, to| {
+            if from == install.join(".bundle-next") && to == install.join("bundle") {
                 injected = true;
                 Err(std::io::Error::other("injected publication failure"))
             } else {
@@ -1035,10 +1040,10 @@ mod tests {
         assert!(result.is_err());
         assert!(injected);
         assert_eq!(
-            std::fs::read_to_string(app_root.join("bundle/main.splash")).unwrap(),
+            std::fs::read_to_string(install.join("bundle/main.splash")).unwrap(),
             "text Hello"
         );
-        assert!(!app_root.join(".bundle-previous").exists());
+        assert!(!install.join(".bundle-previous").exists());
         assert_eq!(
             std::fs::read_to_string(app_root.join("data/notes")).unwrap(),
             "keep my notes"
@@ -1050,20 +1055,21 @@ mod tests {
         let f = Fixture::new();
         f.install_first_version();
         let app_root = f.root().join("test-app");
+        let install = octosense_app_hub::install_root(&f.root(), "test-app");
         let update = f.update();
-        std::fs::rename(app_root.join("bundle"), app_root.join(".bundle-previous")).unwrap();
+        std::fs::rename(install.join("bundle"), install.join(".bundle-previous")).unwrap();
         std::fs::rename(
             f.path.join("hub").join(update.artifact),
-            app_root.join(".bundle-next"),
+            install.join(".bundle-next"),
         )
         .unwrap();
         f.backend();
         assert_eq!(
-            std::fs::read_to_string(app_root.join("bundle/main.splash")).unwrap(),
+            std::fs::read_to_string(install.join("bundle/main.splash")).unwrap(),
             "text Hello"
         );
-        assert!(!app_root.join(".bundle-previous").exists());
-        assert!(!app_root.join(".bundle-next").exists());
+        assert!(!install.join(".bundle-previous").exists());
+        assert!(!install.join(".bundle-next").exists());
         assert_eq!(
             std::fs::read_to_string(app_root.join("data/notes")).unwrap(),
             "keep my notes"
@@ -1075,12 +1081,12 @@ mod tests {
         let f = Fixture::new();
         f.install_first_version();
         let update = f.update();
-        let app_root = f.root().join("test-app");
+        let install = octosense_app_hub::install_root(&f.root(), "test-app");
         let result = publish_bundle(
-            &app_root,
+            &install,
             &f.path.join("hub").join(update.artifact),
             |from, to| {
-                if to == app_root.join("bundle") {
+                if to == install.join("bundle") {
                     Err(std::io::Error::other(
                         "filesystem temporarily refuses publication and rollback",
                     ))
@@ -1091,18 +1097,18 @@ mod tests {
         );
         assert!(result.unwrap_err().contains("preserved for recovery"));
         assert_eq!(
-            std::fs::read_to_string(app_root.join(".bundle-previous/main.splash")).unwrap(),
+            std::fs::read_to_string(install.join(".bundle-previous/main.splash")).unwrap(),
             "text Hello"
         );
-        assert!(!app_root.join("bundle").exists());
+        assert!(!install.join("bundle").exists());
         let snapshot = f.backend().snapshot();
         assert_eq!(snapshot.library.len(), 1);
         assert_eq!(
-            std::fs::read_to_string(app_root.join("bundle/main.splash")).unwrap(),
+            std::fs::read_to_string(install.join("bundle/main.splash")).unwrap(),
             "text Hello"
         );
-        assert!(!app_root.join(".bundle-next").exists());
-        assert!(!app_root.join(".bundle-previous").exists());
+        assert!(!install.join(".bundle-next").exists());
+        assert!(!install.join(".bundle-previous").exists());
     }
 
     #[test]
@@ -1110,19 +1116,20 @@ mod tests {
         let f = Fixture::new();
         f.install_first_version();
         let app_root = f.root().join("test-app");
+        let install = octosense_app_hub::install_root(&f.root(), "test-app");
         let update = f.update();
-        std::fs::rename(app_root.join("bundle"), app_root.join(".bundle-previous")).unwrap();
+        std::fs::rename(install.join("bundle"), install.join(".bundle-previous")).unwrap();
         std::fs::rename(
             f.path.join("hub").join(update.artifact),
-            app_root.join("bundle"),
+            install.join("bundle"),
         )
         .unwrap();
         f.backend();
         assert_eq!(
-            std::fs::read_to_string(app_root.join("bundle/main.splash")).unwrap(),
+            std::fs::read_to_string(install.join("bundle/main.splash")).unwrap(),
             "text Updated"
         );
-        assert!(!app_root.join(".bundle-previous").exists());
+        assert!(!install.join(".bundle-previous").exists());
         assert_eq!(
             std::fs::read_to_string(app_root.join("data/notes")).unwrap(),
             "keep my notes"
@@ -1134,17 +1141,17 @@ mod tests {
         let f = Fixture::new();
         let entry = f.entry();
         f.publish_today(1, vec![entry.clone()]);
-        let app_root = f.root().join("test-app");
-        std::fs::create_dir_all(app_root.join(".bundle-next")).unwrap();
+        let install = octosense_app_hub::install_root(&f.root(), "test-app");
+        std::fs::create_dir_all(install.join(".bundle-next")).unwrap();
         std::fs::write(
-            app_root.join(".bundle-next/manifest.json"),
+            install.join(".bundle-next/manifest.json"),
             serde_json::to_vec(&entry.manifest).unwrap(),
         )
         .unwrap();
         let snapshot = f.backend().refresh();
         assert!(snapshot.library.is_empty());
-        assert!(!app_root.join(".bundle-next").exists());
-        assert!(!app_root.join("bundle").exists());
+        assert!(!install.join(".bundle-next").exists());
+        assert!(!install.join("bundle").exists());
     }
 
     #[test]
@@ -1167,16 +1174,17 @@ mod tests {
         let consent = backend.refresh().entries[0].consent.clone().unwrap();
         backend.install(&consent).unwrap();
         let app_root = f.root().join("test-app");
+        let install = octosense_app_hub::install_root(&f.root(), "test-app");
         assert_eq!(
             backend.store.installed_version("test-app").as_deref(),
             Some("2")
         );
         assert_eq!(
-            std::fs::read_to_string(app_root.join("bundle/main.splash")).unwrap(),
+            std::fs::read_to_string(install.join("bundle/main.splash")).unwrap(),
             "text Updated"
         );
-        assert!(!app_root.join(".bundle-previous").exists());
-        assert!(!app_root.join(".bundle-next").exists());
+        assert!(!install.join(".bundle-previous").exists());
+        assert!(!install.join(".bundle-next").exists());
         assert_eq!(
             std::fs::read_to_string(app_root.join("data/notes")).unwrap(),
             "keep my notes"

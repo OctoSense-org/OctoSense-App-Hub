@@ -166,7 +166,9 @@ On the device, `Origin` in
 directory or HTTP origin. `Store::accept_catalog` verifies the signature
 and rejects a sequence older than the catalog it already holds. Installation
 checks freshness and bundle bytes before writing
-`<app-data>/<app-id>/bundle`. The 14-day freshness window applies to new installs.
+`<app-data>/.bundles/<app-id>/bundle`, outside the app's own storage
+(`<app-data>/<app-id>/`); an install from before that layout is moved there
+once (`adopt_legacy_installs`). The 14-day freshness window applies to new installs.
 Already-installed apps remain subject to `may_run`.
 
 `CardAppView::start` reopens the last verified catalog and calls

@@ -23,7 +23,10 @@ pub mod remote;
 pub mod scan;
 pub mod signing;
 
-pub use client::{days_between, AppAvailability, Availability, Listing, PreparedLaunch, Store, CATALOG_FRESHNESS_DAYS};
+pub use client::{
+    adopt_legacy_install, adopt_legacy_installs, days_between, install_root, installed_bundle_dir, AppAvailability, Availability, Listing,
+    PreparedLaunch, Store, CATALOG_FRESHNESS_DAYS, INSTALLS_DIR,
+};
 pub use pack::{pack_dir, unpack, Pack};
 pub use remote::{today, Remote};
 pub use scan::{packet, scan, Packet, Route, Verdict};
