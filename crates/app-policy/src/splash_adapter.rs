@@ -28,8 +28,10 @@ pub struct Applied {
 /// come next; the isolate's own network module is granted last, so a failure
 /// earlier leaves an isolate with less reach rather than more.
 pub fn apply(splash: &SplashRef, cx: &mut Cx, settings: &IsolateSettings) -> Applied {
-    splash.set_sandbox_dir(cx, Some(settings.jail_root.clone()));
-    splash.set_storage_quota(cx, Some(settings.storage_quota));
+    // Storage only for an app granted `storage`: no root, no quota.
+    let storage_quota = settings.granted_storage_quota();
+    splash.set_sandbox_dir(cx, settings.storage_root());
+    splash.set_storage_quota(cx, Some(storage_quota));
     splash.set_host_caps(cx, settings.capabilities.clone());
     splash.set_host_prompts(cx, settings.host_prompts);
     // `Some(hosts)` is what turns enforcement on for this isolate; an empty
@@ -42,7 +44,7 @@ pub fn apply(splash: &SplashRef, cx: &mut Cx, settings: &IsolateSettings) -> App
     Applied {
         capabilities: settings.capabilities.len(),
         hosts: settings.hosts.len(),
-        storage_quota: settings.storage_quota,
+        storage_quota,
         instruction_budget: settings.instruction_budget,
         memory_bytes: settings.memory_bytes,
     }

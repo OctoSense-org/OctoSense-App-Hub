@@ -69,11 +69,17 @@ impl GateReport {
             out.push_str(&format!("  [{mark}] {}: {}\n", finding.check, finding.detail));
         }
         if let Some(policy) = &self.policy {
+            // The quota is resolved either way; the app gets storage only
+            // when it declares it.
+            let storage = if policy.capabilities.iter().any(|c| c == "storage") {
+                format!("{} bytes", policy.storage_bytes)
+            } else {
+                "none".to_string()
+            };
             out.push_str(&format!(
-                "  grants: capabilities {:?}, hosts {:?}, storage {} bytes, agent {}\n",
+                "  grants: capabilities {:?}, hosts {:?}, storage {storage}, agent {}\n",
                 policy.capabilities,
                 policy.hosts,
-                policy.storage_bytes,
                 policy.agent.as_ref().map(|a| a.profile.as_kernel_mode()).unwrap_or("none")
             ));
             if let Some(scope) = &policy.research {
@@ -178,6 +184,15 @@ pub fn check_bundle(
             "secrets",
             format!("{field}: apps may not ask for passwords or codes; a host service collects them on its own sheet"),
         ));
+    }
+
+    // ---- storage is asked for ------------------------------------------
+    // An app gets its storage only when it declares `storage`; without it,
+    // every fs call errors and the camera saves nothing. Warned, not
+    // refused: the publisher may handle the error, and a camera preview
+    // needs no storage.
+    for warning in storage_warnings(bundle, &manifest)? {
+        findings.push(Finding::warn("storage", warning));
     }
 
     // ---- the listing ----------------------------------------------------
@@ -383,6 +398,35 @@ fn secret_fields(root: &Path) -> Result<Vec<String>, String> {
     Ok(found)
 }
 
+/// The splash runtime's `fs` methods, all of which need the app's storage.
+const FS_METHODS: &[&str] = &["read", "read_bytes", "write", "append", "exists", "list", "mkdir", "remove"];
+
+/// What an app that did not declare `storage` will find does not work: each
+/// script that calls `fs`, and the camera's captures, which land in the
+/// app's storage.
+fn storage_warnings(root: &Path, manifest: &AppManifest) -> Result<Vec<String>, String> {
+    let has = |capability: &str| manifest.capabilities.iter().any(|c| c == capability);
+    if has("storage") {
+        return Ok(Vec::new());
+    }
+    let mut found = Vec::new();
+    for file in list_files(root)? {
+        if file.extension().and_then(|e| e.to_str()) != Some("splash") {
+            continue;
+        }
+        let Ok(text) = std::fs::read_to_string(root.join(&file)) else { continue };
+        let compact: String = text.chars().filter(|c| !c.is_whitespace()).collect();
+        let calls: Vec<String> = FS_METHODS.iter().filter(|m| compact.contains(&format!("fs.{m}("))).map(|m| format!("fs.{m}")).collect();
+        if !calls.is_empty() {
+            found.push(format!("{} calls {}, which fail without the storage capability", file.display(), calls.join(", ")));
+        }
+    }
+    if has("camera") {
+        found.push("camera without storage: the preview shows, but a capture saves nothing; captures land in the app's storage".to_string());
+    }
+    Ok(found)
+}
+
 /// Build the index entry for a bundle the gate passed.
 #[allow(clippy::too_many_arguments)]
 pub fn entry_for(
@@ -507,6 +551,45 @@ mod tests {
         assert_eq!(found.len(), 2, "{found:?}");
         assert!(found[0].contains("login.card") && found[0].contains("is_password"));
         assert!(found[1].contains("otp.card") && found[1].contains("OneTimeCode"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_bundle_that_needs_storage_without_asking_is_warned() {
+        let dir = std::env::temp_dir().join(format!("gate-storage-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("main.splash"), "fn save(text){ fs.write(\"notes.txt\", text) }\nfn load(){ fs.read(\"notes.txt\") }").unwrap();
+        let write = |caps: &[&str]| {
+            std::fs::write(
+                dir.join(octosense_app_policy::MANIFEST_FILE),
+                serde_json::json!({"schema": 1, "id": "dev.example.jotter", "version": "1.0.0", "name": "Jotter", "integrity": {"bundle_blake3": ""}, "capabilities": caps}).to_string(),
+            )
+            .unwrap()
+        };
+        let limits = HostLimits::default().with_require_signature(false);
+        let warnings = |dir: &Path| -> Vec<String> {
+            let report = check_bundle(dir, &limits, &octosense_app_policy::RefuseAllSignatures, None).unwrap();
+            let storage: Vec<Finding> = report.findings.into_iter().filter(|f| f.check == "storage").collect();
+            assert!(storage.iter().all(|f| f.severity == Severity::Warning), "{storage:?}");
+            storage.into_iter().map(|f| f.detail).collect()
+        };
+        write(&[]);
+        let found = warnings(&dir);
+        assert_eq!(found.len(), 1, "one warning per script: {found:?}");
+        assert!(found[0].contains("main.splash") && found[0].contains("fs.write"), "{found:?}");
+        let grants = |dir: &Path| check_bundle(dir, &limits, &octosense_app_policy::RefuseAllSignatures, None).unwrap().render();
+        assert!(grants(&dir).contains("storage none"), "{}", grants(&dir));
+        write(&["storage"]);
+        assert!(warnings(&dir).is_empty());
+        assert!(grants(&dir).contains("storage 16777216 bytes"), "{}", grants(&dir));
+        write(&["camera", "storage"]);
+        assert!(warnings(&dir).is_empty());
+        std::fs::write(dir.join("main.splash"), "Label{text: \"no files here\"}").unwrap();
+        write(&["camera"]);
+        let found = warnings(&dir);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(found[0].contains("camera") && found[0].contains("capture"), "{found:?}");
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

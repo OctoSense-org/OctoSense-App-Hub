@@ -143,12 +143,12 @@ refused.
 
 | Capability | Grants | The store says |
 | --- | --- | --- |
-| `storage` | Read and write inside the app's own storage jail. | Keep its own data on this device |
+| `storage` | The app's own storage jail: `fs.*`, camera captures, and the local files a widget reads (a map archive). Without it the app has no storage: every `fs` call errors, and `hub check` warns. | Keep its own data on this device |
 | `net` | Requests to the hosts in `network.hosts`, and no others. | Reach only: *hosts* |
 | `prompt` | Ask the person questions of its own. A service's sheet (Mail's sign-in) does not need it. | Ask you questions |
 | `ledger.read` | Read the shared ledger; writing is always the app's own rows. | Read your shared data |
 | `location` | The device's location. | Use your location |
-| `camera` | The camera. | Use the camera |
+| `camera` | The camera. A capture is saved in the app's storage, so it needs `storage` too; without it the preview shows and a capture saves nothing. | Use the camera |
 | `clipboard` | The clipboard. | Use the clipboard |
 | `images` | Show pictures from any public https host, not only `network.hosts` (a feed's thumbnails). | Show pictures from any website |
 | `web` | Open any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view |
