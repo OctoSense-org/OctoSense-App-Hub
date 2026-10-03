@@ -13,10 +13,27 @@ fn manifest_with(body: &str) -> String {
 }
 
 #[test]
-fn version_one_point_zero_knows_no_features_and_minor_zero() {
+fn palpo_extension_preserves_schema_and_declares_its_host_feature() {
     assert_eq!(SCHEMA, 1);
     assert_eq!(SCHEMA_MINOR, 0);
-    assert!(KNOWN_FEATURES.is_empty());
+    assert_eq!(KNOWN_FEATURES, &["palpo-admin-v1"]);
+}
+
+#[test]
+fn palpo_uses_exact_service_grants() {
+    let services = serde_json::to_string(octosense_app_contract::palpo::SERVICES).unwrap();
+    let manifest = parse(&manifest_with(&format!(
+        r#""requires":["palpo-admin-v1"],"capabilities":{services}"#
+    ))).unwrap();
+    let limits = HostLimits::system().with_require_signature(false);
+    let resolved = resolve(&manifest, &limits).unwrap();
+    for service in octosense_app_contract::palpo::SERVICES {
+        assert!(resolved.allows(service));
+    }
+    assert!(!resolved.allows("palpo.*"));
+    assert!(!resolved.allows("palpo.users.delete"));
+    let unknown = parse(&manifest_with(r#""capabilities":["palpo.users.delete"]"#)).unwrap();
+    assert!(resolve(&unknown, &limits).is_err());
 }
 
 #[test]
