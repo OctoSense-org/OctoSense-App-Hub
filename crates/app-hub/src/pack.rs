@@ -29,8 +29,13 @@ pub fn pack_dir(root: &Path) -> Result<Pack, String> {
     let mut files = BTreeMap::new();
     for file in crate::admission::inventory(root)? {
         let bytes = crate::admission::read_bounded(&root.join(&file.path), file.bytes)?;
+        // The pack is a bundle by another name: its keys are bundle names, so
+        // they carry `/` on every platform, and a pack made on one host
+        // unpacks and re-packs to the same digest on another.
+        let name = octosense_app_policy::portable_path(&file.path)
+            .ok_or("a bundle path is not a plain UTF-8 name")?;
         files.insert(
-            file.path.to_str().ok_or("a bundle path is not UTF-8")?.to_string(),
+            name,
             base64::engine::general_purpose::STANDARD.encode(bytes),
         );
     }

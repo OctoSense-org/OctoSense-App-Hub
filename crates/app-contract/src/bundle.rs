@@ -10,23 +10,54 @@
 //! The manifest is excluded because it carries the digest; a symlink is
 //! refused rather than followed, because what it points at is not in the
 //! bundle and would not be signed.
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 /// The file inside a bundle that carries its manifest.
 pub const MANIFEST_FILE: &str = "manifest.json";
+
+/// A bundle-relative path as a name: `/` between components, on every platform.
+///
+/// A bundle holds names, not host paths — `assets/icon.svg` means the same
+/// thing to a manifest, to the gate and to the digest wherever they run. A
+/// `Path` renders the host's own separator (`\` on Windows), so every place
+/// that turns a walked path into a string, or into bytes to hash, goes
+/// through here instead. `None` when a component is not a plain UTF-8 name,
+/// so a caller can refuse rather than hash a lossy stand-in.
+pub fn portable_path(relative: &Path) -> Option<String> {
+    let mut parts = Vec::new();
+    for component in relative.components() {
+        match component {
+            Component::Normal(name) => parts.push(name.to_str()?),
+            _ => return None,
+        }
+    }
+    if parts.is_empty() {
+        return None;
+    }
+    Some(parts.join("/"))
+}
 
 /// Hex blake3 over the bundle's files, in the canonical order.
 pub fn digest_dir(root: &Path) -> Result<String, String> {
     let mut files = Vec::new();
     collect(root, root, &mut files)?;
-    files.sort();
+    // Both the order and the bytes come from the portable name: a bundle that
+    // is the same on every platform must have one digest there too, and a
+    // host's separator is not part of the bundle.
+    let mut named = Vec::with_capacity(files.len());
+    for relative in files {
+        let name = portable_path(&relative)
+            .ok_or_else(|| format!("{}: a bundle path must be a plain UTF-8 name", relative.display()))?;
+        named.push((name, relative));
+    }
+    named.sort();
     let mut hasher = blake3::Hasher::new();
-    for relative in &files {
+    for (name, relative) in &named {
         let bytes = std::fs::read(root.join(relative)).map_err(|e| format!("{}: {e}", relative.display()))?;
         // Path, then length, then content: without the length a file ending
         // where the next path begins could be shuffled without changing the
         // digest.
-        hasher.update(relative.to_string_lossy().as_bytes());
+        hasher.update(name.as_bytes());
         hasher.update(&[0]);
         hasher.update(&(bytes.len() as u64).to_le_bytes());
         hasher.update(&bytes);
@@ -104,5 +135,34 @@ mod tests {
         std::os::unix::fs::symlink("/etc/hosts", dir.join("link")).unwrap();
         #[cfg(unix)]
         assert!(digest_dir(&dir).unwrap_err().contains("symlink"));
+    }
+
+    #[test]
+    fn a_nested_path_is_named_with_slashes_wherever_it_is_read() {
+        let nested = Path::new("kit").join("native").join("light").join("kit.json");
+        assert_eq!(portable_path(&nested).as_deref(), Some("kit/native/light/kit.json"));
+        assert_eq!(portable_path(&nested).unwrap().matches('\\').count(), 0);
+        assert_eq!(portable_path(Path::new("page.card")).as_deref(), Some("page.card"));
+    }
+
+    #[test]
+    fn the_digest_is_the_same_wherever_the_host_separates_paths() {
+        let dir = scratch("portable-digest");
+        // The definition, spelled out: each file's portable name, its length
+        // and its bytes, in portable-name order. A Windows host and a Linux
+        // host must land on these bytes for the same bundle.
+        let mut files = vec![
+            ("kit/kit.json", fs::read(dir.join("kit").join("kit.json")).unwrap()),
+            ("page.card", fs::read(dir.join("page.card")).unwrap()),
+        ];
+        files.sort();
+        let mut hasher = blake3::Hasher::new();
+        for (name, bytes) in &files {
+            hasher.update(name.as_bytes());
+            hasher.update(&[0]);
+            hasher.update(&(bytes.len() as u64).to_le_bytes());
+            hasher.update(bytes);
+        }
+        assert_eq!(digest_dir(&dir).unwrap(), hasher.finalize().to_hex().to_string());
     }
 }

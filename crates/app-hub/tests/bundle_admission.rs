@@ -287,3 +287,26 @@ fn native_theme_overlay_does_not_require_native_placements() {
     f.sign();
     assert!(f.report(None).passed(), "the native kit is checked; its placements are optional");
 }
+
+#[test]
+fn a_nested_bundle_is_read_under_the_names_a_manifest_uses() {
+    // The gate, the digest and a manifest all speak `/`. A path read back
+    // through the host's separator carries a `\` on Windows, and then the
+    // inventory refuses the bundle's own subdirectories while the checks
+    // inside a kit never run. Regression for #75.
+    let mut f = Fixture::new();
+    f.card();
+    let names: Vec<String> = octosense_app_hub::admission::inventory(&f.bundle)
+        .expect("a bundle with subdirectories is inventoried")
+        .iter()
+        .map(|file| octosense_app_policy::portable_path(&file.path).expect("a walked path is a plain UTF-8 name"))
+        .collect();
+    assert!(
+        names.iter().any(|name| name == "kit/native/light/kit.json"),
+        "the kit is named the way a manifest names it: {names:?}"
+    );
+    assert!(
+        names.iter().all(|name| !name.contains('\\')),
+        "no name carries the host's separator: {names:?}"
+    );
+}
