@@ -1,4 +1,5 @@
 //! Native App Hub, backed by the signed OctoSense catalog.
+pub mod ai;
 pub mod catalog;
 pub mod icons;
 pub use octosense_appstore::{data_root, data_root_if_set, installed_apps, set_data_root};

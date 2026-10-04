@@ -22,7 +22,14 @@ impl AppModule for AppHubModule {
         OpenSchema::new(1)
     }
     fn capabilities(&self) -> &'static [&'static str] {
-        &["storage", "net"]
+        &[
+            "storage",
+            "net",
+            "octos.session.open",
+            "octos.session.history",
+            "octos.turn.start",
+            "octos.turn.interrupt",
+        ]
     }
     fn create(
         &self,
@@ -32,10 +39,13 @@ impl AppModule for AppHubModule {
     ) -> InstanceParts {
         let value = script_eval!(vm, { use mod.widgets.* AppHubView {} });
         let root = WidgetRef::script_from_value(vm, value);
+        if let Some(mut view) = root.borrow_mut::<AppHubView>() {
+            view.open_agent(vm.cx_mut());
+        }
         let shutdown_root = root.clone();
         InstanceParts {
-            root,
-            executor: Box::new(HubExecutor),
+            root: root.clone(),
+            executor: Box::new(HubExecutor { root }),
             shutdown: Box::new(move |vm| {
                 if let Some(mut view) = shutdown_root.borrow_mut::<AppHubView>() {
                     view.shutdown(vm.cx_mut());
@@ -44,15 +54,21 @@ impl AppModule for AppHubModule {
         }
     }
 }
-struct HubExecutor;
+/// App Hub's read tools ([`crate::ai`]), answered from the catalog the view
+/// shows; installing stays on App Hub's own screens.
+struct HubExecutor {
+    root: WidgetRef,
+}
 impl ServiceExecutor for HubExecutor {
     fn manifest(&self) -> ServiceManifest {
-        ServiceManifest::new("apphub", "App Hub", "Discover and install OctoSense apps")
+        crate::ai::manifest()
     }
     fn execute(&mut self, _cx: &mut Cx, call: &ServiceCall) -> ExecOutcome {
-        ExecOutcome::Done(ToolResult::unavailable(
-            &call.call_id,
-            "Use App Hub to review and install apps",
-        ))
+        let result = self
+            .root
+            .borrow::<AppHubView>()
+            .map(|view| crate::ai::answer(view.snapshot(), call))
+            .unwrap_or_else(|| ToolResult::unavailable(&call.call_id, "App Hub is gone"));
+        ExecOutcome::Done(result)
     }
 }
