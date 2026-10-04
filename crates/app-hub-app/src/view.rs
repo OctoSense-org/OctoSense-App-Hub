@@ -279,6 +279,10 @@ pub struct AppHubView {
     notice: String,
     #[rust]
     snapshot: Option<CatalogSnapshot>,
+    /// The link to App Hub's own agent, when its host grants one: it calls
+    /// the read tools ([`crate::ai`]) over it.
+    #[rust]
+    agent: Option<makepad_app_module::makepad_ai_services::peer::OctosPeer>,
     #[rust]
     rows: Vec<Row>,
     #[rust]
@@ -300,6 +304,20 @@ impl ScriptHook for AppHubView {
     }
 }
 impl AppHubView {
+    /// The catalog the view shows (`None` until it loads).
+    pub fn snapshot(&self) -> Option<&CatalogSnapshot> {
+        self.snapshot.as_ref()
+    }
+
+    /// Open the link to App Hub's own agent (a host that grants none
+    /// refuses it, and nothing arrives on it). Once: a second call keeps
+    /// the open link.
+    pub fn open_agent(&mut self, cx: &mut Cx) {
+        if self.agent.is_none() {
+            self.agent = Some(makepad_app_module::makepad_ai_services::peer::OctosPeer::open(cx));
+        }
+    }
+
     fn start(&mut self, cx: &mut Cx) {
         if self.started {
             return;
@@ -1040,6 +1058,13 @@ impl Widget for AppHubView {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
         self.start(cx);
         self.drain(cx, scope);
+        // Its own agent's tool calls, answered from the catalog this view
+        // shows (read tools only); the link is set aside for the answer.
+        if let Some(mut agent) = self.agent.take() {
+            let snapshot = self.snapshot.as_ref();
+            agent.serve_tools(cx, event, |call| crate::ai::answer(snapshot, call));
+            self.agent = Some(agent);
+        }
         if let Event::NetworkResponses(responses) = event {
             self.receive_svg(cx, responses);
             handle_image_cache_network_responses(cx, responses);
