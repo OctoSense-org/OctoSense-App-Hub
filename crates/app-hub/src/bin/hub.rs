@@ -5,7 +5,7 @@
 //! hub certify --anchor <key> --working <key>
 //! hub stamp <bundle>                      # write the bundle digest into its manifest
 //! hub sign-manifest <bundle> --key <key> --key-id <id>
-//! hub check <bundle> [--catalog <file> [--anchor <hex>]] [--allow-unsigned] [--publisher-key id=hex]
+//! hub check <bundle> [--catalog <file> [--anchor <hex>]] [--allow-unsigned] [--publisher-key id=hex] [--json]
 //! hub publish <bundle> --catalog <file> --key <working> --anchor-cert <hex>
 //!             --publisher <id> --repo <url> --commit <sha> [--out <dir>] [--anchor <hex>]
 //! hub verify <catalog> --anchor <hex>
@@ -81,8 +81,23 @@ fn run() -> Result<(), String> {
         }
         "check" => {
             let bundle = PathBuf::from(positional.ok_or("usage: hub check <bundle>")?);
-            let report = gate_for(&bundle, &argv, has("allow-unsigned"), flag("catalog"))?;
-            print!("{}", report.render());
+            let report = match gate_for(&bundle, &argv, has("allow-unsigned"), flag("catalog")) {
+                Ok(report) => report,
+                Err(error) => {
+                    // A bundle the gate cannot even read is a refusal too, in
+                    // the same shape, for tools that read --json.
+                    if has("json") {
+                        println!("{}", serde_json::json!({"schema": 1, "stage": "structural", "passed": false,
+                            "findings": [{"severity": "refusal", "check": "bundle-invalid", "detail": error}]}));
+                    }
+                    return Err(error);
+                }
+            };
+            if has("json") {
+                println!("{}", report.json());
+            } else {
+                print!("{}", report.render());
+            }
             if report.passed() {
                 Ok(())
             } else {

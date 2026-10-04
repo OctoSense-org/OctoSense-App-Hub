@@ -96,6 +96,11 @@ review packets outside the submitted bundle.
 | Native and host names are reserved | An id, or an id's last segment (its tool namespace), that is a native app's id or a name the host acts under: `agents`, `apphub`, `appcard`, `card`, `dev`, `octos`, `os`, `reference`, `rinx`, `sheets`, `shell`, `system`, `terminal`, `toolbox`, `workflow`. The device keys an app's storage, tools and consent by its id, so `terminal` or `com.example.terminal` would stand in for the Terminal. |
 | Size | A bundle over 8 MB. |
 | No symlinks | Any symlink in the bundle. |
+| Within the structural limits | More than 2048 files and directories, nesting deeper than 32, a manifest over 64 KiB, or a path that is not portable (a `\`, `:`, `.` or `..` segment, or not UTF-8). |
+| An entry the runtime can start | Neither `main.splash` (a script app) nor `page.card` (a card). A card's source must be valid L0, its `page.data.json` valid JSON, and its kit complete: the `kit/native/<theme>/kit.json` its theme names, or the Octoscript kit modules it needs. |
+| Well-formed contents (`contents-invalid`) | A text file (`.splash .card .json .l0 .octoscript .txt .md`) over 1 MiB or not UTF-8, or JSON that does not parse; a PNG, JPEG or WebP that does not decode, or is wider or taller than 4096 pixels; an SVG that does not parse, has no size, holds a script or foreign content, or whose styling (a `style` attribute or a `<style>` block) imports a stylesheet, uses escapes or comments, or points `url()` anywhere but `#a-fragment` in the same file. |
+| Listing icon | An icon that is not square, or a PNG icon over 1 MiB or 1024 pixels a side. |
+| Local resources (`resource-invalid`) | A card's image or font reference, or an SVG `href`, to a file not in the bundle. Each finding names the property (`page.data.json/$kit/placements/…/src`). |
 | Digest matches | A manifest whose `integrity.bundle_blake3` does not match the directory. Run `hub stamp` after any change. |
 | Manifest is exact | Unknown fields, an unknown capability, a `schema` other than 1, an id outside `[a-z0-9.-]{1,64}` not starting with `.`. |
 | Hosts are bare | A host with a scheme, path, port, wildcard or credentials. `api.example.com` is right; `https://api.example.com/v1` and `*.example.com` are refused. |
@@ -629,7 +634,7 @@ locally is the report the hub acts on. Build it from this repository with
 | Command | What it does |
 | --- | --- |
 | `hub stamp <bundle>` | Write the bundle's digest into `manifest.json`. Rerun after every change. |
-| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]]` | The gate. Prints PASSED or REFUSED, each finding, and what the app will be granted; exits non-zero on a refusal. |
+| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json]` | The gate. Prints PASSED or REFUSED, each finding (with the file or property at fault), and what the app will be granted; exits non-zero on a refusal. `--json` prints the same report as JSON (`schema`, `passed`, `findings`, `resources`) for tools. |
 | `hub scan <bundle> [--packet <out.json>] [--reviewer <cmd>]` | Stage two: the review packet (manifest, listing, grants, the entry's source, and the reviewer's questions), optionally handed to a reviewer command. Runs only on a bundle the gate passes. |
 | `hub keygen <key file>` | Make a signing key; prints its public half. |
 | `hub pubkey <key file>` | Print a key's public half. |
