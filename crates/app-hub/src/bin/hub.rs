@@ -59,13 +59,7 @@ fn run() -> Result<(), String> {
         }
         "stamp" => {
             let bundle = PathBuf::from(positional.ok_or("usage: hub stamp <bundle>")?);
-            let digest = octosense_app_policy::digest_dir(&bundle)?;
-            let path = bundle.join(octosense_app_policy::MANIFEST_FILE);
-            let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-            let mut value: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
-            value["integrity"]["bundle_blake3"] = serde_json::Value::String(digest.clone());
-            write_json(&path, &value)?;
-            println!("{digest}");
+            println!("{}", stamp_bundle(&bundle)?);
             Ok(())
         }
         "sign-manifest" => {
@@ -273,6 +267,25 @@ fn run() -> Result<(), String> {
     }
 }
 
+/// Write the bundle's digest into its manifest.
+///
+/// The manifest is parsed first, with the parser the gate uses, so one the
+/// gate cannot read is refused at the earliest step of the flow instead of at
+/// `check`, after signing. What the gate then *judges* about the bundle - a
+/// capability, a host, a listing that is not there yet - is not judged here:
+/// `stamp` runs before signing, and the gate needs a signature policy that
+/// only `check` is given.
+fn stamp_bundle(bundle: &Path) -> Result<String, String> {
+    let path = bundle.join(octosense_app_policy::MANIFEST_FILE);
+    let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    AppManifest::parse(&text)?;
+    let digest = octosense_app_policy::digest_dir(bundle)?;
+    let mut value: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    value["integrity"]["bundle_blake3"] = serde_json::Value::String(digest.clone());
+    write_json(&path, &value)?;
+    Ok(digest)
+}
+
 fn gate_for(bundle: &Path, argv: &[String], allow_unsigned: bool, catalog: Option<String>) -> Result<GateReport, String> {
     let mut keys = PublisherKeys::new();
     for pair in argv.windows(2).filter(|w| w[0] == "--publisher-key").map(|w| w[1].clone()) {
@@ -331,4 +344,54 @@ fn copy_tree(from: &Path, to: &Path) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MANIFEST: &str = r#"{"schema":1,"id":"stamp-check","version":"1.0.0","name":"Stamp check","integrity":{"bundle_blake3":""},"capabilities":[]}"#;
+
+    fn scratch(name: &str, manifest: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("hub-stamp-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(octosense_app_policy::MANIFEST_FILE), manifest).unwrap();
+        std::fs::write(dir.join("main.splash"), "Label{text: \"Example\"}").unwrap();
+        dir
+    }
+
+    fn manifest_text(dir: &Path) -> String {
+        std::fs::read_to_string(dir.join(octosense_app_policy::MANIFEST_FILE)).unwrap()
+    }
+
+    #[test]
+    fn stamp_writes_the_digest_the_directory_hashes_to() {
+        let dir = scratch("ok", MANIFEST);
+        let digest = stamp_bundle(&dir).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&manifest_text(&dir)).unwrap();
+        assert_eq!(value["integrity"]["bundle_blake3"], serde_json::Value::String(digest));
+    }
+
+    #[test]
+    fn stamp_refuses_a_manifest_the_gate_cannot_read() {
+        // An unknown field: `stamp` used to write the digest and exit 0, and
+        // `check` refused afterwards, once the manifest had been signed.
+        let bad = MANIFEST.replace(r#""capabilities":[]"#, r#""capabilities":[],"nonsense":1"#);
+        let dir = scratch("unknown-field", &bad);
+        let err = stamp_bundle(&dir).unwrap_err();
+        assert!(err.contains("manifest is not valid") && err.contains("unknown field"), "{err}");
+        // Nothing was written on the way out.
+        assert!(manifest_text(&dir).contains(r#""bundle_blake3":"""#), "the digest stays empty");
+    }
+
+    #[test]
+    fn stamp_still_works_before_signing_and_before_the_listing() {
+        // The documented order is stamp, then sign, then check, so the bundle
+        // stamp is handed has no signature and may have no listing yet. Stamp
+        // refuses a manifest the gate cannot *read*, never one the gate would
+        // later *judge*: that judgement needs the policy `check` is given.
+        let dir = scratch("early", MANIFEST);
+        assert!(stamp_bundle(&dir).is_ok(), "an unsigned bundle with no listing is still stamped");
+    }
 }
