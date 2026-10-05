@@ -125,6 +125,7 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     "palpo.agents.register",
     "palpo.agents.rename",
     "palpo.agents.retire",
+    "palpo.agents.control",
     "palpo.activity.list",
     "palpo.accounts.list",
     "palpo.accounts.open",
