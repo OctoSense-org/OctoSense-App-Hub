@@ -530,8 +530,8 @@ pub fn short_id(app_id: &str) -> &str {
 /// app may share one, and a host resolves another app's tool by its owner,
 /// not by its name.
 pub const RESERVED_NAMES: &[&str] = &[
-    "agents", "apphub", "appcard", "browser", "calculator", "card", "clock", "dev", "notes", "octos", "os", "reference",
-    "reminders", "rinx", "sheets", "shell", "system", "task", "terminal", "toolbox", "weather", "workflow",
+    "agents", "apphub", "appcard", "browser", "calculator", "card", "clock", "dev", "notes", "octos", "octoscode", "os",
+    "reference", "reminders", "rinx", "sheets", "shell", "system", "task", "terminal", "toolbox", "weather", "workflow",
 ];
 
 /// Refuse an app id that is, or whose namespace is, a [`RESERVED_NAMES`]

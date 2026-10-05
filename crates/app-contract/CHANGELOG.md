@@ -3,6 +3,14 @@
 `octosense-app-contract` follows the rules in [README.md](README.md#stability):
 within `1.x` it only grows.
 
+## 1.3.0
+
+- `RESERVED_NAMES` gains `octoscode`: OctoSense ships OctosCode
+  (octos-org/octoscode-app) as a native app, on desktops and phones. A store
+  app with that id, or with it as its namespace (`com.example.octoscode`),
+  is now refused as reserved. Nothing else changes: every other manifest
+  1.2.0 admitted is admitted unchanged.
+
 ## 1.2.0
 
 Palpo mini-app operations (App Hub #72), for the Hagency/Rinx mini-app
