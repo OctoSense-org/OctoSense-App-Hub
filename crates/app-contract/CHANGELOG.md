@@ -3,6 +3,27 @@
 `octosense-app-contract` follows the rules in [README.md](README.md#stability):
 within `1.x` it only grows.
 
+## 1.2.0
+
+Palpo mini-app operations (App Hub #72), for the Hagency/Rinx mini-app
+that administers Palpo. Only additions: the schema stays at minor 0, and
+every manifest 1.1.0 admitted is admitted unchanged.
+
+- `KNOWN_CAPABILITIES` gains 29 exact `palpo.*` operations:
+  `palpo.intent.new`; `palpo.session.open` and `.disconnect`;
+  `palpo.catalog.list`; `palpo.projects.list` and `.create`;
+  `palpo.requests.list` and `.create`; `palpo.fleets.list`, `.register`,
+  `.install`, `.set_state`, `.migrate`, `.queue`, `.export` and
+  `.connect`; `palpo.agents.list`, `.register`, `.rename` and `.retire`;
+  `palpo.activity.list`; `palpo.accounts.list`; `palpo.inbox.list`,
+  `.submit`, `.get`, `.decide`, `.activate`, `.seen` and `.snooze`.
+  Each is a grant of its own and implies no other. None changes Matrix
+  admin, owner or membership authority, and credentials stay the host's.
+- `palpo::SERVICES` lists them, and `palpo::words` gives each one's
+  plain-language line for the consent sheet.
+- `KNOWN_FEATURES` gains `palpo-admin-v1`, the host feature an app that
+  uses these operations requires.
+
 ## 1.1.0
 
 `RESERVED_NAMES` lists the native apps OctoSense ships (its
