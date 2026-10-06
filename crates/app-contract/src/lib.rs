@@ -102,7 +102,7 @@ pub mod research;
 pub mod verify;
 
 pub use assets::{rewrite_assets, AssetServer, StaticAssets};
-pub use bundle::{digest_dir, MANIFEST_FILE};
+pub use bundle::{digest_dir, portable_path, MANIFEST_FILE};
 pub use entry::{script_source, ASSETS_PLACEHOLDER, SCRIPT_ENTRY};
 pub use manifest::{
     check_reserved_id, parse, short_id, AgentSpec, AgentWorkspace, AppManifest, Compute, Integrity, ModelNeed, ModelSpec,
