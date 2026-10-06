@@ -55,6 +55,12 @@ tool grants. The walkthrough distinguishes native `AppModule`, Splash and
 L0 apps, with the crate inventory at the end. Contributor instructions are
 in [AGENTS.md](AGENTS.md).
 
+System apps with cross-app agent tools need an explicit host admission offer.
+Before preparing the app, its shell calls `system::set_agent_tool_offer` for that
+app id. Only requested names are eligible; owner sharing, caller grants and a
+real executor remain separate shell checks. An offer neither starts an agent
+nor gives script UI code raw host-service access. Store defaults are unchanged.
+
 ## Trust anchor
 
 Stores trust this anchor and follow its certificate to the working key that
