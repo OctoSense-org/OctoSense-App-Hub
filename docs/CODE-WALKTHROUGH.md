@@ -377,3 +377,12 @@ is not inherited by a shell consuming App Hub as a dependency.
 | Agent tool appears but fails | Owner/grant/executor route in shell `host_tools`; JSON is not implementation |
 | Agent cannot see app records | Active account workspace and file placement, then storage read-tool limits |
 | App peer absent | Shell consent and peer preparation; `card-host` has no peer list |
+
+### Host offers for shipped agents
+
+`appstore::system::set_agent_tool_offer(app_id, names)` lets a shell declare
+additional tool names before `system::prepare` admits that shipped app. The
+offer is scoped to its system id and checked on every prepare, including cached
+bundles. The app must request a name in `agent.tools`; the shell relay still
+checks the owning tool's sharing flag and the caller's grant before its executor
+runs. Store-app admission and raw UI capabilities do not change.

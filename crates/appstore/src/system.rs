@@ -32,6 +32,16 @@ pub struct SystemApp {
 }
 
 static SYSTEM_APPS: Mutex<Vec<SystemApp>> = Mutex::new(Vec::new());
+static AGENT_TOOL_OFFERS: Mutex<std::collections::BTreeMap<String, Vec<String>>> = Mutex::new(std::collections::BTreeMap::new());
+
+/// Replace the host's additional agent-tool offer for one shipped app.
+/// Call before admitting/preparing that app. The manifest must still request
+/// each tool, and the shell must check sharing, caller grants and execution.
+/// This does not offer tools to store apps or grant a script UI capability.
+pub fn set_agent_tool_offer(app: &str, tools: &[&str]) {
+    assert!(app.starts_with(SYSTEM_ID_PREFIX), "only a system app has a system tool offer");
+    AGENT_TOOL_OFFERS.lock().unwrap().insert(app.into(), tools.iter().map(|tool| tool.to_string()).collect());
+}
 
 /// Make a system app openable through the `card` module. Registering the
 /// same id again replaces it.
@@ -72,7 +82,11 @@ pub fn prepare(app_data_root: &Path, app: &SystemApp) -> Result<(PathBuf, AppPol
     let manifest = std::fs::read_to_string(dir.join(octosense_app_policy::MANIFEST_FILE))
         .map_err(|e| format!("{}: no manifest: {e}", app.id))?;
     let digest = octosense_app_policy::digest_dir(&dir)?;
-    let policy = octosense_app_policy::admit_and_resolve_dir(&manifest, &digest, &HostLimits::system(), &RefuseAllSignatures)?;
+    let mut limits = HostLimits::system();
+    if let Some(tools) = AGENT_TOOL_OFFERS.lock().unwrap().get(app.id) {
+        limits.offered_tools.extend(tools.iter().cloned());
+    }
+    let policy = octosense_app_policy::admit_and_resolve_dir(&manifest, &digest, &limits, &RefuseAllSignatures)?;
     if policy.app_id != app.id {
         return Err(format!("the pack registered as {} holds {}", app.id, policy.app_id));
     }
@@ -82,6 +96,33 @@ pub fn prepare(app_data_root: &Path, app: &SystemApp) -> Result<(PathBuf, AppPol
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_system_agent_tool_request_needs_its_own_hosts_explicit_offer() {
+        let root = std::env::temp_dir().join(format!("appstore-system-tool-offer-{}", std::process::id()));
+        let source = root.join("source");
+        std::fs::create_dir_all(&source).unwrap();
+        std::fs::write(source.join("main.splash"), "Label{text: \"fixture\"}").unwrap();
+        let digest = octosense_app_policy::digest_dir(&source).unwrap();
+        let manifest = serde_json::json!({"schema":1,"id":"os.tool-offer-fixture","name":"Fixture","version":"1",
+            "integrity":{"bundle_blake3":digest},"capabilities":["storage"],
+            "agent":{"tools":["ask_user_question","calendar.events"]}});
+        std::fs::write(source.join("manifest.json"), serde_json::to_vec(&manifest).unwrap()).unwrap();
+        let pack = Box::leak(serde_json::to_string(&octosense_app_hub::pack::pack_dir(&source).unwrap()).unwrap().into_boxed_str());
+        let app = SystemApp { id:"os.tool-offer-fixture", name:"Fixture", pack, assets:&[] };
+        assert!(prepare(&root, &app).unwrap_err().contains("calendar.events"));
+        set_agent_tool_offer("os.another-tool-offer-fixture", &["calendar.events"]);
+        assert!(prepare(&root, &app).is_err(), "another app's offer is not inherited");
+        set_agent_tool_offer(app.id, &["calendar.events"]);
+        let (dir, policy) = prepare(&root, &app).unwrap();
+        assert!(!policy.allows("calendar"), "agent tools do not grant raw service access");
+        set_agent_tool_offer(app.id, &[]);
+        assert!(prepare(&root, &app).is_err(), "cached unpacked bytes are readmitted after withdrawal");
+        set_agent_tool_offer(app.id, &["calendar.events"]);
+        std::fs::write(dir.join("main.splash"), "tampered").unwrap();
+        assert!(prepare(&root, &app).is_err(), "an offer never bypasses integrity");
+        let _ = std::fs::remove_dir_all(root);
+    }
 
     fn pack_of(name: &str, files: &[(&str, &str)]) -> String {
         let dir = std::env::temp_dir().join(format!("appstore-system-src-{name}-{}", std::process::id()));
