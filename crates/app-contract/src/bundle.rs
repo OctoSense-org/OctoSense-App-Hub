@@ -41,16 +41,18 @@ pub fn portable_path(relative: &Path) -> Option<String> {
 pub fn digest_dir(root: &Path) -> Result<String, String> {
     let mut files = Vec::new();
     collect(root, root, &mut files)?;
-    // Both the order and the bytes come from the portable name: a bundle that
-    // is the same on every platform must have one digest there too, and a
-    // host's separator is not part of the bundle.
+    // The bytes come from the portable name: a host's separator is not part
+    // of the bundle. The order stays path-component order, the order every
+    // published digest was made in, and it is the same on every platform.
+    // Sorting the names as text would put `kit.json` before `kit/kit.json`
+    // (`.` sorts before `/`) and change such a bundle's digest everywhere.
     let mut named = Vec::with_capacity(files.len());
     for relative in files {
         let name = portable_path(&relative)
             .ok_or_else(|| format!("{}: a bundle path must be a plain UTF-8 name", relative.display()))?;
         named.push((name, relative));
     }
-    named.sort();
+    named.sort_by(|a, b| a.1.cmp(&b.1));
     let mut hasher = blake3::Hasher::new();
     for (name, relative) in &named {
         let bytes = std::fs::read(root.join(relative)).map_err(|e| format!("{}: {e}", relative.display()))?;
@@ -149,13 +151,13 @@ mod tests {
     fn the_digest_is_the_same_wherever_the_host_separates_paths() {
         let dir = scratch("portable-digest");
         // The definition, spelled out: each file's portable name, its length
-        // and its bytes, in portable-name order. A Windows host and a Linux
+        // and its bytes, in path-component order. A Windows host and a Linux
         // host must land on these bytes for the same bundle.
         let mut files = vec![
             ("kit/kit.json", fs::read(dir.join("kit").join("kit.json")).unwrap()),
             ("page.card", fs::read(dir.join("page.card")).unwrap()),
         ];
-        files.sort();
+        files.sort_by(|a, b| a.0.split('/').cmp(b.0.split('/')));
         let mut hasher = blake3::Hasher::new();
         for (name, bytes) in &files {
             hasher.update(name.as_bytes());
@@ -164,5 +166,15 @@ mod tests {
             hasher.update(bytes);
         }
         assert_eq!(digest_dir(&dir).unwrap(), hasher.finalize().to_hex().to_string());
+    }
+
+    #[test]
+    fn a_folder_sorts_before_a_file_that_extends_its_name() {
+        // `kit/kit.json` before `kit.json`, although `.` sorts before `/` as
+        // text. Pinned to the digest every 1.x release so far computes for
+        // this bundle, so a change of order cannot pass unseen.
+        let dir = scratch("component-order");
+        fs::write(dir.join("kit.json"), b"{}").unwrap();
+        assert_eq!(digest_dir(&dir).unwrap(), "c84d3407bd95ee139b199b629150b7379113b964ce776a2342a9d1efca5a002b");
     }
 }
