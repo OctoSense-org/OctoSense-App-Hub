@@ -234,6 +234,147 @@ fn every_tool_is_in_the_apps_namespace() {
 }
 
 #[test]
+fn shared_host_method_alias_is_pinned_and_needs_its_declared_capability() {
+    let dir = scratch("shared-host-method");
+    edit_tools(&dir, |tools| {
+        tools["tools"][0]["host_method"] = json!("gcalendar.cached");
+        tools["tools"][0]["private_data"] = json!(true);
+        tools["tools"][0]["shareable"] = json!(false);
+    });
+    let manifest = stamp(&dir, |_| {});
+    refused_with(
+        &dir,
+        &manifest,
+        "requires the declared \"gcalendar\" service capability",
+    );
+    assert!(AgentBundle::load(&dir, &manifest).is_err());
+    let manifest = stamp(&dir, |m| {
+        m["capabilities"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!("gcalendar"))
+    });
+    let loaded = AgentBundle::load(&dir, &manifest).unwrap().unwrap();
+    let tool = loaded.tool("news.list").unwrap();
+    assert_eq!(tool.service_method(), "gcalendar.cached");
+    assert_eq!(
+        tool.name, "news.list",
+        "alias never changes owner namespace"
+    );
+    edit_tools(&dir, |tools| {
+        tools["tools"][0]["host_method"] = json!("gmail.messages")
+    });
+    assert!(AgentBundle::load(&dir, &manifest)
+        .unwrap_err()
+        .contains("digest"));
+}
+
+#[test]
+fn host_aliases_cannot_target_script_implementations_sheets_or_unreviewed_writes() {
+    let base = || {
+        json!({"schema":1,"tools":[{
+            "name":"inbox.messages","description":"Read the connected inbox.",
+            "input_schema":{"type":"object"},"output_schema":{"type":"object"},
+            "risk":"read","private_data":true,"implemented_by":"host-service","host_method":"gmail.messages"
+        }]})
+    };
+    let valid =
+        ToolManifest::load(&base().to_string(), "inbox", ToolHost::Contained, false).unwrap();
+    assert_eq!(valid.0.tools[0].service_method(), "gmail.messages");
+    let mut app = base();
+    app["tools"][0]["implemented_by"] = json!("app");
+    assert!(
+        ToolManifest::load(&app.to_string(), "inbox", ToolHost::Contained, false)
+            .unwrap_err()
+            .contains("only valid")
+    );
+    for method in [
+        "gmail.sheet.send",
+        "gmail.sheet",
+        "auth.connect",
+        "auth.disconnect",
+        "auth.accounts",
+        "gmail.send",
+        "gmail.draft.review",
+        "gcalendar.review_save",
+        "github.review_save",
+        "github.save",
+        "unknown.read",
+        "gmail..message",
+        "Gmail.message",
+        "gmail/message",
+        "gmail.message?scope=all",
+        "gmail.message\n",
+        "gmail.message.extra",
+    ] {
+        let mut tool = base();
+        tool["tools"][0]["host_method"] = json!(method);
+        assert!(
+            ToolManifest::load(&tool.to_string(), "inbox", ToolHost::Contained, false).is_err(),
+            "{method}"
+        );
+    }
+}
+
+#[test]
+fn shared_local_mutations_keep_risk_and_private_data_floors() {
+    let make = |method: &str, risk: &str, private: bool| {
+        json!({"schema":1,"tools":[{
+            "name":"inbox.action","description":"Run a scoped inbox action.",
+            "input_schema":{"type":"object"},"output_schema":{"type":"object"},
+            "risk":risk,"private_data":private,"implemented_by":"host-service","host_method":method
+        }]})
+        .to_string()
+    };
+    for method in [
+        "gmail.draft.open",
+        "gmail.draft.edit",
+        "glance.publish",
+        "glance.withdraw",
+    ] {
+        assert!(ToolManifest::load(
+            &make(method, "read", true),
+            "inbox",
+            ToolHost::Contained,
+            false
+        )
+        .unwrap_err()
+        .contains("at least act"));
+        assert!(ToolManifest::load(
+            &make(method, "act", true),
+            "inbox",
+            ToolHost::Contained,
+            false
+        )
+        .is_ok());
+    }
+    assert!(ToolManifest::load(
+        &make("gmail.message", "read", false),
+        "inbox",
+        ToolHost::Contained,
+        false
+    )
+    .unwrap_err()
+    .contains("private_data: true"));
+}
+
+#[test]
+fn omitted_host_method_keeps_legacy_serialization_and_dispatch() {
+    let original = read_json(&fixture().join(TOOLS_FILE));
+    let tools = ToolManifest::parse(&original.to_string()).unwrap();
+    let serialized = serde_json::to_value(&tools).unwrap();
+    for (tool, value) in tools
+        .tools
+        .iter()
+        .zip(serialized["tools"].as_array().unwrap())
+    {
+        assert!(tool.host_method.is_none());
+        assert_eq!(tool.service_method(), tool.name);
+        assert!(!value.as_object().unwrap().contains_key("host_method"));
+    }
+}
+
+#[test]
 fn an_app_whose_short_id_the_broker_cannot_name_may_not_declare_tools() {
     let dir = scratch("short-id");
     let manifest = stamp(&dir, |m| m["id"] = json!("dev.example.news-reader"));

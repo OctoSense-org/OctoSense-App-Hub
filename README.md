@@ -69,6 +69,15 @@ The declarations do not register services: standalone `card-host` has none of
 these providers. The OctoSense host implementation and provider registrations
 must be installed before a sample can sign in. No OctoSense account is required.
 
+An ordinary app can bind its own agent tool to a reviewed shared service with
+`"implemented_by":"host-service", "host_method":"github.read"` in `tools.json`.
+The tool keeps its app namespace. Admission checks the target against
+`SHARED_HOST_METHODS`, the declared service grant, private-data disclosure and
+minimum risk; the shell must check the resolved grant again when executing it.
+Omitting `host_method` preserves the original dispatch behavior. Authentication,
+host sheets, direct saves and sends cannot be aliased. An admitted alias neither
+installs its service nor grants approval for an external action.
+
 The `calendar` capability (app contract 1.4) separately admits Calendar UI
 requests. OctoSense registers the Calendar service and checks its owning app
 identity. A declared capability alone does not provide a service, a calendar
