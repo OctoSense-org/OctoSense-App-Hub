@@ -67,6 +67,9 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // person signs in to on the host's own sheet. The app never holds the
     // password or the connection.
     "mail",
+    // Calendar's local event store and UI. The service additionally checks
+    // owning app identity; this is not Google/Android calendar access.
+    "calendar",
     // See and arrange the assistant's LLM providers through the host's llm
     // service. Keys are typed, shown as a QR and scanned only on the host's
     // own sheets; the app sees masked status, never a key.

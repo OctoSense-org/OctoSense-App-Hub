@@ -37,6 +37,18 @@ fn palpo_uses_exact_service_grants() {
 }
 
 #[test]
+fn calendar_ui_access_is_explicit_and_does_not_grant_other_services() {
+    let limits = HostLimits::system();
+    let old = resolve(&parse(&manifest_with("")).unwrap(), &limits).unwrap();
+    assert!(!old.allows("calendar"));
+    let calendar = resolve(&parse(&manifest_with(r#""capabilities":["calendar"]"#)).unwrap(), &limits).unwrap();
+    assert!(calendar.allows("calendar"));
+    assert!(!calendar.allows("mail") && !calendar.allows("calendar.*"));
+    assert!(!calendar.allows("glance"));
+    assert!(resolve(&parse(&manifest_with(r#""capabilities":["calendar.*"]"#)).unwrap(), &limits).is_err());
+}
+
+#[test]
 fn an_unknown_required_feature_needs_a_newer_host() {
     let err = parse(&manifest_with(r#""requires":["storage.encrypted"]"#)).unwrap_err();
     assert_eq!(err, "app forecast needs a newer host: storage.encrypted");
