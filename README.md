@@ -83,6 +83,13 @@ requests. OctoSense registers the Calendar service and checks its owning app
 identity. A declared capability alone does not provide a service, a calendar
 account, or agent tools.
 
+Host-owned account and review sheets are modal: text, keyboard, IME,
+clipboard and pointer-release events reach only the visible sheet. Timer and
+service callbacks continue to reach the app. The runner captures its own card
+and sheet references before evaluating app widgets, so a bundle cannot replace
+the host surface by reusing a widget ID. `services::is_sheet_input_event` supplies
+the same input boundary to integrated foreground Glance hosts.
+
 ## Trust anchor
 
 The `photos` and `youtube` capabilities admit requests to the app-owned media

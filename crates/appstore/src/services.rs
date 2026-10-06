@@ -381,6 +381,19 @@ fn apply_sheet(cx: &mut Cx, sheet: &SplashRef, change: Option<String>) {
     cx.redraw_all();
 }
 
+/// Input owned exclusively by a visible host sheet. Makepad's visibility
+/// classification omits keyboard, text and pointer-up events; it is not a
+/// modal-input boundary. Timers and service replies still reach the app.
+pub fn is_sheet_input_event(event: &makepad_widgets::Event) -> bool {
+    use makepad_widgets::Event;
+    event.requires_visibility() || matches!(event,
+        Event::MouseUp(_) | Event::MouseLeave(_) | Event::LongPress(_)
+        | Event::KeyDown(_) | Event::KeyUp(_) | Event::TextInput(_)
+        | Event::TextRangeReplace(_) | Event::TextCopy(_) | Event::TextCut(_)
+        | Event::TextInputStateQuery(_) | Event::ImeAction(_)
+        | Event::SelectionHandleDrag(_) | Event::Drag(_) | Event::Drop(_) | Event::DragEnd)
+}
+
 /// One turn of a host running an app: hand the app's (and its sheet's) host
 /// requests to the services, apply the sheets they raise, and deliver the
 /// answers that are ready. Call it on every event the host sees.
