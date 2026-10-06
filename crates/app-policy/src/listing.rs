@@ -175,6 +175,8 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
         ("calendar", "Reads and manages local calendar events through the device's Calendar service."),
         ("llm", "Manages the assistant's AI providers; it never sees your API keys."),
         ("news", "Reads news the device collects from its feeds and topics."),
+        ("photos", "Reads Photos's own library and publishes photo collections."),
+        ("youtube", "Searches YouTube videos and manages music recommendations; playback requires a tap."),
         ("glance", "Shows short cards on your glance screen; each opens only this app."),
         ("model", "Sends what you give it to the AI provider you configured, for one-off answers within a daily budget; it never sees your API keys."),
     ] {

@@ -14,7 +14,20 @@
 //! never take over a system app's jail.
 use octosense_app_policy::{AppPolicy, HostLimits, RefuseAllSignatures};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, OnceLock, Weak};
+
+// A cold launch, image server and agent can all prepare the same pack. Each
+// process uses one lock per destination; staging names also differ across
+// processes, and only a completely admitted directory becomes visible.
+fn preparation_lock(dir: &Path) -> Arc<Mutex<()>> {
+    static LOCKS: OnceLock<Mutex<std::collections::BTreeMap<PathBuf, Weak<Mutex<()>>>>> = OnceLock::new();
+    let mut locks = LOCKS.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner());
+    locks.retain(|_, lock| lock.strong_count() > 0);
+    if let Some(lock) = locks.get(dir).and_then(Weak::upgrade) { return lock; }
+    let lock = Arc::new(Mutex::new(()));
+    locks.insert(dir.into(), Arc::downgrade(&lock));
+    lock
+}
 
 /// The id prefix only system apps may use.
 pub const SYSTEM_ID_PREFIX: &str = "os.";
@@ -70,32 +83,69 @@ pub fn prepare(app_data_root: &Path, app: &SystemApp) -> Result<(PathBuf, AppPol
     let pack_hash = octosense_app_policy::bundle_digest(app.pack.as_bytes());
     // `.system` can never be an app id, so it is no app's jail.
     let dir = app_data_root.join(".system").join(app.id).join(&pack_hash[..16]);
-    if !dir.join(octosense_app_policy::MANIFEST_FILE).is_file() {
-        let pack: octosense_app_hub::pack::Pack =
-            serde_json::from_str(app.pack).map_err(|e| format!("{}: not a pack: {e}", app.id))?;
-        let staging = dir.with_extension("staging");
-        let _ = std::fs::remove_dir_all(&staging);
-        octosense_app_hub::pack::unpack(&pack, &staging)?;
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::rename(&staging, &dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    }
-    let manifest = std::fs::read_to_string(dir.join(octosense_app_policy::MANIFEST_FILE))
-        .map_err(|e| format!("{}: no manifest: {e}", app.id))?;
-    let digest = octosense_app_policy::digest_dir(&dir)?;
+    let lock = preparation_lock(&dir);
+    let _guard = lock.lock().unwrap_or_else(|e| e.into_inner());
     let mut limits = HostLimits::system();
     if let Some(tools) = AGENT_TOOL_OFFERS.lock().unwrap().get(app.id) {
         limits.offered_tools.extend(tools.iter().cloned());
     }
-    let policy = octosense_app_policy::admit_and_resolve_dir(&manifest, &digest, &limits, &RefuseAllSignatures)?;
+    if !dir.join(octosense_app_policy::MANIFEST_FILE).is_file() {
+        let pack: octosense_app_hub::pack::Pack =
+            serde_json::from_str(app.pack).map_err(|e| format!("{}: not a pack: {e}", app.id))?;
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        let staging = dir.with_extension(format!("staging-{}-{}", std::process::id(), NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)));
+        let staged = octosense_app_hub::pack::unpack(&pack, &staging)
+            .and_then(|_| admit_directory(&staging,app,&limits));
+        if let Err(error) = staged {
+            let _ = std::fs::remove_dir_all(&staging);
+            return Err(error);
+        }
+        if let Err(error) = std::fs::rename(&staging, &dir) {
+            // Another process may have published this immutable pack first.
+            // Never delete its directory, and never accept an incomplete one.
+            let _ = std::fs::remove_dir_all(&staging);
+            if !dir.join(octosense_app_policy::MANIFEST_FILE).is_file() { return Err(format!("{}: {error}",dir.display())); }
+        }
+    }
+    let policy = admit_directory(&dir,app,&limits)?;
+    Ok((dir, policy))
+}
+
+fn admit_directory(dir:&Path,app:&SystemApp,limits:&HostLimits)->Result<AppPolicy,String>{
+    let manifest = std::fs::read_to_string(dir.join(octosense_app_policy::MANIFEST_FILE))
+        .map_err(|e| format!("{}: no manifest: {e}", app.id))?;
+    let digest = octosense_app_policy::digest_dir(&dir)?;
+    let policy = octosense_app_policy::admit_and_resolve_dir(&manifest, &digest, limits, &RefuseAllSignatures)?;
     if policy.app_id != app.id {
         return Err(format!("the pack registered as {} holds {}", app.id, policy.app_id));
     }
-    Ok((dir, policy))
+    Ok(policy)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn concurrent_cold_preparations_never_publish_partial_bundles() {
+        let mut owned=vec![("main.splash".to_string(),"Label{text: \"fixture\"}".to_string())];
+        for i in 0..80 { owned.push((format!("asset-{i}.txt"),"fixture".repeat(256))); }
+        let files:Vec<_>=owned.iter().map(|(name,body)|(name.as_str(),body.as_str())).collect();
+        let pack=Box::leak(pack_of("concurrent",&files).into_boxed_str());
+        let app=SystemApp{id:"os.demo",name:"Demo",pack,assets:&[]};
+        let root=std::env::temp_dir().join(format!("appstore-concurrent-{}",std::process::id()));
+        let _=std::fs::remove_dir_all(&root);
+        let barrier=Arc::new(std::sync::Barrier::new(12));
+        let workers:Vec<_>=(0..12).map(|_|{
+            let root=root.clone();let barrier=barrier.clone();
+            std::thread::spawn(move||{barrier.wait();for _ in 0..3 {
+                let (dir,_)=prepare(&root,&app).unwrap();
+                assert_eq!(std::fs::read_dir(&dir).unwrap().count(),82);
+            }})
+        }).collect();
+        for worker in workers {worker.join().unwrap();}
+        let _=std::fs::remove_dir_all(root);
+    }
 
     #[test]
     fn a_system_agent_tool_request_needs_its_own_hosts_explicit_offer() {
