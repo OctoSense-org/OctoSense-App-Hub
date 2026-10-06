@@ -61,6 +61,14 @@ app id. Only requested names are eligible; owner sharing, caller grants and a
 real executor remain separate shell checks. An offer neither starts an agent
 nor gives script UI code raw host-service access. Store defaults are unchanged.
 
+App contract 1.5 admits four additional, independent host-service capabilities:
+`auth` for GitHub/Google connection management, `github` for repository operations,
+`gcalendar` for Google Calendar, and `gmail` for Gmail. OAuth tokens belong to the
+host; apps receive handles bound to their own identity and authorized scopes.
+The declarations do not register services: standalone `card-host` has none of
+these providers. The OctoSense host implementation and provider registrations
+must be installed before a sample can sign in. No OctoSense account is required.
+
 The `calendar` capability (app contract 1.4) separately admits Calendar UI
 requests. OctoSense registers the Calendar service and checks its owning app
 identity. A declared capability alone does not provide a service, a calendar

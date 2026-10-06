@@ -67,6 +67,14 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // person signs in to on the host's own sheet. The app never holds the
     // password or the connection.
     "mail",
+    // Host-owned OAuth connection lifecycle. Returns app-bound handles, never tokens.
+    "auth",
+    // GitHub repository reads and host-reviewed Markdown commits.
+    "github",
+    // Google Calendar connector; distinct from the local system calendar.
+    "gcalendar",
+    // Google Gmail API connector; distinct from the IMAP/SMTP mail service.
+    "gmail",
     // Calendar's local event store and UI. The service additionally checks
     // owning app identity; this is not Google/Android calendar access.
     "calendar",

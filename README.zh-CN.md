@@ -86,5 +86,11 @@ appstore
 
 曾用于跑通发布流程的相机卡片已于 2026 年 9 月 20 日移除：相机是随 Shell 出厂的系统应用（与新闻、相册一样），不是商店应用。它的仓库仍保留在 [ymote/camera-card](https://github.com/ymote/camera-card)，作为可发布应用包的完整示例。
 
+应用契约 1.5 新增四项独立的宿主服务能力：`auth` 管理 GitHub/Google
+连接，`github` 访问仓库，`gcalendar` 访问 Google Calendar，`gmail` 访问 Gmail。
+OAuth 令牌由宿主保存；应用只取得绑定自身身份与授权范围的连接句柄。
+能力声明不会注册服务；独立的 `card-host` 不提供这些服务。样例登录需要
+安装 OctoSense 的宿主实现并配置提供商注册信息，无需 OctoSense 账号。
+
 Calendar 的脚本 UI 另需应用契约 1.4 的 `calendar` 能力。OctoSense 注册日历服务，
 每次调用均校验所属应用身份。声明能力本身不会创建服务、连接日历账号或授予 Agent 工具。
