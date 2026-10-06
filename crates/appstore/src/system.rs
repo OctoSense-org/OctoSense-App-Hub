@@ -106,11 +106,12 @@ mod tests {
         let digest = octosense_app_policy::digest_dir(&source).unwrap();
         let manifest = serde_json::json!({"schema":1,"id":"os.tool-offer-fixture","name":"Fixture","version":"1",
             "integrity":{"bundle_blake3":digest},"capabilities":["storage"],
-            "agent":{"tools":["ask_user_question","calendar.events"]}});
+            "agent":{"profile":"read-only","tools":["ask_user_question","calendar.events"]}});
         std::fs::write(source.join("manifest.json"), serde_json::to_vec(&manifest).unwrap()).unwrap();
         let pack = Box::leak(serde_json::to_string(&octosense_app_hub::pack::pack_dir(&source).unwrap()).unwrap().into_boxed_str());
         let app = SystemApp { id:"os.tool-offer-fixture", name:"Fixture", pack, assets:&[] };
-        assert!(prepare(&root, &app).unwrap_err().contains("calendar.events"));
+        let refused = prepare(&root, &app).unwrap_err();
+        assert!(refused.contains("calendar.events"), "{refused}");
         set_agent_tool_offer("os.another-tool-offer-fixture", &["calendar.events"]);
         assert!(prepare(&root, &app).is_err(), "another app's offer is not inherited");
         set_agent_tool_offer(app.id, &["calendar.events"]);
