@@ -27,7 +27,7 @@ base64 = "0.22"
 # SVG, and check a card's L0 source, the same crate card-host renders with.
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
 roxmltree = "0.21.1"
-octoscript-ui-l0 = { git = "https://github.com/OctoSense-org/Octoscript.git", rev = "5991dfae9344589e732b2605b530f788e8bbcd11" }
+octoscript-ui-l0 = { git = "https://github.com/OctoSense-org/Octoscript.git", rev = "2e37d9e657a246f16718d9a475e167ccd2d5b5fa" }
 ureq = "3"
 
 [[bin]]
