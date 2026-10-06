@@ -61,6 +61,11 @@ app id. Only requested names are eligible; owner sharing, caller grants and a
 real executor remain separate shell checks. An offer neither starts an agent
 nor gives script UI code raw host-service access. Store defaults are unchanged.
 
+The `calendar` capability (app contract 1.4) separately admits Calendar UI
+requests. OctoSense registers the Calendar service and checks its owning app
+identity. A declared capability alone does not provide a service, a calendar
+account, or agent tools.
+
 ## Trust anchor
 
 Stores trust this anchor and follow its certificate to the working key that

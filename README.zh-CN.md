@@ -81,3 +81,6 @@ appstore
 | _暂无_ | | | | | | |
 
 曾用于跑通发布流程的相机卡片已于 2026 年 9 月 20 日移除：相机是随 Shell 出厂的系统应用（与新闻、相册一样），不是商店应用。它的仓库仍保留在 [ymote/camera-card](https://github.com/ymote/camera-card)，作为可发布应用包的完整示例。
+
+Calendar 的脚本 UI 另需应用契约 1.4 的 `calendar` 能力。OctoSense 注册日历服务，
+每次调用均校验所属应用身份。声明能力本身不会创建服务、连接日历账号或授予 Agent 工具。
