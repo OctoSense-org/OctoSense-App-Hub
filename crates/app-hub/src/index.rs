@@ -97,6 +97,7 @@ impl Entry {
                 "microphone" => "Use the microphone".to_string(),
                 "library" => "Save to your photo library, where other apps can see it".to_string(),
                 "mail" => "Read and send mail from accounts you sign in to on the device".to_string(),
+                "calendar" => "Read and manage local events through the device's Calendar service".to_string(),
                 "llm" => "Manage the assistant's AI providers, whose keys stay with the device".to_string(),
                 "news" => "Read news the device collects from its feeds and topics".to_string(),
                 "glance" => "Show cards on your glance screen".to_string(),

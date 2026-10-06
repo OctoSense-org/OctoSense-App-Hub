@@ -172,6 +172,7 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
         ("microphone", "Records sound with videos."),
         ("library", "Saves photos and videos to your photo library."),
         ("mail", "Reads and sends mail from accounts you add; it never sees your password."),
+        ("calendar", "Reads and manages local calendar events through the device's Calendar service."),
         ("llm", "Manages the assistant's AI providers; it never sees your API keys."),
         ("news", "Reads news the device collects from its feeds and topics."),
         ("glance", "Shows short cards on your glance screen; each opens only this app."),

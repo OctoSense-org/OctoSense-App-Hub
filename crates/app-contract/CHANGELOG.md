@@ -3,6 +3,13 @@
 `octosense-app-contract` follows the rules in [README.md](README.md#stability):
 within `1.x` it only grows.
 
+## 1.4.0
+
+- Add the `calendar` capability for a contained Calendar UI to call its
+  owning host service. Agent tool sharing remains a separate grant. This
+  grants no access to Android or Google Calendar accounts; the registered
+  host service checks its owning app identity on every call.
+
 ## 1.3.0
 
 - `RESERVED_NAMES` gains `octoscode`: OctoSense ships OctosCode
