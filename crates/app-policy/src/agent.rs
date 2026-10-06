@@ -442,6 +442,8 @@ pub const SHARED_HOST_METHODS: &[(&str, Risk)] = &[
     ("gmail.draft.open", Risk::Act),
     ("gmail.draft.get", Risk::Read),
     ("gmail.draft.edit", Risk::Act),
+    ("gmail.event.decide", Risk::Act),
+    ("gmail.event.status", Risk::Read),
     ("glance.publish", Risk::Act),
     ("glance.withdraw", Risk::Act),
     ("glance.list", Risk::Read),

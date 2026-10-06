@@ -329,6 +329,7 @@ fn shared_local_mutations_keep_risk_and_private_data_floors() {
     for method in [
         "gmail.draft.open",
         "gmail.draft.edit",
+        "gmail.event.decide",
         "glance.publish",
         "glance.withdraw",
     ] {
@@ -348,6 +349,13 @@ fn shared_local_mutations_keep_risk_and_private_data_floors() {
         )
         .is_ok());
     }
+    assert!(ToolManifest::load(
+        &make("gmail.event.status", "read", true),
+        "inbox",
+        ToolHost::Contained,
+        false
+    )
+    .is_ok());
     assert!(ToolManifest::load(
         &make("gmail.message", "read", false),
         "inbox",
