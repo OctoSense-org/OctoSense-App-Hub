@@ -68,6 +68,11 @@ account, or agent tools.
 
 ## Trust anchor
 
+The `photos` and `youtube` capabilities admit requests to the app-owned media
+services supplied by OctoSense. They do not grant Android Gallery access, a
+YouTube account, or another agent's tools. Cross-app tools still need an owner
+declaration, an explicit caller grant, host admission, and an executor.
+
 Stores trust this anchor and follow its certificate to the working key that
 signs the catalog. Rotating the working key needs no store release.
 

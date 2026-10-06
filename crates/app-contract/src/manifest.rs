@@ -78,6 +78,9 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // schedule into the app's store, and the items' text. The app never
     // fetches arbitrary sites itself through it.
     "news",
+    // App-owned media libraries and recommendations; no OS gallery/account grant.
+    "photos",
+    "youtube",
     // Publish cards to the glance screen through the host's glance service:
     // L0 cards the shell checks, caps, rate-limits and expires, keyed to the
     // app itself. The app sees only its own cards and a card opens only it.
