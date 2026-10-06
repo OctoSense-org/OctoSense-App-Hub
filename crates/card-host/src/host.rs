@@ -37,6 +37,10 @@ pub struct App {
     ui: WidgetRef,
     #[rust]
     mounted: bool,
+    /// Set when the bundle was refused: nothing of the bundle runs, and the
+    /// window carries the reason instead of an empty frame.
+    #[rust]
+    refused: bool,
     #[rust]
     assets: Option<octosense_app_policy::AssetServer>,
     #[rust]
@@ -103,6 +107,83 @@ fn policy_for(args: &Args) -> Result<AppPolicy, String> {
     // The digest is computed from the directory, so the manifest's claim is
     // checked against what is actually there.
     admit_and_resolve_dir(&manifest_json, &digest, &limits, &RefuseAllSignatures)
+}
+
+/// The card a refusal draws.
+///
+/// A refused bundle gives the host nothing to draw, which used to leave the
+/// window empty with the reason on stdout only. But the author is looking at
+/// the window, and a capture of a refusal should be a failure state rather
+/// than a blank frame — so the host says why in the window it already opened.
+///
+/// This is not the bundle's card, and grants it nothing: no manifest is
+/// admitted, no isolate is configured, no asset server starts. It is one
+/// plain `View` with the reason in it, wrapped by hand because a label does
+/// not wrap and a digest, a path or a `refused:` line is one long token.
+fn refusal_card(reason: &str) -> String {
+    let mut out = String::from(
+        "View{width: Fill height: Fill flow: Down padding: Inset{left: 24 right: 24 top: 28 bottom: 24} \
+         spacing: 10 show_bg: true draw_bg.color: #xffffff\n\
+         \x20   Label{width: Fill max_lines: 1 text: \"card-host refused this bundle\" \
+         draw_text.color: #x1c1c1e draw_text.text_style: theme.font_bold{font_size: 16}}\n",
+    );
+    for line in wrap_script_text(reason, 52, 6) {
+        out.push_str(&format!(
+            "    Label{{width: Fill max_lines: 1 text: \"{}\" \
+             draw_text.color: #x3a3a3c draw_text.text_style.font_size: 13}}\n",
+            escape_script_text(&line)
+        ));
+    }
+    out.push_str("}\n");
+    out
+}
+
+/// `reason` broken into lines of at most `width` characters, at most `lines`
+/// of them. A token longer than `width` is broken rather than allowed to run
+/// off the card, which is what a digest or a path is.
+fn wrap_script_text(text: &str, width: usize, lines: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut line = String::new();
+    for word in text.split_whitespace() {
+        let mut word = word;
+        loop {
+            let room = width.saturating_sub(if line.is_empty() { 0 } else { line.chars().count() + 1 });
+            if word.chars().count() <= room {
+                if !line.is_empty() {
+                    line.push(' ');
+                }
+                line.push_str(word);
+                break;
+            }
+            if room > 1 {
+                let take: String = word.chars().take(room).collect();
+                if !line.is_empty() {
+                    line.push(' ');
+                }
+                line.push_str(&take);
+                word = &word[take.len()..];
+            }
+            out.push(std::mem::take(&mut line));
+            if out.len() == lines {
+                out.last_mut().unwrap().push('…');
+                return out;
+            }
+        }
+    }
+    if !line.is_empty() {
+        out.push(line);
+    }
+    if out.is_empty() {
+        out.push("(no reason given)".to_string());
+    }
+    out.truncate(lines);
+    out
+}
+
+/// A string as a Makepad script string literal: the two characters that would
+/// end or corrupt it, escaped.
+fn escape_script_text(text: &str) -> String {
+    text.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', " ").replace('\t', " ")
 }
 
 /// Lower the card to isolate source: realize it, then lower it with the kit
@@ -242,6 +323,11 @@ impl App {
             Ok(policy) => policy,
             Err(e) => {
                 error!("card-host: refused: {e}");
+                // The refusal is right; an empty window is not. Say why in the
+                // window the author is already looking at, and stop there:
+                // nothing of the bundle is admitted, configured or served.
+                self.refused = true;
+                self.ui.splash(cx, ids!(card)).set_text(cx, &refusal_card(&e));
                 return;
             }
         };
@@ -321,8 +407,60 @@ impl AppMain for App {
         }
         self.ui.handle_event(cx, event, &mut Scope::empty());
         // Host services (a sheet the service raises, answers from its
-        // workers), exactly as the Card runner does.
-        let (card, sheet) = (self.ui.splash(cx, ids!(card)), self.ui.splash(cx, ids!(sheet)));
-        octosense_appstore::services::pump(cx, &self.app_id, &self.host_dir, &card, &sheet);
+        // workers), exactly as the Card runner does. A refused bundle has no
+        // app to pump for.
+        if !self.refused {
+            let (card, sheet) = (self.ui.splash(cx, ids!(card)), self.ui.splash(cx, ids!(sheet)));
+            octosense_appstore::services::pump(cx, &self.app_id, &self.host_dir, &card, &sheet);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_refusal_card_carries_the_reason() {
+        let card = refusal_card("app shiyi is unsigned and this host requires a signature");
+        assert!(card.starts_with("View{"), "{card}");
+        assert!(card.ends_with("}\n"), "{card}");
+        assert!(card.contains("card-host refused this bundle"), "{card}");
+        assert!(card.contains("unsigned"), "{card}");
+    }
+
+    #[test]
+    fn a_reason_longer_than_a_line_is_wrapped_not_run_off_the_card() {
+        // A digest is one token and no amount of it fits on one line.
+        let digest = "a".repeat(64);
+        let lines = wrap_script_text(&format!("bundle digest {digest} does not match"), 52, 6);
+        assert!(lines.len() > 1, "{lines:?}");
+        assert!(lines.iter().all(|l| l.chars().count() <= 52), "{lines:?}");
+        assert!(lines.iter().all(|l| !l.trim().is_empty()), "{lines:?}");
+        let card = refusal_card(&format!("bundle digest {digest} does not match"));
+        assert_eq!(card.matches("text: \"").count(), lines.len() + 1, "{card}");
+    }
+
+    #[test]
+    fn a_reason_keeps_its_quotes_and_backslashes_inside_the_literal() {
+        // Windows paths and JSON-quoted field names both turn up in reasons.
+        assert_eq!(escape_script_text(r#"a "b" c\d"#), r#"a \"b\" c\\d"#);
+        let card = refusal_card(r#"unknown field "background" at C:\bundle"#);
+        assert!(card.contains(r#"\"background\""#), "{card}");
+        assert!(card.contains(r"C:\\bundle"), "{card}");
+    }
+
+    #[test]
+    fn a_reason_never_makes_more_lines_than_the_card_shows() {
+        let lines = wrap_script_text(&"word ".repeat(200), 52, 6);
+        assert_eq!(lines.len(), 6);
+        assert!(lines.last().unwrap().ends_with('…'), "{lines:?}");
+    }
+
+    #[test]
+    fn an_empty_reason_still_draws_something() {
+        let lines = wrap_script_text("   ", 52, 6);
+        assert_eq!(lines.len(), 1);
+        assert!(!lines[0].is_empty());
     }
 }
