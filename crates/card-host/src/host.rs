@@ -139,8 +139,9 @@ fn refusal_card(reason: &str) -> String {
 }
 
 /// `reason` broken into lines of at most `width` characters, at most `lines`
-/// of them. A token longer than `width` is broken rather than allowed to run
-/// off the card, which is what a digest or a path is.
+/// of them. A word that fits on a line moves to the next one whole; only a
+/// token longer than `width` is broken rather than allowed to run off the
+/// card, which is what a digest or a path is.
 fn wrap_script_text(text: &str, width: usize, lines: usize) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let mut line = String::new();
@@ -155,7 +156,7 @@ fn wrap_script_text(text: &str, width: usize, lines: usize) -> Vec<String> {
                 line.push_str(word);
                 break;
             }
-            if room > 1 {
+            if room > 1 && word.chars().count() > width {
                 let take: String = word.chars().take(room).collect();
                 if !line.is_empty() {
                     line.push(' ');
@@ -165,7 +166,12 @@ fn wrap_script_text(text: &str, width: usize, lines: usize) -> Vec<String> {
             }
             out.push(std::mem::take(&mut line));
             if out.len() == lines {
-                out.last_mut().unwrap().push('…');
+                // On a full line the ellipsis takes the last character's place.
+                let last = out.last_mut().unwrap();
+                if last.chars().count() >= width {
+                    last.pop();
+                }
+                last.push('…');
                 return out;
             }
         }
@@ -462,5 +468,19 @@ mod tests {
         let lines = wrap_script_text("   ", 52, 6);
         assert_eq!(lines.len(), 1);
         assert!(!lines[0].is_empty());
+    }
+
+    #[test]
+    fn a_word_that_fits_on_a_line_is_not_split() {
+        let lines = wrap_script_text("app shiyi is unsigned and this host requires a signature", 52, 6);
+        assert_eq!(lines, ["app shiyi is unsigned and this host requires a", "signature"]);
+    }
+
+    #[test]
+    fn the_ellipsis_stays_within_the_line() {
+        let lines = wrap_script_text(&"a".repeat(400), 52, 6);
+        assert_eq!(lines.len(), 6);
+        assert!(lines.iter().all(|l| l.chars().count() <= 52), "{lines:?}");
+        assert!(lines.last().unwrap().ends_with('…'), "{lines:?}");
     }
 }

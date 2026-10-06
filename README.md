@@ -66,12 +66,13 @@ requests. OctoSense registers the Calendar service and checks its owning app
 identity. A declared capability alone does not provide a service, a calendar
 account, or agent tools.
 
-## Trust anchor
+The `photos` and `youtube` capabilities (app contract 1.5) admit requests to
+the app-owned media services supplied by OctoSense. They do not grant Android
+Gallery access, a YouTube account, or another agent's tools. Cross-app tools
+still need an owner declaration, an explicit caller grant, host admission, and
+an executor.
 
-The `photos` and `youtube` capabilities admit requests to the app-owned media
-services supplied by OctoSense. They do not grant Android Gallery access, a
-YouTube account, or another agent's tools. Cross-app tools still need an owner
-declaration, an explicit caller grant, host admission, and an executor.
+## Trust anchor
 
 Stores trust this anchor and follow its certificate to the working key that
 signs the catalog. Rotating the working key needs no store release.
