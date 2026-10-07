@@ -21,7 +21,7 @@ templates and test fixtures.
 | Path | What it is |
 | --- | --- |
 | `catalog.json` | The signed catalog. Stores verify it against the anchor below before showing anything. |
-| `index/<app>-<version>.json` | One admitted entry per app version: its manifest, publisher, source and status. Created by `hub publish`; absent while no app is published. |
+| `index/<app>-<version>.json` | One admitted entry per app version: its manifest, publisher, source and status. A maintainer exports the admitted entry from the catalog after `hub publish`; absent while no app is published. |
 | `artifacts/<app>-<version>.bundle/` | The hub's copy of the bundle, exactly the bytes that were reviewed. Created by `hub publish`. |
 | `artifacts/<app>-<version>.bundle.pack.json` | The same bundle as one file, which stores download. |
 | `docs/FIRST-APP.md` | First-app walkthrough for a card app or a script app: author, package, run, capture, validate and submit. |
@@ -77,6 +77,11 @@ minimum risk; the shell must check the resolved grant again when executing it.
 Omitting `host_method` preserves the original dispatch behavior. Authentication,
 host sheets, direct saves and sends cannot be aliased. An admitted alias neither
 installs its service nor grants approval for an external action.
+
+Catalog tool summaries omit `host_method` so older stores can read the catalog.
+They retain permission and risk metadata, but are never used for dispatch.
+The signed bundle keeps the complete tools file; installation and launch still
+verify its exact digest and publisher signature before loading those bindings.
 
 The `calendar` capability (app contract 1.4) separately admits Calendar UI
 requests. OctoSense registers the Calendar service and checks its owning app

@@ -155,9 +155,21 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
         lines.push("Stores nothing.".to_string());
     }
     if has("net") && !manifest.network.hosts.is_empty() {
-        lines.push(format!("Contacts only: {}.", manifest.network.hosts.join(", ")));
+        lines.push(format!("Direct network requests are limited to: {}.", manifest.network.hosts.join(", ")));
     } else {
-        lines.push("Never contacts the network.".to_string());
+        lines.push("No direct network access is granted.".to_string());
+    }
+    let provider_services = manifest.capabilities.iter().any(|cap| {
+        matches!(cap.as_str(), "auth" | "github" | "gmail" | "gcalendar" | "mail" | "images" | "web"
+            | "news" | "youtube" | "model" | "research" | "crawl" | "octos.turn.start")
+            || cap.starts_with("matrix.")
+            || octosense_app_contract::palpo::SERVICES.contains(&cap.as_str())
+    });
+    let remote_agent_allowed = manifest.agent.as_ref().is_some_and(|agent| {
+        !agent.model.as_ref().is_some_and(|model| model.local_only)
+    });
+    if provider_services || remote_agent_allowed {
+        lines.push("Shared host services and assistants may send data to their providers, under the permissions you allow. Direct-network limits do not restrict those service requests.".to_string());
     }
     if has("ledger.read") {
         lines.push("Reads your shared data.".to_string());
@@ -172,6 +184,10 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
         ("microphone", "Records sound with videos."),
         ("library", "Saves photos and videos to your photo library."),
         ("mail", "Reads and sends mail from accounts you add; it never sees your password."),
+        ("auth", "Connects its own provider accounts through the host; credentials stay with the host."),
+        ("github", "Reads authorized GitHub repositories and requests your review before committing Markdown through the host."),
+        ("gmail", "Reads authorized Gmail messages, keeps reply drafts and requests native host review before sending."),
+        ("gcalendar", "Reads authorized Google calendars and requests your review before saving event changes through the host."),
         ("calendar", "Reads and manages local calendar events through the device's Calendar service."),
         ("llm", "Manages the assistant's AI providers; it never sees your API keys."),
         ("news", "Reads news the device collects from its feeds and topics."),
@@ -342,7 +358,7 @@ mod tests {
         let quiet = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"}}"#).unwrap();
         let lines = privacy_summary(&quiet);
         assert!(lines.contains(&"Stores nothing.".to_string()));
-        assert!(lines.contains(&"Never contacts the network.".to_string()));
+        assert!(lines.contains(&"No direct network access is granted.".to_string()));
     }
 
     #[test]
@@ -351,7 +367,7 @@ mod tests {
             "capabilities":["glance"]}"#).unwrap();
         let lines = privacy_summary(&m);
         assert!(lines.contains(&"Shows short cards on your glance screen; each opens only this app.".to_string()), "{lines:?}");
-        assert!(lines.contains(&"Never contacts the network.".to_string()), "{lines:?}");
+        assert!(lines.contains(&"No direct network access is granted.".to_string()), "{lines:?}");
         let quiet = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"}}"#).unwrap();
         assert!(!privacy_summary(&quiet).iter().any(|l| l.contains("glance")));
     }
@@ -366,8 +382,8 @@ mod tests {
             "{lines:?}"
         );
         assert!(!lines.iter().any(|l| l.starts_with("Crawls")), "{lines:?}");
-        // The toolbox is the host's, not the app's network.
-        assert!(lines.contains(&"Never contacts the network.".to_string()), "{lines:?}");
+        // Host-mediated searches must not be described as offline.
+        assert!(lines.contains(&"No direct network access is granted.".to_string()), "{lines:?}");
 
         let m = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"},
             "capabilities":["crawl"],"research":{"domains_allow":["docs.rs"],"max_depth":2,"max_pages":30}}"#).unwrap();
@@ -388,9 +404,49 @@ mod tests {
             lines.iter().any(|l| l.contains("to the AI provider you configured") && l.contains("never sees your API keys")),
             "{lines:?}"
         );
-        // The model service is the host's, not the app's network.
-        assert!(lines.contains(&"Never contacts the network.".to_string()), "{lines:?}");
+        // Model calls may leave the device even without a direct-network grant.
+        assert!(lines.contains(&"No direct network access is granted.".to_string()), "{lines:?}");
         let quiet = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"}}"#).unwrap();
         assert!(!privacy_summary(&quiet).iter().any(|l| l.contains("AI provider")));
+    }
+
+    #[test]
+    fn connected_apps_disclose_service_traffic_without_a_direct_network_grant() {
+        for capability in ["auth", "github", "gmail", "gcalendar", "model", "research", "crawl", "octos.turn.start"] {
+            let m = AppManifest::parse(&serde_json::json!({
+                "schema":1,"id":"preview","version":"1","name":"Preview",
+                "integrity":{"bundle_blake3":"00"},"capabilities":[capability]
+            }).to_string()).unwrap();
+            let lines = privacy_summary(&m);
+            assert!(lines.iter().any(|line| line == "No direct network access is granted."), "{capability}: {lines:?}");
+            assert!(lines.iter().any(|line| line.contains("may send data to their providers")), "{capability}: {lines:?}");
+            assert!(!lines.iter().any(|line| line.contains("Never contacts") || line.starts_with("Contacts only:")));
+            if ["auth", "github", "gmail", "gcalendar"].contains(&capability) {
+                assert!(lines.iter().any(|line| line.starts_with("Connects its own") || line.starts_with("Reads authorized")));
+            }
+        }
+    }
+
+    #[test]
+    fn a_direct_allowlist_does_not_claim_to_limit_shared_provider_requests() {
+        let m = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A",
+            "integrity":{"bundle_blake3":"00"},"capabilities":["net","github"],
+            "network":{"hosts":["notes.example"]}}"#).unwrap();
+        let lines = privacy_summary(&m);
+        assert!(lines.contains(&"Direct network requests are limited to: notes.example.".into()));
+        assert!(lines.iter().any(|line| line.contains("Direct-network limits do not restrict those service requests")));
+        assert!(lines.iter().any(|line| line.contains("GitHub repositories")));
+    }
+
+    #[test]
+    fn assistant_provider_access_is_disclosed_but_local_ui_does_not_gain_it() {
+        let mut m = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A",
+            "integrity":{"bundle_blake3":"00"},"agent":{"profile":"read-only","tools":[]}}"#).unwrap();
+        assert!(privacy_summary(&m).iter().any(|line| line.contains("may send data to their providers")));
+        m.agent = None;
+        m.capabilities = vec!["storage".into(), "glance".into()];
+        let lines = privacy_summary(&m);
+        assert!(lines.contains(&"No direct network access is granted.".into()));
+        assert!(!lines.iter().any(|line| line.contains("may send data to their providers")));
     }
 }
