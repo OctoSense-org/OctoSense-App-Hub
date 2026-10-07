@@ -113,7 +113,7 @@ my-app/
 
 尚不支持：其他内置字体（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。
 
-`font_src` 指向的打包字体能通过准入检查，但目前在 `card-host` 中不会加载，`card-host` 的日志里也没有任何提示。不要为卡片附带字体文件。Inter 同样没有中文字形。卡片中要显示中文，请用角色 kit 组合卡片，并且不设 `font_src`。角色 kit 指放在 `kit/` 中的 OctoScript kit 模块，其组件包括 `Surface`、`TextTitle` 和 `TextBody` 等；它会用 Makepad 内置的 CJK 字体 LXGW WenKai（霞鹜文楷）显示中文。
+`font_src` 指向的打包字体能通过准入检查，但目前在 `card-host` 中不会加载，`card-host` 的日志里也没有任何提示。不要为卡片附带字体文件。Inter 同样没有中文字形。卡片中要显示中文，请用角色 kit 组合卡片，并且不设 `font_src`。角色 kit 是 `Surface`、`TextTitle`、`TextBody` 等组件背后的 OctoScript kit 模块：把 OctoScript-Makepad 的 `components/l0/` 中的 `_kit.octoscript`、`_derive.octoscript`、`_derive_color.octoscript`、`_palette_light.octoscript` 和 `_palette_dark.octoscript` 复制到应用包的 `kit/` 中。它会用 Makepad 内置的 CJK 字体 LXGW WenKai（霞鹜文楷）显示中文。
 
 默认情况下，卡片字体缺少的字形，Makepad 会改用操作系统的字体来绘制，所以在 macOS 上，即使卡片自己的字体没有加载，中文也照样显示。检查卡片时，请关闭这项回退：
 

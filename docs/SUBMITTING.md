@@ -351,8 +351,8 @@ output; look at that frame. For other capture problems, see
 
 Unverified, Linux only: if `shot` times out under software rendering
 (llvmpipe, WSL), set `MAKEPAD_WRITE_FRAMEBUFFER_PNG=<file>` before you start
-`tools/octo run` or `card-host`, and Makepad's OpenGL backend saves the window
-to that PNG each time it draws it; on macOS, `shot` stays the verified path.
+`tools/octo run` or `card-host`. Makepad's OpenGL backend then saves the window
+to that PNG each time it draws. On macOS, `shot` stays the verified path.
 
 A screen that needs a host service, or a native widget such as GitHub Notes'
 Markdown editor, does not render in `card-host`. Capture such a screen with

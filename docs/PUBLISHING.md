@@ -149,9 +149,13 @@ Not yet: other built-in fonts
 A bundled font named in `font_src` passes the gate but does not load in
 `card-host` today, and `card-host` logs nothing about it. Do not ship one for a
 card. Inter has no Chinese glyphs either. For Chinese text in a card, build the
-card from the role kit, the OctoScript kit modules in `kit/` with components
-such as `Surface`, `TextTitle` and `TextBody`, and set no `font_src`. The role
-kit draws Chinese with Makepad's built-in CJK face, LXGW WenKai.
+card from the role kit and set no `font_src`. The role kit is the set of
+OctoScript kit modules behind components such as `Surface`, `TextTitle` and
+`TextBody`: copy `_kit.octoscript`, `_derive.octoscript`,
+`_derive_color.octoscript`, `_palette_light.octoscript` and
+`_palette_dark.octoscript` from OctoScript-Makepad's `components/l0/` into the
+bundle's `kit/`. It draws Chinese with Makepad's built-in CJK face, LXGW
+WenKai.
 
 By default, Makepad draws a glyph that the card's fonts lack with one of the
 operating system's fonts, so on macOS Chinese appears even when the card's own
@@ -500,8 +504,8 @@ abridged:
 }
 ```
 
-The gate admits these tools, but in a store app OctoSense refuses them,
-because they have no `host_method`
+The gate admits these tools, but in a store app each call fails with
+`not_granted`, because they have no `host_method`
 ([What OctoSense runs today](#what-octosense-runs-today)).
 
 | Field | Meaning |
