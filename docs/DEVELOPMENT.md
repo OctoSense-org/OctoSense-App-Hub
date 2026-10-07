@@ -112,7 +112,8 @@ The `realize` report has four parts. Read it with the `/log` route
 | `lowering` or `lower_error` | `design` for a native kit pack; `l0-kit` for a card composed from the role kit, whose nodes get inspectable ids `beauty_0_1_…`. |
 
 `card-host` registers no host services, including `model` and the `octos.*`
-services that reach octos, the agent kernel OctoSense runs. A script app that
+services that reach octos, the agent kernel OctoSense runs. Only `runtime`
+discovery answers there. A script app that
 calls `host.request("mail.list", …)` gets
 `no service answers "mail" on this device`. Test a service-backed app in an
 OctoSense shell that registers the service.

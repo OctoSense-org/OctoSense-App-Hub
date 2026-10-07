@@ -61,7 +61,7 @@ flowchart LR
 ```
 
 The shell supplies the last two boxes. Standalone `card-host` has a pump but
-registers no host services.
+registers no host services, so only `runtime` discovery answers there.
 
 <a id="7-run-the-right-host"></a>
 

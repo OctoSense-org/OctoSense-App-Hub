@@ -47,7 +47,8 @@ owns those.
   skills as per-turn guidance, not as kernel skills.
 - Keep native `AppModule`, Splash script bundles and OctoScript L0 cards
   distinct. `tools/octo` is Design Flow's Python CLI; octos is the agent
-  kernel. `card-host` serves no host services and runs no agent.
+  kernel. `card-host` serves no host service except `runtime` discovery,
+  and runs no agent.
 - For agent or storage changes, also inspect OctoSense `crates/shell/src/host_tools`,
   `crates/shell/src/app_storage`, `crates/ai-host` and `crates/app-peers` at
   the revision the consumer pins. Do not claim a tool runs because

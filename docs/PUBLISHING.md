@@ -246,9 +246,9 @@ OctoSense desktop 0.1.0-beta.2.
 | `net` | Requests to the hosts in `network.hosts`, and no others. | Reach only: *hosts* | The runtime, in every host |
 | `images` | Pictures from any public https host, not only `network.hosts`. | Show pictures from any website | The runtime |
 | `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime, only in macOS, iOS and Android builds. Desktop Linux and Windows builds have no system web view. |
-| `location` | The device's location. | Use your location | The runtime, where the device has it |
-| `camera` | The camera. A capture is saved in the app's storage, so the app also needs `storage`. | Use the camera | The runtime, where the device has it |
-| `microphone` | Sound with a camera video. | Use the microphone | The runtime, where the device has it |
+| `location` | The device's location. On OctoSense `main` only, an app that declares `host-api-v1` must first ask with `location.permission.request`; on Android it can then read the last-known fix with `location.get` ([Host API compatibility](HOST-API.md)). | Use your location | The runtime, where the device has it |
+| `camera` | The camera. A capture is saved in the app's storage, so the app also needs `storage`. On OctoSense `main` only, an app that declares `host-api-v1` must first ask with `camera.permission.request`. | Use the camera | The runtime, where the device has it |
+| `microphone` | Sound with a camera video. On OctoSense `main` only, an app that declares `host-api-v1` must first ask with `microphone.permission.request`. | Use the microphone | The runtime, where the device has it |
 | `library` | Offering captures to the system photo library, where other apps can see them. | Save to your photo library, where other apps can see it | The runtime, where the device has it |
 | `clipboard` | The clipboard. | Use the clipboard | Not yet: no API uses it |
 | `prompt` | Questions the app asks the person. | Ask you questions | Not yet: no host reads it. An app agent asks with `ask_user_question`. |
@@ -807,7 +807,8 @@ for `mail.*`) or the exact service name. A granted call goes to the service
 the host registered for that family. The service does the work and answers
 with data, never with a credential or a connection. A call to a family that
 no service answers fails at once with `no service answers "<family>" on this device`;
-`card-host` registers no service. To see which shell serves which family, read
+`card-host` registers no service, so only `runtime` discovery answers there.
+To see which shell serves which family, read
 Design Flow's
 [Host services](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md).
 

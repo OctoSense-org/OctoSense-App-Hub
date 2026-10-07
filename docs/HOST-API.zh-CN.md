@@ -48,7 +48,8 @@ API 可用不等于已经配置，也不等于已经授权。`configured: null` 
 - **后端。** 宿主只从已准入的签名应用包读取 `backend` 块。它返回不透明的连接句柄，拒绝重定向和含有令牌的应答，并在原生界面中让用户确认每一次写操作。后台读取无法批准写操作。修改端点、更新应用或撤回应用，都会结束应用的后端连接。
 - **脚本工具。** 签名的 `app_tool(name, call_id)` 处理函数在已打开的完整应用自己的 VM 和存储隔离目录中运行。它不加载任何原生库或 Wasm；应用关闭时返回 `app_not_running`。
 - **平台。** 设备权限方法支持 Android 和 macOS。`location.get` 返回 Android 上次已知的位置，时效未知。Linux 和 Windows 不支持内嵌 `WebReader`。
+- **设备控件。** 在声明了 `host-api-v1` 的应用中，`CameraPreview`、`sys.request_location`、`sys.gps` 和地图的 GPS 读取同样需要这项按应用的授权。应用每次启动后，这些功能都保持关闭，直到应用调用某个权限方法（例如 `camera.permission.status`）载入已保存的授权。请在应用打开时就调用它。
 - **`card-host`。** 三个标记所需的 API，它一个也没有实现，因此会拒绝要求这些标记的应用（[在本地运行应用包](DEVELOPMENT.zh-CN.md#在本地运行应用包card-host)）。
-- **未验证：** Linux、Windows、手机、真实提供商和真实模型的验收。
+- **未验证：** 亲手点按批准权限、相机拍摄，以及 Linux、Windows、手机、真实提供商和真实模型的验收。
 
 具体调用方法见 Design Flow 的[发现并使用宿主 API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-API-V1.zh-CN.md)。

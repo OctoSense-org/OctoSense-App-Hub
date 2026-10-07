@@ -90,11 +90,16 @@ adds a provider registration.
 - **Platforms.** The device-permission methods cover Android and macOS.
   `location.get` returns Android's last-known fix, of unknown age. Embedded
   `WebReader` is unsupported on Linux and Windows.
+- **Device widgets.** With `host-api-v1`, `CameraPreview`,
+  `sys.request_location`, `sys.gps` and map GPS reads need the app's device
+  consent too. After each start they stay closed until the app calls a
+  permission method, such as `camera.permission.status`, which loads the
+  saved consent. Call it when the app opens.
 - **`card-host`.** It implements none of the APIs that the three markers need,
   so it refuses apps that require them
   ([Run a bundle locally](DEVELOPMENT.md#run-a-bundle-locally-card-host)).
-- **Unverified:** Linux, Windows, phone, live-provider and real-model
-  acceptance.
+- **Unverified:** a physical permission approval, camera capture, and Linux,
+  Windows, phone, live-provider and real-model acceptance.
 
 For the calls, see Design Flow's
 [Discover and use host APIs](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-API-V1.md).

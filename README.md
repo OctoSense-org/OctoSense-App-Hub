@@ -123,6 +123,13 @@ each one today.
   `auth`, to the backend that its manifest declares, and runs the backend
   operations the manifest names, on macOS and Android. Each write waits for
   the person's review ([Sign in to your own backend](docs/PUBLISHING.md#sign-in-to-your-own-backend)).
+- OctoSense `main` also serves device permissions on macOS and Android to an
+  app that declares `host-api-v1` and the matching capability:
+  `camera.permission.*`, `microphone.permission.*` and
+  `location.permission.*`, each with `status`, `request` and `revoke`. On
+  Android it also serves `location.get`. Only the app on screen can request a
+  permission, and the person approves it in the host's own dialog
+  ([Host API compatibility](docs/HOST-API.md)).
 - OctoSense `main` also requires a physical press to approve a GitHub or
   Google Calendar save, refuses executable Splash (`script`) cards from app agents,
   and keeps Google Calendar events from 30 days back to 366 days ahead
