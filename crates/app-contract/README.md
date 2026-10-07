@@ -33,13 +33,43 @@ fn open(package: &std::path::Path) -> Result<octosense_app_contract::AppPolicy, 
 }
 ```
 
+## Versions on crates.io
+
+crates.io has 1.0.0, 1.1.0, 1.2.0 and 1.5.0. Versions 1.3.0 and 1.4.0 exist
+only in this repository ([CHANGELOG.md](CHANGELOG.md)); 1.5.0 includes their
+changes. A lock file that still holds 1.2.0 refuses every capability added
+since, such as `auth`:
+
+```text
+app org.example.connect requests unknown capability "auth"
+```
+
+`cargo update -p octosense-app-contract` moves it to 1.5.0. OctoSense `main`
+resolves 1.5.0 from crates.io with no patch; OctoSense desktop 0.1.0-beta.2
+patched the crate to an App Hub revision. To build against a contract newer
+than the latest release, patch crates.io's copy with an App Hub revision, then
+update the lock file:
+
+```toml
+[patch.crates-io]
+octosense-app-contract = { git = "https://github.com/OctoSense-org/OctoSense-App-Hub", rev = "<App Hub commit>" }
+```
+
+```sh
+cargo update -p octosense-app-contract
+```
+
+Without `cargo update`, a lock file that already holds 1.2.0 keeps it, and
+Cargo warns that the patch `was not used in the crate graph`.
+
 ## Stability
 
 Within `1.x` the contract only grows (ADR 0005 section 2):
 
-- **Additive only.** New types, functions, optional manifest fields and enum
-  variants. Nothing is removed or renamed, and no existing field, default
-  or rule changes meaning. Anything else is `2.0`, decided in an ADR.
+- **Additive only.** A minor release adds only new types, functions, optional
+  manifest fields and enum variants. Nothing is removed or renamed, and no
+  existing field, default or rule changes meaning. Anything else is `2.0`,
+  decided in an ADR.
 - **Every public struct and enum is `#[non_exhaustive]`** (except the unit
   marker `RefuseAllSignatures`), so adding a field or variant is a minor
   change. Build values with the provided constructors instead of struct
@@ -51,8 +81,8 @@ Within `1.x` the contract only grows (ADR 0005 section 2):
   let signature = Signature::new("release", "aabb");
   ```
 
-  Manifests come from `parse`, policies from `policy::resolve`.
-- **Unknown manifest fields are classified, not ignored.** A field added in
+  Get manifests from `parse` and policies from `policy::resolve`.
+- **Unknown manifest fields are classified, never silently dropped.** A field added in
   `1.x` is *optional* (a host may run the app without it: it only adds
   information or asks for less) or *required* (it restricts or changes
   what the app gets). A manifest that uses a required field lists its
@@ -62,14 +92,14 @@ Within `1.x` the contract only grows (ADR 0005 section 2):
   2. Every `requires` entry must be in `KNOWN_FEATURES`, at every
      `schema_minor`. Otherwise: `app <id> needs a newer host: <feature>`.
      `1.0.0` knows no features.
-  3. `schema_minor` (default 0) at most `SCHEMA_MINOR` (0 in `1.0.0`): the
-     manifest is read strictly, and an unknown field at any level refuses
-     it.
-  4. `schema_minor` above `SCHEMA_MINOR`: the manifest was written for a
-     newer `1.x`. Its unknown fields, at any level, are optional by rule 2,
-     so they are ignored, and `AppManifest::ignored_fields()` lists them
-     (`network.retry`, `agent.model.temperature`) for the host to log.
-     Known fields are checked as always.
+  3. If `schema_minor` (default 0) is at most `SCHEMA_MINOR` (0 in every
+     release so far), `parse` reads the manifest strictly and refuses it if
+     any level has an unknown field.
+  4. If `schema_minor` is above `SCHEMA_MINOR`, the manifest was written for
+     a newer `1.x`. Rule 2 has passed, so every unknown field, at any level,
+     is optional: `parse` ignores it, and `AppManifest::ignored_fields()`
+     lists it (for example `network.retry`) for the host to log. Known
+     fields are checked as always.
 
   ```json
   { "schema": 1, "schema_minor": 2, "requires": ["<feature>"], ... }
@@ -78,12 +108,13 @@ Within `1.x` the contract only grows (ADR 0005 section 2):
   An older host therefore never runs an app under weaker rules than its
   author wrote, and a newer optional field never breaks an older host.
   Ignored fields stay in the manifest's signing bytes, so a newer signed
-  manifest still verifies. A field added in `1.x` must be skipped when it
-  holds its default, and must serialise exactly as written.
-- **Older manifests are unchanged.** `requires` and `schema_minor` are left
+  manifest still verifies. A field added in `1.x` must be omitted from
+  serialization when it holds its default, and must serialize exactly as
+  written.
+- **Older signatures still verify.** `requires` and `schema_minor` are left
   out of the canonical signing bytes when empty, so a manifest signed before
-  they existed signs as it did.
-- **Behaviour is pinned by fixtures.** [`tests/fixtures/`](tests/fixtures/README.md)
+  they existed produces the same signing bytes.
+- **Fixtures pin the behavior.** [`tests/fixtures/`](tests/fixtures/README.md)
   holds real manifests and packages with their digest, signing bytes,
   ignored fields and resolved `AppPolicy`. Every `1.x` must reproduce all
   of them; the corpus is append-only.
@@ -91,15 +122,23 @@ Within `1.x` the contract only grows (ADR 0005 section 2):
 ## Checks and releases
 
 App Hub's CI (`.github/workflows/app-contract.yml`) tests this crate on its
-own, as crates.io builds it, and runs `cargo semver-checks` against the
-latest published version: a non-additive change fails the pull request. It
-skips the API diff, saying so, until a first version is published.
+own, as crates.io builds it: the unit tests, the fixture corpus, the doc
+tests, clippy and a publish dry run. It also runs `cargo semver-checks`
+against the latest version on crates.io, so a non-additive change fails the
+pull request.
 
-A release is a version bump here and in [CHANGELOG.md](CHANGELOG.md),
-reviewed by App Hub and one app owner (Rinx), then the manual workflow
-`publish-app-contract` (`.github/workflows/publish-app-contract.yml`), which
-runs the tests and publishes with the `CARGO_REGISTRY_TOKEN` secret. It
-refuses a version that is already on crates.io.
+To release a version:
+
+1. Bump `version` in this crate's `Cargo.toml`, add the release to
+   [CHANGELOG.md](CHANGELOG.md), and update the crates.io status in this
+   README ([Versions on crates.io](#versions-on-cratesio)) and in the
+   changelog.
+2. Have App Hub and the owner of one consuming app (Rinx) review the change.
+3. Run the `publish-app-contract` workflow
+   (`.github/workflows/publish-app-contract.yml`) by hand, or push the tag
+   `app-contract-v<version>`. The workflow refuses a version that is already
+   on crates.io, runs the tests, and publishes with the
+   `CARGO_REGISTRY_TOKEN` secret.
 
 ## License
 

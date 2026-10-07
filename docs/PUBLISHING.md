@@ -1,185 +1,326 @@
-# Publishing an app to the OctoSense app hub
+# App Hub publishing reference
 
-This is the shared publication contract for app authors and their coding tools.
-Start with [Build your first Hub app](FIRST-APP.md), follow the
-[icon guidelines](ICONS.md), and use the [development guide map](DEVELOPMENT.md)
-for UI, state, runtime setup and native testing.
+English | [简体中文](PUBLISHING.zh-CN.md)
 
-The [app starter](../templates/app/README.md) includes a short
-[`AGENTS.md`](../templates/app/AGENTS.md) that links to these guides. Merge it
-into an existing repository's instructions. Keep any offline copy versioned
-against a known Hub revision instead of maintaining independent rules.
+| To | Read |
+| --- | --- |
+| Submit an app, step by step | [Submit an app to the App Hub](SUBMITTING.md) |
+| Build and check a first app | [Build your first Hub app](FIRST-APP.md) |
+| Set up the workspace, build `hub` and `card-host`, run and capture an app | [Quickstart](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md) in Design Flow (OctoScript-App-Design-Flow), the app-development harness |
+| Call a capability or a host service from a script | Design Flow [Capabilities](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.md) and [Script API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md) |
+| See which shell serves which host service | Design Flow [Host services](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md) |
+| Prepare the icon | [App icons and bundled artwork](ICONS.md) |
 
-The admission rules below are enforced by code and reported as refusals or
-warnings. Authoring and visual-review recommendations are separate: a gate
-pass does not prove the UI renders, the icon is readable, or the listing is
-truthful. See [current icon enforcement](ICONS.md#technical-requirements-and-current-enforcement).
+The gate is the Hub's admission check. Run it yourself with `hub check`: it
+reports each broken rule as a refusal or a warning. A pass does not show that
+the app renders, that its icon reads at small sizes or that its listing is
+true. Reviewers check those
+([What reviewers check](SUBMITTING.md#8-what-reviewers-check)).
 
 ## What an app is
 
-A bundle is a directory of text and artwork that OctoSense runs in its own
-sandboxed isolate, under the policy its manifest resolves to. It contains no
-native code. An app that needs new native runtime code must be integrated
-into a shell release; see the
-[delivery paths](DEVELOPMENT.md#choose-the-appropriate-delivery-path).
+A bundle is a directory of text and artwork. A **host** runs it: the OctoSense
+shell (the desktop or phone app) or `card-host`. Each app runs in an
+**isolate**, a sandboxed script runtime of its own, under its **policy**: only
+what its manifest requests and the host grants. A bundle holds no native code.
+An app that needs new native code ships inside a shell release instead
+([Choose a delivery path](DEVELOPMENT.md#choose-a-delivery-path)).
 
-The entry file decides the kind (`crates/app-contract/src/entry.rs`): a bundle
-with `main.splash` at its root is a **script app**; otherwise it is a
-**card app** and runs `page.card`.
+The entry file decides the kind of app:
 
-A **card app** is an L0 card the host lowers to widgets: presentation, no logic.
+| Kind | Entry | Runs as |
+| --- | --- | --- |
+| Script app | `main.splash` at the bundle root | A program in Splash, Makepad's UI script language, with its own state, handlers, storage and requests. |
+| Card app | `page.card` at the bundle root | A card in L0, OctoSense's declarative card language, which the host renders as widgets. It holds no logic. |
 
-```
+A bundle with both entry files is a script app.
+
+A script app's bundle holds these files:
+
+```text
 my-app/
-  manifest.json      what the app is and what it may do   (required)
-  listing.json       what the store shows about it         (required)
-  page.card          the L0 card, the app's screen          (required)
-  page.data.json     the data bound into the card           (optional)
-  kit/               the kit the card is lowered with       (required)
-  assets/            icon and other local runtime artwork   (icon required)
-  screenshots/       at least one PNG the listing names     (required)
+  manifest.json      what the app is and what it may do       (required)
+  listing.json       what the store shows about it             (required)
+  main.splash        the program                               (required)
+  assets/            the icon and other local artwork          (icon required)
+  screenshots/       at least one PNG or SVG the listing names (required)
 ```
 
-Produce the card, data and kit with the
-[image-to-card flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md)
-in OctoScript-App-Design-Flow. Do not hand-write L0 unless asked; the language
-is specified in [L0](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md).
-
-A **script app** is a Splash program with its own state, handlers, storage and
-requests, evaluated as it is.
-
-```
-my-app/
-  manifest.json      what the app is and what it may do   (required)
-  listing.json       what the store shows about it         (required)
-  main.splash        the program                            (required)
-  assets/            icon and other local artwork           (icon required)
-  screenshots/       at least one PNG the listing names     (required)
-```
-
-Either kind may also ship **its own agent** (ADR 0002): a tool manifest, the
-agent's instructions and skills, next to `manifest.json`. See
-[The app's agent and tools](#the-apps-agent-and-tools).
-
-```
-my-app/
-  tools.json                     the app's tools, typed, with risk levels   (optional)
-  AGENT.md                       the agent's instructions                   (optional)
-  skills/<name>/SKILL.md         an octos skill, data only                  (optional)
-  skills/<name>/manifest.json    its manifest                               (with SKILL.md)
-```
-
-Write it with the
+Build a script app with Design Flow's
 [script-app flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/script-app/FLOW.md)
-and the [script API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md),
-starting from its [`templates/script-app/`](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/templates/script-app).
-The program names its own artwork through the `{{assets}}` placeholder
-(`http_resource("{{assets}}/assets/logo.png")`): the host replaces it with a
-loopback origin that serves this bundle and nothing else, and adds only that
-origin to the app's hosts. The first-party
-[system apps](https://github.com/OctoSense-org/OctoSense/tree/main/apps)
-(`apps/<name>/bundle/`) are complete examples; their `os.` ids are reserved,
-so a store copy needs an id of its own.
+and [Script API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md), starting from its
+[`templates/script-app/`](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/templates/script-app).
 
-Keep developer instructions, source tools, keys, test data directories and
-review packets outside the submitted bundle.
+Name the bundle's own artwork through the `{{assets}}` placeholder, for example
+`http_resource("{{assets}}/assets/logo.png")`. The host replaces the
+placeholder with a loopback origin that serves this bundle and nothing else.
+
+The first-party [system apps](https://github.com/OctoSense-org/OctoSense/tree/main/apps)
+(`apps/<name>/bundle/`) are complete examples. Their `os.` ids are reserved,
+so a copy needs an id of its own.
+
+A card app's bundle holds these files:
+
+```text
+my-app/
+  manifest.json      what the app is and what it may do       (required)
+  listing.json       what the store shows about it             (required)
+  page.card          the L0 card, the app's screen             (required)
+  page.data.json     the data bound into the card              (optional)
+  kit/               the widget kit that renders the card      (required)
+  assets/            the icon and other local artwork          (icon required)
+  screenshots/       at least one PNG or SVG the listing names (required)
+```
+
+Produce the card, its data and its kit with Design Flow's
+[image-to-card flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md).
+The [L0 specification](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md)
+defines the card language.
+
+Either kind may also ship its own agent next to `manifest.json`: `tools.json`,
+`AGENT.md` and `skills/<name>/`
+([The app's agent and tools](#the-apps-agent-and-tools)).
+
+You submit only the bundle. Keep developer instructions, source tools, keys,
+test data and review packets outside it
+([Lay out the repository](SUBMITTING.md#1-lay-out-the-repository)).
 
 ## Rules the gate enforces
 
-| Rule | What is refused |
+`hub check` runs in two stages: the structural limits first, then every other
+rule.
+
+### Structural limits
+
+A bundle that breaks a structural limit gets no report. `hub check` prints a
+single line, `hub: <reason>`, and exits 1. With `--json` it reports the same
+reason as one refusal under the check name `bundle-invalid`.
+
+| Limit | Reason printed |
 | --- | --- |
-| Assets are local | Any `http://`, `https://`, `file://` or `../` in a `.card`, `.l0`, `.octoscript`, `.json`, `.txt` or `.md` file (`manifest.json`, `listing.json` and the agent files excepted). Ship the asset in the bundle and reference it by a bundle-relative path such as `assets/icon.svg`. |
-| Script apps and agent files reach only declared hosts | In a `.splash` file, `tools.json`, the agent's instructions or anything under `skills/`: any `http://`, `file://` or `../`; and any `https://` address whose host is not in `network.hosts`, unless the app requests `images` or `web`, which allow any public https host. Name bundle artwork through `{{assets}}`. |
-| Allowed file types only | Anything other than `.card .json .l0 .octoscript .splash .svg .png .jpg .jpeg .webp .ttf .otf .txt .md`. No other scripts, archives or binaries. |
-| No secrets | A `.card`, `.l0`, `.octoscript` or `.splash` file declaring `is_password: true` or a `TextInputContentType` of `Password`, `NewPassword` or `OneTimeCode`. Apps never collect secrets; see [host services](#host-services-and-sheets). |
-| System ids are reserved | An id starting with `os.`. Those belong to system apps that ship with the device, and no device installs one from a store. |
-| Native and host names are reserved | An id, or an id's last segment (its tool namespace), that is a native app's id or a name the host acts under: `agents`, `apphub`, `appcard`, `card`, `dev`, `octos`, `os`, `reference`, `rinx`, `sheets`, `shell`, `system`, `terminal`, `toolbox`, `workflow`. The device keys an app's storage, tools and consent by its id, so `terminal` or `com.example.terminal` would stand in for the Terminal. |
-| Size | A bundle over 8 MB. |
-| No symlinks | Any symlink in the bundle. |
-| Within the structural limits | More than 2048 files and directories, nesting deeper than 32, a manifest over 64 KiB, or a path that is not portable (a `\`, `:`, `.` or `..` segment, or not UTF-8). |
-| An entry the runtime can start | Neither `main.splash` (a script app) nor `page.card` (a card). A card's source must be valid L0, its `page.data.json` valid JSON, and its kit complete: the `kit/native/<theme>/kit.json` its theme names, or the Octoscript kit modules it needs. |
-| Well-formed contents (`contents-invalid`) | A text file (`.splash .card .json .l0 .octoscript .txt .md`) over 1 MiB or not UTF-8, or JSON that does not parse; a PNG, JPEG or WebP that does not decode, or is wider or taller than 4096 pixels; an SVG that does not parse, has no size, holds a script or foreign content, or whose styling (a `style` attribute or a `<style>` block) imports a stylesheet, uses escapes or comments, or points `url()` anywhere but `#a-fragment` in the same file. |
-| Listing icon | An icon that is not square, or a PNG icon over 1 MiB or 1024 pixels a side. |
-| Local resources (`resource-invalid`) | A card's image or font reference, or an SVG `href`, to a file not in the bundle. Each finding names the property (`page.data.json/$kit/placements/…/src`). |
-| Digest matches | A manifest whose `integrity.bundle_blake3` does not match the directory. Run `hub stamp` after any change. |
-| Manifest is exact | Unknown fields, an unknown capability, a `schema` other than 1, an id outside `[a-z0-9.-]{1,64}` not starting with `.`. |
-| Hosts are bare | A host with a scheme, path, port, wildcard or credentials. `api.example.com` is right; `https://api.example.com/v1` and `*.example.com` are refused. |
-| Hosts need `net` | Listing hosts without requesting the `net` capability. |
-| Research has a scope | `research` or `crawl` without a top-level `research` scope; a scope without either capability; a scope that octos's `Scope::from_grant` would refuse (a language that is not a BCP-47 tag, a region that is not two letters, a category outside `news`, `general`, `science`, `it`, `social`, `max_results` of 0, an unknown field); a domain pattern that is not a bare domain; the toolbox's old field names (`languages`, `allowed_domains`, `denied_domains`, `recency_hours`). |
-| Crawl limits need `crawl` | `crawl` without `max_depth` and `max_pages` above 0, or crawl limits without `crawl`. |
-| Version is new | Re-publishing a version already in the catalog. |
-| Listing present and complete | No `listing.json`; no icon or no screenshot; an unknown category, platform or age rating; a non-https privacy policy; or an icon or screenshot the listing names that is not in the bundle. |
-| Publisher continuity | An update, or a new app from a publisher already on record, not signed by the key the catalog records for that publisher; a `--publisher-key` that disagrees with the recorded key; catalog history that disagrees with itself. |
-| Tools are the app's own | In `tools.json`: a tool outside the app's namespace (the last segment of its id); a namespace that is not `[a-z0-9_]{1,24}`; a duplicate name, or two names the broker would spell the same; a missing `risk` or `implemented_by`; an unknown field; a schema outside the supported subset, over 8 KB or nested deeper than 8; an input that is not an object; more than 64 tools or a file over 64 KB; `confirm: "app"` on a tool the host service implements. |
-| Local-only data stays local | A `shareable` tool of an app whose `agent.model.local_only` is true, unless it declares `"private_data": false`. |
-| Agent files are declared text | An `AGENT.md` that `agent.instructions` does not name, or a `skills/<name>/` that `agent.skills` does not; instructions over 32 KB, not UTF-8, holding control characters, a leading `#!`, `<script`, `<iframe>`, `javascript:` or similar; agent files without an `agent`. |
-| Skills are data only | A skill manifest declaring `tools`, `binaries`, `sha256`, `mcp_servers`, `hooks` or other executable fields; a file in a skill other than `.md`, `.json`, `.txt`; a manifest `name` other than its directory; a `uses` entry that is neither one of the app's tools nor in `agent.tools`. |
-| Background needs triggers | `agent.background: true` without a schedule or an event; a schedule that is not five cron fields; an event outside the app's namespace; an unknown model need or tier. |
+| At most 8 MiB (8,388,608 bytes) of files, not counting `manifest.json` | `the bundle exceeds the size limit` |
+| At most 2048 files and directories | `the bundle exceeds the file count limit` |
+| Nesting at most 32 directories deep | `the bundle exceeds the directory depth limit` |
+| A `manifest.json` at the bundle root, at most 64 KiB | `<bundle>/manifest.json: No such file or directory (os error 2)`, `manifest.json exceeds the size limit` |
+| Regular files and directories only, no symlinks | `<path>: only regular files and directories are allowed` |
+| Portable paths: UTF-8 names with no `\` or `:`, and no empty, `.` or `..` segment | `not a portable bundle path: "<path>"` |
+| A manifest that parses: no unknown field or value, `schema` 1, every `requires` feature known | `manifest is not valid: …`, `manifest schema <n> is not 1`, `app <id> needs a newer host: …` |
+
+### Findings
+
+Every other broken rule adds a report line, a **finding**, that names its
+check: `[refused] <check> (<path>): <detail>` or `[warning] <check>: <detail>`.
+`(<path>)` appears only when one file or property is at fault. A refusal stops
+admission. A warning does not.
+
+| Check | Refused when | Warned when |
+| --- | --- | --- |
+| `digest` | `integrity.bundle_blake3` does not match the bundle. Run `hub stamp` after every change. | |
+| `publisher-signature` | The signature does not verify against the key given with `--publisher-key` or recorded in the catalog; no key was given for a signed manifest (`publisher key "<id>" is not registered with this hub`); the manifest is unsigned and `--allow-unsigned` is absent. | The manifest is unsigned and `--allow-unsigned` is given. |
+| `identity` | The id starts with `os.`; the id, or its last segment, is a reserved name ([Ids and reserved names](#ids-and-reserved-names)). | |
+| `contents` | A file's extension is not one of `.card`, `.json`, `.l0`, `.octoscript`, `.splash`, `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.ttf`, `.otf`, `.txt` or `.md`. Files with no extension, such as `.DS_Store` and `LICENSE`, are refused too. | |
+| `contents-invalid` (text and images) | A text file (`.splash`, `.card`, `.json`, `.l0`, `.octoscript`, `.txt` or `.md`) is over 1 MiB or not UTF-8; JSON does not parse; a PNG, JPEG or WebP does not decode or is over 4096 px a side; the listing icon is not square, or is a bitmap over 1 MiB or 1024 px a side. | |
+| `contents-invalid` (SVG) | An SVG does not parse; lacks a numeric `width` and `height` or a `viewBox`; is over 4096 px a side; or holds a script, a `foreignObject` or an `on…` handler. Its styling (a `style` attribute or a `<style>` block) imports a stylesheet, uses an escape, uses a comment or points `url()` anywhere but a `#fragment` in the same file. | |
+| `entry` | The bundle has neither `main.splash` nor `page.card`; `page.card` is not valid L0; `page.data.json` is not JSON; neither `kit/native/<theme>/kit.json` nor every OctoScript kit module the card needs is in the bundle. | |
+| `resource-invalid` | A card's image or font reference, or an SVG `href`, names a file that is not in the bundle. The finding names the JSON pointer. See [Fonts](#fonts). | |
+| `assets` | A `.card`, `.json`, `.l0`, `.octoscript`, `.txt` or `.md` file other than `manifest.json`, `listing.json` and the agent files contains `http://`, `https://`, `file://` or `../`, including a URL in a bundled readme or font license. A `.splash` file or an agent file contains `http://`, `file://`, `../` or an `https://` host that is not in `network.hosts` (any public host is allowed when the app requests `images` or `web`). | |
+| `secrets` | A `.card`, `.l0`, `.octoscript` or `.splash` file declares `is_password: true` or a `TextInputContentType` of `Password`, `NewPassword` or `OneTimeCode`. | |
+| `storage` | | A `.splash` file calls `fs.*`, or the app requests `camera`, without the `storage` capability. The `grants:` line then says `storage none`. |
+| `listing` | `listing.json` is missing or breaks a rule in [The listing](#the-listing); the listing names no screenshot or no icon; it names a screenshot or icon that is not in the bundle. | |
+| `tools`, `agent`, `skills` | `tools.json`, `AGENT.md` or a skill breaks a rule in [Rules for agent files](#rules-for-agent-files). | A tool is destructive or outward (each call waits for approval); a tool says `confirm: "app"`; the app declares tools but `agent.model.needs` omits `tool_calling`; a background agent has destructive tools. |
+| `policy` | A capability is unknown; the id breaks a rule in [Ids and reserved names](#ids-and-reserved-names); the version is empty; a host is not a bare host name, or hosts are listed without `net` ([Network hosts](#network-hosts)); the `research` scope or an `agent` field breaks its rules; `storage.cache_max_bytes` is 0. | |
+| `version` (with `--catalog`) | The catalog already holds this version of the app. | |
+| `continuity` (with `--catalog`) | The publisher rules in [Signing](#signing) are broken, or the catalog history disagrees with itself. | |
+
+### Fonts
+
+A card names a font with `font_src`, in the `page.data.json` placements or in
+a native kit's component styles. The value must be a font file in the bundle,
+or the one built-in font the gate allows,
+`makepad_widgets:resources/Inter.ttf`. Any other built-in font is refused:
+
+```text
+[refused] resource-invalid (kit/native/light/kit.json/components/detail/style/font_src): not a portable bundle path: "makepad_widgets:resources/LXGWWenKaiRegular.ttf"
+```
+
+Not yet: other built-in fonts
+([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). For text
+that Inter does not cover, such as Chinese, bundle a `.ttf` or `.otf` file; it
+counts toward the 8 MiB limit. The gate does not decode font files, so test the
+font in `card-host`.
 
 ## The manifest
 
 ```json
 {
   "schema": 1,
-  "id": "weather-card",
+  "id": "com.example.forecast",
   "version": "1.0.0",
-  "name": "Weather",
+  "name": "Forecast",
   "integrity": { "bundle_blake3": "<written by hub stamp>" },
   "capabilities": ["storage", "net"],
-  "network": { "hosts": ["api.weather.example"] },
+  "network": { "hosts": ["api.open-meteo.com"] },
   "storage": { "max_bytes": 1048576 },
-  "compute": { "instruction_budget": 5000000, "memory_bytes": 33554432 },
-  "agent": {
-    "profile": "workspace-write-never-ask",
-    "tools": ["net.fetch", "storage.read"],
-    "max_iterations": 4,
-    "token_budget": 50000
-  }
+  "compute": { "instruction_budget": 5000000, "memory_bytes": 33554432 }
 }
 ```
 
-Ask for the least the app needs. Everything not requested is not granted, and
-the store shows the person exactly what was requested, in plain words, before
-they install.
-
-**Capabilities** (closed list, `KNOWN_CAPABILITIES` in
-`crates/app-contract/src/manifest.rs`, the app contract). Anything else is
-refused.
-
-| Capability | Grants | The store says |
+| Field | Meaning | Rule |
 | --- | --- | --- |
-| `storage` | The app's own storage jail: `fs.*`, camera captures, and the local files a widget reads (a map archive). Without it the app has no storage: every `fs` call errors, and `hub check` warns. | Keep its own data on this device |
-| `net` | Requests to the hosts in `network.hosts`, and no others. | Reach only: *hosts* |
-| `prompt` | Ask the person questions of its own. A service's sheet (Mail's sign-in) does not need it. | Ask you questions |
-| `ledger.read` | Read the shared ledger; writing is always the app's own rows. | Read your shared data |
-| `location` | The device's location. | Use your location |
-| `camera` | The camera. A capture is saved in the app's storage, so it needs `storage` too; without it the preview shows and a capture saves nothing. | Use the camera |
-| `clipboard` | The clipboard. | Use the clipboard |
-| `images` | Show pictures from any public https host, not only `network.hosts` (a feed's thumbnails). | Show pictures from any website |
-| `web` | Open any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view |
-| `microphone` | Record sound with a camera video. | Use the microphone |
-| `library` | Offer captures to the system photo library, where other apps can see them; without it, captures stay in the app's storage. | Save to your photo library, where other apps can see it |
-| `mail` | Read and send mail through the host's mail service, from accounts the person signs in to on the host's sheet. | Read and send mail from accounts you sign in to on the device |
-| `llm` | See and arrange the assistant's LLM providers through the host's `llm` service; keys are typed, shown and scanned only on the host's sheets. The service answers only `os.` system apps (AI providers), so a store app gains nothing from it. | Manage the assistant's AI providers, whose keys stay with the device |
-| `news` | Read the host's `news` service: items the device collects on a schedule from its feeds and topic feeds, and their text. The app does not fetch arbitrary sites through it. | Read news the device collects from its feeds and topics |
-| `glance` | Publish cards to the glance screen through the host's `glance` service (`glance.publish`, `glance.withdraw`, `glance.list`). A card is an L0 card the host checks and lowers before storing it; the host caps its size, rate-limits publishing, keeps a few cards per app and expires them. The publisher is always the calling app: it sees, replaces and withdraws only its own cards, and a card opens only that app. | Show cards on your glance screen |
-| `research` | Search through the system toolbox (`search`, `deep_research`) within the manifest's [`research` scope](#the-research-scope): languages, regions, domains, recency, categories and results per search. The host runs each search and refuses or narrows a call outside the scope; the app never fetches the sites itself, so it needs no `net` for it. | Search *what the scope allows*, for example "Search news in English and Chinese, from the last 7 days" |
-| `crawl` | Crawl a site through the system toolbox (`deep_crawl`): follow links up to the scope's `max_depth` and read up to its `max_pages` a crawl, inside its domain lists. **More reach than `research`**, which reads only search results: ask for it only when a screen needs whole sites, and prefer a `domains_allow` list. Neither capability implies the other. | Crawl websites, following links up to *depth* deep and reading up to *pages* pages a crawl, *on which sites*, which reaches more than searching |
-| `model` | Make bounded one-shot model calls through the host's `model` service (`model.complete`). The app names a model class (`fast` or `strong`) and a JSON Schema; the host picks the model from the person's own AI providers, sends the app's inputs there, checks the reply against the schema (URLs refused unless the app asks for them) and keeps a per-app daily rate and token budget. No tools, memory or history; the app never sees the provider, model id or key. Not `llm`, which only manages providers. | Send what you give it to the AI provider you configured, within a daily budget |
+| `schema` | The manifest grammar. | `1`. |
+| `id` | The app's identity. It names the app's storage folder, and its last segment is the namespace of the app's tools. | See [Ids and reserved names](#ids-and-reserved-names). Keep it the same in every version. |
+| `version` | This release. | Not empty. Use a new value for every release; a published version is never replaced. |
+| `name` | What the person sees. | |
+| `integrity.bundle_blake3` | The bundle's digest. | Written by `hub stamp`. Never edit it by hand. |
+| `integrity.signature` | `{key_id, value}`, the publisher's signature over the manifest. | Written by `hub sign-manifest` ([Signing](#signing)). |
+| `capabilities` | What the app may use. | Names from the closed list ([Capabilities](#capabilities)). |
+| `network.hosts` | The hosts the app may reach. | Bare host names, and only with `net` ([Network hosts](#network-hosts)). |
+| `storage` | `max_bytes`, `accounts`, `agent_workspace`, `cache_max_bytes`. | See [Storage and quotas](#storage-and-quotas). |
+| `compute` | `instruction_budget`, `memory_bytes`. | Clamped to the host's ceilings. |
+| `agent` | The app's own agent. | Optional ([The manifest's `agent`](#the-manifests-agent)). |
+| `research` | The scope of `research` and `crawl`. | Required with `research` or `crawl`; refused when the manifest requests neither ([The research scope](#the-research-scope)). |
+| `requires` | Host features the app needs. | Each must be a feature the host knows; the only one is `palpo-admin-v1`. |
+| `schema_minor` | Which additions to schema 1 the manifest uses. | Leave it out. |
 
-Location, camera and clipboard are each a separate consent; none implies
-another.
+Any other field is refused. After `hub sign-manifest`, the manifest also holds
+`null` for optional fields you left out, such as `"agent": null`. They change
+nothing.
+
+Ask for the least the app needs. The host grants nothing the manifest does not
+request, and the store shows the person every request in plain words before
+install.
+
+### Capabilities
+
+The gate knows 103 capability names: the 25 below and the 78 in
+[Exact service names](#exact-service-names-octos-matrix-palpo). It refuses any
+other name:
+
+```text
+[refused] policy: app com.example.forecast requests unknown capability "model.image"
+```
+
+A capability lets the app make requests; it does not provide a service to
+answer them. A **host service**, code in the OctoSense shell that does what the
+app may not do itself, answers them. **Served today** says what answers on
+OctoSense desktop 0.1.0-beta.2.
+
+| Capability | Grants | The store says | Served today |
+| --- | --- | --- | --- |
+| `storage` | The app's own storage folder: `fs.*`, camera captures and local files a widget reads. Without it every `fs.*` call fails. | Keep its own data on this device | The runtime, in every host |
+| `net` | Requests to the hosts in `network.hosts`, and no others. | Reach only: *hosts* | The runtime, in every host |
+| `images` | Pictures from any public https host, not only `network.hosts`. | Show pictures from any website | The runtime |
+| `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime |
+| `location` | The device's location. | Use your location | The runtime, where the device has it |
+| `camera` | The camera. A capture is saved in the app's storage, so the app also needs `storage`. | Use the camera | The runtime, where the device has it |
+| `microphone` | Sound with a camera video. | Use the microphone | The runtime, where the device has it |
+| `library` | Offering captures to the system photo library, where other apps can see them. | Save to your photo library, where other apps can see it | The runtime, where the device has it |
+| `clipboard` | The clipboard. | Use the clipboard | Not yet: no API uses it |
+| `prompt` | Questions the app asks the person. | Ask you questions | Not yet: no host reads it. An app agent asks with `ask_user_question`. |
+| `ledger.read` | Reading the shared ledger. | Read your shared data | Not yet: no `ledger` service |
+| `mail` | Mail through the host's `mail` service, from accounts the person signs in to on a host [sheet](#sheets-apps-never-collect-secrets). | Read and send mail from accounts you sign in to on the device | OctoSense |
+| `auth` | Connecting the app's own GitHub or Google accounts. On OctoSense `main` only, also signing in to the app's own backend ([Sign in to your own backend](#sign-in-to-your-own-backend)). | Connect and disconnect its own GitHub or Google accounts through the host | OctoSense, with OAuth client registrations on the host ([Connected accounts](#connected-accounts)) |
+| `github` | Reading repositories; each Markdown commit waits for the person's review. | Read authorized repositories and ask you to review Markdown commits | As `auth` |
+| `gcalendar` | Reading Google calendars; each event change waits for the person's review. | Read authorized Google calendars and ask you to review event changes | As `auth` |
+| `gmail` | Reading Gmail and keeping reply drafts; each send waits for the person's review. Separate from `mail`. | Read authorized Gmail messages, keep reply drafts and request native send review | As `auth` |
+| `calendar` | Calendar's local event store and UI. Not Google Calendar. | Read and manage local events through the device's Calendar service | System app `os.calendar` only; store apps use `gcalendar` |
+| `llm` | Managing the device's AI providers through the `llm` service. | Manage the assistant's AI providers, whose keys stay with the device | System apps only |
+| `news` | Items the device collects from its feeds and topic feeds. | Read news the device collects from its feeds and topics | System apps only |
+| `photos` | Photos' own library and collections. | Read Photos's own library and publish collections | System apps only: OctoSense serves just `photos.notify`, to `os.photos` |
+| `youtube` | YouTube search and music recommendations. | Search YouTube and manage music recommendations | System apps only: OctoSense serves just `youtube.notify`, to `os.youtube` |
+| `glance` | Publishing Glance cards to the Glance screen (`glance.publish`, `glance.withdraw`, `glance.list`). The host checks, caps and expires the cards; a card opens only its own app. | Show cards on your glance screen | OctoSense |
+| `model` | `model.complete` and `model.budget`, within a daily budget per app. `model.complete` takes a model class (`fast` or `strong`) and a JSON Schema. No image, audio, video or embedding calls. | Send what you give it to the AI provider you configured, within a daily budget | OctoSense |
+| `research` | Searching through the system toolbox, within the manifest's research scope ([The research scope](#the-research-scope)). The host runs every search. | Search *what the scope allows* | System apps only, in phone builds |
+| `crawl` | Crawling sites through the system toolbox, up to the scope's `max_depth` and `max_pages`, inside its domain lists. More reach than `research`. | Crawl websites, *within the scope*, which reaches more than searching | As `research` |
+
+No capability implies another. Not yet: `photos` and `youtube` services for
+store apps. For how a script calls each capability, see Design Flow's
+[Capabilities](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.md).
+
+Source: `KNOWN_CAPABILITIES` in `crates/app-contract/src/manifest.rs`.
+
+### Exact service names: `octos.*`, `matrix.*`, `palpo.*`
+
+Each of these 78 names is a separate capability, matched exactly. A prefix
+such as `octos.` or `matrix.` is an unknown capability. Passing the gate is not enough: on every call, the host also
+checks that it serves the name, that the app's policy includes it and that the
+person granted it.
+
+| Group | Names | Grants | Served today |
+| --- | --- | --- | --- |
+| `octos.*` | 4: `octos.session.open`, `octos.session.history`, `octos.turn.start`, `octos.turn.interrupt` | A conversation with the app's own agent, run by octos, the agent kernel OctoSense runs: open it, read its history, start a turn, stop a turn the app started. The app never names a provider, a model or a key. | OctoSense, once the person allows the app's agent. Until then a call answers `Waiting for the person to allow this app's agent (OctoSense asks the first time)`. |
+| `matrix.*` | 45, such as `matrix.read_messages`, `matrix.room_members`, `matrix.send_message` | One Matrix operation each, on the person's current account, in the rooms they allow. | No OctoSense host service serves them. Unverified: Rinx, a native app OctoSense ships, serves them to bundles imported into it. |
+| `palpo.*` | 29, such as `palpo.projects.list`, `palpo.inbox.decide` | One Palpo administration operation each. | Not yet: nothing in OctoSense serves them. |
+
+Source: the store's words for each name are in
+`crates/app-policy/src/services.rs` and `crates/app-contract/src/palpo.rs`.
+
+### Ids and reserved names
+
+An id is 1 to 64 characters of `[a-z0-9.-]`, does not start with `.` and never
+contains `..`. The gate also refuses:
+
+- **Every id under `os.`.** Those belong to system apps that ship with the
+  device, and no store installs one.
+- **An id that is a reserved name, or whose last segment is one.** The host
+  keys an app's storage and consent by its id, and its tools by its namespace,
+  so `com.example.notes` would stand in for the native Notes app. There are 23
+  reserved names:
+
+| Reserved because | Names |
+| --- | --- |
+| Apps OctoSense ships as native apps | `apphub`, `appcard`, `browser`, `calculator`, `clock`, `notes`, `octoscode`, `reference`, `reminders`, `rinx`, `sheets`, `task`, `terminal`, `weather` |
+| Names the shell acts as or owns tools under | `agents`, `card`, `dev`, `octos`, `os`, `shell`, `system`, `toolbox`, `workflow` |
+
+```text
+[refused] identity: app id "com.example.notes" ends in "notes", which is reserved: its tools would be notes.*, a native app's or the host's
+```
+
+A system app's own namespace is not reserved: `com.example.news` is allowed.
+An app that ships `tools.json` needs a namespace of `[a-z0-9_]{1,24}`:
+`com.example.mynotes` can declare tools, and `com.example.my-notes` cannot.
+
+Source: `RESERVED_NAMES` in `crates/app-contract/src/manifest.rs`.
+
+### Network hosts
+
+Apart from `images` and `web`, an app reaches the network only with `net` and
+an exact host list. The runtime enforces the list on every path out of the
+isolate: the network module, artwork loading and data fetches. `net` with an
+empty list reaches nothing. Hosts match exactly: `example.com` does not allow
+`api.example.com`. Write bare host names, such as `api.example.com`, with no
+scheme, path, port or wildcard:
+
+```text
+[refused] policy: host "https://api.open-meteo.com/v1" must be a bare host name, with no scheme or path
+```
+
+### Storage and quotas
+
+| Field | Meaning |
+| --- | --- |
+| `storage.max_bytes` | The storage the app requests, in bytes. |
+| `storage.accounts` | `true` gives each account its own data folder and agent. The default is one `device` folder. |
+| `storage.agent_workspace` | `"account"` (the default): the agent reads the account's folder. `"none"`: the agent reads no files and works only through its tools. |
+| `storage.cache_max_bytes` | The space the app requests for `cache/`, in bytes; above 0. |
+| `compute.instruction_budget` | Script instructions per session, cumulative. |
+| `compute.memory_bytes` | The isolate's heap. |
+
+Quotas are requests. The host clamps each one to its ceiling, the host's
+maximum, and an absent value gets the ceiling. The `grants:` line of
+`hub check` shows the storage the app gets after clamping.
+
+| Ceiling | Value |
+| --- | --- |
+| Storage | 16 MiB |
+| Instructions per session | 20,000,000 |
+| Heap | 64 MiB |
 
 ### The research scope
 
 `research` and `crawl` share one scope, the manifest's top-level `research`
-object. Its schema is exactly octos's `octos_research::toolbox::Scope`
-(octos `crates/octos-research/src/toolbox.rs`), the single source of truth for
-an app's research permission: the gate checks it with the same rules as
-`Scope::from_grant`, pins it, and the host hands the same JSON to the toolbox
-(OctoSense `crates/toolbox/src/scope.rs` parses it). App Hub mirrors the
-struct in `crates/app-contract/src/research.rs` because the app contract links
-no octos code; the two change together.
+object. The gate checks it with octos's own rules, and the host hands the same
+JSON to the system toolbox.
 
 ```json
 {
@@ -200,165 +341,98 @@ no octos code; the two change together.
 
 | Field | Meaning | Rule |
 | --- | --- | --- |
-| `langs` | BCP-47 languages the app may search in | each a language tag (`en`, `zh-CN`, `zh-Hant`); normalised |
-| `regions` | ISO 3166-1 alpha-2 regions | two letters; upper-cased |
-| `domains_allow` | only these domains (and their subdomains) | a bare domain: `example.com`, `.example.com` or `*.example.com`; no scheme, path or port |
-| `domains_deny` | never these domains | as above |
-| `max_age_days` | the oldest material, in days back from now | a whole number of days |
-| `categories` | metasearch categories | `news`, `general`, `science`, `it`, `social` |
-| `max_results` | most results per search | above 0; default 20 |
-| `max_depth`, `max_pages` | the `crawl` limits: link depth and pages of one crawl | both above 0 with `crawl`; both 0 (or absent) without it |
+| `langs` | BCP-47 languages the app may search in. | A language tag such as `en`, `zh-CN` or `zh-Hant`; `zh_cn` becomes `zh-CN`. |
+| `regions` | ISO 3166-1 alpha-2 regions. | Two letters; upper-cased. |
+| `domains_allow` | Only these domains and their subdomains. | A bare domain: `example.com`, `.example.com` or `*.example.com`; no scheme, path or port. |
+| `domains_deny` | Never these domains. | As above. |
+| `max_age_days` | The oldest material, in days back from now. | A whole number of days. |
+| `categories` | Metasearch categories. | `news`, `general`, `science`, `it` or `social`. |
+| `max_results` | The most results per search. | Above 0; default 20. |
+| `max_depth`, `max_pages` | The `crawl` limits: link depth and pages of one crawl. | Both above 0 with `crawl`; both 0 or absent without it. |
 
-An empty list or an absent field means no limit, and `{}` is a scope with no
-limits (the store then says "Search the web in any language, from any time").
-Unknown fields are refused. The bare-domain rule is App Hub's and is stricter
-than octos, which compares patterns as strings: `https://example.com/` would
-match no site, so in `domains_deny` it would deny nothing the person was told
-it denies. A scope in the toolbox's old shape (`languages`,
-`allowed_domains`, `denied_domains`, `recency_hours`, and `max_pages` as
-articles per run) is refused with the fields to rename; it is not converted,
-because rounding hours up to days would widen the grant.
+An empty or absent list, or an absent `max_age_days`, means no limit. `{}`
+keeps only the defaults: 20 results a search and no crawl. Unknown fields are
+refused.
 
-The store shows the scope in plain words, derived from the manifest:
-
-| Scope | The store's privacy summary says |
-| --- | --- |
-| `research`, `{"langs":["en","zh"],"categories":["news"],"max_age_days":7}` | Searches news in English and Chinese, from the last 7 days |
-| `research`, `{}` | Searches the web in any language, from any time |
-| `research`, `{"langs":["zh-TW"],"regions":["TW"],"categories":["news","it"],"max_age_days":1,"domains_allow":["cna.com.tw"]}` | Searches news and technology in Chinese (TW), region TW, from the last day, only on cna.com.tw |
-| `crawl`, `{"max_depth":2,"max_pages":50}` | Crawls websites, following links up to 2 deep and reading up to 50 pages a crawl, on any site: this reaches more of the web than searching |
-| `crawl`, `{"domains_allow":["docs.rs"],"max_depth":1,"max_pages":10}` | Crawls websites, following links up to 1 deep and reading up to 10 pages a crawl, only on docs.rs: this reaches more of the web than searching |
-
-The person or the store may grant a narrower scope than the one requested;
-never a wider one.
-
-**Where these are served (2026-09-30, OctoSense `main` `7082ff5`, which pins
-App Hub `0f332112`):** the OctoSense shells serve `mail` and `model` to any
-app granted them (`model` since [OctoSense#95](https://github.com/OctoSense-org/OctoSense/pull/95), within the host's
-per-app budget), `glance` to any contained app granted it
-([OctoSense#86](https://github.com/OctoSense-org/OctoSense/pull/86)), and `llm` and `news` only to `os.` system apps.
-`card-host` serves none of them: a call there answers `no service answers
-"<family>" on this device`. No shell serves `research` or `crawl` to an app's
-agent yet: OctoSense links its toolbox (`crates/toolbox`) only with the
-`toolbox-peers` feature, which the shipped shells leave off
-([OctoSense#64](https://github.com/OctoSense-org/OctoSense/issues/64)).
-OctoSense pins this App Hub itself. Rinx, pinned by tagged release, no longer
-depends on App Hub (since v1.1.0): App Hub, the shells and Rinx all take the
-app contract from crates.io by version (`octosense-app-contract = "1"`,
-OctoSense [ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)),
-so a build links one copy of it and needs no `[patch]` to line them up.
-
-**Host services by exact name** (`crates/app-policy/src/services.rs`). A host
-that offers the Matrix account (Rinx) or the device's assistant (Octos) serves
-these to a bundle that requests them. Each name is its own consent, checked
-exactly: a prefix such as `octos.` or `matrix.`, or any name not listed here,
-is an unknown capability and the manifest is refused. Admission is not
-dispatch: the host also intersects the request with the services it supports,
-its policy and the person's per-instance grant (for Matrix, the rooms they
-allow), and checks that lease on every call. A host that does not offer a
-requested service shows the app as unavailable with the reason.
-
-**Where these are served (2026-09-30):** the OctoSense shells serve `octos.*`
-to contained apps where the shell hosts a kernel (not iOS). The first call
-waits for the person to allow the app's agent (`Waiting for the person to
-allow this app's agent (OctoSense asks the first time)`); after that the app
-talks to its own peer, `card.<app id>` ([OctoSense#106](https://github.com/OctoSense-org/OctoSense/pull/106),
-[#120](https://github.com/OctoSense-org/OctoSense/pull/120), [#184](https://github.com/OctoSense-org/OctoSense/pull/184); `OCTOSENSE_CONTAINED_APPS=1` asks nobody,
-`0` turns it off). Rinx's mini-app host serves `octos.*` and `matrix.*` to
-bundles a person imports into Rinx; no OctoSense shell serves `matrix.*` to a
-contained app. `card-host` serves neither: every call answers `no service
-answers "octos" on this device` (the dispatch in
-`crates/appstore/src/services.rs`). See OctoSense
-[architecture § Agents](https://github.com/OctoSense-org/OctoSense/blob/main/docs/architecture.md#2-agents).
-
-| Capability | Grants | The store says |
-| --- | --- | --- |
-| `octos.session.open` | Open the app's own conversation with the host's assistant. The host binds it to this app and the current account; the app never names a profile, provider or workspace. | Open its own conversation with the assistant |
-| `octos.session.history` | Read that conversation's history. Does not allow starting a turn. | Read its own conversations with the assistant |
-| `octos.turn.start` | Send a request the assistant works on, under the host's AI settings and tool limits. The model provider and its keys stay with the host. | Ask the assistant to work for it, using the device's AI settings |
-| `octos.turn.interrupt` | Stop a turn this app started. | Stop assistant work it started |
-| `matrix.*` (45 names) | One Matrix operation each, on the person's current account, in the rooms they allow: reads such as `matrix.read_messages`, `matrix.room_members`, `matrix.profile`; actions such as `matrix.send_message`, `matrix.react`, `matrix.join`. The exact list is `KNOWN_CAPABILITIES`. | One plain line per name, for example "Read messages in rooms you allow" |
-
-Sending room data to the assistant needs both the Matrix read grant and the
-assistant grant. No `octos.*` service chooses a model provider, submits a key
-or reaches the kernel's raw protocol.
-
-
-**Network**: `net` plus an exact host list. The list is enforced on every path
-out of the isolate: the network module, artwork loading and data fetches. An
-empty list with `net` reaches nothing. Hosts match exactly: listing
-`example.com` does not allow `api.example.com`.
-
-**Id**: `[a-z0-9.-]{1,64}`, not starting with `.`, never containing `..`.
-Ids under `os.` are reserved for system apps. Neither the id nor its last
-segment may be a native app's id or one of the host's own names (the list is
-in the gate table above, and in app-policy's `RESERVED_NAMES`).
-
-**Storage** (the same block as OctoSense's `native-apps.json`, ADR 0004 §11):
-`max_bytes` (the jail's ceiling), `accounts` (`true`: data and one agent per
-account; default one `device` folder), `agent_workspace` (`account`, the
-default: the agent reads the account's folder; `none`: tools only) and
-`cache_max_bytes` (a positive ceiling for `cache/`). `external` (a path
-outside the jail) is for reviewed native apps only and is refused here, like
-any unknown field.
-
-**Quotas** are requests; the host clamps them to its ceilings (storage 16 MB,
-20 000 000 instructions, 64 MB heap). Ask for less than the ceiling when you can.
-
-**Agent** is optional; omit it and the app gets no assistant. `profile` is one
-of `read-only`, `workspace-write`, `workspace-write-never-ask`. Full access does
-not exist in this schema; do not add it. `tools` may name only what the host
-offers contained apps: `ledger.read`, `ledger.write`, `net.fetch`,
-`storage.read`, `storage.write`, `card.render`, and one octos kernel tool,
-`ask_user_question` (the agent asks the person a question on the device's own
-surfaces; it has no side effect of its own; the store says "Ask you
-questions"). No other kernel tool (shell, files, the web, memory, peers) may
-be named, whatever a host offers (`KERNEL_TOOLS` in
-`crates/app-policy/src/policy.rs`). Iterations clamp to 8, tokens
-to 200 000. The agent's workspace is the app's own storage jail and its hosts are
-the app's hosts; it cannot be given more than the app. The agent's own
-tools, instructions, skills, model requirements and triggers are below.
+The store shows the scope in plain words. For `research` with
+`{"langs":["en","zh"],"categories":["news"],"max_age_days":7}`, the store's
+privacy summary ([The listing](#the-listing)) says "Searches news in English
+and Chinese, from the last 7 days".
 
 ## The app's agent and tools
 
-> **Status (2026-09-30):** the gate admits, checks and pins everything in this
-> section, and the store shows its lines. The OctoSense shells (`main`
-> `7082ff5`, which pins App Hub `0f332112`) give an app that declares an
-> `agent` or `octos.*`, or ships `tools.json`, its own peer once the person
-> allows it: they load the bundle with `AgentBundle::load`, register its
-> `tools.json` tools with the peer (the kernel side is
-> [octos#2567](https://github.com/octos-org/octos/pull/2567), merged), keep
-> the generic `agent.tools` names this gate admits (`ask_user_question`), run
-> `implemented_by: "host-service"` tools on the app's own host services, and
-> let the person talk to the agent in the shell's "Ask <app>" panel
-> ([OctoSense#145](https://github.com/OctoSense-org/OctoSense/pull/145), [#184](https://github.com/OctoSense-org/OctoSense/pull/184)). Not yet: `AGENT.md` and
-> `skills/` are not installed into the peer, `model` and `tier` choose no
-> model, triggers and `background` do not fire, and `implemented_by: "app"`
-> tools are refused (OctoSense
-> [ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0002-event-driven-app-agents.md)
-> is still Proposed, amended by ADR 0004). A field newer than the shells' App
-> Hub pin is refused there until the pin moves (the "host older than them"
-> below).
+An app can ship an agent of its own: its tools in `tools.json`, its
+instructions in `AGENT.md` and data-only skills under `skills/`, declared by
+the manifest's `agent` block. Every file is under the bundle digest, so the
+agent that runs is the one that was reviewed. The store calls this agent the
+app's assistant.
 
-An app that wants an assistant of its own (ADR 0002 §3, §4) ships it in the
-bundle. Every file is under the bundle digest, so the agent that runs is the
-one that was reviewed; a shell loads it with `AgentBundle::load`
-(`crates/app-policy/src/agent.rs`), which refuses a bundle whose digest does
-not match and everything the gate refuses.
+### The manifest's `agent`
 
-`tools.json` is the one tool manifest for every app. A native module ships the
-same file as a module resource, pinned by the shell build. The app-peers broker
-(OctoSense `crates/app-peers`) loads it with
-`ToolManifest::load(json, <module id>, ToolHost::Native, local_only)`, which
-runs the same checks, and builds its `ToolDef`s from it. The module's Rust code
-only implements executors keyed by tool name. For a native module the
-namespace is the module id; for a contained app it is the last segment of the
-app id. The risk levels are the broker's, so one approval gate serves both.
+```json
+"agent": {
+  "profile": "workspace-write-never-ask",
+  "tools": [],
+  "max_iterations": 8,
+  "token_budget": 120000,
+  "model": {
+    "needs": ["tool_calling", "long_context"],
+    "tier": "standard",
+    "per_task": { "triage": { "needs": ["tool_calling"], "tier": "fast" } }
+  },
+  "background": true,
+  "triggers": { "schedule": ["0 7 * * *", "0 19 * * *"], "events": ["news.items.new"] },
+  "instructions": "AGENT.md",
+  "skills": ["news-digest"]
+}
+```
 
-The News example, complete, is
-[`crates/app-policy/tests/fixtures/news-agent`](../crates/app-policy/tests/fixtures/news-agent).
+| Field | Meaning | Refused when |
+| --- | --- | --- |
+| `profile` | The agent session's permissions: `read-only` (every write asks first), `workspace-write` (reads and writes its workspace; anything else asks) or `workspace-write-never-ask` (the same, but anything else is refused without asking). No profile grants full access. | Any other value (`manifest is not valid`). |
+| `tools` | Generic host tools (`ledger.read`, `ledger.write`, `net.fetch`, `storage.read`, `storage.write` and `card.render`) and one kernel tool, `ask_user_question`. The app's own tools come from `tools.json`; the agent gets both and nothing else. | A kernel tool other than `ask_user_question`, or a name the host does not offer. |
+| `max_iterations`, `token_budget` | The most model iterations and tokens per request, clamped to 8 iterations and 200,000 tokens. | |
+| `model` | What the agent needs from a model, never a provider or model name. `needs` lists any of `tool_calling`, `vision`, `long_context`, `reasoning`, `structured_output` and `multilingual`; `tier` is one of `fast`, `standard` or `strong` (default `standard`); `local_only` for data that must not leave the person's devices (app-wide; a task cannot relax it); `per_task` for named tasks that `AGENT.md` refers to. | An unknown need or tier (`manifest is not valid`); more than 8 `per_task` entries; a task name that is not `[a-z_]{1,32}`. |
+| `background` | A request to run while the app is closed. The person grants it per app. | `true` without triggers. |
+| `triggers.schedule` | Five-field cron, in local time. | Not five fields of digits and `* , / -`; more than 16 entries. |
+| `triggers.events` | The app's own host-service events, in its namespace (`news.items.new`). | An event outside the app's namespace; more than 16 entries. |
+| `instructions` | The agent's instructions, conventionally `AGENT.md`. | Not a `.md` path in the bundle. |
+| `skills` | The skills to load, by directory name under `skills/`. | More than 16 skills, or one named twice. |
+
+The agent's workspace is the app's own storage folder, and the agent reaches
+only the app's hosts. It never gets more than the app has.
+
+### An app with `tools.json` has an agent
+
+OctoSense offers "Ask &lt;app&gt;" for any app that ships `tools.json`, even one with
+no `agent` block. `hub check` still prints `agent none` for it, because the
+`grants:` line reports only the manifest's `agent` block. What the store's
+privacy summary says about such an app depends on the App Hub revision the
+store was built from:
+
+| Store | Privacy summary for `tools.json` without `agent` |
+| --- | --- |
+| A store built from App Hub `main` | "Offers the host's Ask assistant for its admitted tools, only after you consent. Your conversation and tool results may be sent to your configured AI provider." and "No app-declared background assistant or automatic triggers." |
+| The store in OctoSense desktop 0.1.0-beta.2 | "Runs no assistant." |
+
+Each OctoSense build shows the summary of the App Hub revision it pins. An app
+with neither `agent` nor `tools.json` gets "Runs no assistant." in every store,
+and an app that declares `agent` gets "Runs an assistant limited to this app's
+own data."
+
+The reference app GitHub Notes shows the difference. Version 0.1.0 ships three
+tools with `"agent": null`: `hub check` prints `agent none`, and the store in
+OctoSense desktop 0.1.0-beta.2 says "Runs no assistant." Version 0.1.1
+declares a `read-only` `agent` block: `hub check` prints `agent read-only`,
+and every store says "Runs an assistant limited to this app's own data."
+
+If you ship `tools.json`, also declare `agent`, and disclose the agent in the
+privacy policy. If the app should have no agent, ship no `tools.json`.
 
 ### `tools.json`: the app's tools
+
+From the [News example](../crates/app-policy/tests/fixtures/news-agent),
+abridged:
 
 ```json
 {
@@ -396,91 +470,97 @@ The News example, complete, is
 
 | Field | Meaning |
 | --- | --- |
-| `name` | `<namespace>.<tool>`, the namespace being the last segment of the app's id (`os.news` and `dev.example.news` are both `news`). Segments are `[a-z0-9_]`; the broker sees the rest with dots as underscores (`topics_get`, at most 32 characters). |
-| `description` | What it does and when to use it, for a model; at most 1024 characters. |
-| `input_schema`, `output_schema` | JSON Schema, this subset only: `type title description properties required items enum const default minimum maximum minLength maxLength minItems maxItems additionalProperties format pattern`. No `$ref`, no `anyOf`/`oneOf`/`allOf`, no conditionals. The input is an object. |
-| `risk` | `read` (looks), `act` (changes the app's own state) or `destructive` (sends, posts, shares, buys, deletes: anything past the app). Required. The broker's `Read`/`Act`/`Destructive` spelling is accepted. |
-| `background` | May run in a run the person did not start. Default false. |
-| `shareable` | Other callers (the system agent, other apps' agents, the person's assistant) may be granted it. Default false. |
-| `private_data` | The result carries the person's private data. A shareable tool of a `local_only` app must say `false`. |
-| `implemented_by` | `host-service` (the app's native host service, which holds data, devices, network or secrets) or `app` (the app's own script, for tools that only reshape its data). |
-| `outward` | The call reaches outside the device (sends, posts, shares). It then waits for the person like a destructive one. Default false; refused on a `read` tool. |
-| `auto_approvable` | A standing rule ("allow for an hour") may approve a call. Say `false` for permanent deletion, payments, sharing outside the device, account and security changes: each call then needs the person live. Default true. |
-| `confirm` | Who asks the person before a destructive or outward call: `host` (the default: the host's approval path) or `app` (the app's own confirmation sheet). Independent of `risk`, and never inferred from it. `app` is allowed only for a tool the app implements itself (`implemented_by: "app"`) or a native module's tool. |
+| `name` | `<namespace>.<tool>`. The namespace is the last segment of the app's id: `news` for both `os.news` and `dev.example.news`. Each segment is `[a-z0-9_]`. OctoSense's tool broker, which registers and dispatches app tools, spells the part after the namespace with underscores for dots (`news.topics.get` becomes `topics_get`). The gate refuses a broker name over 32 characters. |
+| `description` | What the tool does and when to use it, for a model. 1 to 1024 characters. |
+| `input_schema`, `output_schema` | JSON Schema, with only these keywords: `type`, `title`, `description`, `properties`, `required`, `items`, `enum`, `const`, `default`, `minimum`, `maximum`, `minLength`, `maxLength`, `minItems`, `maxItems`, `additionalProperties`, `format` and `pattern`. No `$ref`, no `anyOf`, `oneOf` or `allOf`, and no conditionals. At most 8 KiB and 8 levels deep. The input is an object. |
+| `risk` | `read` (only reads), `act` (changes the app's own state) or `destructive` (sends, posts, shares, buys, deletes: anything past the app). Required. The tool broker's `Read`, `Act` and `Destructive` spellings are accepted. |
+| `background` | The tool may run in a turn the person did not start. Default `false`. |
+| `shareable` | Callers other than the app's own agent may be granted it, such as OctoSense's system agent (the device-wide agent the person talks to) and other apps' agents. Default `false`. |
+| `private_data` | The result carries the person's private data. A shareable tool of a `local_only` app must say `false`; a `host_method` tool must say `true`. |
+| `implemented_by` | `host-service`: a host service runs it. `app`: the app's own script runs it. Required. |
+| `host_method` | A reviewed shared-service method the tool runs on ([Map a tool to a shared service](#map-a-tool-to-a-shared-service-host_method)). Optional. |
+| `outward` | Set it on an `act` tool whose call reaches outside the device (sends, posts, shares). Each call then waits for the person, as a destructive call does. Default `false`; refused on a `read` tool. |
+| `auto_approvable` | A standing rule ("allow for an hour") may approve a call. Default `true`. Say `false` for deletion, payments, account or security changes and sharing outside the device, so the person approves each call as it happens. |
+| `confirm` | Who asks the person before a destructive or outward call: `host` (the default, the host's approval path) or `app` (the app's own confirmation screen). `app` is allowed only for a tool the app implements itself. |
 
-**Whether a call needs the person comes from the risk and `outward`; whose
-surface asks comes from `confirm`.** Read and act run unattended. A destructive
-tool, and an outward one, always waits for the person:
+### Map a tool to a shared service: `host_method`
+
+A `host_method` routes a tool to a reviewed method of a shared host service,
+written `family.method`: the family is the service, such as `github` in
+`github.read`. The tool keeps its own name in the app's namespace, and the
+call runs as the app. The reference app [GitHub Notes](SUBMITTING.md#the-three-reference-apps)
+maps its `githubnotes.read` tool to `github.read`:
+
+```json
+{
+  "name": "githubnotes.read",
+  "risk": "read",
+  "private_data": true,
+  "implemented_by": "host-service",
+  "host_method": "github.read",
+  "…": "…"
+}
+```
+
+The gate refuses a `host_method` unless every rule holds:
+
+| Rule | Refusal |
+| --- | --- |
+| The tool says `implemented_by: "host-service"`. | `host_method is only valid for implemented_by "host-service"` |
+| The value is `family.method`, with `[a-z0-9_]` segments, at most 96 bytes. | `host_method must be family.method with nonempty [a-z0-9_] segments, at most 96 bytes` |
+| No segment is `sheet`. | `host_method cannot target a host sheet or approve an action` |
+| The method is in the table below. | `host_method "<m>" is not in the reviewed shared-service tool contract` |
+| The tool's `risk` is at least the method's minimum. | `host_method "<m>" requires at least <risk> risk` |
+| The tool says `"private_data": true`. | `shared-service tools must declare private_data: true` |
+| The manifest declares the method's family as a capability, or the exact method. | `host_method "<m>" requires the declared "<family>" service capability` |
+
+| Family | Methods, minimum risk `read` | Methods, minimum risk `act` |
+| --- | --- | --- |
+| `github` | `github.repositories`, `github.files`, `github.read` | |
+| `gcalendar` | `gcalendar.calendars`, `gcalendar.sync`, `gcalendar.refresh`, `gcalendar.cached`, `gcalendar.get`, `gcalendar.prepare` | |
+| `gmail` | `gmail.labels`, `gmail.messages`, `gmail.message`, `gmail.draft.get`, `gmail.event.status` | `gmail.draft.open`, `gmail.draft.edit`, `gmail.event.decide` |
+| `glance` | `glance.list` | `glance.publish`, `glance.withdraw` |
+
+Provider writes, sign-in, reviews and approvals have no `host_method`: the
+person starts them from the app's own screen.
+
+For a tool mapped to `glance.publish`, let `input_schema` accept only
+`template` with `initial`, or an L0 `source` with `data`. Never accept
+`script`. OctoSense desktop 0.1.0-beta.2 publishes an agent's script card
+under the app's own policy, so a model-written `script` runs as your app.
+OctoSense `main` (in no release yet) refuses it with
+`Agents cannot publish executable Splash; choose an admitted template with initial data, or L0 source`,
+and refuses an L1 `source` too.
+
+Source: `SHARED_HOST_METHODS` in `crates/app-policy/src/agent.rs`.
+
+### Who confirms a call
+
+`risk` and `outward` decide whether a call needs the person; `confirm` decides
+whose surface asks. Read calls, and act calls without `outward`, run
+unattended. A destructive or outward call runs only after the person approves
+it, live or through a standing rule:
 
 | `risk: "destructive"` (or `outward: true`) with | Person present | Person absent |
 | --- | --- | --- |
 | `confirm: "host"` (default) | The host's approval path asks. | An approval request in the app's conversation. |
-| `confirm: "app"` | The app's own confirmation sheet is the only confirmation (for example Rinx's `send_message`); the host does not ask again. | An approval request in the app's conversation. |
+| `confirm: "app"` | The app's own confirmation screen is the only confirmation (for example Rinx's `send_message`). The host does not ask again. | An approval request in the app's conversation. |
 
 The person is never asked twice for one call. A destructive tool may still say
-`background: true`: the gate records a warning, and the tool only runs after
-approval. `confirm: "app"` on a tool that is neither destructive nor outward confirms nothing,
-and the gate warns about it. The gate report, the review packet and the store
-lines all state whose confirmation each destructive tool uses.
-
-An app may ship `tools.json` without an agent: its tools then serve other
-callers, such as the person's assistant, but no agent of its own.
-
-### The manifest's `agent`
-
-```json
-"agent": {
-  "profile": "workspace-write-never-ask",
-  "tools": [],
-  "max_iterations": 8,
-  "token_budget": 120000,
-  "model": {
-    "needs": ["tool_calling", "long_context", "multilingual"],
-    "tier": "standard",
-    "local_only": false,
-    "per_task": {
-      "triage": { "needs": ["tool_calling"], "tier": "fast" },
-      "synthesis": { "needs": ["tool_calling", "reasoning", "long_context"], "tier": "strong" }
-    }
-  },
-  "background": true,
-  "triggers": { "schedule": ["0 7 * * *", "0 19 * * *"], "events": ["news.items.new"] },
-  "instructions": "AGENT.md",
-  "skills": ["news-digest"]
-}
-```
-
-- `tools` stays the generic host tools (above). The app's own tools come from
-  `tools.json`; the agent gets both and nothing else.
-- `model` states needs, never a provider or model name: `needs` from
-  `tool_calling vision long_context reasoning structured_output multilingual`,
-  `tier` one of `fast standard strong` (default `standard`), `local_only` for
-  data that must not leave the person's devices (app-wide; a task cannot relax
-  it), and `per_task` for named tasks (`[a-z_]{1,32}`, at most 8) that
-  `AGENT.md` refers to. The host picks a model from the person's providers.
-- `background` asks to run while the app is closed. It is a request: the
-  person grants it per app, and it requires `triggers`.
-- `triggers.schedule` is five-field cron in local time; `triggers.events` are
-  the app's own host-service events, in its namespace (`news.items.new`).
-- `instructions` names the agent's instructions (`AGENT.md`); `skills` names
-  each `skills/<name>/` directory. Undeclared agent files are refused.
-
-These fields are optional additions to schema 1. A manifest without them
-reads, and signs, exactly as before; a host older than them refuses a manifest
-that uses them (unknown fields are refused), which is the safe direction.
+`background: true`: the gate records a warning, and the tool runs only after
+approval. `confirm: "app"` on a tool that is neither destructive nor outward
+confirms nothing, and the gate warns about it.
 
 ### `AGENT.md` and skills
 
 `AGENT.md` is the agent's role and instructions: what to do on each trigger,
-what matters in the app's data, the rubric for its output, and its rules for
-memory. Text only (32 KB, UTF-8, no HTML scripts or `#!`); the system agent may
-add a local overlay but never edits it.
+what matters in the app's data, the rubric for its output and its rules for
+memory.
 
-A skill is an octos skill directory with `SKILL.md` and `manifest.json`,
-installed into this app's peer workspace only. For a contained app it is data
-only: its manifest holds `name` (its directory), `version`, `description`,
-`uses` (the tools it calls, each one of the app's tools or in `agent.tools`)
-and optionally `prompts.include`; `.md`, `.json` and `.txt` files only.
+A skill is an octos skill directory with `SKILL.md` and `manifest.json`. For a
+store app it is data only: the skill's `manifest.json` holds `name` (its directory),
+`version`, `description`, `uses` (the tools it calls, each one of the app's
+tools or in `agent.tools`) and optionally `prompts.include`.
 
 ```json
 {
@@ -491,306 +571,347 @@ and optionally `prompts.include`; `.md`, `.json` and `.txt` files only.
 }
 ```
 
+### Rules for agent files
+
+The gate refuses these under the check `tools`, `agent` or `skills`:
+
+| File | Refused when |
+| --- | --- |
+| `tools.json` | The file is over 64 KiB or declares no tools or more than 64; a tool is outside the app's namespace; the namespace is not `[a-z0-9_]{1,24}`; a name is duplicated; two names share a broker name; a broker name is over 32 characters; a tool lacks `name`, `description`, `input_schema`, `output_schema`, `risk` or `implemented_by`; a field is unknown; a schema uses a keyword the `input_schema` row does not list; a host-service tool says `confirm: "app"`; a `read` tool says `outward`; a shareable tool of a `local_only` app lacks `"private_data": false`; a `host_method` breaks its rules. |
+| `AGENT.md` | `agent.instructions` does not name it; the text is empty, over 32 KiB, not UTF-8, holds control characters, starts with `#!` or contains `<script`, `<iframe`, `<object`, `<embed`, `javascript:`, `vbscript:` or `data:text/html`. |
+| `skills/<name>/` | `agent.skills` does not name it; its manifest declares executable fields (`tools`, `binaries`, `sha256`, `mcp_servers`, `hooks`, `hardware_lifecycle`, `tool_discovery`, `actions` or `make_type`); it holds a file other than `.md`, `.json` or `.txt`, or a symlink; the manifest's `name` differs from the directory; a `uses` entry is neither one of the app's tools nor in `agent.tools`. |
+| `AGENT.md` or `skills/` | The manifest has no `agent` block. |
+
 ### What the store shows
 
-Derived from the manifest and `tools.json`, beside the other permissions:
+The store derives lines like these from the manifest and `tools.json`, and
+shows them beside the other permissions before install:
 
+- "Run an assistant for this app, only after you allow it" (`agent`)
+- "Its assistant can use these app tools: news.list, news.read" (the tools in
+  `tools.json` of an app that declares `agent`)
+- "Its assistant requests these additional tools: net.fetch" (`agent.tools`
+  other than `ask_user_question`)
 - "Its assistant may work while the app is closed, on a schedule and when new
-  data arrives; only if you allow it, and you can turn it off."
-- "Can ask to mail.send: nothing of this runs until you approve it." (host
-  confirmation)
-- "Asks you on its own screen before rinx.send_message; when you are away, it
-  waits for your approval in the app's conversation." (`confirm: "app"`)
+  data arrives; only if you allow it, and you can turn it off." (`background`)
+- "Can ask to mail.send: nothing of this runs until you approve it." (a
+  destructive or outward tool that the host confirms)
 - "You approve every call of pay.transfer yourself: no standing rule can."
   (`auto_approvable: false`)
-- "Offers news.list to other assistants you allow." (and, for a shareable tool
-  with `private_data: true`, that it can pass private data)
-- "Its assistant uses only models that run on your own devices."
+- "Offers news.list to other assistants you allow." (`shareable`)
 
-The catalog entry carries the reviewed `tools.json` so a store can show these
-before install; the review packet carries the agent files with a question on
-them.
+The store in OctoSense desktop 0.1.0-beta.2 shows one line in place of the
+first three: "Run an assistant for this app (&lt;tools&gt;), inside this
+app's own data only", where &lt;tools&gt; lists only `agent.tools`. An app
+whose tools are all in `tools.json` therefore gets "Run an assistant for this app
+(no tools), inside this app's own data only".
+
+### What OctoSense runs today
+
+On OctoSense desktop 0.1.0-beta.2, each part works as follows:
+
+| Part | Today |
+| --- | --- |
+| Talking to the agent | The shell's "Ask &lt;app&gt;" panel, once the person allows the app's agent. OctoSense asks at first use. `card-host` runs no agent. |
+| Tools with `implemented_by: "host-service"` | Run as the app on the host service of their namespace, or of their `host_method`. The manifest must grant that family. A tool call never raises a sheet. |
+| Tools with `implemented_by: "app"` | Not yet: a call fails with `app_tool_unavailable`. |
+| `AGENT.md` and skills | Loaded as guidance for every turn. They grant no tools. |
+| `agent.tools` | `ask_user_question` works. Not yet: an executor for `ledger.read`, `ledger.write`, `net.fetch`, `storage.read`, `storage.write` or `card.render`. |
+| `background` and `triggers.events` | Only the event `<namespace>.new_message`, for an app granted `gmail` and `auth`, with `background: true`, after the person allows its agent. |
+| `triggers.schedule` and other events | Not yet. |
+| `agent.model` | Not yet: OctoSense ignores it. |
+| Glance cards from the agent | Any card the app may publish, a `script` card included. |
+
+OctoSense `main` (in no release yet) changes three things:
+
+- A tool call that publishes a Glance card (`glance.publish`, directly or
+  through `host_method`) accepts only a template with an `initial` object, or
+  L0 `source`. It refuses `script` and L1 source with the error kind
+  `unsafe_card_source`.
+- Approving a GitHub or Google Calendar save takes a physical press
+  ([Connected accounts](#connected-accounts)).
+- The host keeps Google Calendar events from 30 days back to 366 days ahead.
 
 ## The listing
 
 `listing.json` is what a person sees in the store before installing. It is
-reviewed with the bundle and travels in the signed catalog, so what a
-reviewer read is what the store shows. The permissions shown beside it come
-from the manifest, never from here: a listing cannot understate what the app
+reviewed with the bundle and travels in the signed catalog, so what a reviewer
+read is what the store shows. The permissions shown beside it come from the
+manifest, never from the listing, so a listing cannot understate what the app
 does.
 
-```json
-{
-  "schema": 1,
-  "subtitle": "One line under the name (80 characters)",
-  "description": "What the app does, for a person deciding whether to install it (4000 characters).",
-  "category": "photo-video",
-  "keywords": ["camera", "viewfinder"],
-  "screenshots": ["screenshots/01-photo-mode.png"],
-  "icon": "assets/icon.svg",
-  "platforms": ["macos", "android", "linux"],
-  "publisher": {
-    "name": "Your name or organisation",
-    "support": "https://github.com/you/my-app/issues",
-    "privacy_policy_url": "https://github.com/you/my-app/blob/main/PRIVACY.md"
-  },
-  "release_notes": "What changed in this version.",
-  "age_rating": "all",
-  "license": "Apache-2.0"
-}
-```
+| Field | Rule |
+| --- | --- |
+| `schema` | `1`. |
+| `subtitle` | At most 80 characters. |
+| `description` | Not empty; at most 4000 characters. |
+| `category` | One of `productivity`, `utilities`, `photo-video`, `news`, `weather`, `travel`, `finance`, `health`, `education`, `entertainment`, `games`, `social`, `shopping`, `lifestyle` or `developer`. |
+| `keywords` | At most 10. |
+| `screenshots` | 1 to 8 paths to PNG or SVG files in the bundle. Use real captures of the running app ([Capture the screenshots](SUBMITTING.md#4-capture-the-screenshots)). |
+| `icon` | The path to a square PNG or SVG in the bundle ([App icons and bundled artwork](ICONS.md)). A PNG icon is at most 1 MiB and 1024 px a side. Use the same icon in the launcher. |
+| `platforms` | At least one of `android`, `ios`, `macos`, `windows`, `linux`, `openharmony` or `web`. List only platforms you tested. |
+| `publisher.name` | Not empty. |
+| `publisher.support` | A URL or an email address. |
+| `publisher.privacy_policy_url` | An `https://` URL. |
+| `release_notes` | What changed in this version. |
+| `age_rating` | `all`, `12+`, `16+` or `18+`. |
+| `license` | An SPDX identifier, when the source is open. |
 
-Rules the gate enforces: `category` is one of `productivity utilities
-photo-video news weather travel finance health education entertainment games
-social shopping lifestyle developer`; `platforms` names at least one of
-`android ios macos windows linux openharmony web` (list what you tested; a
-bundle runs wherever the OctoSense shell does); `age_rating` is one of
-`all 12+ 16+ 18+`; `privacy_policy_url` is an https URL; every screenshot
-and the icon is a PNG or SVG inside the bundle; at most 10 keywords and 8
-screenshots; unknown fields are refused. An icon and at least one screenshot
-are required: the icon is what the launcher shows once the app is installed,
-and a screenshot is the one claim a reviewer can check against the running app.
-Use one app-owned canonical icon across store and launcher surfaces; see
-[ICONS.md](ICONS.md) for export limits, native rendering and small-size review.
-The two-field icon declaration used by a built-in native app is not a complete
-publishable listing.
+`subtitle`, `keywords`, `release_notes` and `license` are optional; every other
+field is required. Unknown fields are refused. The listing is part of the
+signed version: to change its text, publish a new version.
 
-To produce a screenshot, run an unsigned development bundle in the reference
-host, `MAKEPAD_REMOTE=8151 card-host --bundle my-app --allow-unsigned &`, then
-`curl 127.0.0.1:8151/g` (capture metadata, with the PNG's path) or
-`curl -o 01-main.png '127.0.0.1:8151/g?raw=1'` (the PNG bytes), and
-`curl 127.0.0.1:8151/quit`. Capture the actual app content at the host's
-current dimensions; do not assume a fixed crop. `card-host` verifies no
-publisher keys, so use an unsigned development copy before final signing. See
-the [card-host reference](DEVELOPMENT.md#running-a-bundle-locally-card-host),
-the [first-app walkthrough](FIRST-APP.md#4-run-the-unsigned-development-bundle-and-capture-it)
-and the [native testing guide](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md).
-
-The store also shows a **privacy summary derived from the manifest**: what
-the app stores, which hosts it contacts, which device features it uses,
-whether it runs an assistant. Do not restate it in the description; make
-the manifest right instead.
+The store also shows a **privacy summary**, derived from the manifest and, in a
+store built from App Hub `main`, the reviewed tools: what the app stores,
+which hosts it contacts, which device features it uses and whether it runs an
+agent ([An app with `tools.json` has an agent](#an-app-with-toolsjson-has-an-agent)).
+Do not restate it in the description; make the manifest right instead. You
+may still describe what your app agent sends, as GitHub Notes 0.1.1 does.
 
 ## Host services and sheets
 
-A script app does not hold sockets, credentials or devices it does not need.
-For work that needs them it calls a **host service**
-(`crates/appstore/src/services.rs`):
+A script app never holds a credential. For work that needs one, it calls a
+host service:
 
-```
+```splash
 host.request("mail.list", {…}, fn(r){ … })
 ```
 
-The isolate refuses the call unless the app's policy grants the family
-(`mail` for `mail.*`). A granted call goes to the Rust service registered for
-that family, which does the work and answers the app with data, never with
-the means. A family no service answers fails at once with
-`no service answers "<family>" on this device`; the reference `card-host`
-registers none.
+The isolate refuses the call unless the app's policy grants the family (`mail`
+for `mail.*`) or the exact service name. A granted call goes to the service
+the host registered for that family. The service does the work and answers
+with data, never with a credential or a connection. A call to a family that
+no service answers fails at once with `no service answers "<family>" on this device`;
+`card-host` registers no service. To see which shell serves which family, read
+Design Flow's
+[Host services](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md).
 
-**Apps never collect secrets.** Input only the person should give (a
-password, an account approval) is collected on a **sheet**: a host-owned
-surface the runner draws over the app, in an isolate of its own under no
-app's policy. Only a service can open one. Service methods that take a secret
-live under `<family>.sheet.` and are accepted only from that sheet, before any
-service sees the call. An app's own password fields take no input at runtime,
-and the gate refuses a bundle that declares one. Service state (accounts,
-secrets, caches) lives in `<app data>/.host`, outside every app's jail.
+### Sheets: apps never collect secrets
 
-Mail is the worked example: the
-[Mail bundle](https://github.com/OctoSense-org/OctoSense/tree/main/apps/mail/bundle)
-requests `mail`, and its
-[host service](https://github.com/OctoSense-org/OctoSense/tree/main/apps/mail/host-service)
-signs in on its own sheet. A store app can request `mail` only where the
-shell links a mail service.
+Input that only the person should give, such as a password or an account
+approval, goes on a **sheet**: a surface the host draws over the app, in an
+isolate of its own under no app's policy. Only a service can open one. Service
+methods that take a secret live under `<family>.sheet.` and are accepted only
+from that sheet. An app's own password fields take no input at runtime, and
+the gate refuses a bundle that declares one.
 
-**Every request settles.** A call answers exactly once, with the service's
-data or an error the app can act on:
+While a sheet is up, text, keys, IME input, the clipboard and pointer releases
+go only to the sheet; timers and service replies still reach the app. A host
+built from App Hub `main` keeps its own reference to the sheet, so an app
+widget named `sheet` cannot hide or replace it.
 
-- **Timeouts.** A call that waits longer than its service allows (60 seconds
-  unless the service asks for more) answers `the host service timed out`. The
-  clock stops while the service's sheet is up, because the person is still
-  typing, and it starts again when the sheet closes.
-- **Limits.** At most 32 calls from one app wait at a time. Further calls
-  answer `too many host requests are waiting` until some have answered.
-- **Sizes.** Arguments over 1 MiB are refused, and so is arguments text that
-  is not valid JSON. An answer over 4 MiB becomes an error.
-- **Closing.** When the app closes, its waiting calls end with it, and no late
-  answer reaches the next copy of the app.
+See Design Flow's
+[Mail, the worked example](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md#mail-the-worked-example).
 
-**The surface decides whether a sheet may appear.** An app in the foreground
-may have a service raise a sheet over it. The same app shown as a home-screen
-tile, or a call an assistant makes as a tool, may not: the service is told
-(`may_prompt` is false), and a sheet it raises anyway is refused with
-`this surface cannot raise a prompt; open the app to continue`. This does not
-depend on the `prompt` capability, which is about the app's own questions.
+### Connected accounts
+
+An app that works with GitHub or Google declares `auth` plus the provider
+capability it uses: `github`, `gcalendar` or `gmail`. The person signs in on a
+host sheet, and the app gets a connection handle, never a token. Writes go
+through a host review. Set `storage.accounts: true`, so that each account keeps
+its own data. For the hosts that serve these apps, see
+[Before you start](SUBMITTING.md#before-you-start); for the calls, see Design
+Flow's [Use a connected account](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.md#use-a-connected-account).
+
+What the host enforces depends on its build:
+
+| | OctoSense desktop 0.1.0-beta.2 | OctoSense `main` (in no release yet) |
+| --- | --- | --- |
+| Approving a Gmail send | A physical press on the native Approve & Send control | The same |
+| Approving a GitHub or Google Calendar save | The host's review sheet, which does not check that the press is physical | A physical press on the native Approve & Save control; script and agent requests cannot approve |
+| Google Calendar events the host keeps | The calendar's whole history | 30 days before today to 366 days after (UTC), with recurring events expanded |
+
+To identify the person without reading their data, declare `auth` alone and
+request only identity scopes: `read:user` for GitHub, or `openid`, `email` and
+`profile` for Google. `auth.connect` then returns a connection with the
+provider's `subject` and a display `label`, and grants no access to
+repositories, mail or calendars.
+
+Sign-in needs the provider's OAuth registration in the host:
+
+| Host | Registrations come from | Without one, `auth.connect` fails with |
+| --- | --- | --- |
+| OctoSense desktop 0.1.0-beta.2 | The host's `oauth/clients.json`, which the release does not ship | `OAuth is not configured. Add provider registrations in the host's oauth/clients.json` |
+| OctoSense `main`, not yet in any release | The distributor, at build time; an `oauth/clients.json` on the host replaces them | `GitHub sign-in is unavailable in this build. Check for an OctoSense update or contact its distributor.`, or the same for Google |
+
+### Sign in to your own backend
+
+OctoSense `main` can sign an app in to its own backend; no release includes
+this yet. Declare `auth` and set `storage.accounts: true`. Call
+`auth.connect` with `{"provider":"backend","scopes":["app.session"]}`, then
+`auth.backend.me` with the returned connection handle to get the backend's
+verified identity (`sub` and `label`). The person registers or signs in on the
+backend's own web page. On macOS and Android 9 or later, the host shows that
+page in its own web view, which stays on your login origin. On desktop, add
+`"presentation":"browser"` to the `auth.connect` arguments to use the system
+browser instead, as you must if the page sends the person to GitHub or another
+provider. Windows and Linux use the browser (unverified). iOS has no backend
+sign-in.
+
+What an app cannot do:
+
+- Register its backend. The host reads each app's backend registration from
+  the host's `oauth/backends.json`, which the device's operator writes. A
+  bundle cannot supply one, so a published app signs in only on devices whose
+  operator registered its backend
+  ([#16](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/16)).
+- Call its backend with the session. The app gets the verified identity,
+  never the backend's tokens, so the session authorizes no other requests.
+- Collect the password itself, or reuse the host's GitHub or Google tokens.
+
+The backend's side of the protocol is in OctoSense's
+[developer backend contract](https://github.com/OctoSense-org/OctoSense/blob/main/crates/oauth-service/README.md#developer-backend-contract).
+
+### Limits on host-service calls
+
+Each call gets exactly one answer: the service's data, or an error the app can
+act on.
+
+| Limit | Value | Otherwise the app gets |
+| --- | --- | --- |
+| Time to answer | 60 s, unless the service asks for more; paused while the service's sheet is up | `the host service timed out` |
+| Calls waiting per app | 32 | `too many host requests are waiting; try again when some have answered` |
+| Arguments | 1 MiB of valid JSON | `the request's arguments exceed 1 MiB`, or `the request's arguments are not valid JSON: …` |
+| Answer | 4 MiB | `the service's answer exceeds 4 MiB` |
+
+When the app closes, its waiting calls end with it, and no late answer reaches
+the app's next session.
+
+### Where a sheet may appear
+
+A service may raise a sheet only over an app in the foreground. For an app
+shown as a home-screen tile, or a tool call from an agent, the host sets
+`may_prompt` to `false` and refuses any sheet with
+`this surface cannot raise a prompt; open the app to continue`. The `prompt`
+capability does not change this.
 
 ## Commands
 
-The `hub` command is the same binary the hub itself runs, so the report you see
-locally is the report the hub acts on. Build it from this repository with
-`cargo build --release -p octosense-app-hub --bin hub`.
+`hub` runs the gate's own code, so its report is the one the Hub acts on.
+Build it as in Design Flow's
+[Quickstart](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md).
+Run `hub`, `hub help` or any command with `--help` or `-h` for the usage;
+none of them reads a bundle or writes a file. An unknown command fails with
+``hub: unknown command "<name>"; run `hub help` for usage``.
 
 | Command | What it does |
 | --- | --- |
-| `hub stamp <bundle>` | Parse `manifest.json` with the gate's own parser, then write the bundle's digest into it. Rerun after every change. A manifest the gate cannot read (an unknown field, a schema that does not parse) is refused here, before signing. A finding the gate would make about the *bundle* — a capability, a host, a listing that is not there yet — is still `check`'s: stamping comes first in the flow and has no signature policy to apply. |
-| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json]` | The gate. Prints PASSED or REFUSED, each finding (with the file or property at fault), and what the app will be granted; exits non-zero on a refusal. `--json` prints the same report as JSON (`schema`, `passed`, `findings`, `resources`) for tools. |
-| `hub scan <bundle> [--packet <out.json>] [--reviewer <cmd>]` | Stage two: the review packet (manifest, listing, grants, the entry's source, and the reviewer's questions), optionally handed to a reviewer command. Runs only on a bundle the gate passes. |
-| `hub keygen <key file>` | Make a signing key; prints its public half. |
-| `hub pubkey <key file>` | Print a key's public half. |
-| `hub sign-manifest <bundle> --key <key file> --key-id <publisher id>` | Sign the manifest, which covers the digest. |
+| `hub stamp <bundle>` | Parses `manifest.json` with the gate's parser, then writes the bundle's digest into `integrity.bundle_blake3` and prints it. Refuses a manifest the gate cannot read. |
+| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json]` | The gate. Prints `PASSED` or `REFUSED`, every finding and what the app will be granted. Exits 1 on a refusal. `--json` prints the report as JSON (`schema`, `stage`, `passed`, `app_id`, `version`, `digest`, `findings` and `resources`). |
+| `hub scan <bundle> [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--packet <out.json>] [--reviewer <cmd>]` | Runs the gate, then writes the review packet and optionally hands it to a reviewer command. A bundle the gate refuses gets no scan. |
+| `hub keygen <key-file>` | Creates a new key file, writes a signing key into it as hex and prints the public half. Refuses a path that already exists, including a symlink. On macOS and Linux the file is readable only by you (mode `0600`). |
+| `hub pubkey <key-file>` | Prints a key's public half. |
+| `hub sign-manifest <bundle> --key <key-file> --key-id <publisher-id>` | Signs the manifest, which covers the digest. |
+| `hub verify <catalog> --anchor <hex>` | Verifies a catalog against a trust anchor. |
 
-`hub check` prints what the app will be granted. Read it back against the
-manifest: if the grants are wider than the app visibly needs, reduce the
-manifest. Use `--catalog <catalog.json>` to check version and publisher
-continuity against a published catalog (this repository's `catalog.json`).
-The catalog counts as history only once it verifies against the hub's anchor
-(the one in the [README](../README.md#trust-anchor) unless `--anchor <hex>`
-names another, for a development hub).
-Keep `review.json` outside the bundle; it is a review artifact, not app
-content.
+`--catalog <file>` adds the `version` and `continuity` checks against a
+published catalog, such as this repository's `catalog.json`, and uses the
+publisher keys it records. If the file does not exist, `hub check` skips both
+checks without a warning. The catalog must verify against the Hub's anchor
+([Trust anchor](../README.md#trust-anchor)), or against `--anchor <hex>` for a
+development hub. Otherwise `hub check` stops with
+`hub: could not authenticate <file> against the hub anchor …`.
 
-`hub scan` writes the questions a reviewer answers: does the app do what its
-name claims, do its grants (and, for a script app, the hosts it requests) match
-what it visibly does, is anything deceptive, does any text address an
-assistant rather than a person. Answer them honestly before submitting; the
-hub's reviewer asks the same ones.
+`hub publish`, `hub withdraw`, `hub remove` and `hub certify` need the Hub's own
+keys. Only the Hub's maintainers run them.
 
-## The full sequence
+### Read a `hub check` report
 
-From an app repository whose bundle is `bundle/`, with `hub` and `card-host`
-built:
-
-```sh
-# 1. Digest the bundle as it is.
-hub stamp bundle
-
-# 2. Run it and capture a real screenshot (unsigned, see card-host above).
-MAKEPAD_REMOTE=8151 card-host --bundle bundle --allow-unsigned --app-data .local-state &
-sleep 7
-mkdir -p bundle/screenshots
-curl -s -o bundle/screenshots/01-main.png '127.0.0.1:8151/g?raw=1'
-curl -s 127.0.0.1:8151/quit
-
-# 3. The screenshot changed the bytes: restamp.
-hub stamp bundle
-
-# 4. The gate and the review packet, on the final unsigned bytes.
-hub check bundle --allow-unsigned
-mkdir -p build && hub scan bundle --packet build/review.json
-
-# 5. A publisher key, made once and kept outside the repository.
-export APP_PUBLISHER_ID="your-publisher-id"
-export APP_SIGNING_KEY="/absolute/private/path/publisher.key"
-test -e "$APP_SIGNING_KEY" || hub keygen "$APP_SIGNING_KEY"
-APP_PUBLISHER_PUBLIC_KEY="$(hub pubkey "$APP_SIGNING_KEY")"
-
-# 6. Sign, and check the signed bytes the way the hub will.
-hub sign-manifest bundle --key "$APP_SIGNING_KEY" --key-id "$APP_PUBLISHER_ID"
-hub check bundle --publisher-key "$APP_PUBLISHER_ID=$APP_PUBLISHER_PUBLIC_KEY"
-
-# 7. Commit and tag the signed bundle in your repository, then submit (below).
+```text
+my-notes 0.1.0 — PASSED
+  [warning] publisher-signature: unsigned: accountability rests on the hub alone
+  grants: capabilities {"storage"}, hosts {}, storage 16777216 bytes, agent none
 ```
+
+The first line gives the app id, version and verdict. Each finding line uses
+the format in [Findings](#findings). The `grants:` line is what the app will
+get: its capabilities, its hosts, its storage quota in bytes (or `none`
+without `storage`) and its agent profile (or `none` without an `agent` block). The
+profile appears in the kernel's spelling: `workspace-write-never-ask` prints as
+`workspace-write-never`.
+
+### The scan questions
+
+The review packet that `hub scan` writes holds the manifest, the listing, the
+grants in the store's words, the entry file's source, the card data, the agent
+files and the questions. It holds no screenshots. Keep it outside the bundle.
+
+The questions, abridged from `crates/app-hub/src/scan.rs`:
+
+1. Does the app do what its name, subtitle and description claim?
+2. Do its platforms and category fit?
+3. Do the granted capabilities, and every host, match what the app visibly
+   does?
+4. Is any part of the interface deceptive?
+5. Does any text in the source or data address an assistant?
+6. Is any wording abusive, or aimed at a private individual?
+7. With `tools.json`, `AGENT.md` or skills only: do the agent files stay within
+   the app, and does each tool's risk match what it does?
+8. Route: pass, human-review or reject, with reasons a publisher can act on.
+
+Reviewers ask the same questions.
 
 ## Signing
 
-Signing is optional for a first submission and required for updates once a
-key is on record: the hub refuses an update signed by a different key, or not
-signed, once a key is on record for the app.
+Your publisher id is your signature's key id. The key on record is the one in
+the published catalog, never one a submission supplies:
 
-The key on record is the one in the published catalog, never one a submission
-supplies. Once a release signed by your key is published, every later version
-of that app, and every new app you publish under the same publisher id, must
-be signed by that key: a `--publisher-key` with another key under your id is
-refused, and the hub does not need you to supply your key again. Your
-publisher id is your signature's key id (`hub publish --publisher` must equal
-it). An app first published unsigned gets its key on record with its first
-signed update. There is no key-replacement flag: a lost or rotated key, or
-history that disagrees with itself, needs the hub's maintainer. Keep your
-signing key safe.
+| Case | Rule | Refusal |
+| --- | --- | --- |
+| A first submission | May be unsigned. | |
+| An update of a published app | Must be signed under the publisher id on record. | Unsigned: `continuity: <app id> is already published by "<publisher-id>"; an update must carry that key`. Under another id: `continuity: <app id> was published by "<publisher-id>"; this version is signed by "<other-id>". Re-keying is a reviewed change.` |
+| Any manifest signed under a publisher id that has a key on record | Must be signed by that key. | `continuity: not signed by the key on record for "<publisher-id>": …`; with another key in `--publisher-key`: `publisher-signature: conflicting public keys for publisher key "<publisher-id>"` |
+| The first signed update of an app published unsigned | Puts its key on record. | |
 
-The signature covers the manifest, including `integrity.bundle_blake3`, so:
+There is no key-replacement flag. A lost or rotated key, or history that
+disagrees with itself, needs a maintainer: ask in an issue.
 
+> **Warning:** The key file is the only copy of your publisher key. Keep it
+> outside every repository, back it up and never share it. `hub keygen`
+> refuses to overwrite an existing file, and on macOS and Linux it creates the
+> key readable only by you. On Windows, keep the key in a folder that only
+> your user can read.
+
+The signature covers the manifest, including `integrity.bundle_blake3`. Follow
+these rules:
+
+- **Sign last.** `card-host`, and any host without a signature verifier,
+  refuses a signed bundle: `no signature verifier is installed, so the
+  signature from key "<id>" cannot be checked`. Capture screenshots and test
+  on the unsigned bundle, then stamp and sign.
 - **Stamp, then sign.** Signing an unstamped manifest signs the wrong digest.
-- **Any edit after signing means restamp and re-sign.** Changing any file
-  (a screenshot, the listing, one character of `main.splash`) makes
-  `hub check` refuse with `digest: the bundle hashes to …, the manifest
-  claims …`. Restamping alone then fails with `publisher-signature: the
-  signature from key "<id>" does not match the manifest`. Run `hub stamp`,
-  then `hub sign-manifest`, then `hub check --publisher-key` again.
-- A signed bundle checked without `--publisher-key` is refused, by design.
-- A new version needs a new `version` in the manifest; a published version is
-  never replaced.
+- **Stamp and sign again after any edit.** Changing any file other than
+  `manifest.json` makes `hub check` refuse with `digest: the bundle hashes to
+  …, the manifest claims …`. After `hub stamp` alone, `hub check` still
+  refuses, now with `publisher-signature: the signature from key "<id>" does
+  not match the manifest`. Changing `manifest.json` itself gives that second
+  refusal at once. Run `hub stamp`, then `hub sign-manifest`, then
+  `hub check --publisher-key` again.
+- **Check signed bytes with the key.** Unless `--catalog` already records
+  your key, `hub check` refuses a signed bundle without
+  `--publisher-key <id>=<hex>`, even with `--allow-unsigned`. `hub scan` takes
+  no `--allow-unsigned`: it accepts unsigned bundles, and a signed one needs a
+  key the same way.
+- **Keep the bytes exact.** The digest covers every file except
+  `manifest.json`: its path, length and bytes, with `/` between path segments
+  on every platform. Line-ending conversion changes it, so keep Git from
+  converting the bundle
+  ([Lay out the repository](SUBMITTING.md#1-lay-out-the-repository)).
 
 ## Submitting
 
-**What exists today.** The hub's published state is this repository,
-[OctoSense-org/OctoSense-App-Hub](https://github.com/OctoSense-org/OctoSense-App-Hub):
-`catalog.json` (the signed catalog stores read), `artifacts/` (the hub's
-copy of each admitted bundle) and `index/` (one entry per admitted version).
-The catalog and the artifacts are written by `hub publish`, which re-runs the
-gate (and the scan, with a reviewer), copies the bundle and signs a new
-catalog with the hub's working key; the maintainer adds the `index/` entry in
-the same commit. Publishers do not hold that key.
+Submit by opening an issue, never by a pull request that edits `catalog.json`,
+`index/` or `artifacts/` ([Submit an app to the App Hub](SUBMITTING.md)).
 
-**Not yet available.** There is no separate index repository and no
-`octosense-org/publish-app` GitHub action. Do not add a release workflow that
-uses them. When they exist, this section will say so and give the workflow.
+## After publication
 
-**The route maintainers accept now:**
-
-1. Push the signed bundle to your app's public repository and tag the commit
-   (for example `v1.0.0`).
-2. Open an issue in
-   [OctoSense-org/OctoSense-App-Hub](https://github.com/OctoSense-org/OctoSense-App-Hub/issues)
-   titled `Submit <app id> <version>`, giving:
-   - the repository URL, the tag and the full commit SHA;
-   - the bundle's path in that repository (usually `bundle/`);
-   - your publisher id and public key (`hub pubkey`), or "unsigned" for an
-     unsigned first submission;
-   - the complete output of `hub check` on that commit (with
-     `--publisher-key`), and your answers to the `hub scan` questions.
-3. Do not open a pull request that edits `catalog.json`, `index/` or
-   `artifacts/`. A catalog not signed by the hub's key is refused by every
-   store, and the admitted bytes must be the ones the gate checked.
-
-A maintainer checks out that commit, runs `hub check` and `hub scan` on the
-exact bytes, and, if both pass, runs
-`hub publish <bundle> --catalog catalog.json --publisher <id> --publisher-key <id>=<hex> --repo <url> --commit <sha> …`
-and commits the result. A first submission, or a scan that asks for human
-review, waits for a person. The issue is closed with the catalog sequence the
-app appeared in, or with the findings to fix.
-
-## What happens after
-
-- The hub keeps its own copy of the bundle and signs a new catalog. Every
-  OctoSense store verifies that catalog against an anchor it ships with, so a
-  catalog nobody signed is never shown.
-- The app runs in its own isolate with exactly the manifest's grants; a
-  request outside them fails with an error, and the person sees why.
-- An installed app runs as the release it is: the version installed, with
-  that version's grants. A newer version on offer is an update the person
-  may take; until they do, the installed version keeps opening.
-- The installed bundle is kept outside the app's storage
-  (`<app data>/.bundles/<id>/`, beside the app's own `<app data>/<id>/`),
-  so an app cannot write to it. Each launch still checks it against the
-  catalog (the manifest and the digest) and runs a copy of it; a bundle
-  that no longer matches is refused until the app is reinstalled.
-- A version can be withdrawn with a reason. Installed copies of that version
-  stop running on the device's next catalog fetch; other versions are not
-  affected. Publish a fixed version rather than arguing with a withdrawal.
-
-## Do not
-
-- Reference any server, CDN or local path from a card, or an undeclared host
-  from a script app. Bundle the asset.
-- Request `prompt`, `location`, `camera`, `microphone`, `clipboard`, `library`,
-  `images`, `web`, `mail`, `news`, `glance`, `model`, `research` or `crawl` unless a screen needs it (and never `llm`, which
-  serves only system apps); each is shown to the
-  person as a separate line.
-- Ask for a password, PIN or code in the app. A host service asks on its own
-  sheet.
-- Put instructions to an assistant in card text or data. The scan treats text
-  addressed to an assistant as a reason to reject.
-- Edit `integrity.bundle_blake3` by hand. Run `hub stamp`.
-- Reuse a version number.
+- **Versions.** An installed app runs the installed version, with that
+  version's grants. A newer version is an update the person may take; until
+  they do, the installed version keeps opening.
+- **Integrity.** The host keeps the installed bundle outside the app's
+  storage, so the app cannot write to it. Each launch checks it against the
+  catalog: the manifest, the digest and the publisher signature. A bundle that
+  no longer matches is refused until the person reinstalls the app.
+- **Withdrawal.** A withdrawn version stops running on each device's next
+  catalog fetch, and other versions keep working
+  ([After you submit](SUBMITTING.md#9-after-you-submit)).

@@ -1,0 +1,176 @@
+name: Submit an app
+description: Submit one app version for admission to the App Hub catalog.
+title: "Submit <app id> <version>"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Follow [the submission guide](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/SUBMITTING.md) ([简体中文](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/SUBMITTING.zh-CN.md)) before you open this issue.
+        Replace `<app id>` and `<version>` in the title, for example `Submit org.example.tipjar 0.1.0`.
+
+        Open one issue per version. To submit an update, open a new issue that links the old one; do not post the update as a comment on the old one.
+        Do not open a pull request that edits `catalog.json`, `index/` or `artifacts/`.
+
+  - type: input
+    id: app-id
+    attributes:
+      label: App id
+      description: "The `id` in `bundle/manifest.json`."
+      placeholder: org.example.tipjar
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "The `version` in `bundle/manifest.json`. Use a version the catalog does not list yet; a published version is never replaced."
+      placeholder: 0.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: repository
+    attributes:
+      label: Repository URL
+      description: The public repository that holds the tag.
+      placeholder: https://github.com/<you>/<app>
+    validations:
+      required: true
+
+  - type: input
+    id: tag
+    attributes:
+      label: Tag
+      description: "`v` followed by the version. Never move, delete or recreate it after you push it."
+      placeholder: v0.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: commit
+    attributes:
+      label: Full commit SHA
+      description: "The output of `git rev-parse \"<tag>^{commit}\"`, all 40 characters. For an annotated tag, `git rev-parse <tag>` alone prints the tag object."
+      placeholder: 40-character commit SHA
+    validations:
+      required: true
+
+  - type: input
+    id: bundle-path
+    attributes:
+      label: Bundle path
+      description: The bundle directory at the submitted commit.
+      value: bundle/
+    validations:
+      required: true
+
+  - type: input
+    id: bundle-digest
+    attributes:
+      label: Bundle BLAKE3 digest
+      description: "`integrity.bundle_blake3` in `bundle/manifest.json`, the value `hub stamp` printed."
+      placeholder: 64 hex characters
+    validations:
+      required: true
+
+  - type: input
+    id: publisher-id
+    attributes:
+      label: Publisher id
+      description: "Your publisher id: the `--key-id` you signed with, or, for an unsigned first version, the id you will sign updates with."
+      placeholder: your-publisher-id
+    validations:
+      required: true
+
+  - type: input
+    id: publisher-key
+    attributes:
+      label: Publisher public key
+      description: "The output of `hub pubkey <key-file>`. For an unsigned first version, write `unsigned`; every later version must be signed. Never paste the private key."
+      placeholder: 64 hex characters
+    validations:
+      required: true
+
+  - type: input
+    id: privacy-url
+    attributes:
+      label: Privacy policy URL
+      description: "The listing's `publisher.privacy_policy_url`, or the same file at the submitted commit. It must return HTTP 200."
+      placeholder: https://github.com/<you>/<app>/blob/<commit>/PRIVACY.md
+    validations:
+      required: true
+
+  - type: input
+    id: support
+    attributes:
+      label: Support contact
+      description: "The listing's `publisher.support`: a URL that returns HTTP 200, or an email address."
+      placeholder: https://github.com/<you>/<app>/issues
+    validations:
+      required: true
+
+  - type: textarea
+    id: platforms
+    attributes:
+      label: Platforms tested
+      description: Each platform the listing declares, with the host you ran the app on and what you tested there.
+      placeholder: |
+        macos: macOS on Apple silicon, card-host from App Hub <revision>, every screen driven by hand
+        macos: OctoSense desktop 0.1.0-beta.2, installed from a local catalog
+    validations:
+      required: true
+
+  - type: input
+    id: hub-revision
+    attributes:
+      label: App Hub revision the gate ran on
+      description: "The output of `git rev-parse HEAD` in the App Hub checkout your `hub` was built from. Use an unpatched build of `main`."
+      placeholder: 40-character commit SHA
+    validations:
+      required: true
+
+  - type: textarea
+    id: gate-output
+    attributes:
+      label: Gate output
+      description: "The complete output of the `hub check` you ran on a fresh clone of the pushed tag ([step 6 of the submission guide](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/SUBMITTING.md#6-freeze-and-verify-the-release))."
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: scan-answers
+    attributes:
+      label: Scan answers
+      description: "Every question in the review packet that `hub scan --packet` wrote, each followed by your answer and the bundle file behind it. The packet holds 7 questions, or 8 when the bundle ships `tools.json`, `AGENT.md` or skills; `hub scan` does not print them."
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Links to each screenshot at the submitted commit. Say which ones show fictional data.
+    validations:
+      required: true
+
+  - type: textarea
+    id: not-verified
+    attributes:
+      label: What is not verified
+      description: Everything you did not test, such as platforms, host services, live provider sign-in or remote writes.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: My bundle contains no passwords, API keys, tokens or other secrets.
+          required: true
+        - label: I will not move, delete or recreate the tag.
+          required: true
+        - label: I took the gate output above from a fresh clone of the pushed tag.
+          required: true
