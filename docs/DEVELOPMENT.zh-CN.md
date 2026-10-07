@@ -15,12 +15,12 @@
 
 | 任务 | 指南 |
 | --- | --- |
-| 搭建工作区，构建 `hub` 和 `card-host` | [快速上手](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md) |
+| 搭建工作区，构建 `hub` 和 `card-host` | [快速上手](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.zh-CN.md) |
 | 准备共享的 Makepad/Octoscript 依赖 | [原生工作区](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/NATIVE-WORKSPACE.md) |
-| 从可运行模板开始一个脚本应用 | [快速上手](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md) 和 [`templates/script-app/`](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/templates/script-app) |
+| 从可运行模板开始一个脚本应用 | [快速上手](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.zh-CN.md) 和 [`templates/script-app/`](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/templates/script-app) |
 | 用元数据和 Agent 指引搭建卡片应用仓库 | [应用起步模板](../templates/app/README.zh-CN.md) |
 | 编写脚本应用：状态、处理函数、存储、请求、宿主服务 | [脚本应用流程](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/script-app/FLOW.md) 和 [脚本 API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md) |
-| 查询哪个 Shell 提供哪个宿主服务 | [宿主服务](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md) |
+| 查询哪个 Shell 提供哪个宿主服务 | [宿主服务](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md) |
 | 把 UI 设计转成原生卡片 | [图像到卡片流程](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md) |
 | 理解卡片的数据、状态、事件、文案、主题和视图 | [L0 语言](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md) 和 [L0 笔记](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/docs/l0) |
 | 运行应用包，并通过 HTTP 驱动它 | 下文的 [`card-host`](#在本地运行应用包card-host) |
@@ -94,7 +94,7 @@ card-host --help
 | `sources` | 每个已声明数据源的 `$state`：取数据中的 `$status` 条目；没有该条目时，有值为 `ready`，无值为 `pending`。 |
 | `lowering` 或 `lower_error` | 原生 kit 包为 `design`；由角色 kit 组合的卡片为 `l0-kit`，其节点带有可检查的 id `beauty_0_1_…`。 |
 
-`card-host` 不注册任何宿主服务，包括 `model`，以及连接 octos（OctoSense 运行的 Agent 内核）的 `octos.*` 服务。调用 `host.request("mail.list", …)` 的脚本应用会得到 `no service answers "mail" on this device`。依赖服务的应用，请在注册了该服务的 OctoSense Shell 中测试。[宿主服务](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md) 列出了哪个 Shell 提供哪个服务。已连接账户相关的服务需要 desktop-v0.1.0-beta.2 或更高版本。
+`card-host` 不注册任何宿主服务，包括 `model`，以及连接 octos（OctoSense 运行的 Agent 内核）的 `octos.*` 服务。调用 `host.request("mail.list", …)` 的脚本应用会得到 `no service answers "mail" on this device`。依赖服务的应用，请在注册了该服务的 OctoSense Shell 中测试。[宿主服务](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md) 列出了哪个 Shell 提供哪个服务。已连接账户相关的服务需要 desktop-v0.1.0-beta.2 或更高版本。
 
 ### 通过 HTTP 驱动：`MAKEPAD_REMOTE`
 
