@@ -109,17 +109,20 @@ are in [AGENTS.md](AGENTS.md).
 
 ## What hosts serve today
 
-The gate admits 103 capability names, but a capability works only where a host
+The gate admits 104 capability names, but a capability works only where a host
 serves it. [Capabilities](docs/PUBLISHING.md#capabilities) lists who serves
 each one today.
 
-- `card-host` serves no host services and runs no agent.
+- `card-host` serves no host service except `runtime` discovery, and runs no
+  agent.
 - OctoSense serves `mail`, `model` and `glance` to any app granted them.
 - OctoSense desktop 0.1.0-beta.2 serves the connected-account capabilities
   (`auth`, `github`, `gcalendar`, `gmail`) once the host has OAuth client
   registrations. Tokens stay with the host; apps get connection handles.
-- OctoSense `main`, not yet in any release, also signs an app in to its own
-  backend through `auth`, once the device's operator registers that backend ([Sign in to your own backend](docs/PUBLISHING.md#sign-in-to-your-own-backend)).
+- OctoSense `main`, not yet in any release, also signs an app in, through
+  `auth`, to the backend that its manifest declares, and runs the backend
+  operations the manifest names, on macOS and Android. Each write waits for
+  the person's review ([Sign in to your own backend](docs/PUBLISHING.md#sign-in-to-your-own-backend)).
 - OctoSense `main` also requires a physical press to approve a GitHub or
   Google Calendar save, refuses executable Splash (`script`) cards from app agents,
   and keeps Google Calendar events from 30 days back to 366 days ahead
@@ -130,8 +133,12 @@ each one today.
   and `os.youtube`. Not yet: media services for store apps.
 - OctoSense runs an app agent's granted `implemented_by: "host-service"`
   tools, including tools mapped to a reviewed shared service with
-  `host_method`, and loads `AGENT.md` and skills as guidance. It refuses tools
-  with `implemented_by: "app"`
+  `host_method`, and loads `AGENT.md` and skills as guidance. A host that
+  advertises `app_tools.dispatch@1` also runs `implemented_by: "app"` tools: it
+  calls the app's signed handler in the open full app. Declare
+  `requires: ["script-tools-v1"]`; a closed app answers `app_not_running`.
+  Older hosts, desktop 0.1.0-beta.2 included, refuse these tools with
+  `app_tool_unavailable`
   ([The app's agent and tools](docs/PUBLISHING.md#the-apps-agent-and-tools)).
 
 ## Trust anchor

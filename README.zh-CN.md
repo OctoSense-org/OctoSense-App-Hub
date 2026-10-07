@@ -76,15 +76,15 @@ OCTOSENSE_PREVIEW_SIZE=1200x860 OCTOSENSE_APP_DATA="$(mktemp -d)" target/release
 
 ## 宿主目前提供什么
 
-准入检查接受 103 个能力名称，但只有宿主提供了对应的服务，能力才会生效。[能力](docs/PUBLISHING.zh-CN.md#能力)一节列出了每项能力目前由谁提供。
+准入检查接受 104 个能力名称，但只有宿主提供了对应的服务，能力才会生效。[能力](docs/PUBLISHING.zh-CN.md#能力)一节列出了每项能力目前由谁提供。
 
-- `card-host` 不提供任何宿主服务，也不运行 Agent。
+- 除了用于发现宿主 API 的 `runtime`，`card-host` 不提供任何宿主服务，也不运行 Agent。
 - OctoSense 向每个获得授权的应用提供 `mail`、`model` 和 `glance`。
 - 宿主配置好 OAuth 客户端注册信息后，OctoSense 桌面版 0.1.0-beta.2 提供已连接账户相关的能力（`auth`、`github`、`gcalendar`、`gmail`）。令牌留在宿主中，应用只拿到连接句柄。
-- OctoSense `main`（尚未进入任何发布版本）还能通过 `auth` 让应用登录它自己的后端，前提是设备的运维人员登记了这个后端（[登录应用自己的后端](docs/PUBLISHING.zh-CN.md#登录自己的后端)）。
+- OctoSense `main`（尚未进入任何发布版本）还能在 macOS 和 Android 上通过 `auth` 让应用登录清单声明的后端，并执行清单列出的后端操作。每次写操作都要等用户确认（[登录应用自己的后端](docs/PUBLISHING.zh-CN.md#登录自己的后端)）。
 - OctoSense `main` 还要求亲手点按才能批准 GitHub 或 Google 日历的保存，拒绝应用 Agent 发布可执行 Splash（`script`）卡片，并且只保留从 30 天前到 366 天后的 Google 日历日程（尚未进入任何发布版本）。OctoSense 桌面版 0.1.0-beta.2 不具备其中任何一项。
 - OctoSense 只向自己的系统应用提供 `calendar`、`llm` 和 `news`。对于 `photos` 和 `youtube`，它只向 `os.photos` 和 `os.youtube` 提供一个 `notify` 方法。尚未提供：面向商店应用的媒体服务。
-- OctoSense 运行应用 Agent 已获授权的 `implemented_by: "host-service"` 工具，包括用 `host_method` 映射到已审核共享服务的工具。它还把 `AGENT.md` 和技能作为指引加载，但拒绝运行 `implemented_by: "app"` 的工具（[应用的 Agent 与工具](docs/PUBLISHING.zh-CN.md#应用的-agent-与工具)）。
+- OctoSense 运行应用 Agent 已获授权的 `implemented_by: "host-service"` 工具，包括用 `host_method` 映射到已审核共享服务的工具，并把 `AGENT.md` 和技能作为指引加载。提供 `app_tools.dispatch@1` 的宿主还会运行 `implemented_by: "app"` 的工具：它在已打开的完整应用中调用应用签名的处理函数。清单需声明 `requires: ["script-tools-v1"]`；应用关闭时返回 `app_not_running`。更早的宿主（包括桌面版 0.1.0-beta.2）拒绝这类工具，返回 `app_tool_unavailable`（[应用的 Agent 与工具](docs/PUBLISHING.zh-CN.md#应用的-agent-与工具)）。
 
 ## 信任锚
 

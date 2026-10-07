@@ -96,6 +96,8 @@ card-host --help
 
 `card-host` 不注册任何宿主服务，包括 `model`，以及连接 octos（OctoSense 运行的 Agent 内核）的 `octos.*` 服务。调用 `host.request("mail.list", …)` 的脚本应用会得到 `no service answers "mail" on this device`。依赖服务的应用，请在注册了该服务的 OctoSense Shell 中测试。[宿主服务](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md) 列出了哪个 Shell 提供哪个服务。已连接账户相关的服务需要 desktop-v0.1.0-beta.2 或更高版本。
 
+`card-host` 也会拒绝清单要求 `host-api-v1`、`backend-api-v1` 或 `script-tools-v1` 的应用，因为这些标记所需的 API 它一个也没有实现。窗口会显示“card-host refused this bundle”和 `app <id> needs a host implementing <method>@1`。这类应用无法在 `card-host` 中运行，请在基于 `main` 构建的 OctoSense Shell 中测试。
+
 ### 通过 HTTP 驱动：`MAKEPAD_REMOTE`
 
 用 `MAKEPAD_REMOTE=<port>` 或 `--remote [<port>]` 启动，即可获得 localhost HTTP 控制接口。每个路由都是 GET，除 `/g?raw=1` 外都返回一行 JSON；坐标是窗口内的布局点。

@@ -65,7 +65,7 @@ revision ([step 6](#6-freeze-and-verify-the-release)).
 
 | Host | Runs | Does not |
 | --- | --- | --- |
-| `card-host` | One unsigned bundle, with a remote bridge to drive and capture it | Serve any host service. Every `host.request` fails with `no service answers "<family>" on this device`. It also refuses signed bundles. |
+| `card-host` | One unsigned bundle, with a remote bridge to drive and capture it | Serve any host service except `runtime` discovery: every other `host.request` fails with `no service answers "<family>" on this device`. It also refuses signed bundles, and apps that require `host-api-v1`, `backend-api-v1` or `script-tools-v1`. |
 | desktop-v0.1.0-beta.2 (macOS, Apple silicon) | Installed apps, including apps that use `auth`, `github`, `gmail` and `gcalendar` | Sign in to GitHub or Google until the host has an OAuth registration in `oauth/clients.json` ([setup](https://github.com/OctoSense-org/OctoSense/blob/desktop-v0.1.0-beta.2/crates/oauth-service/README.md)); the release ships none. Sign an app in to its own backend. Unverified on this release: live provider sign-in. |
 | desktop-v0.1.0-beta.1 and home-v0.1.0-beta.1 (the only released phone build) | Store apps that use only capabilities their older app contract knows | Install an app that requests `auth`, `github`, `gmail`, `gcalendar`, `calendar`, `photos`, `youtube` or `palpo.*`. Their stores refuse it, for example with `unknown capability "auth"`. |
 
@@ -76,8 +76,8 @@ release has them yet.
   build you make from source has no registrations until you add them, for
   example in `oauth/clients.json`
   ([Connected accounts](PUBLISHING.md#connected-accounts)).
-- An app can sign in to its own backend once the device's operator registers
-  that backend
+- On macOS and Android, an app can sign in to the backend that its manifest
+  declares and call the backend operations the manifest names
   ([Sign in to your own backend](PUBLISHING.md#sign-in-to-your-own-backend)).
 - Approving a GitHub or Google Calendar save takes a physical press on the
   host's confirmation sheet, as approving a Gmail send does on both builds.
@@ -711,7 +711,7 @@ cannot read gets no report, only one `hub: …` line. The full rules are in
 
 | You want | Status | Instead |
 | --- | --- | --- |
-| Sign in to your own backend | Only on OctoSense `main`, not yet in any release, and only on devices whose operator registered your backend; a bundle cannot register it ([#16](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/16)). The app gets the person's verified identity, not a session for your backend's other APIs ([Sign in to your own backend](PUBLISHING.md#sign-in-to-your-own-backend)). | To identify the person, use identity-only sign-in: `auth` with GitHub's `read:user`, or Google's `openid`, `email` and `profile`. For provider data, add `github`, `gmail` or `gcalendar`. |
+| Sign in to your own backend | Only on OctoSense `main`, not yet in any release, on macOS and Android. Declare the backend in the manifest; the app then calls only the backend operations it declares, and each write waits for the person's review on the host ([Sign in to your own backend](PUBLISHING.md#sign-in-to-your-own-backend)). | On a released build, identify the person with identity-only sign-in: `auth` with GitHub's `read:user`, or Google's `openid`, `email` and `profile`. For provider data, add `github`, `gmail` or `gcalendar`. |
 | Keep an API key or token in the app | Not supported. The gate refuses only password and one-time-code fields, so it does not catch a key typed into a plain field or kept in storage. | Ship no keys. For text generation, use `model`, which calls the person's own AI provider. |
 | Generate images, audio, video or embeddings | Not yet. `model` serves only `model.complete` and `model.budget`. `model.image`, `model.audio`, `model.video` and `model.embeddings` are unknown capabilities ([#85](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/85)–[#88](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/88)). | Use `model.complete` for text. |
 | Use `llm`, `news`, `calendar`, `prompt`, `ledger.read`, `clipboard` or `palpo.*` | The gate admits them, but no host serves them to a store app. `llm` and `news` answer only `os.*` apps, and `calendar` only `os.calendar`. Nothing acts on the others. | Do not request them. For Google Calendar, use `gcalendar`. |

@@ -45,14 +45,14 @@ hub
 
 | 宿主 | 能运行 | 不能 |
 | --- | --- | --- |
-| `card-host` | 单个未签名的应用包，并提供远程控制接口，用于驱动和截图 | 提供任何宿主服务。每个 `host.request` 都会失败，返回 `no service answers "<family>" on this device`。它也拒绝已签名的应用包。 |
+| `card-host` | 单个未签名的应用包，并提供远程控制接口，用于驱动和截图 | 提供 `runtime` 查询以外的任何宿主服务：其他每个 `host.request` 都会失败，返回 `no service answers "<family>" on this device`。它也拒绝已签名的应用包，以及要求 `host-api-v1`、`backend-api-v1` 或 `script-tools-v1` 的应用。 |
 | desktop-v0.1.0-beta.2（macOS，Apple 芯片） | 已安装的应用，包括使用 `auth`、`github`、`gmail` 和 `gcalendar` 的应用 | 在宿主的 `oauth/clients.json` 中配好 OAuth 注册之前，登录 GitHub 或 Google（[配置方法](https://github.com/OctoSense-org/OctoSense/blob/desktop-v0.1.0-beta.2/crates/oauth-service/README.md)）；该发布版不附带任何注册信息。让应用登录它自己的后端。未在该发布版上验证：真实的提供商登录。 |
 | desktop-v0.1.0-beta.1 和 home-v0.1.0-beta.1（目前唯一发布的手机版本） | 所用能力都在旧版应用契约之内的商店应用 | 安装请求 `auth`、`github`、`gmail`、`gcalendar`、`calendar`、`photos`、`youtube` 或 `palpo.*` 的应用。它们的商店会拒绝这类应用，例如报 `unknown capability "auth"`。 |
 
 OctoSense `main` 与 desktop-v0.1.0-beta.2 有以下不同，这些改动尚未进入任何发布版。
 
 - 发行方可以在构建时编入 GitHub 和 Google 注册信息。你自己从源码构建的版本不带注册信息，需要自行添加，例如写入 `oauth/clients.json`（见发布参考的[已连接账户](PUBLISHING.zh-CN.md#已连接账户)一节）。
-- 设备的运维人员登记了应用自己的后端之后，应用就可以登录这个后端（见发布参考的[登录自己的后端](PUBLISHING.zh-CN.md#登录自己的后端)一节）。
+- 在 macOS 和 Android 上，应用可以登录清单声明的后端，并调用清单列出的后端操作（见发布参考的[登录自己的后端](PUBLISHING.zh-CN.md#登录自己的后端)一节）。
 - 批准 GitHub 或 Google 日历的保存时，须在宿主的确认面板上亲手点按；批准 Gmail 发送在两个版本上都有这个要求。
 - 应用 Agent 调用 `glance.publish` 时，宿主拒绝可执行的 Splash（`script`）和 L1 卡片源码。
 - 宿主只保留从 30 天前到 366 天后的 Google 日历日程，而不是日历的全部历史。
@@ -467,7 +467,7 @@ mkdir -p build review
 
 | 需求 | 现状 | 替代做法 |
 | --- | --- | --- |
-| 登录你自己的后端 | 只有 OctoSense `main` 支持，尚未进入任何发布版；而且只在设备运维人员登记了你的后端的设备上可用，应用包无法自行登记（[#16](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/16)）。应用拿到的是用户经过验证的身份，而不是可用来调用你后端其他 API 的会话（见发布参考的[登录自己的后端](PUBLISHING.zh-CN.md#登录自己的后端)一节）。 | 只需识别用户身份时，使用只验证身份的登录：`auth` 搭配 GitHub 的 `read:user`，或 Google 的 `openid`、`email` 和 `profile`。需要提供商数据时，再加上 `github`、`gmail` 或 `gcalendar`。 |
+| 登录你自己的后端 | 只有 macOS 和 Android 上的 OctoSense `main` 支持，尚未进入任何发布版。在清单中声明后端之后，应用只能调用自己声明的后端操作，每次写操作都要等用户在宿主上确认（见发布参考的[登录自己的后端](PUBLISHING.zh-CN.md#登录自己的后端)一节）。 | 在已发布的版本上，用只验证身份的登录来识别用户：`auth` 搭配 GitHub 的 `read:user`，或 Google 的 `openid`、`email` 和 `profile`。需要提供商数据时，再加上 `github`、`gmail` 或 `gcalendar`。 |
 | 在应用中保存 API 密钥或令牌 | 不支持。准入检查只拒绝密码和一次性验证码字段，因此发现不了输入到普通字段或存放在存储中的密钥。 | 不要附带任何密钥。生成文本请用 `model`，它调用的是用户自己的 AI 提供商。 |
 | 生成图片、音频、视频或向量嵌入 | 尚不支持。`model` 只提供 `model.complete` 和 `model.budget`；`model.image`、`model.audio`、`model.video` 和 `model.embeddings` 都是未知能力（[#85](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/85)–[#88](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/88)）。 | 用 `model.complete` 生成文本。 |
 | 使用 `llm`、`news`、`calendar`、`prompt`、`ledger.read`、`clipboard` 或 `palpo.*` | 准入检查接受它们，但没有宿主向商店应用提供这些服务。`llm` 和 `news` 只响应 `os.*` 应用，`calendar` 只响应 `os.calendar`，其余的没有任何宿主处理。 | 不要请求它们。访问 Google 日历请用 `gcalendar`。 |

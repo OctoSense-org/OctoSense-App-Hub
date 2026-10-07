@@ -24,7 +24,7 @@ on, so that every shell links the same code at the same pin.
 
 ## Adopt it in a shell
 
-1. Depend on it at an App Hub pin. It needs contract 1.5, which Cargo
+1. Depend on it at an App Hub pin. It needs contract 1.6, which Cargo
    resolves from crates.io, as OctoSense `main` does:
 
    ```toml
