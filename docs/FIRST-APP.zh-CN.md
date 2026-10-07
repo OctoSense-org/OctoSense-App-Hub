@@ -123,7 +123,7 @@ my-app/
       01-main.png        # 真实截图，在第 4 节添加
 ```
 
-卡片的 `font_src`，准入检查只接受应用包中的字体文件或内置的 `makepad_widgets:resources/Inter.ttf`，但打包的字体目前在卡片中不会加载。设置字体或显示中文之前，请先阅读[字体](PUBLISHING.zh-CN.md#字体)。
+卡片的 `font_src`，准入检查只接受应用包中的字体文件或内置的 `makepad_widgets:resources/Inter.ttf`。设置字体或显示中文之前，请先阅读[字体](PUBLISHING.zh-CN.md#字体)。
 
 ### 两类应用都适用
 

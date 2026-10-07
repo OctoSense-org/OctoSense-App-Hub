@@ -185,9 +185,8 @@ my-app/
 ```
 
 The gate accepts a card's `font_src` only as a font file in the bundle or the
-built-in `makepad_widgets:resources/Inter.ttf`, yet a bundled font does not
-load in a card today. Read [Fonts](PUBLISHING.md#fonts) before you set a font
-or show Chinese text.
+built-in `makepad_widgets:resources/Inter.ttf`. Read
+[Fonts](PUBLISHING.md#fonts) before you set a font or show Chinese text.
 
 ### Both kinds
 
