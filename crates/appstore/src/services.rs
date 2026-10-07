@@ -45,6 +45,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
+pub use octosense_app_policy::contract::host_api::{AgentAccess, HostApiMethod};
 
 /// How long a request may wait for its service, unless the service says
 /// otherwise ([`HostService::timeout`]).
@@ -120,6 +121,12 @@ fn queue_reply(heap_key: usize, req_id: u64, result: Result<String, String>) {
 }
 
 impl Replier {
+    /// Services must check this before opening a delayed OS prompt or doing work
+    /// after the owning isolate closed. It is not permission to perform a write.
+    pub fn is_pending(&self) -> bool {
+        with_pending(|pending| pending.get(&(self.heap_key, self.req_id))
+            .is_some_and(|entry| entry.deadline.is_none_or(|deadline| deadline > Instant::now())))
+    }
     /// Answer the request. An answer after the request timed out, or after
     /// its isolate closed, or a second answer, goes nowhere.
     pub fn send(self, result: Result<Value, String>) {
@@ -252,6 +259,9 @@ pub trait ServiceHost {
 pub trait HostService: Send {
     /// The capability family this service answers: `mail`.
     fn family(&self) -> &'static str;
+    /// Only describe methods actually implemented by this service. Descriptors
+    /// do not grant the capability or claim that an account is connected.
+    fn api_methods(&self) -> Vec<HostApiMethod> { Vec::new() }
     /// How long a call may wait for its answer. A sheet the service raises
     /// holds its call open, whatever this says.
     fn timeout(&self, _call: &ServiceCall) -> Duration {
@@ -265,8 +275,10 @@ static SERVICES: Mutex<Vec<Box<dyn HostService>>> = Mutex::new(Vec::new());
 /// Offer a service to every app granted its family. A second registration
 /// for a family replaces the first.
 pub fn register_host_service(service: Box<dyn HostService>) {
-    let mut services = SERVICES.lock().unwrap();
     let family = service.family();
+    let methods = service.api_methods();
+    crate::host_api::register_methods(family, methods);
+    let mut services = SERVICES.lock().unwrap();
     services.retain(|s| s.family() != family);
     services.push(service);
 }
@@ -288,6 +300,11 @@ pub fn dispatch(call: ServiceCall, heap_key: usize, req_id: u64, host: &mut dyn 
         return;
     }
     let reply = Replier { heap_key, req_id };
+    if family == "runtime" {
+        drop(services);
+        crate::host_api::dispatch(call, reply);
+        return;
+    }
     // What the person types on a sheet reaches only the sheet's methods,
     // whatever the service does: an app calling one is refused here.
     if call.method().starts_with("sheet.") && !call.from_sheet {

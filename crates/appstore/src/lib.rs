@@ -22,6 +22,7 @@ use octosense_app_policy::HostLimits;
 use std::path::PathBuf;
 
 pub mod cardapp;
+pub mod host_api;
 pub mod services;
 pub mod source;
 pub mod system;
@@ -188,7 +189,7 @@ impl AppStoreView {
         // overrides it for development.
         self.app_data_root = data_root(cx);
         let anchor = std::env::var("OCTOSENSE_HUB_ANCHOR").unwrap_or_else(|_| DEFAULT_ANCHOR.to_string());
-        let mut store = Store::new(&anchor, &self.app_data_root, HostLimits::default());
+        let mut store = Store::new(&anchor, &self.app_data_root, HostLimits::default()).with_host_api_versions(crate::host_api::available_versions());
 
         // A hub override on disk (`<data dir>/hub.txt`, a path or a base URL)
         // wins over the built-in hub: how a device with no route to the

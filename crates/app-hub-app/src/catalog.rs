@@ -123,7 +123,7 @@ impl Backend {
     // Caller holds CATALOG_IO. This reads local state and performs recovery;
     // neither constructor nor the shell launch gate contacts the origin.
     fn new_unlocked(root: PathBuf, origin: Origin, anchor: String) -> Self {
-        let store = Store::new(&anchor, &root, HostLimits::default());
+        let store = Store::new(&anchor, &root, HostLimits::default()).with_host_api_versions(octosense_appstore::host_api::available_versions());
         let recovery_warning = recover_installations(&root).err();
         let mut backend = Self {
             root_key: root_identity(&root),
@@ -177,7 +177,7 @@ impl Backend {
         // including when another Hub instance refreshed since this worker did.
         self.load_cache();
         match self.origin.catalog().and_then(|json| {
-            let mut candidate = Store::new(&self.anchor, &self.root, HostLimits::default());
+            let mut candidate = Store::new(&self.anchor, &self.root, HostLimits::default()).with_host_api_versions(octosense_appstore::host_api::available_versions());
             if let Some(held) = self.store.catalog() {
                 candidate
                     .accept_catalog(&serde_json::to_string(held).map_err(|e| e.to_string())?)?;
@@ -271,7 +271,9 @@ impl Backend {
                 _ => EntryStatus::Available,
             },
         };
-        let consent = if can_install
+        let incompatible = self.store.entry(&listing.app_id).and_then(|entry| octosense_appstore::host_api::check_manifest(&entry.manifest).err());
+        let status = if !can_open { incompatible.clone().map(EntryStatus::Unavailable).unwrap_or(status) } else { status };
+        let consent = if incompatible.is_none() && can_install
             && matches!(
                 status,
                 EntryStatus::Available | EntryStatus::UpdateAvailable
@@ -361,7 +363,7 @@ impl Backend {
                 &self.anchor,
                 &workspace.join("verified"),
                 HostLimits::default(),
-            );
+            ).with_host_api_versions(octosense_appstore::host_api::available_versions());
             prepared_store.accept_catalog(
                 &serde_json::to_string(self.store.catalog().unwrap()).map_err(|e| e.to_string())?,
             )?;
@@ -400,6 +402,7 @@ impl Backend {
         {
             return Err("This app changed after the permissions were shown. Review its details and confirm again.".into());
         }
+        octosense_appstore::host_api::check_manifest(&entry.manifest)?;
         octosense_app_policy::policy::resolve(&entry.manifest, &HostLimits::default())?;
         Ok(())
     }

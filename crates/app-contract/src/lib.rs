@@ -93,6 +93,8 @@
 //!   fields and resolved [`AppPolicy`]; every `1.x` release must reproduce
 //!   all of them, and the corpus is append-only within `1.x`.
 pub mod assets;
+pub mod backend;
+pub mod host_api;
 pub mod bundle;
 pub mod entry;
 mod lenient;

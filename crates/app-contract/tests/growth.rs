@@ -16,7 +16,16 @@ fn manifest_with(body: &str) -> String {
 fn palpo_extension_preserves_schema_and_declares_its_host_feature() {
     assert_eq!(SCHEMA, 1);
     assert_eq!(SCHEMA_MINOR, 0);
-    assert_eq!(KNOWN_FEATURES, &["palpo-admin-v1"]);
+    assert_eq!(KNOWN_FEATURES, &["palpo-admin-v1", "host-api-v1", "backend-api-v1", "script-tools-v1"]);
+}
+
+#[test]
+fn host_api_requirements_need_the_feature_and_do_not_grant_access() {
+    assert!(parse(&manifest_with(r#""host_api":{"required":{"camera.permission.status":1}}"#)).is_err());
+    let manifest = parse(&manifest_with(r#""requires":["host-api-v1"],"host_api":{"required":{"camera.permission.status":1}},"capabilities":["runtime"]"#)).unwrap();
+    let policy = resolve(&manifest, &HostLimits::default().with_require_signature(false)).unwrap();
+    assert!(policy.allows("runtime"));
+    assert!(!policy.allows("camera"));
 }
 
 #[test]
