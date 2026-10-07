@@ -83,7 +83,19 @@ appstore
 
 | 应用 | 版本 | 分类 | 运行平台 | 发布者 | 允许的权限 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| _暂无_ | | | | | | |
+| [GitHub Notes](https://github.com/ymote/octosense-github-notes) | 0.1.0 | 效率 | macOS | ymote | 本地草稿；宿主管理的 GitHub 登录和提交审核 | 预览 |
+| [Inbox Assistant](https://github.com/ymote/octosense-inbox-assistant) | 0.1.0 | 效率 | macOS | ymote | Gmail、本地草稿、已配置模型，以及授权后的 Glance/助手处理 | 预览 |
+| [Google Calendar](https://github.com/ymote/octosense-google-calendar) | 0.1.0 | 效率 | macOS | ymote | Google Calendar、本地草稿、授权后的聊天与 Glance | 预览 |
+
+以上为 **macOS 开发者预览**，在目录序列 7 中准入。先安装支持关联服务的
+OctoSense 运行时，在 App Hub 搜索上述名称，查看权限后选择 Install → Open。
+[准入记录](reviews/connected-apps-0.1.0/README.zh-CN.md)列出发布者的精确提交和验证边界。
+旧宿主可以读取目录，但会拒绝不支持的能力；请先更新宿主。
+
+提供方登录需要宿主 OAuth 应用注册，配置保存在应用包之外；参阅
+[关联账户说明](https://github.com/OctoSense-org/OctoSense/blob/main/crates/oauth-service/README.zh-CN.md)。
+真实 GitHub/Google 登录和远程写入尚未验证。Calendar 助手仅提供建议，不能预约。
+无需 OctoSense 云端账户。
 
 曾用于跑通发布流程的相机卡片已于 2026 年 9 月 20 日移除：相机是随 Shell 出厂的系统应用（与新闻、相册一样），不是商店应用。它的仓库仍保留在 [ymote/camera-card](https://github.com/ymote/camera-card)，作为可发布应用包的完整示例。
 
