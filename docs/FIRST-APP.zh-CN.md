@@ -15,7 +15,7 @@ Hub 应用分为两类，提交方式相同：
 
 ## 1. 准备工具和应用仓库
 
-1. 按[快速上手第 1 节](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md#1-prerequisites)（英文）的说明搭建工作区 `~/octosense-ws`：把 App Hub 和 Design Flow（OctoScript-App-Design-Flow）都克隆到这个目录下，然后运行 Design Flow 的 `tools/setup-native.py`。这个脚本会添加 `makepad`、`octoscript-makepad` 和 `octoscript` 三个检出目录，App Hub 的 `Cargo.toml` 以补丁方式引入它们。
+1. 按[快速上手第 1 节](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.zh-CN.md#1-前置条件)的说明搭建工作区 `~/octosense-ws`：把 App Hub 和 Design Flow（OctoScript-App-Design-Flow）都克隆到这个目录下，然后运行 Design Flow 的 `tools/setup-native.py`。这个脚本会添加 `makepad`、`octoscript-makepad` 和 `octoscript` 三个检出目录，App Hub 的 `Cargo.toml` 以补丁方式引入它们。
 
    ```sh
    cd ~/octosense-ws/OctoScript-App-Design-Flow
@@ -249,7 +249,7 @@ hub: the bundle was refused
 - **签名放在最后。** 签名之后的任何改动，都要重新写入摘要并重新签名（[签名](PUBLISHING.zh-CN.md#签名)）。
 - **发布者密钥只创建一次，放在所有仓库之外。** `hub keygen <key-file>` 创建密钥并输出公钥，之后可以用 `hub pubkey <key-file>` 再次输出公钥。`hub keygen` 不会覆盖已有文件，所以再次运行它也不会替换你的密钥。
 
-要在提交前用 OctoSense 桌面版试用应用，请用一个临时信任锚把它发布到本地签名目录（[在本地演练商店流程](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally)，英文）。
+要在提交前用 OctoSense 桌面版试用应用，请用一个临时信任锚把它发布到本地签名目录（[在本地演练商店流程](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)）。
 
 ## 故障排查
 
