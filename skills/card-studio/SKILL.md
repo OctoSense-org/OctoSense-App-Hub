@@ -1,6 +1,6 @@
 ---
 name: card-studio
-description: Inspect a generated L0 card before publishing it to the glance screen — render at glance, phone and desktop sizes, measured checks, vision critique payload. Triggers: card render, check my card, critique card, glance card, before glance.publish, card-studio.
+description: Inspect a generated L0 card before publishing it to the Glance screen — render at glance, phone and desktop sizes, measured checks, vision critique payload. Triggers: card render, check my card, critique card, glance card, before glance.publish, card-studio.
 version: 0.1.0
 author: OctoSense
 always: false
@@ -8,40 +8,45 @@ always: false
 
 # card-studio
 
-ADR 0002 section 7: an app agent's card is rendered and critiqued before it
-is published. This skill does the rendering and the measuring; the vision
-critique is a request it prepares for you to send.
+Under OctoSense ADR 0002 section 7, an app agent renders and critiques its card before
+it publishes it. This skill renders and measures the card, and prepares the
+vision critique as a request for you to send.
 
-## Loop
+## Render, check and revise
 
-1. Write the card (L0) and its data (the host-resolved sources, e.g. the
-   `sys.digest` payload). Try two styles when the run's budget allows.
-2. `card_render {card, data}` — renders each size in a hidden `card-host
-   --remote` and returns the report. Read `summary.pass` and every finding
-   with `severity: "error"`: `text_truncated` / `text_hidden` /
-   `text_clipped` / `overflow` (text is cut: shorten it, drop a row, or let
-   it wrap), `does_not_fit` (the glance tile is 350x160pt: show fewer items),
-   `source_failed`, `lint`, `realize_truncated`, `lower_failed`, `log_error`.
-   Warnings (`state_visible`, `missing_value`, `overlap`, `source_pending`)
-   are worth a revision when the budget allows.
-3. Revise and render again until there is no error, or the budget is spent.
-4. `card_critique_payload {report, rubric, inline: true}` — send its
-   `prompt`, then for each entry of `sizes` a text line naming the size with
-   its `widgets` and `findings`, then its image, to a vision model. Keep the
-   answer with the run (the critique record). A `revise` verdict with
-   concrete `fix`es is another revision, within budget.
-5. Publish only a card whose last render passed (admission follows:
-   level check, lint, approval pin).
+1. Write the card (L0) and its data: the host-resolved sources, such as the
+   `sys.digest` payload. Try two styles when the run's budget allows.
+2. Call `card_render {card, data}`. It renders each size in a hidden
+   `card-host --remote` and returns the report. Read `summary.pass` and every
+   finding with `severity: "error"`:
+   - `text_truncated`, `text_hidden`, `text_clipped` or `overflow` on text:
+     the text is cut. Shorten it, drop a row or let it wrap.
+   - `does_not_fit` at the glance size: the glance tile is 350x160pt and
+     cannot scroll. Show fewer items.
+   - `empty_card`: the card drew nothing; fix the card or its data.
+   - `source_failed`, `lint`, `realize`, `realize_truncated`, `lower_failed`,
+     `log_error`: fix the card or its data.
+
+   Revise for these warnings when the budget allows: `state_visible`,
+   `missing_value`, `overlap`, `source_pending`, `hidden`,
+   `outside_viewport` and `does_not_fit` at the phone or desktop size.
+3. Revise and render again until no error remains or the budget is spent.
+4. Call `card_critique_payload {report, rubric, inline: true}`. Send a vision
+   model the payload's `prompt`. Then, for each entry of `sizes`, send a text
+   line with the size's name, `widgets` and `findings`, followed by that
+   size's image. Keep the model's answer with the run as the critique record.
+   If the verdict is `revise` with concrete `fix` entries, revise again while
+   the budget allows.
+5. Publish, with `glance.publish`, only a card whose last render passed, and
+   write it at L0. The shell admits it only when the app holds the `glance`
+   capability and `check_ui_l0` finds the card valid. OctoSense desktop
+   0.1.0-beta.2 also admits a card valid at L1; OctoSense `main` (in no
+   release yet) refuses an agent's L1 card and any `script` card.
 
 ## Install
 
-The skill runs `main` (the `card-studio` binary) with cwd set to the
-session workspace and a filtered environment, so its defaults live next to
-it in `card-studio.json`:
-
-```json
-{"card_host": "/abs/path/card-host", "kit": "/abs/path/octoscript-makepad/components/l0", "out_dir": "/abs/path/card-studio-runs"}
-```
+Build `card-host` and `card-studio`, then copy the skill into the octos
+profile:
 
 ```sh
 cargo build --release -p octosense-card-host -p octosense-card-studio
@@ -50,6 +55,17 @@ mkdir -p "$dest" && cp skills/card-studio/{SKILL.md,manifest.json,rubric.md} "$d
 cp target/release/card-studio "$dest/main"   # card-host may stay where it was built
 ```
 
-Rendering needs a graphical session (the window is hidden, not headless):
-run it on the desktop or a server with a display, or on the phone only while
-charging; the measured checks alone run anywhere (`card-studio check`).
+If the build fails with `no variant … TextInputStateQuery`, see [`card-host` fails to build](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/DEVELOPMENT.md#card-host-fails-to-build).
+
+The skill runs `main` (the `card-studio` binary) in the session workspace,
+with a filtered environment. It reads its defaults from `card-studio.json`
+next to `main`, so write that file into `$dest`:
+
+```json
+{"card_host": "<absolute path>/card-host", "kit": "<absolute path>/octoscript-makepad/components/l0", "out_dir": "<absolute path>/card-studio-runs"}
+```
+
+Rendering needs a graphical session (the window is hidden, not headless): run
+it on a desktop, or on a server with a display. The measured checks alone run
+anywhere (`card-studio check`). Not yet: rendering on the phone, where OctoSense
+ADR 0006 plans an in-process renderer.

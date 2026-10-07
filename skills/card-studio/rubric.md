@@ -14,6 +14,6 @@ fallback.
   empty or failed state is showing when data was given; no em dash where a
   value should be.
 - **Reads as this app's card.** Its subject and voice are the app's (for
-  News: what happened, from whom), recognisable next to other apps' cards.
+  News: what happened, from whom), recognizable next to other apps' cards.
 - **Fits every size.** The glance tile shows the essential content without
   scrolling; phone and desktop use their room without stretching thin.

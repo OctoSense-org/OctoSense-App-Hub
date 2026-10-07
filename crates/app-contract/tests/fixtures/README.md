@@ -27,7 +27,7 @@ that would need it is not additive and belongs in `2.0`.
 | `signing_blake3` | `bundle_digest` of the manifest's canonical signing bytes. |
 | `entry` | `script` when the package has a `main.splash` (`script_source`), else `card`. |
 | `policy` | The resolved `AppPolicy` as JSON. A later `1.x` may add fields; every pinned one must hold. |
-| `refused` | Instead of the three above: the refusal, from parse, `admit_digest` or `resolve`. A later `1.x` may say more, never something else. |
+| `refused` | Instead of `ignored_fields`, `signing_blake3`, `entry` and `policy`: the refusal, from parse, `admit_digest` or `resolve`. A later `1.x` may say more, never something else. |
 
 Packages whose source manifest had an empty or placeholder
 `integrity.bundle_blake3` carry the digest filled in, as the tools that pack
