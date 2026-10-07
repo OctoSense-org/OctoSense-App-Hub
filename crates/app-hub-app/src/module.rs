@@ -16,6 +16,7 @@ impl AppModule for AppHubModule {
         "App Hub"
     }
     fn register(&self, vm: &mut ScriptVm) {
+        octosense_appstore::register_policy_runtime_features();
         crate::view::script_mod(vm);
     }
     fn open_schema(&self) -> OpenSchema {

@@ -679,7 +679,7 @@ impl AppManifest {
     /// installers and runners must supply their actual implemented API versions.
     pub fn check_host_apis(&self, available: &BTreeMap<String, u32>) -> Result<(), String> {
         if let Some(api) = &self.host_api { api.check_available(available)?; }
-        for (feature, method) in [("backend-api-v1", "auth.backend.request"), ("script-tools-v1", "app_tools.dispatch")] {
+        for (feature, method) in [("host-api-v1", "app_policy.device_consent"), ("backend-api-v1", "auth.backend.request"), ("script-tools-v1", "app_tools.dispatch")] {
             if self.requires.iter().any(|f| f == feature) && available.get(method) != Some(&1) {
                 return Err(format!("app {} needs a host implementing {method}@1", self.id));
             }

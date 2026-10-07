@@ -274,6 +274,15 @@ fn start_sweeper() {
     }
 }
 
+/// The runner checks this before delivering any app event or callback. It
+/// combines this suppress-only bit with its own admitted foreground policy.
+pub fn pending_for(cx: &mut Cx, app: &str, card: &SplashRef) -> bool {
+    let Some(heap) = card.isolate_heap_key(cx) else { return false };
+    let s = state();
+    let Some(owner) = s.surfaces.get(app).filter(|owner| owner.heap == heap) else { return false };
+    s.pending.values().any(|p| p.app == app && p.heap == heap && p.generation == owner.generation)
+}
+
 /// Run from the owning runner on UI events, outside draw. The framework's
 /// entry limit and cumulative isolate instruction budget bound each hook.
 pub fn pump(cx: &mut Cx, app: &str, card: &SplashRef) {
@@ -284,14 +293,6 @@ pub fn pump(cx: &mut Cx, app: &str, card: &SplashRef) {
     let Some(heap) = card.isolate_heap_key(cx) else {
         return;
     };
-    // A tool call is not physical foreground input, even when its app is
-    // visible. Host requests emitted by its hook or awaited callbacks cannot
-    // open consent sheets. UI prompting resumes after pending tools settle.
-    let tool_pending = state()
-        .pending
-        .values()
-        .any(|p| p.app == app && p.heap == heap);
-    card.set_host_prompts(cx, !tool_pending);
     let jobs = {
         let mut s = state();
         let Some(owner) = s.surfaces.get(app).filter(|v| v.heap == heap).cloned() else {
@@ -308,6 +309,10 @@ pub fn pump(cx: &mut Cx, app: &str, card: &SplashRef) {
             })
             .collect::<Vec<_>>()
     };
+    // Never grant prompt authority here. Only the runner knows whether its
+    // admitted policy and foreground lifecycle allow prompts. Keep suppression
+    // through completion callbacks for this event, even for a synchronous hook.
+    if pending_for(cx, app, card) { card.set_host_prompts(cx, false); }
     for (token, name) in jobs {
         if !is_active(heap, &token) {
             continue;
@@ -391,6 +396,10 @@ fn finish(heap: usize, token: &str, result: Result<Value, String>) -> bool {
     }
 }
 
+fn read_token(vm: &mut ScriptVm, value: ScriptValue) -> Option<String> {
+    vm.string_with(value, |_, token| (token.len() <= 128).then(|| token.to_owned())).flatten()
+}
+
 /// No service capability is conferred by this module. A reply token only
 /// identifies a live call in this exact heap; another app or host sheet cannot
 /// read its arguments or complete it, even if it guesses the token.
@@ -402,8 +411,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
         script_args_def!(call_id = NIL),
         |vm, args| {
             let value = script_value!(vm, args.call_id);
-            let mut token = String::new();
-            vm.string_with(value, |_, s| token.push_str(s));
+            let Some(token) = read_token(vm, value) else { return NIL };
             let Some(data) = request(vm.bx.heap.heap_key(), &token) else {
                 return NIL;
             };
@@ -417,8 +425,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
         script_args_def!(call_id = NIL),
         |vm, args| {
             let value = script_value!(vm, args.call_id);
-            let mut token = String::new();
-            vm.string_with(value, |_, s| token.push_str(s));
+            let Some(token) = read_token(vm, value) else { return false.into() };
             is_active(vm.bx.heap.heap_key(), &token).into()
         },
     );
@@ -429,12 +436,8 @@ pub fn script_mod(vm: &mut ScriptVm) {
         |vm, args| {
             let value = script_value!(vm, args.call_id);
             let result = script_value!(vm, args.result);
-            let mut token = String::new();
-            vm.string_with(value, |_, s| token.push_str(s));
-            let mut data = String::new();
-            vm.bx.heap.to_json_inner(result, &mut data);
-            let result = serde_json::from_str(&data)
-                .map_err(|_| "invalid_result: expected JSON data".into());
+            let Some(token) = read_token(vm, value) else { return false.into() };
+            let result = crate::script_tools_json::result(&vm.bx.heap, result, MAX_BYTES);
             finish(vm.bx.heap.heap_key(), &token, result).into()
         },
     );
@@ -445,8 +448,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
         |vm, args| {
             let value = script_value!(vm, args.call_id);
             let error = script_value!(vm, args.error);
-            let mut token = String::new();
-            vm.string_with(value, |_, s| token.push_str(s));
+            let Some(token) = read_token(vm, value) else { return false.into() };
             let mut message = String::new();
             vm.string_with(error, |_, s| message.extend(s.chars().take(2048)));
             finish(
@@ -709,6 +711,45 @@ mod tests {
             "a visible app does not make agent input physical input"
         );
     }
+    #[test]
+    fn tool_result_graphs_are_bounded_before_host_allocation() {
+        for (suffix, code, expected) in [
+            ("cycle", "let data = {}; data.self = data", "cyclic"),
+            ("shared", "let data = [1]; for i in 0..25 { data = [data, data] }", "exceeds 1 MiB"),
+        ] {
+            let app = format!("org.example.tool-json-{suffix}");
+            let body = format!("fn app_tool(name, call_id) {{ {code}; mod.app_tools.complete(call_id, data) }} Label{{text: \"bounded JSON\"}}");
+            let (mut cx, card, _registration) = fixture(&app, &body);
+            let (_, replies) = call(&app, json!({"amount":1}));
+            pump(&mut cx, &app, &card);
+            let replies = replies.lock().unwrap();
+            let error = replies[0].as_ref().unwrap_err();
+            assert!(error.contains(expected), "{suffix}: {error}");
+        }
+    }
+
+    #[test]
+    fn pump_never_grants_prompt_authority_to_a_denied_or_unowned_surface() {
+        let app = "org.example.tool-denied-prompt";
+        let body = r#"fn probe() { host.request("fixture.permission", {}, fn(r){}) } Label{text:"denied"}"#;
+        let (mut cx, card, registration) = fixture(app, body);
+        card.set_host_caps(&mut cx, vec!["fixture".into()]);
+        card.set_policy(&mut cx, Some(vec![]), Some(100_000));
+        let heap = card.isolate_heap_key(&mut cx).unwrap();
+        for owner in [true, false] {
+            card.set_host_prompts(&mut cx, false);
+            pump(&mut cx, if owner { app } else { "org.example.other-owner" }, &card);
+            card.call_script_fn_with_strings(&mut cx, id!(probe), &[]);
+            let requests = makepad_widgets::splash_host::take_splash_host_requests_for(&[heap]);
+            assert_eq!(requests.len(), 1);
+            assert!(!requests[0].may_prompt, "pump enlarged prompt authority");
+        }
+        drop(registration);
+        pump(&mut cx, app, &card);
+        card.call_script_fn_with_strings(&mut cx, id!(probe), &[]);
+        assert!(!makepad_widgets::splash_host::take_splash_host_requests_for(&[heap])[0].may_prompt);
+    }
+
     #[test]
     fn an_unbounded_script_loop_is_stopped_by_the_vm_entry_budget() {
         let app = "org.example.tool-budget";

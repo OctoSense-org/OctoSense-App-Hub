@@ -29,6 +29,19 @@ fn host_api_requirements_need_the_feature_and_do_not_grant_access() {
 }
 
 #[test]
+fn host_api_marker_requires_the_policy_abi_even_without_a_device_method() {
+    let manifest = parse(&manifest_with(r#""requires":["host-api-v1"]"#)).unwrap();
+    let mut versions = std::collections::BTreeMap::new();
+    assert!(manifest.check_host_apis(&versions).unwrap_err().contains("app_policy.device_consent@1"));
+    versions.insert("camera.permission.status".into(), 1);
+    assert!(manifest.check_host_apis(&versions).is_err(), "a method is not the policy ABI");
+    versions.insert("app_policy.device_consent".into(), 2);
+    assert!(manifest.check_host_apis(&versions).is_err(), "ABI majors match exactly");
+    versions.insert("app_policy.device_consent".into(), 1);
+    assert!(manifest.check_host_apis(&versions).is_ok());
+}
+
+#[test]
 fn palpo_uses_exact_service_grants() {
     let services = serde_json::to_string(octosense_app_contract::palpo::SERVICES).unwrap();
     let manifest = parse(&manifest_with(&format!(

@@ -25,6 +25,7 @@ pub mod cardapp;
 pub mod host_api;
 pub mod services;
 pub mod script_tools;
+mod script_tools_json;
 mod tool_schema;
 pub mod source;
 pub mod system;
@@ -435,6 +436,13 @@ pub(crate) fn register_card_vocabulary() {
     makepad_widgets::widget_async::register_splash_isolate_mod(makepad_widgets::splash::register_agent_module);
 }
 
+/// Inventory for the patched runtime's policy ABI, independent of which
+/// device services a shell registers. Plain Makepad must not advertise it.
+pub fn register_policy_runtime_features() {
+    #[cfg(feature = "text-input-state-query")]
+    crate::host_api::register_runtime_feature("app_policy.device_consent", 1);
+}
+
 /// Apply the host-only device consent marker before untrusted source runs.
 /// Plain Makepad hosts cannot advertise OctoSense's permission boundary.
 pub fn apply_device_consent(cx: &mut Cx, bundle: &std::path::Path, splash: &SplashRef) -> Result<(), String> {
@@ -577,6 +585,7 @@ impl AppModule for AppStoreModule {
         OpenSchema::new(1).arg("app", OpenArgKind::Text, false)
     }
     fn register(&self, vm: &mut ScriptVm) {
+        register_policy_runtime_features();
         octoscript_widgets::design::script_mod(vm);
         octoscript_widgets::kit::script_mod(vm);
         script_mod(vm);
@@ -640,6 +649,16 @@ mod card_vocabulary_tests {
         });
         cx.free_splash_vm(card);
         errors
+    }
+
+    #[test]
+    fn policy_abi_is_advertised_only_by_the_patched_runner() {
+        register_policy_runtime_features();
+        let versions = crate::host_api::available_versions();
+        #[cfg(feature = "text-input-state-query")]
+        assert_eq!(versions.get("app_policy.device_consent"),Some(&1));
+        #[cfg(not(feature = "text-input-state-query"))]
+        assert!(!versions.contains_key("app_policy.device_consent"));
     }
 
     #[test]
