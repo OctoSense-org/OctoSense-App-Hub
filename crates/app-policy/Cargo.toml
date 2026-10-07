@@ -28,12 +28,12 @@ description = "Signed app manifests resolved into splash-isolate settings and oc
 # consumer that takes this crate from git (the OctoSense shell) must link the
 # same crates.io copy as every app (Rinx), or Cargo builds two contracts. The
 # workspace's [patch.crates-io] points it at crates/app-contract here.
-octosense-app-contract = "1.4"
+octosense-app-contract = "1.5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Only for the splash adapter: the policy core never touches makepad, so the
 # rules stay testable in milliseconds. Off by default.
-makepad-widgets = { git = "https://github.com/OctoSense-org/makepad.git", rev = "c155f61d0e1600d2ec474209374444a38a09a470", optional = true }
+makepad-widgets = { git = "https://github.com/OctoSense-org/makepad.git", rev = "68d1f4ecc111daa90c50530e77df3245f05fc2cf", optional = true }
 
 [features]
 default = []

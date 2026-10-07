@@ -47,8 +47,13 @@ pub fn inventory(root: &Path) -> Result<Vec<BundleFile>, String> {
             }
             let path = entry.path();
             let relative = path.strip_prefix(root).map_err(|e| e.to_string())?;
-            let name = relative.to_str().ok_or("bundle paths must be UTF-8")?;
-            safe_relative(name)?;
+            // Name it the way a bundle writes it, not the way this host
+            // separates paths. Reading it back from the host's `Path` puts a
+            // `\` on Windows, which `safe_relative` then refuses - so a
+            // Windows hub rejected its own subdirectories (#75).
+            let name = octosense_app_policy::portable_path(relative)
+                .ok_or("bundle paths must be plain UTF-8 names")?;
+            safe_relative(&name)?;
             let kind = entry.file_type().map_err(|e| e.to_string())?;
             if kind.is_dir() {
                 walk(root, &path, depth + 1, entries, remaining, out)?;
@@ -161,10 +166,15 @@ pub fn validate(root: &Path, files: &[BundleFile]) -> (Vec<Finding>, Vec<Resourc
         .and_then(|text| octosense_app_policy::Listing::parse(&text).ok())
         .and_then(|listing| listing.icon);
     for file in files {
-        let name = file.path.to_string_lossy();
+        // The name the bundle knows this file by. Read back from the host's
+        // `Path` it would carry the host's separator, and on Windows neither
+        // `kit/native/...` nor a listing's `assets/icon.svg` would match -
+        // the checks inside a kit would silently not run.
+        let name = octosense_app_policy::portable_path(&file.path)
+            .unwrap_or_else(|| file.path.to_string_lossy().replace('\\', "/"));
         let path = root.join(&file.path);
         let extension = file.path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
-        let is_icon = icon.as_deref() == Some(name.as_ref());
+        let is_icon = icon.as_deref() == Some(name.as_str());
         let result = match extension.as_str() {
             "splash" | "card" | "json" | "l0" | "octoscript" | "txt" | "md" => read_text(&path, MAX_TEXT_BYTES).and_then(|text| {
                 if extension == "json" {
@@ -191,7 +201,7 @@ pub fn validate(root: &Path, files: &[BundleFile]) -> (Vec<Finding>, Vec<Resourc
             _ => Ok(()),
         };
         if let Err(error) = result {
-            findings.push(Finding::at("contents-invalid", name.as_ref(), error));
+            findings.push(Finding::at("contents-invalid", name.as_str(), error));
         }
     }
     if let Err((path, error)) = validate_entry(root) {

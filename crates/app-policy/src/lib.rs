@@ -55,7 +55,7 @@ pub use agent::{
     SKILLS_DIR, TOOLS_FILE,
 };
 pub use assets::{rewrite_assets, AssetServer, StaticAssets};
-pub use bundle::{digest_dir, MANIFEST_FILE};
+pub use bundle::{digest_dir, portable_path, MANIFEST_FILE};
 pub use containers::{IsolateSettings, Provenance, SessionProfile};
 pub use entry::{script_source, ASSETS_PLACEHOLDER, SCRIPT_ENTRY};
 pub use listing::{agent_permission_lines, kernel_tool_words, privacy_summary, Listing, Publisher, LISTING_FILE};

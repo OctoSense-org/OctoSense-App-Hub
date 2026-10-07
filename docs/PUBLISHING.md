@@ -633,7 +633,7 @@ locally is the report the hub acts on. Build it from this repository with
 
 | Command | What it does |
 | --- | --- |
-| `hub stamp <bundle>` | Write the bundle's digest into `manifest.json`. Rerun after every change. |
+| `hub stamp <bundle>` | Parse `manifest.json` with the gate's own parser, then write the bundle's digest into it. Rerun after every change. A manifest the gate cannot read (an unknown field, a schema that does not parse) is refused here, before signing. A finding the gate would make about the *bundle* — a capability, a host, a listing that is not there yet — is still `check`'s: stamping comes first in the flow and has no signature policy to apply. |
 | `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json]` | The gate. Prints PASSED or REFUSED, each finding (with the file or property at fault), and what the app will be granted; exits non-zero on a refusal. `--json` prints the same report as JSON (`schema`, `passed`, `findings`, `resources`) for tools. |
 | `hub scan <bundle> [--packet <out.json>] [--reviewer <cmd>]` | Stage two: the review packet (manifest, listing, grants, the entry's source, and the reviewer's questions), optionally handed to a reviewer command. Runs only on a bundle the gate passes. |
 | `hub keygen <key file>` | Make a signing key; prints its public half. |

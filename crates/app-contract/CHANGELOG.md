@@ -9,6 +9,17 @@ within `1.x` it only grows.
   Each remains an independent grant. OAuth returns app-bound connection handles;
   provider tokens stay in the host. These declarations require corresponding
   OctoSense implementations and do not make a provider available by themselves.
+- Add the `photos` and `youtube` capabilities for the contained Photos and
+  YouTube UIs to call their owning host services. Neither grants Android
+  Gallery access, a YouTube account or another app's agent tools; cross-app
+  tools remain separate grants.
+- Add `portable_path`: a bundle-relative path written with `/` on every
+  platform. `digest_dir` hashes these names, so a bundle with folders gets
+  the same digest on Windows as on Linux and macOS, where its digest is
+  unchanged: the files keep their path-component order. A Windows host used
+  to hash `\`, which matched no other host. A path that is not a plain UTF-8
+  name is refused instead of hashed lossily; the gate already refused such
+  bundles.
 
 ## 1.4.0
 
