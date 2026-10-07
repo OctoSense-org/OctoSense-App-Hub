@@ -219,6 +219,14 @@ Success prints `bundle/manifest.json: text: unset`. If the bundle is already
 committed, run `git add --renormalize bundle` and repeat
 [step 5](#5-produce-the-final-bytes).
 
+Git matches the pattern from the repository root, so `bundle/**` covers only a
+bundle there. If your bundle is deeper, name its real path, such as
+`apps/my-app/bundle/** -text`, or write `**/bundle/** -text` to cover a
+`bundle/` at any depth. Then run `git check-attr` on that bundle's
+`manifest.json`, and `git add --renormalize` on its directory.
+`text: unspecified` means that the pattern misses the bundle, and Git can
+still convert its files.
+
 ## 2. Get the manifest right
 
 Edit `bundle/manifest.json`. GitHub Notes' 0.1.0 manifest before stamping and
@@ -699,7 +707,7 @@ cannot read gets no report, only one `hub: …` line. The full rules are in
 | Keep an API key or token in the app | Not supported. The gate refuses only password and one-time-code fields, so it does not catch a key typed into a plain field or kept in storage. | Ship no keys. For text generation, use `model`, which calls the person's own AI provider. |
 | Generate images, audio, video or embeddings | Not yet. `model` serves only `model.complete` and `model.budget`. `model.image`, `model.audio`, `model.video` and `model.embeddings` are unknown capabilities ([#85](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/85)–[#88](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/88)). | Use `model.complete` for text. |
 | Use `llm`, `news`, `calendar`, `prompt`, `ledger.read`, `clipboard` or `palpo.*` | The gate admits them, but no host serves them to a store app. `llm` and `news` answer only `os.*` apps, and `calendar` only `os.calendar`. Nothing acts on the others. | Do not request them. For Google Calendar, use `gcalendar`. |
-| Ship `implemented_by: "app"` tools | The gate admits them, but OctoSense refuses to run them. | Use `host-service` tools. |
+| Ship tools that run your app's own logic | Not supported. OctoSense refuses `implemented_by: "app"` tools with `app_tool_unavailable`. A `host-service` tool without `host_method` calls the service named by your app's namespace, which is not a capability, so the call fails with `not_granted`. The gate admits both. | Map each tool with `host_method` to a method of `github`, `gcalendar`, `gmail` or `glance`; OctoSense runs those ([Map a tool to a shared service](PUBLISHING.md#map-a-tool-to-a-shared-service-host_method)). |
 | Submit a system app (`os.*`) or a native app | No route here. System apps ship with the shells, and native code needs a shell release ([delivery paths](DEVELOPMENT.md#choose-a-delivery-path)). | Build a store app with an id of your own. |
 | Install an `auth` app on a phone | No released phone build can. | Test on desktop-v0.1.0-beta.2. |
 | Name Makepad's built-in CJK font in a card kit | Not yet ([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). | Bundle a subset of the font. Unverified: how a subset renders in every host. |

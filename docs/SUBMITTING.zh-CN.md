@@ -126,6 +126,8 @@ git check-attr text -- bundle/manifest.json
 
 成功时输出 `bundle/manifest.json: text: unset`。如果应用包已经 commit 过，运行 `git add --renormalize bundle`，再重做[第 5 步](#5-生成最终字节)。
 
+Git 从仓库根目录开始匹配这个模式，所以 `bundle/**` 只覆盖根目录下的应用包。如果应用包在更深的目录中，就写出它的实际路径，例如 `apps/my-app/bundle/** -text`；也可以写 `**/bundle/** -text`，覆盖任意层级的 `bundle/`。然后对这个应用包的 `manifest.json` 运行 `git check-attr`，对它的目录运行 `git add --renormalize`。输出 `text: unspecified` 说明这个模式没有覆盖应用包，Git 仍可能转换其中的文件。
+
 ## 2. 写对清单
 
 编辑 `bundle/manifest.json`。下面是 GitHub Notes 0.1.0 在写入摘要和签名之前的清单：
@@ -467,7 +469,7 @@ mkdir -p build review
 | 在应用中保存 API 密钥或令牌 | 不支持。准入检查只拒绝密码和一次性验证码字段，因此发现不了输入到普通字段或存放在存储中的密钥。 | 不要附带任何密钥。生成文本请用 `model`，它调用的是用户自己的 AI 提供商。 |
 | 生成图片、音频、视频或向量嵌入 | 尚不支持。`model` 只提供 `model.complete` 和 `model.budget`；`model.image`、`model.audio`、`model.video` 和 `model.embeddings` 都是未知能力（[#85](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/85)–[#88](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/88)）。 | 用 `model.complete` 生成文本。 |
 | 使用 `llm`、`news`、`calendar`、`prompt`、`ledger.read`、`clipboard` 或 `palpo.*` | 准入检查接受它们，但没有宿主向商店应用提供这些服务。`llm` 和 `news` 只响应 `os.*` 应用，`calendar` 只响应 `os.calendar`，其余的没有任何宿主处理。 | 不要请求它们。访问 Google 日历请用 `gcalendar`。 |
-| 附带 `implemented_by: "app"` 的工具 | 准入检查接受，但 OctoSense 拒绝运行它们。 | 使用 `host-service` 工具。 |
+| 附带运行应用自身逻辑的工具 | 不支持。OctoSense 拒绝 `implemented_by: "app"` 的工具，返回 `app_tool_unavailable`。没有 `host_method` 的 `host-service` 工具会调用以应用的命名空间命名的服务，而命名空间不是能力，所以调用失败，返回 `not_granted`。准入检查接受这两种工具。 | 用 `host_method` 把每个工具映射到 `github`、`gcalendar`、`gmail` 或 `glance` 的某个方法，OctoSense 会运行这样的工具（见发布参考的[把工具映射到共享服务](PUBLISHING.zh-CN.md#把工具映射到共享服务host_method)一节）。 |
 | 提交系统应用（`os.*`）或原生应用 | 这里没有提交途径。系统应用随 Shell 一起发布，原生代码需要随 Shell 新版本发布（[交付路径](DEVELOPMENT.zh-CN.md#选择合适的交付路径)）。 | 用自己的 ID 做一个商店应用。 |
 | 在手机上安装 `auth` 应用 | 目前没有任何已发布的手机版本能做到。 | 在 desktop-v0.1.0-beta.2 上测试。 |
 | 在卡片 kit 中引用 Makepad 内置的 CJK 字体 | 尚不支持（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。 | 打包该字体的子集。未验证：子集在各个宿主中的渲染效果。 |

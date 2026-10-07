@@ -165,7 +165,7 @@ my-app/
 | `storage` | 应用自己的存储文件夹：`fs.*`、相机拍摄的内容，以及控件读取的本地文件。没有它，所有 `fs.*` 调用都会失败。 | Keep its own data on this device | 运行时，所有宿主都提供 |
 | `net` | 向 `network.hosts` 中的主机发出请求，不能访问其他主机。 | Reach only: *主机列表* | 运行时，所有宿主都提供 |
 | `images` | 显示任何公开 https 主机上的图片，不限于 `network.hosts`。 | Show pictures from any website | 运行时 |
-| `web` | 在系统网页视图中打开任何公开 https 页面；网页视图没有任何回到应用的通道。 | Open web pages in a browser view | 运行时 |
+| `web` | 在系统网页视图中打开任何公开 https 页面；网页视图没有任何回到应用的通道。 | Open web pages in a browser view | 运行时，仅限 macOS、iOS 和 Android 构建。桌面版 Linux 和 Windows 构建没有系统网页视图。 |
 | `location` | 设备的位置。 | Use your location | 运行时，限具备该功能的设备 |
 | `camera` | 相机。拍摄的内容保存在应用的存储中，所以应用还需要 `storage`。 | Use the camera | 运行时，限具备该功能的设备 |
 | `microphone` | 相机录像时的声音。 | Use the microphone | 运行时，限具备该功能的设备 |
@@ -222,6 +222,8 @@ ID 由 1 到 64 个 `[a-z0-9.-]` 字符组成，不能以 `.` 开头，也不能
 
 系统应用自己的命名空间不在保留之列：`com.example.news` 是允许的。附带 `tools.json` 的应用，命名空间必须符合 `[a-z0-9_]{1,24}`：`com.example.mynotes` 可以声明工具，`com.example.my-notes` 则不能。
 
+ID 请以你能控制的反向域名前缀开头，例如把自己的域名倒过来写（`example.com` 写作 `com.example`），或者用 `io.github.<your-account>`；准入检查不会核实你是否控制这个前缀。
+
 源码：`crates/app-contract/src/manifest.rs` 中的 `RESERVED_NAMES`。
 
 ### 网络主机
@@ -231,6 +233,8 @@ ID 由 1 到 64 个 `[a-z0-9.-]` 字符组成，不能以 `.` 开头，也不能
 ```text
 [refused] policy: host "https://api.open-meteo.com/v1" must be a bare host name, with no scheme or path
 ```
+
+主机列表是每个签名版本的一部分，所以只列出稳定的主机：已发布的应用跟不上隧道换用的新名称，`localhost` 指向的也是用户自己的设备，而不是你的服务器。
 
 ### 存储与配额
 
@@ -378,6 +382,8 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 }
 ```
 
+准入检查接受这些工具，但在商店应用中，OctoSense 会拒绝运行它们，因为它们没有 `host_method`（见 [OctoSense 目前的支持情况](#octosense-目前的支持情况)）。
+
 | 字段 | 含义 |
 | --- | --- |
 | `name` | `<namespace>.<tool>`。命名空间是应用 ID 的最后一段：`os.news` 和 `dev.example.news` 的命名空间都是 `news`。每一段都由 `[a-z0-9_]` 组成。OctoSense 的工具代理（tool broker）负责注册和分派应用工具，它把命名空间之后的部分写成代理名称，用下划线代替点（`news.topics.get` 变为 `topics_get`）。准入检查拒绝超过 32 个字符的代理名称。 |
@@ -387,7 +393,7 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | `background` | 工具可以在并非由用户发起的一轮对话中运行。默认 `false`。 |
 | `shareable` | 可以授权给应用自身 Agent 以外的调用方，例如 OctoSense 的系统 Agent（覆盖整台设备，用户直接与它对话）和其他应用的 Agent。默认 `false`。 |
 | `private_data` | 结果中含有用户的私人数据。`local_only` 应用的可共享工具必须设为 `false`；带 `host_method` 的工具必须设为 `true`。 |
-| `implemented_by` | `host-service`：由宿主服务运行。`app`：由应用自己的脚本运行。必填。 |
+| `implemented_by` | `host-service`：由宿主服务运行。`app`：由应用自己的脚本运行，OctoSense 目前还不支持。必填。 |
 | `host_method` | 工具映射到的已审核共享服务方法（[把工具映射到共享服务](#把工具映射到共享服务host_method)）。可选。 |
 | `outward` | 如果 `act` 工具的调用会触及设备之外（发送、发帖、分享），就设置此项。这样每次调用都会像破坏性（`destructive`）调用一样，等待用户批准。默认 `false`；准入检查拒绝在 `read` 工具上设置它。 |
 | `auto_approvable` | 常设规则（例如“一小时内允许”）可以批准调用。默认 `true`。对于删除、付款、账户或安全设置的变更，以及向设备之外分享，请设为 `false`，让用户逐次当场批准。 |
@@ -491,7 +497,7 @@ OctoSense 桌面版 0.1.0-beta.2 的商店用一行说明代替前三行：“Ru
 | 组成部分 | 现状 |
 | --- | --- |
 | 与 Agent 对话 | 用户允许应用的 Agent 之后，在 Shell 的“Ask &lt;app&gt;”对话栏中进行。OctoSense 会在首次使用时询问。`card-host` 不运行 Agent。 |
-| `implemented_by: "host-service"` 的工具 | 以应用的身份，在工具命名空间对应的宿主服务上运行；设置了 `host_method` 时，则在该方法所属的宿主服务上运行。清单必须授予该服务族。工具调用从不弹出面板。 |
+| `implemented_by: "host-service"` 的工具 | 以应用的身份，在 `host_method` 指定的服务上运行，清单必须请求该服务。没有 `host_method` 的工具会调用以其命名空间命名的服务。系统应用（例如 `os.news`）可以这样调用，但商店应用的命名空间不是能力，调用会失败，返回 `not_granted`。工具调用从不弹出面板。 |
 | `implemented_by: "app"` 的工具 | 尚不支持：调用会失败，返回 `app_tool_unavailable`。 |
 | `AGENT.md` 和技能 | 作为指引，在每一轮对话中加载。它们不授予任何工具。 |
 | `agent.tools` | `ask_user_question` 可用。尚不支持：`ledger.read`、`ledger.write`、`net.fetch`、`storage.read`、`storage.write` 和 `card.render` 的执行器。 |
