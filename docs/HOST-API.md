@@ -49,6 +49,15 @@ returns opaque connection handles, refuses redirects and token-bearing results,
 and reviews writes in its native UI. Background reads cannot approve writes.
 Endpoint or lifecycle changes invalidate backend connections.
 
+Host-service tools may alias `auth.backend.me`, `auth.backend.request`,
+`runtime.list`, `runtime.describe`, the three device `*.permission.status`
+methods and `location.get`, with minimum risk `read`, the relevant capability
+and `private_data: true`. The backend request alias runs **declared GET operations
+only**: every agent tool call is nonprompting, so backend mutations are refused
+before HTTP execution and still require foreground native review. Permission
+requests/revocation, account management and sheet controls remain unavailable
+as aliases. Admission does not replace runtime account, consent or platform checks.
+
 Script tools run a signed `app_tool(name, call_id)` handler in the full app's
 existing VM and storage jail. They do not load native libraries or Wasm, and a
 closed app returns `app_not_running`. See the

@@ -270,6 +270,44 @@ fn shared_host_method_alias_is_pinned_and_needs_its_declared_capability() {
 }
 
 #[test]
+fn host_api_read_aliases_load_only_with_the_owning_apps_capability_and_privacy_declaration() {
+    for method in [
+        "runtime.list",
+        "runtime.describe",
+        "auth.backend.me",
+        "auth.backend.request",
+        "camera.permission.status",
+        "microphone.permission.status",
+        "location.permission.status",
+        "location.get",
+    ] {
+        let family = method.split('.').next().unwrap();
+        let dir = scratch(&format!("host-api-read-{method}"));
+        edit_tools(&dir, |tools| {
+            tools["tools"][0]["host_method"] = json!(method);
+            tools["tools"][0]["private_data"] = json!(true);
+            tools["tools"][0]["shareable"] = json!(false);
+        });
+        let manifest = stamp(&dir, |_| {});
+        assert!(AgentBundle::load(&dir, &manifest).unwrap_err().contains(
+            &format!("requires the declared {family:?} service capability")
+        ), "{method} must not grant its own capability");
+        let manifest = stamp(&dir, |manifest| {
+            manifest["capabilities"].as_array_mut().unwrap().push(json!(family));
+        });
+        let loaded = AgentBundle::load(&dir, &manifest).unwrap().unwrap();
+        let tool = loaded.tool("news.list").unwrap();
+        assert_eq!(tool.service_method(), method);
+        assert_eq!(tool.risk, Risk::Read);
+        assert!(!tool.shareable, "admission must not expand sharing");
+        edit_tools(&dir, |tools| tools["tools"][0]["private_data"] = json!(false));
+        let manifest = stamp(&dir, |_| {});
+        assert!(AgentBundle::load(&dir, &manifest).unwrap_err().contains("private_data: true"), "{method}");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+}
+
+#[test]
 fn host_aliases_cannot_target_script_implementations_sheets_or_unreviewed_writes() {
     let base = || {
         json!({"schema":1,"tools":[{
@@ -294,6 +332,17 @@ fn host_aliases_cannot_target_script_implementations_sheets_or_unreviewed_writes
         "auth.connect",
         "auth.disconnect",
         "auth.accounts",
+        "auth.active",
+        "auth.select",
+        "auth.backend.sheet.approve",
+        "camera.permission.request",
+        "microphone.permission.request",
+        "location.permission.request",
+        "camera.permission.revoke",
+        "microphone.permission.revoke",
+        "location.permission.revoke",
+        "app_tools.dispatch",
+        "app_policy.device_consent",
         "gmail.send",
         "gmail.draft.review",
         "gcalendar.review_save",

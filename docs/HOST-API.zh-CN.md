@@ -24,6 +24,8 @@
 
 可选的 `backend` 块包含公开 OAuth 客户端信息和同源的具名业务操作，要求 `auth`、账户存储及 `backend-api-v1`。宿主只从已准入、签名验证的应用包解析声明，返回不透明连接句柄，拒绝重定向和含令牌的结果，并在原生界面审阅写入。后台读取不能批准写入。端点或安装生命周期变化会使后端连接失效。
 
+宿主服务工具可映射到 `auth.backend.me`、`auth.backend.request`、`runtime.list`、`runtime.describe`、三种设备的 `*.permission.status` 及 `location.get`，最低风险为 `read`，仍需相应能力和 `private_data: true`。后端请求别名**只执行已声明的 GET 操作**：Agent 工具调用均不能弹窗，因此后端修改操作会在发起 HTTP 前被拒绝，仍须在前台原生界面审阅。权限申请/撤销、账户管理和面板控制不提供工具别名。准入不代替运行时的账户、授权或平台检查。
+
 脚本工具在完整应用已有的 VM 和存储沙箱中执行签名源码的 `app_tool(name, call_id)`，不加载原生库或 Wasm。应用关闭时返回 `app_not_running`。详见[脚本工具 ABI](PUBLISHING.zh-CN.md)和[开发指南](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-API-V1.zh-CN.md)。
 
 平台限制仍须明确：首批设备服务支持 Android 和 macOS 权限；`location.get` 只返回 Android 上次已知位置，时效未知。Linux/Windows 内嵌 `WebReader` 尚不支持。字体修复为宿主提供的随包字体选择正确资源加载器，并保留中文后备字体；准入同时检查字面量和单层 token 引用的字体。这些改动不代表 Linux/Windows、手机、真实提供商或模型验收已经完成。

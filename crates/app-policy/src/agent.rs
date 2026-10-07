@@ -427,6 +427,17 @@ impl ToolManifest {
 /// management are not agent aliases. The executor must still check its actual
 /// resolved capability and registered handler; admission does not provide one.
 pub const SHARED_HOST_METHODS: &[(&str, Risk)] = &[
+    ("runtime.list", Risk::Read),
+    ("runtime.describe", Risk::Read),
+    ("auth.backend.me", Risk::Read),
+    // Agent tools always carry may_prompt=false. The backend service permits
+    // only declared GET operations in that context; mutations require the
+    // foreground native review and are refused before HTTP execution.
+    ("auth.backend.request", Risk::Read),
+    ("camera.permission.status", Risk::Read),
+    ("microphone.permission.status", Risk::Read),
+    ("location.permission.status", Risk::Read),
+    ("location.get", Risk::Read),
     ("github.repositories", Risk::Read),
     ("github.files", Risk::Read),
     ("github.read", Risk::Read),
