@@ -22,6 +22,8 @@ App Hub 为 OctoSense 发布应用。本仓库包含：
 
 **要提交应用？** 请按照[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)操作：在本仓库开一个 issue，提交一个已签名的应用包；它必须位于打了 tag 的 commit 上。目录中的[三个参考应用](docs/SUBMITTING.zh-CN.md#三个参考应用)（GitHub Notes、Inbox Assistant 和 Google Calendar）完整通过了准入，它们的仓库展示了一次完整的提交。规则、能力和字段请查阅[发布参考](docs/PUBLISHING.zh-CN.md)。
 
+新的宿主 API 声明与可用性检查见[宿主 API 兼容性](docs/HOST-API.zh-CN.md)。
+
 ## 仓库结构
 
 | 路径 | 说明 |

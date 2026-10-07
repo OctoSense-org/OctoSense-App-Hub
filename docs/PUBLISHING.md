@@ -179,7 +179,9 @@ font in `card-host`.
 | `compute` | `instruction_budget`, `memory_bytes`. | Clamped to the host's ceilings. |
 | `agent` | The app's own agent. | Optional ([The manifest's `agent`](#the-manifests-agent)). |
 | `research` | The scope of `research` and `crawl`. | Required with `research` or `crawl`; refused when the manifest requests neither ([The research scope](#the-research-scope)). |
-| `requires` | Host features the app needs. | Each must be a feature the host knows; the only one is `palpo-admin-v1`. |
+| `requires` | Host features the app needs. | Each must be a feature the host knows; known features are `palpo-admin-v1`, `host-api-v1`, `backend-api-v1` and `script-tools-v1`. The latter three require compatible host implementations; see [Host API compatibility](HOST-API.md). |
+| `host_api` | Optional required/optional exact API-version maps. | Requires `host-api-v1`; the installer and launcher check required implementations. |
+| `backend` | Optional public backend login and named-operation declaration. | Requires `backend-api-v1`, `auth` and account storage. Never include credentials. |
 | `schema_minor` | Which additions to schema 1 the manifest uses. | Leave it out. |
 
 Any other field is refused. After `hub sign-manifest`, the manifest also holds

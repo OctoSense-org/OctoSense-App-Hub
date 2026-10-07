@@ -34,6 +34,8 @@ Notes, Inbox Assistant and Google Calendar) passed admission end to end; their
 repositories show a complete submission. Look up rules, capabilities and
 fields in the [publishing reference](docs/PUBLISHING.md).
 
+New host API declarations and availability checks are described in [Host API compatibility](docs/HOST-API.md).
+
 ## Repository layout
 
 | Path | What it is |

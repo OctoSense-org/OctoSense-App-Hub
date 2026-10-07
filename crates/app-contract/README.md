@@ -33,6 +33,18 @@ fn open(package: &std::path::Path) -> Result<octosense_app_contract::AppPolicy, 
 }
 ```
 
+## Host API declarations (1.6 source)
+
+`host_api::HostApiRequirements` records required and optional exact ABI-major
+versions. `AppManifest::check_host_apis` compares required methods and feature
+ABIs with the host's implemented inventory. Hosts must perform this check at
+install and launch; admission alone does not prove runtime support.
+
+`backend::BackendRegistration` describes an app's public HTTPS login and named
+business operations. Credentials remain in the host. Backend and device access
+still require separate grants, supported native adapters and user consent.
+See [host API compatibility](../../docs/HOST-API.md) for examples and limits.
+
 ## Versions on crates.io
 
 crates.io has 1.0.0, 1.1.0, 1.2.0 and 1.5.0. Versions 1.3.0 and 1.4.0 exist

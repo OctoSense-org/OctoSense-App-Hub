@@ -143,7 +143,9 @@ my-app/
 | `compute` | `instruction_budget`、`memory_bytes`。 | 会限制在宿主的上限以内。 |
 | `agent` | 应用自己的 Agent。 | 可选（[清单中的 `agent`](#清单中的-agent)）。 |
 | `research` | `research` 和 `crawl` 的范围。 | 请求了 `research` 或 `crawl` 时必需；两者都没请求时，出现此字段即拒绝（[research 范围](#research-范围)）。 |
-| `requires` | 应用需要的宿主特性。 | 每一项都必须是宿主已知的特性；唯一的已知特性是 `palpo-admin-v1`。 |
+| `requires` | 应用需要的宿主特性。 | 每一项都必须是宿主已知的特性；已知特性有 `palpo-admin-v1`、`host-api-v1`、`backend-api-v1` 和 `script-tools-v1`。后三项还要求宿主实现对应接口，见[宿主 API 兼容性](HOST-API.zh-CN.md)。 |
+| `host_api` | 可选的必需/可选 API 精确版本映射。 | 要求 `host-api-v1`，安装和启动时检查必需的实现。 |
+| `backend` | 可选的公开后端登录及具名业务操作声明。 | 要求 `backend-api-v1`、`auth` 和账户存储，不得包含凭据。 |
 | `schema_minor` | 清单用到了 schema 1 的哪些新增内容。 | 省略此字段。 |
 
 其他字段一律拒绝。运行 `hub sign-manifest` 之后，你省略的可选字段也会出现在清单中，值为 `null`，例如 `"agent": null`。这些字段不改变任何行为。

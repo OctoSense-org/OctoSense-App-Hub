@@ -8,6 +8,18 @@ unpublished, and 1.5.0 includes their changes.
 [README.md](README.md#versions-on-cratesio) shows how to update a lock file
 that holds 1.2.0.
 
+## 1.6.0 (release pending)
+
+- Adds signed `host_api` requirements with exact ABI-major versions, implemented
+  method descriptions, and the introspection-only `runtime` capability.
+- Adds public, app-owned `backend` declarations: one HTTPS origin, fixed public
+  client metadata, and a bounded named operation map. It contains no credentials.
+- Adds the `host-api-v1`, `backend-api-v1` and `script-tools-v1` requirement
+  markers. Older hosts reject the markers; newer hosts must also check that
+  required methods and runtime policy/dispatch ABIs exist before installation.
+- Old manifests preserve their serialized defaults and signature payloads.
+  A declaration never grants OS access, authorizes a write or implements a service.
+
 ## 1.5.0
 
 - `KNOWN_CAPABILITIES` gains the `auth`, `github`, `gcalendar` and `gmail`
