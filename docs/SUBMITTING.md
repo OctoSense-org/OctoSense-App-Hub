@@ -93,7 +93,10 @@ The rehearsal is verified only with a shell built from source.
 ### Check your platform
 
 - **macOS on Apple silicon** is verified: every command in this guide ran on it.
-- **Windows** is unverified on current `main`. Run Design Flow's tool as
+- **Windows** is unverified on current `main`. Open issue
+  [#41](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/41) records
+  a native Windows 11 build and run at an earlier revision, verified by a
+  community member rather than the maintainers. Run Design Flow's tool as
   `python tools/octo`; it finds `hub.exe` and `card-host.exe`. Add the
   `.gitattributes` file from [step 1](#1-lay-out-the-repository) before you
   commit the bundle, and run the final check from a fresh clone
@@ -345,6 +348,11 @@ anyway and adds
 `(still changing after 2s, e.g. an animation; this is the last frame)` to its
 output; look at that frame. For other capture problems, see
 [QUICKSTART's troubleshooting](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md#troubleshooting).
+
+Unverified, Linux only: if `shot` times out under software rendering
+(llvmpipe, WSL), set `MAKEPAD_WRITE_FRAMEBUFFER_PNG=<file>` before you start
+`tools/octo run` or `card-host`, and Makepad's OpenGL backend saves the window
+to that PNG each time it draws it; on macOS, `shot` stays the verified path.
 
 A screen that needs a host service, or a native widget such as GitHub Notes'
 Markdown editor, does not render in `card-host`. Capture such a screen with
@@ -688,7 +696,7 @@ cannot read gets no report, only one `hub: …` line. The full rules are in
 | `hub: manifest is not valid: unknown field …`, with no report | `hub stamp` and `hub check` cannot parse the manifest. | Remove or rename the field. The message lists the valid ones. |
 | `contents: <file> has extension "…", which a bundle may not hold` | `.DS_Store`, `LICENSE` or another file without an allowed extension. | Delete it or move it out of `bundle/`. |
 | `contents-invalid (<file>): cannot decode the image: …` | A corrupt image, another format renamed to `.png` or an image over 4096 pixels a side. | Capture or export it again. |
-| `resource-invalid (…/font_src): not a portable bundle path: "makepad_widgets:resources/…"` | A card kit names a built-in font other than `makepad_widgets:resources/Inter.ttf`, such as the CJK font ([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). | Bundle a subset of the font and point `font_src` at it. |
+| `resource-invalid (…/font_src): not a portable bundle path: "makepad_widgets:resources/…"` | A card kit names a built-in font other than `makepad_widgets:resources/Inter.ttf`, such as the CJK font ([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). | Use `makepad_widgets:resources/Inter.ttf` for Latin text. For Chinese, build the card from the role kit and set no `font_src` ([Fonts](PUBLISHING.md#fonts)). A bundled font passes the gate but does not load in a card. |
 | `assets: <file> contains https://…`, or `assets: main.splash reaches <host>, which the manifest does not declare in network.hosts` | A URL in a bundled `.txt`, `.md`, `.json` or `.card` file, such as a license, or a script host missing from `network.hosts`. | Move the file out of `bundle/` or drop the URL. Declare each script host in `network.hosts` and request `net`. |
 | `identity: … is under os.`, or `identity: app id "…" ends in "…", which is reserved` | The id is under `os.`, or the id or its last segment is one of `agents` `apphub` `appcard` `browser` `calculator` `card` `clock` `dev` `notes` `octos` `octoscode` `os` `reference` `reminders` `rinx` `sheets` `shell` `system` `task` `terminal` `toolbox` `weather` `workflow`. | Choose another id before your first release. |
 | `listing: listing has more than 10 keywords`, `… more than 8 screenshots` or `listing platform "…" is not one of […]` | The listing breaks a limit or misspells a name. | Trim the list, or use a name from the message. |
@@ -710,7 +718,7 @@ cannot read gets no report, only one `hub: …` line. The full rules are in
 | Ship tools that run your app's own logic | Not supported. OctoSense refuses `implemented_by: "app"` tools with `app_tool_unavailable`. A `host-service` tool without `host_method` calls the service named by your app's namespace, which is not a capability, so the call fails with `not_granted`. The gate admits both. | Map each tool with `host_method` to a method of `github`, `gcalendar`, `gmail` or `glance`; OctoSense runs those ([Map a tool to a shared service](PUBLISHING.md#map-a-tool-to-a-shared-service-host_method)). |
 | Submit a system app (`os.*`) or a native app | No route here. System apps ship with the shells, and native code needs a shell release ([delivery paths](DEVELOPMENT.md#choose-a-delivery-path)). | Build a store app with an id of your own. |
 | Install an `auth` app on a phone | No released phone build can. | Test on desktop-v0.1.0-beta.2. |
-| Name Makepad's built-in CJK font in a card kit | Not yet ([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). | Bundle a subset of the font. Unverified: how a subset renders in every host. |
+| Name Makepad's built-in CJK font in a card kit | Not yet ([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). A bundled font passes the gate but does not load in a card. | Build the card from the role kit and set no `font_src`: the role kit draws Chinese with the built-in CJK face ([Fonts](PUBLISHING.md#fonts)). Unverified: how the OctoSense shells draw it. |
 
 Design Flow's
 [HOST-SERVICES.md](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md)

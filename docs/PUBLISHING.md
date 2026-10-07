@@ -135,19 +135,43 @@ admission. A warning does not.
 ### Fonts
 
 A card names a font with `font_src`, in the `page.data.json` placements or in
-a native kit's component styles. The value must be a font file in the bundle,
-or the one built-in font the gate allows,
-`makepad_widgets:resources/Inter.ttf`. Any other built-in font is refused:
+a native kit's component styles. The gate accepts a font file in the bundle,
+or the one built-in font it allows, `makepad_widgets:resources/Inter.ttf`. Any
+other built-in font is refused:
 
 ```text
 [refused] resource-invalid (kit/native/light/kit.json/components/detail/style/font_src): not a portable bundle path: "makepad_widgets:resources/LXGWWenKaiRegular.ttf"
 ```
 
 Not yet: other built-in fonts
-([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). For text
-that Inter does not cover, such as Chinese, bundle a `.ttf` or `.otf` file; it
-counts toward the 8 MiB limit. The gate does not decode font files, so test the
-font in `card-host`.
+([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)).
+
+A bundled font named in `font_src` passes the gate but does not load in
+`card-host` today, and `card-host` logs nothing about it. Do not ship one for a
+card. Inter has no Chinese glyphs either. For Chinese text in a card, build the
+card from the role kit, the OctoScript kit modules in `kit/` with components
+such as `Surface`, `TextTitle` and `TextBody`, and set no `font_src`. The role
+kit draws Chinese with Makepad's built-in CJK face, LXGW WenKai.
+
+By default, Makepad draws a glyph that the card's fonts lack with one of the
+operating system's fonts, so on macOS Chinese appears even when the card's own
+font did not load. Turn that fallback off when you check a card:
+
+```sh
+MAKEPAD_SYSTEM_FONTS=0 tools/octo run ~/apps/my-app/bundle --port 8141 --detach
+```
+
+Each glyph that the card's fonts lack now draws as a box, as it does on Linux
+without a system CJK font.
+
+A script app can bundle a font. Name the file through the `{{assets}}`
+placeholder in a text style's `FontMember`; it counts toward the 8 MiB limit:
+
+```splash
+Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{latin := FontMember{res: http_resource("{{assets}}/fonts/<file>.ttf") asc: 0.0 desc: 0.0}} font_size: 20}}
+```
+
+Unverified: how the OctoSense shells draw these fonts.
 
 ## The manifest
 

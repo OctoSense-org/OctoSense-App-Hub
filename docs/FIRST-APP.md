@@ -184,8 +184,10 @@ my-app/
       01-main.png        # a real capture, added in section 4
 ```
 
-A card's fonts must be files in the bundle, or the built-in
-`makepad_widgets:resources/Inter.ttf` ([Fonts](PUBLISHING.md#fonts)).
+The gate accepts a card's `font_src` only as a font file in the bundle or the
+built-in `makepad_widgets:resources/Inter.ttf`, yet a bundled font does not
+load in a card today. Read [Fonts](PUBLISHING.md#fonts) before you set a font
+or show Chinese text.
 
 ### Both kinds
 

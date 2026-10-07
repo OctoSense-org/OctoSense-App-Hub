@@ -62,7 +62,7 @@ OctoSense `main` 与 desktop-v0.1.0-beta.2 有以下不同，这些改动尚未�
 ### 确认你的平台
 
 - **macOS（Apple 芯片）**：已验证，本文所有命令都在这个平台上运行过。
-- **Windows**：尚未在当前 `main` 上验证。用 `python tools/octo` 运行 Design Flow 的工具，它能找到 `hub.exe` 和 `card-host.exe`。commit 应用包之前，先加上[第 1 步](#1-安排仓库结构)的 `.gitattributes`；最后一次检查要在全新克隆上做（[第 6 步](#6-冻结并验证发布)）。
+- **Windows**：尚未在当前 `main` 上验证。开放中的 issue [#41](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/41) 记录了在较早版本上完成的 Windows 11 原生构建和运行，由社区成员而非维护者验证。用 `python tools/octo` 运行 Design Flow 的工具，它能找到 `hub.exe` 和 `card-host.exe`。commit 应用包之前，先加上[第 1 步](#1-安排仓库结构)的 `.gitattributes`；最后一次检查要在全新克隆上做（[第 6 步](#6-冻结并验证发布)）。
 - **Linux**：未经验证。另有报告称，在软件渲染（llvmpipe、WSL）下截取画面（`/g`）会超时，这一点同样未经验证。
 
 ### 保护发布者密钥
@@ -212,6 +212,8 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 ```
 
 使用前逐张打开 PNG 查看。不要发布错误画面、空白的首帧或效果图。如果应用一直在播放动画，`shot` 仍会保存最后一帧，并在输出中注明 `(still changing after 2s, e.g. an animation; this is the last frame)`；请检查这一帧。其他截图问题见 [QUICKSTART 的故障排查](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md#troubleshooting)。
+
+未验证，仅限 Linux：如果在软件渲染（llvmpipe、WSL）下 `shot` 超时，请在启动 `tools/octo run` 或 `card-host` 之前设置 `MAKEPAD_WRITE_FRAMEBUFFER_PNG=<file>`，Makepad 的 OpenGL 后端每次绘制窗口时都会把窗口画面保存到这个 PNG 文件；在 macOS 上，`shot` 仍是经过验证的截图方式。
 
 需要宿主服务或原生控件（例如 GitHub Notes 的 Markdown 编辑器）的界面，在 `card-host` 中渲染不出来。这样的界面，请在提供该服务或控件的 Shell 中用虚构数据截图；否则，截下它的不可用状态，就像 Google Calendar 的 `03-host-required.png` 那样。在描述中注明哪些截图用了虚构数据。
 
@@ -450,7 +452,7 @@ mkdir -p build review
 | `hub: manifest is not valid: unknown field …`，没有报告 | `hub stamp` 和 `hub check` 无法解析清单。 | 删除该字段，或改用正确的字段名。消息中列出了合法字段。 |
 | `contents: <file> has extension "…", which a bundle may not hold` | `.DS_Store`、`LICENSE`，或其他扩展名不在允许范围内的文件。 | 删除它，或移出 `bundle/`。 |
 | `contents-invalid (<file>): cannot decode the image: …` | 图片损坏、其他格式改名成了 `.png`，或者单边超过 4096 像素。 | 重新截图或导出。 |
-| `resource-invalid (…/font_src): not a portable bundle path: "makepad_widgets:resources/…"` | 卡片 kit 引用了 `makepad_widgets:resources/Inter.ttf` 以外的内置字体，例如内置的 CJK 字体（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。 | 把字体子集打包进应用包，并让 `font_src` 指向它。 |
+| `resource-invalid (…/font_src): not a portable bundle path: "makepad_widgets:resources/…"` | 卡片 kit 引用了 `makepad_widgets:resources/Inter.ttf` 以外的内置字体，例如内置的 CJK 字体（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。 | 拉丁文字用 `makepad_widgets:resources/Inter.ttf`。中文请改用角色 kit 组合卡片，并且不设 `font_src`（见发布参考的[字体](PUBLISHING.zh-CN.md#字体)一节）。打包的字体能通过准入检查，但在卡片中不会加载。 |
 | `assets: <file> contains https://…`，或 `assets: main.splash reaches <host>, which the manifest does not declare in network.hosts` | 应用包中的 `.txt`、`.md`、`.json` 或 `.card` 文件（例如许可证）含有 URL，或者脚本访问的主机没有列在 `network.hosts` 中。 | 把文件移出 `bundle/`，或删掉 URL。在 `network.hosts` 中声明脚本访问的每个主机，并请求 `net`。 |
 | `identity: … is under os.`，或 `identity: app id "…" ends in "…", which is reserved` | ID 以 `os.` 开头，或者 ID 本身或其最后一段是以下名称之一：`agents` `apphub` `appcard` `browser` `calculator` `card` `clock` `dev` `notes` `octos` `octoscode` `os` `reference` `reminders` `rinx` `sheets` `shell` `system` `task` `terminal` `toolbox` `weather` `workflow`。 | 在首次发布之前换一个 ID。 |
 | `listing: listing has more than 10 keywords`、`… more than 8 screenshots` 或 `listing platform "…" is not one of […]` | 商店信息超出上限，或名称拼错。 | 精简列表，或使用消息中给出的名称。 |
@@ -472,6 +474,6 @@ mkdir -p build review
 | 附带运行应用自身逻辑的工具 | 不支持。OctoSense 拒绝 `implemented_by: "app"` 的工具，返回 `app_tool_unavailable`。没有 `host_method` 的 `host-service` 工具会调用以应用的命名空间命名的服务，而命名空间不是能力，所以调用失败，返回 `not_granted`。准入检查接受这两种工具。 | 用 `host_method` 把每个工具映射到 `github`、`gcalendar`、`gmail` 或 `glance` 的某个方法，OctoSense 会运行这样的工具（见发布参考的[把工具映射到共享服务](PUBLISHING.zh-CN.md#把工具映射到共享服务host_method)一节）。 |
 | 提交系统应用（`os.*`）或原生应用 | 这里没有提交途径。系统应用随 Shell 一起发布，原生代码需要随 Shell 新版本发布（[交付路径](DEVELOPMENT.zh-CN.md#选择合适的交付路径)）。 | 用自己的 ID 做一个商店应用。 |
 | 在手机上安装 `auth` 应用 | 目前没有任何已发布的手机版本能做到。 | 在 desktop-v0.1.0-beta.2 上测试。 |
-| 在卡片 kit 中引用 Makepad 内置的 CJK 字体 | 尚不支持（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。 | 打包该字体的子集。未验证：子集在各个宿主中的渲染效果。 |
+| 在卡片 kit 中引用 Makepad 内置的 CJK 字体 | 尚不支持（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。打包的字体能通过准入检查，但在卡片中不会加载。 | 用角色 kit 组合卡片，并且不设 `font_src`：角色 kit 会用内置的 CJK 字体显示中文（见发布参考的[字体](PUBLISHING.zh-CN.md#字体)一节）。未验证：OctoSense Shell 中的显示效果。 |
 
 哪个 Shell 提供哪项宿主服务，见 Design Flow 的 [HOST-SERVICES.md](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md)。

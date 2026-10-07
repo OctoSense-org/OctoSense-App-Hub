@@ -105,13 +105,31 @@ my-app/
 
 ### 字体
 
-卡片用 `font_src` 指定字体，写在 `page.data.json` 的布局项（placements）中，或原生 kit 的组件样式中。它的值必须是应用包中的字体文件，或者准入检查唯一允许的内置字体 `makepad_widgets:resources/Inter.ttf`。其他内置字体一律拒绝：
+卡片用 `font_src` 指定字体，写在 `page.data.json` 的布局项（placements）中，或原生 kit 的组件样式中。准入检查接受应用包中的字体文件，或它唯一允许的内置字体 `makepad_widgets:resources/Inter.ttf`。其他内置字体一律拒绝：
 
 ```text
 [refused] resource-invalid (kit/native/light/kit.json/components/detail/style/font_src): not a portable bundle path: "makepad_widgets:resources/LXGWWenKaiRegular.ttf"
 ```
 
-尚不支持：其他内置字体（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。对于 Inter 没有覆盖的文字（例如中文），请把 `.ttf` 或 `.otf` 文件打包进应用包；该文件计入 8 MiB 上限。准入检查不解码字体文件，所以请在 `card-host` 中测试字体。
+尚不支持：其他内置字体（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。
+
+`font_src` 指向的打包字体能通过准入检查，但目前在 `card-host` 中不会加载，`card-host` 的日志里也没有任何提示。不要为卡片附带字体文件。Inter 同样没有中文字形。卡片中要显示中文，请用角色 kit 组合卡片，并且不设 `font_src`。角色 kit 指放在 `kit/` 中的 OctoScript kit 模块，其组件包括 `Surface`、`TextTitle` 和 `TextBody` 等；它会用 Makepad 内置的 CJK 字体 LXGW WenKai（霞鹜文楷）显示中文。
+
+默认情况下，卡片字体缺少的字形，Makepad 会改用操作系统的字体来绘制，所以在 macOS 上，即使卡片自己的字体没有加载，中文也照样显示。检查卡片时，请关闭这项回退：
+
+```sh
+MAKEPAD_SYSTEM_FONTS=0 tools/octo run ~/apps/my-app/bundle --port 8141 --detach
+```
+
+这时，卡片字体缺少的每个字形都会显示成方框，就像在没有系统 CJK 字体的 Linux 上一样。
+
+脚本应用可以附带字体。在文字样式的 `FontMember` 中通过 `{{assets}}` 占位符指定字体文件；该文件计入 8 MiB 上限：
+
+```splash
+Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{latin := FontMember{res: http_resource("{{assets}}/fonts/<file>.ttf") asc: 0.0 desc: 0.0}} font_size: 20}}
+```
+
+未验证：OctoSense Shell 如何绘制这些字体。
 
 ## 清单
 
