@@ -61,10 +61,34 @@ app id. Only requested names are eligible; owner sharing, caller grants and a
 real executor remain separate shell checks. An offer neither starts an agent
 nor gives script UI code raw host-service access. Store defaults are unchanged.
 
+App contract 1.5 admits four additional, independent host-service capabilities:
+`auth` for GitHub/Google connection management, `github` for repository operations,
+`gcalendar` for Google Calendar, and `gmail` for Gmail. OAuth tokens belong to the
+host; apps receive handles bound to their own identity and authorized scopes.
+The declarations do not register services: standalone `card-host` has none of
+these providers. The OctoSense host implementation and provider registrations
+must be installed before a sample can sign in. No OctoSense account is required.
+
+An ordinary app can bind its own agent tool to a reviewed shared service with
+`"implemented_by":"host-service", "host_method":"github.read"` in `tools.json`.
+The tool keeps its app namespace. Admission checks the target against
+`SHARED_HOST_METHODS`, the declared service grant, private-data disclosure and
+minimum risk; the shell must check the resolved grant again when executing it.
+Omitting `host_method` preserves the original dispatch behavior. Authentication,
+host sheets, direct saves and sends cannot be aliased. An admitted alias neither
+installs its service nor grants approval for an external action.
+
 The `calendar` capability (app contract 1.4) separately admits Calendar UI
 requests. OctoSense registers the Calendar service and checks its owning app
 identity. A declared capability alone does not provide a service, a calendar
 account, or agent tools.
+
+Host-owned account and review sheets are modal: text, keyboard, IME,
+clipboard and pointer-release events reach only the visible sheet. Timer and
+service callbacks continue to reach the app. The runner captures its own card
+and sheet references before evaluating app widgets, so a bundle cannot replace
+the host surface by reusing a widget ID. `services::is_sheet_input_event` supplies
+the same input boundary to integrated foreground Glance hosts.
 
 ## Trust anchor
 

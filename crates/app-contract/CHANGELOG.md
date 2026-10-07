@@ -3,6 +3,13 @@
 `octosense-app-contract` follows the rules in [README.md](README.md#stability):
 within `1.x` it only grows.
 
+## 1.5.0
+
+- Admit the `auth`, `github`, `gcalendar` and `gmail` host-service capabilities.
+  Each remains an independent grant. OAuth returns app-bound connection handles;
+  provider tokens stay in the host. These declarations require corresponding
+  OctoSense implementations and do not make a provider available by themselves.
+
 ## 1.4.0
 
 - Add the `calendar` capability for a contained Calendar UI to call its

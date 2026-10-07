@@ -53,6 +53,10 @@ pub fn is_host_service(capability: &str) -> bool {
 pub fn service_words(capability: &str) -> Option<&'static str> {
     if let Some(words) = octosense_app_contract::palpo::words(capability) { return Some(words); }
     Some(match capability {
+        "auth" => "Connect and disconnect its own GitHub or Google accounts through the host",
+        "github" => "Read authorized repositories and ask you to review Markdown commits",
+        "gcalendar" => "Read authorized Google calendars and ask you to review event changes",
+        "gmail" => "Read authorized Gmail messages, keep reply drafts and request native send review",
         "matrix.account_info" => "See which Matrix account you are using",
         "matrix.device" => "See this device's Matrix session details",
         "matrix.dm_find" => "Find your direct chats with a person",
@@ -146,6 +150,15 @@ mod tests {
         ] {
             assert!(!is_host_service(name), "{name:?} must not be a service");
             assert!(!KNOWN_CAPABILITIES.contains(&name), "{name:?} must not be known");
+        }
+    }
+
+    #[test]
+    fn connected_services_have_consent_words_without_implied_grants() {
+        for name in ["auth", "github", "gcalendar", "gmail"] {
+            assert!(KNOWN_CAPABILITIES.contains(&name));
+            assert!(service_words(name).is_some());
+            assert!(!is_host_service(&format!("{name}.*")));
         }
     }
 }

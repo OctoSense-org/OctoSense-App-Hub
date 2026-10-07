@@ -186,6 +186,13 @@ pub struct ToolSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub private_data: Option<bool>,
     pub implemented_by: ImplementedBy,
+    /// An explicitly reviewed shared host-service method. The public tool name
+    /// stays in this app's namespace; the host still dispatches as this app.
+    /// Omitted preserves the historical same-name route. Only methods in
+    /// [`SHARED_HOST_METHODS`] are eligible; this field never grants a service
+    /// or turns a background tool into a foreground approval surface.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_method: Option<String>,
     /// Whose surface confirms a destructive or outward call. Omitted means
     /// the host.
     #[serde(default, skip_serializing_if = "is_host_confirm")]
@@ -216,6 +223,12 @@ fn is_true(value: &bool) -> bool {
 }
 
 impl ToolSpec {
+    /// Dispatch target after bundle validation and the executor's grant check.
+    /// Never infer it from arguments or the tool's untrusted result.
+    pub fn service_method(&self) -> &str {
+        self.host_method.as_deref().unwrap_or(&self.name)
+    }
+
     /// The name without its namespace: `topics.get`.
     pub fn local_name(&self) -> &str {
         self.name.split_once('.').map(|(_, rest)| rest).unwrap_or("")
@@ -285,8 +298,25 @@ impl ToolManifest {
 
     /// Every rule for a contained app's tools, from its manifest.
     pub fn check(&self, manifest: &AppManifest) -> Vec<Issue> {
-        let local_only = manifest.agent.as_ref().and_then(|a| a.model.as_ref()).is_some_and(|m| m.local_only);
-        self.validate(short_id(&manifest.id), ToolHost::Contained, local_only)
+        let local_only = manifest
+            .agent
+            .as_ref()
+            .and_then(|a| a.model.as_ref())
+            .is_some_and(|m| m.local_only);
+        let mut issues = self.validate(short_id(&manifest.id), ToolHost::Contained, local_only);
+        for tool in &self.tools {
+            if let Some(method) = &tool.host_method {
+                let family = method.split('.').next().unwrap_or("");
+                if !manifest
+                    .capabilities
+                    .iter()
+                    .any(|grant| grant == family || grant == method)
+                {
+                    issues.push(Issue::refuse("tools", format!("{}: host_method {method:?} requires the declared {family:?} service capability", tool.name)));
+                }
+            }
+        }
+        issues
     }
 
     /// Every rule for one owner's tools: `namespace` is the app's short id
@@ -315,6 +345,9 @@ impl ToolManifest {
         let mut broker_names = BTreeSet::new();
         for tool in &self.tools {
             let name = &tool.name;
+            if let Err(error) = check_host_method(tool) {
+                issues.push(Issue::refuse("tools", format!("{name}: {error}")));
+            }
             if let Err(e) = check_tool_name(name, namespace) {
                 issues.push(Issue::refuse("tools", e));
             } else {
@@ -386,6 +419,75 @@ impl ToolManifest {
     pub fn by_risk(&self, risk: Risk) -> Vec<&ToolSpec> {
         self.tools.iter().filter(|t| t.risk == risk).collect()
     }
+}
+
+/// Initial shared-service tool contract, deliberately narrower than UI calls.
+/// New methods need a reviewed host implementation, account/grant checks and a
+/// risk floor here. Provider writes, approval/review controls and account
+/// management are not agent aliases. The executor must still check its actual
+/// resolved capability and registered handler; admission does not provide one.
+pub const SHARED_HOST_METHODS: &[(&str, Risk)] = &[
+    ("github.repositories", Risk::Read),
+    ("github.files", Risk::Read),
+    ("github.read", Risk::Read),
+    ("gcalendar.calendars", Risk::Read),
+    ("gcalendar.sync", Risk::Read),
+    ("gcalendar.refresh", Risk::Read),
+    ("gcalendar.cached", Risk::Read),
+    ("gcalendar.get", Risk::Read),
+    ("gcalendar.prepare", Risk::Read),
+    ("gmail.labels", Risk::Read),
+    ("gmail.messages", Risk::Read),
+    ("gmail.message", Risk::Read),
+    ("gmail.draft.open", Risk::Act),
+    ("gmail.draft.get", Risk::Read),
+    ("gmail.draft.edit", Risk::Act),
+    ("gmail.event.decide", Risk::Act),
+    ("gmail.event.status", Risk::Read),
+    ("glance.publish", Risk::Act),
+    ("glance.withdraw", Risk::Act),
+    ("glance.list", Risk::Read),
+];
+
+fn check_host_method(tool: &ToolSpec) -> Result<(), String> {
+    let Some(method) = &tool.host_method else {
+        return Ok(());
+    };
+    if tool.implemented_by != ImplementedBy::HostService {
+        return Err("host_method is only valid for implemented_by \"host-service\"".into());
+    }
+    if method.len() > 96
+        || !method.contains('.')
+        || method.split('.').any(|part| {
+            part.is_empty()
+                || !part
+                    .bytes()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'_')
+        })
+    {
+        return Err(
+            "host_method must be family.method with nonempty [a-z0-9_] segments, at most 96 bytes"
+                .into(),
+        );
+    }
+    if method.split('.').any(|part| part == "sheet") {
+        return Err("host_method cannot target a host sheet or approve an action".into());
+    }
+    let Some((_, minimum)) = SHARED_HOST_METHODS.iter().find(|(name, _)| *name == method) else {
+        return Err(format!(
+            "host_method {method:?} is not in the reviewed shared-service tool contract"
+        ));
+    };
+    if tool.risk < *minimum {
+        return Err(format!(
+            "host_method {method:?} requires at least {} risk",
+            minimum.broker_name().to_lowercase()
+        ));
+    }
+    if tool.private_data != Some(true) {
+        return Err("shared-service tools must declare private_data: true".into());
+    }
+    Ok(())
 }
 
 /// `<namespace>.<segment>[.<segment>…]`, segments `[a-z0-9_]+`.
