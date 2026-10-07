@@ -120,16 +120,16 @@ impl Entry {
         if let Some(agent) = &self.manifest.agent {
             lines.push("Run an assistant for this app, only after you allow it".to_string());
             // The app's own tools come from tools.json. agent.tools adds
-            // kernel tools and requests for other apps' tools; an empty
+            // kernel tools and requests for host or other apps' tools; an empty
             // list does not mean its assistant has no tools.
             if !self.tools.is_empty() {
                 let own_tools: Vec<&str> = self.tools.iter().map(|tool| tool.name.as_str()).collect();
                 lines.push(format!("Its assistant can use these app tools: {}", own_tools.join(", ")));
             }
-            let other_app_tools: Vec<&str> =
+            let additional_tools: Vec<&str> =
                 agent.tools.iter().map(String::as_str).filter(|t| octosense_app_policy::kernel_tool_words(t).is_none()).collect();
-            if !other_app_tools.is_empty() {
-                lines.push(format!("Its assistant requests access to other apps' tools: {}", other_app_tools.join(", ")));
+            if !additional_tools.is_empty() {
+                lines.push(format!("Its assistant requests these additional tools: {}", additional_tools.join(", ")));
             }
             // The kernel tools it keeps, in plain words ("Ask you
             // questions"), once even when `prompt` says the same.

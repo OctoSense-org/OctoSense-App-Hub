@@ -50,7 +50,7 @@ fn store_consent_discloses_signed_own_read_tools_with_no_generic_grants() {
         for tool in &loaded.tools {
             assert!(own.contains(&tool.name), "missing {}: {own}", tool.name);
         }
-        assert!(!listing.permissions.iter().any(|line| line.contains("no tools") || line.contains("other apps' tools")));
+        assert!(!listing.permissions.iter().any(|line| line.contains("no tools") || line.contains("additional tools")));
         assert_eq!(fs::read(fixture.bundle.join("tools.json")).unwrap(), original_tools);
     }
 }
@@ -59,14 +59,14 @@ fn store_consent_discloses_signed_own_read_tools_with_no_generic_grants() {
 fn own_tools_and_additional_requests_stay_distinct_in_consent() {
     let fixture = connected("notespreview", "github", &[("read", "github.read")]);
     let mut entry = fixture.entry();
-    // Display an already-reviewed cross-app request; this test neither
+    // Display already-reviewed host and cross-app requests; this test neither
     // offers that tool at admission nor grants or executes it.
     let mut manifest = serde_json::to_value(&entry.manifest).unwrap();
-    manifest["agent"]["tools"] = json!(["ask_user_question", "calendar.list"]);
+    manifest["agent"]["tools"] = json!(["ask_user_question", "net.fetch", "calendar.list"]);
     entry.manifest = AppManifest::parse(&manifest.to_string()).unwrap();
     let lines = entry.permissions_summary();
     assert!(lines.contains(&"Its assistant can use these app tools: notespreview.read".into()));
-    assert!(lines.contains(&"Its assistant requests access to other apps' tools: calendar.list".into()));
+    assert!(lines.contains(&"Its assistant requests these additional tools: net.fetch, calendar.list".into()));
     assert_eq!(lines.iter().filter(|line| *line == "Ask you questions").count(), 1);
-    assert!(!lines.iter().any(|line| line.contains("ask_user_question") || line.contains("no tools")));
+    assert!(!lines.iter().any(|line| line.contains("ask_user_question") || line.contains("no tools") || line.contains("other apps' tools")));
 }
