@@ -36,7 +36,9 @@
 | `crates/app-host` | 单窗口宿主，可把任意 OctoSense AppModule 作为独立应用运行。 |
 | `crates/app-hub-app` | 每个 OctoSense Shell 都会链接的集成：原生商店模块、`card` 运行模块、由 `OCTOSENSE_SYSTEM_APPS` 指定的系统应用、已安装应用和图标（[README](crates/app-hub-app/README.md)）。 |
 
-这些 crate 基于固定版本的 OctoSense Makepad 与 Octoscript 分支构建，和启动器工作区一样，从同级检出目录（`../makepad`、`../octoscript-makepad`、`../octoscript`）解析依赖。`cargo test --workspace` 以无界面方式运行策略、准入检查、签名和商店测试；`cargo run -p octosense-app-hub --bin hub` 是发布工具。
+这些 crate 基于固定版本的 OctoSense Makepad 与 Octoscript 分支构建，和启动器工作区一样，从同级检出目录（`../makepad`、`../octoscript-makepad`、`../octoscript`）解析依赖。[原生工具 CI](.github/workflows/native-tools.yml) 使用未经修改的固定版本构建 `hub` 和 `card-host`，并运行契约、策略、准入检查、签名、CLI 和商店测试。`cargo run -p octosense-app-hub --bin hub` 是发布工具。
+
+`appstore` 默认启用 `text-input-state-query`，用于 OctoSense 运行时补丁增加的 IME 事件；独立的 `card-host` 关闭此功能。使用未打补丁的运行时时，请遵循代码导读按包构建的命令：构建整个工作区会合并其他 shell 消费方的功能，因此需要该补丁。
 
 ## 代码导读
 

@@ -1,0 +1,82 @@
+name: Native authoring tools
+
+# Exercise the same unmodified sibling runtime and package selection as
+# Design Flow's doctor / docs/CODE-WALKTHROUGH.md, not an OctoSense overlay.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'crates/**'
+      - '.github/workflows/native-tools.yml'
+  pull_request:
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'crates/**'
+      - '.github/workflows/native-tools.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ format('native-tools-{0}', github.ref) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  standalone:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: app-hub
+      - name: Read the framework pin from this checkout
+        id: runtime
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, re
+          pins = set()
+          for manifest in pathlib.Path('app-hub/crates').glob('*/Cargo.toml'):
+              for line in manifest.read_text().splitlines():
+                  if 'git = "https://github.com/OctoSense-org/Octoscript-Makepad.git"' in line:
+                      pin = re.search(r'rev\s*=\s*"([0-9a-f]{40})"', line)
+                      assert pin, f'Missing framework revision in {manifest}'
+                      pins.add(pin[1])
+          assert len(pins) == 1, f'Expected one framework pin, got {pins}'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'revision={pins.pop()}\n')
+          PY
+      - uses: actions/checkout@v6
+        with:
+          repository: OctoSense-org/Octoscript-Makepad
+          ref: ${{ steps.runtime.outputs.revision }}
+          path: octoscript-makepad
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Prepare and verify the pinned sibling sources
+        run: |
+          python3 octoscript-makepad/tools/runtime.py prepare --root "$GITHUB_WORKSPACE"
+          python3 octoscript-makepad/tools/runtime.py verify --root "$GITHUB_WORKSPACE" --cargo-manifest app-hub/Cargo.toml
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            app-hub/target
+          key: ${{ runner.os }}-${{ runner.arch }}-native-tools-${{ steps.runtime.outputs.revision }}-${{ hashFiles('app-hub/Cargo.lock') }}
+      - name: Build the documented tools against plain Makepad
+        working-directory: app-hub
+        run: cargo build --locked --release -p octosense-card-host -p octosense-app-hub
+      - name: Contract, policy and hub tests
+        working-directory: app-hub
+        run: cargo test --locked --release -p octosense-app-contract -p octosense-app-policy -p octosense-app-hub
+      - name: Standalone CLI and modal service tests
+        working-directory: app-hub
+        run: |
+          cargo test --locked --release -p octosense-card-host --test cli
+          cargo test --locked --release -p octosense-appstore --no-default-features --lib

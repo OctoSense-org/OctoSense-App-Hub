@@ -11,6 +11,13 @@ license = "Apache-2.0"
 publish = false
 description = "Browse, search, install and open apps published to the OctoSense app hub"
 
+[features]
+# OctoSense's runtime overlay adds the IME state-query event. Keep its modal
+# input protection enabled for existing shell consumers; standalone hosts
+# using the unmodified framework pins must opt out.
+default = ["text-input-state-query"]
+text-input-state-query = []
+
 [dependencies]
 octosense-app-hub = { path = "../app-hub" }
 octosense-app-policy = { path = "../app-policy", features = ["splash"] }
@@ -19,4 +26,3 @@ makepad-app-module = { git = "https://github.com/OctoSense-org/makepad.git", rev
 octoscript-makepad = { git = "https://github.com/OctoSense-org/Octoscript-Makepad.git", rev = "aa80f72c509c767faf04822b939d44b2f34fbc81" }
 octoscript-widgets = { git = "https://github.com/OctoSense-org/Octoscript-Makepad.git", rev = "aa80f72c509c767faf04822b939d44b2f34fbc81" }
 serde_json = "1"
-

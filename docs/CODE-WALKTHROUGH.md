@@ -70,13 +70,25 @@ Cargo metadata or a policy-only test from resolving. A consumer's top-level
 patches determine its actual versions; do not mix arbitrary latest engines
 with a different consumer's runtime lock.
 
-From App Hub. **Validation status: build, GUI and device execution unverified.**
+From App Hub. The [native tools CI](../.github/workflows/native-tools.yml)
+builds these two tools against the unmodified pinned runtime and runs the
+tests below; it does not claim GUI or device acceptance.
 
 ```sh
 cargo build --release -p octosense-card-host -p octosense-app-hub
 cargo run -p octosense-app-hub --bin hub -- help
 cargo test -p octosense-app-contract -p octosense-app-policy -p octosense-app-hub
 cargo test -p octosense-card-host --test cli
+```
+
+Keep this package selection for the plain runtime. `card-host` opts out of
+`appstore`'s default `text-input-state-query` feature, which preserves the
+OctoSense overlay's additional IME event for existing shell consumers.
+Building all workspace members together unifies their features and requires
+the overlay. To run the store's service and modal tests with plain Makepad:
+
+```sh
+cargo test -p octosense-appstore --no-default-features --lib
 ```
 
 Run a disposable unsigned development bundle:

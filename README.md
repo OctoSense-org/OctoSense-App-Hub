@@ -42,9 +42,15 @@ templates and test fixtures.
 
 The crates build against the pinned OctoSense forks of Makepad and Octoscript,
 resolved from sibling checkouts (`../makepad`, `../octoscript-makepad`,
-`../octoscript`) as the launcher workspace does. `cargo test --workspace`
-runs the policy, gate, signing and store tests headless; `cargo run -p
+`../octoscript`) as the launcher workspace does. The [native tools CI](.github/workflows/native-tools.yml)
+builds `hub` and `card-host` against those unmodified pins and runs the
+contract, policy, gate, signing, CLI and store tests. `cargo run -p
 octosense-app-hub --bin hub` is the publishing tool.
+
+`appstore` enables `text-input-state-query` by default for OctoSense's IME
+runtime overlay. Standalone `card-host` disables it. Use the walkthrough's
+package-specific commands with the plain runtime: a workspace-wide build
+unifies features from other shell consumers and requires that overlay.
 
 ## Code walkthrough
 

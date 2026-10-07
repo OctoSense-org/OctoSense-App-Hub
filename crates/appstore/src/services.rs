@@ -386,12 +386,21 @@ fn apply_sheet(cx: &mut Cx, sheet: &SplashRef, change: Option<String>) {
 /// modal-input boundary. Timers and service replies still reach the app.
 pub fn is_sheet_input_event(event: &makepad_widgets::Event) -> bool {
     use makepad_widgets::Event;
-    event.requires_visibility() || matches!(event,
+    if event.requires_visibility() {
+        return true;
+    }
+    match event {
         Event::MouseUp(_) | Event::MouseLeave(_) | Event::LongPress(_)
         | Event::KeyDown(_) | Event::KeyUp(_) | Event::TextInput(_)
         | Event::TextRangeReplace(_) | Event::TextCopy(_) | Event::TextCut(_)
-        | Event::TextInputStateQuery(_) | Event::ImeAction(_)
-        | Event::SelectionHandleDrag(_) | Event::Drag(_) | Event::Drop(_) | Event::DragEnd)
+        | Event::ImeAction(_) | Event::SelectionHandleDrag(_)
+        | Event::Drag(_) | Event::Drop(_) | Event::DragEnd => true,
+        // This event belongs to the OctoSense runtime overlay, not the
+        // standalone framework pins used by card-host.
+        #[cfg(feature = "text-input-state-query")]
+        Event::TextInputStateQuery(_) => true,
+        _ => false,
+    }
 }
 
 /// One turn of a host running an app: hand the app's (and its sheet's) host
@@ -482,6 +491,23 @@ pub fn pump(cx: &mut Cx, app_id: &str, host_dir: &std::path::Path, card: &Splash
 mod tests {
     use super::*;
     use std::sync::Arc;
+
+    #[test]
+    fn sheet_input_keeps_text_and_keys_modal_but_allows_service_signals() {
+        use makepad_widgets::{Event, KeyEvent, TextInputEvent};
+        assert!(is_sheet_input_event(&Event::TextInput(TextInputEvent::default())));
+        assert!(is_sheet_input_event(&Event::KeyDown(KeyEvent::default())));
+        assert!(is_sheet_input_event(&Event::KeyUp(KeyEvent::default())));
+        assert!(is_sheet_input_event(&Event::DragEnd));
+        assert!(!is_sheet_input_event(&Event::Signal));
+    }
+
+    #[cfg(feature = "text-input-state-query")]
+    #[test]
+    fn sheet_input_keeps_octosense_ime_queries_modal() {
+        let query = makepad_widgets::Event::TextInputStateQuery(Default::default());
+        assert!(is_sheet_input_event(&query));
+    }
 
     struct Echo;
     impl HostService for Echo {
