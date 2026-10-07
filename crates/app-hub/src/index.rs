@@ -81,7 +81,7 @@ impl Entry {
     }
 
     /// What the person is told this app may do, in plain words, derived from
-    /// the manifest rather than from anything the app says about itself.
+    /// the manifest and reviewed tools rather than app-authored descriptions.
     pub fn permissions_summary(&self) -> Vec<String> {
         let mut lines = Vec::new();
         for capability in &self.manifest.capabilities {
@@ -118,10 +118,19 @@ impl Entry {
             });
         }
         if let Some(agent) = &self.manifest.agent {
-            let host_tools: Vec<&str> =
+            lines.push("Run an assistant for this app, only after you allow it".to_string());
+            // The app's own tools come from tools.json. agent.tools adds
+            // kernel tools and requests for host or other apps' tools; an empty
+            // list does not mean its assistant has no tools.
+            if !self.tools.is_empty() {
+                let own_tools: Vec<&str> = self.tools.iter().map(|tool| tool.name.as_str()).collect();
+                lines.push(format!("Its assistant can use these app tools: {}", own_tools.join(", ")));
+            }
+            let additional_tools: Vec<&str> =
                 agent.tools.iter().map(String::as_str).filter(|t| octosense_app_policy::kernel_tool_words(t).is_none()).collect();
-            let tools = if host_tools.is_empty() { "no tools".to_string() } else { host_tools.join(", ") };
-            lines.push(format!("Run an assistant for this app ({tools}), inside this app's own data only"));
+            if !additional_tools.is_empty() {
+                lines.push(format!("Its assistant requests these additional tools: {}", additional_tools.join(", ")));
+            }
             // The kernel tools it keeps, in plain words ("Ask you
             // questions"), once even when `prompt` says the same.
             for words in agent.tools.iter().filter_map(|t| octosense_app_policy::kernel_tool_words(t)) {
@@ -285,7 +294,8 @@ mod tests {
             admitted: String::new(),
         };
         let lines = entry(serde_json::json!([])).permissions_summary();
-        assert!(lines.contains(&"Run an assistant for this app (no tools), inside this app's own data only".to_string()), "{lines:?}");
+        assert!(lines.contains(&"Run an assistant for this app, only after you allow it".to_string()), "{lines:?}");
+        assert!(!lines.iter().any(|line| line.contains("no tools") || line.contains("these app tools")), "{lines:?}");
         assert!(lines.contains(&"Ask you questions".to_string()), "{lines:?}");
         assert!(!lines.iter().any(|l| l.contains("ask_user_question")), "{lines:?}");
         let lines = entry(serde_json::json!(["prompt"])).permissions_summary();
