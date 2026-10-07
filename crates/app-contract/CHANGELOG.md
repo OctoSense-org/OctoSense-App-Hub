@@ -3,12 +3,12 @@
 `octosense-app-contract` follows the rules in [README.md](README.md#stability):
 within `1.x` it only grows.
 
-crates.io has 1.0.0, 1.1.0, 1.2.0 and 1.5.0; 1.3.0 and 1.4.0 are
+crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0 and 1.6.0; 1.3.0 and 1.4.0 are
 unpublished, and 1.5.0 includes their changes.
 [README.md](README.md#versions-on-cratesio) shows how to update a lock file
 that holds 1.2.0.
 
-## 1.6.0 (release pending)
+## 1.6.0 — 2026-10-07
 
 - Adds signed `host_api` requirements with exact ABI-major versions, implemented
   method descriptions, and the introspection-only `runtime` capability.

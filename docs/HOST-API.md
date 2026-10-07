@@ -4,7 +4,7 @@ English | [简体中文](HOST-API.zh-CN.md)
 
 The 1.6 contract adds declarations and discovery; it does not give apps arbitrary
 access to Rust functions or the operating system. These changes require a
-compatible host build. Until that build and contract are released, use the
+compatible host build. Contract 1.6.0 is published. Until a compatible host build is released, use the
 matching reviewed source revisions; older downloads do not gain new services.
 
 An app may request the `runtime` capability and call `runtime.list` with `{}` or
