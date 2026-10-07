@@ -111,7 +111,9 @@ my-app/
 [refused] resource-invalid (kit/native/light/kit.json/components/detail/style/font_src): not a portable bundle path: "makepad_widgets:resources/LXGWWenKaiRegular.ttf"
 ```
 
-尚不支持：其他内置字体（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。对于 Inter 没有覆盖的文字（例如中文），请把 `.ttf` 或 `.otf` 文件打包进应用包；该文件计入 8 MiB 上限。准入检查不解码字体文件，所以请在 `card-host` 中测试字体。
+随包附带的 `.ttf` 或 `.otf` 使用相对路径，例如 `"font_src": "assets/Body.ttf"`。已安装应用的卡片运行器和 `card-host` 会在 kit 样式及字体 token 求值后解析资源字段，再从这个应用包的宿主素材服务加载文件。不要在应用包中填写 HTTP 地址；加载自带字体不需要网络权限或外部字体 URL。
+
+其他直接指定的内置字体仍不受支持（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。宿主打包了国际字体资源时，渲染器会提供按需加载的中文后备字体。自带字体文件计入 8 MiB 上限。准入检查验证路径但不解码字体，因此请在 `card-host` 中测试完整应用包，并设置 `MAKEPAD_SYSTEM_FONTS=0`，防止本机安装的字体掩盖缺字问题。
 
 ## 清单
 

@@ -22,6 +22,7 @@ use octosense_app_policy::HostLimits;
 use std::path::PathBuf;
 
 pub mod cardapp;
+pub mod card_assets;
 pub mod host_api;
 pub mod services;
 pub mod script_tools;
@@ -469,7 +470,7 @@ pub(crate) fn card_source(bundle: &std::path::Path, asset_origin: &str) -> Resul
     let data_text = std::fs::read_to_string(bundle.join("page.data.json")).unwrap_or_else(|_| "{}".into());
     let mut data: serde_json::Value = serde_json::from_str(&data_text).map_err(|e| format!("page.data.json: {e}"))?;
     octosense_app_policy::rewrite_assets(&mut data, asset_origin);
-    let prepared = octoscript_makepad::l0::prepare(&card, &data, &bundle.join("kit"))?;
+    let prepared = card_assets::prepare(&card, &data, bundle, asset_origin)?;
     let ui = octoscript_makepad::design::to_makepad_ui(&prepared.tree)?;
     Ok(format!("width:Fill height:Fill flow:Overlay {ui}"))
 }

@@ -143,11 +143,19 @@ or the one built-in font the gate allows,
 [refused] resource-invalid (kit/native/light/kit.json/components/detail/style/font_src): not a portable bundle path: "makepad_widgets:resources/LXGWWenKaiRegular.ttf"
 ```
 
-Not yet: other built-in fonts
-([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). For text
-that Inter does not cover, such as Chinese, bundle a `.ttf` or `.otf` file; it
-counts toward the 8 MiB limit. The gate does not decode font files, so test the
-font in `card-host`.
+Use a bundle-relative path such as `"font_src": "assets/Body.ttf"` for a
+bundled `.ttf` or `.otf`. The installed card runner and `card-host` resolve
+resource fields after kit styles and font tokens have been evaluated, then
+load the file from that bundle's host-owned asset server. Keep HTTP URLs out
+of the bundle; neither a network grant nor an external font URL is needed.
+
+Other directly named built-in fonts remain unsupported
+([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). The
+renderer supplies a lazy Chinese fallback when the host packages its
+international font resources. A custom bundled face counts toward the
+8 MiB limit. The gate checks its path but does not decode the font, so test
+the complete bundle in `card-host`, with `MAKEPAD_SYSTEM_FONTS=0` to avoid
+hiding missing glyphs behind fonts installed on your machine.
 
 ## The manifest
 
