@@ -143,7 +143,21 @@ withdrawn with `hub withdraw`, and every store honours it on its next fetch;
 
 | App | Version | Category | Runs on | Publisher | Allowed to | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| _none yet_ | | | | | | |
+| [GitHub Notes](https://github.com/ymote/octosense-github-notes) | 0.1.0 | Productivity | macOS | ymote | Local drafts; host-managed GitHub login and reviewed commits | Preview |
+| [Inbox Assistant](https://github.com/ymote/octosense-inbox-assistant) | 0.1.0 | Productivity | macOS | ymote | Gmail, local drafts, configured model and consented Glance/agent work | Preview |
+| [Google Calendar](https://github.com/ymote/octosense-google-calendar) | 0.1.0 | Productivity | macOS | ymote | Google Calendar, local drafts, consented chat and Glance | Preview |
+
+These are **macOS developer previews**, admitted in catalog sequence 7. Install
+the connected-services OctoSense runtime, then search App Hub for the names above,
+review permissions, and choose Install → Open. See the [admission record](reviews/connected-apps-0.1.0/README.md)
+for exact publisher commits and validation boundaries. Old hosts can read the
+catalog but refuse capabilities they do not support; update the host first.
+
+Provider sign-in requires a host OAuth registration, stored outside app bundles;
+see [connected accounts](https://github.com/OctoSense-org/OctoSense/blob/main/crates/oauth-service/README.md).
+Live GitHub/Google login and remote writes remain unverified. The Calendar
+assistant is advisory; it does not book events. No OctoSense cloud account is
+required.
 
 The camera card that exercised the pipeline was removed on 20 Sep 2026:
 Camera is a system app that ships with the shells (like News and Photos),
