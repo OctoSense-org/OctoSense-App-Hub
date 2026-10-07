@@ -44,5 +44,35 @@ These records establish admission and integrity. They do not establish a live
 GitHub or Google connection, provider writes, physical approval, Android Google
 authorization, Windows/Linux UX, or absence of long-run memory growth. Existing
 native/synthetic-provider and model evidence retains its original source hashes
-in the publisher repositories. Official HTTP/native Store acceptance is recorded
-separately after publication; it is not inferred from this staged catalog.
+in the publisher repositories.
+
+## Official Store acceptance
+
+The [public HTTP check](official-http.json) verified all 21 catalog, index and
+artifact URLs, the default trust anchor and the unchanged publisher bundles.
+
+The [macOS Apple Silicon preview](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-beta.2)
+uses source `84e3438b7ee25b43ba945bfe063db594a71e61ba`. Its normal packaged
+application searched, installed and opened all three apps from the official
+catalog in a fresh isolated profile. No catalog or anchor override was used.
+[Nine functional checks and six independent visual reviews](native-store/receipt.json)
+passed, including exact local draft restoration after a full process restart.
+The receipt binds the runtime, executable, package, kernel and app bundle hashes.
+Its candidate record is preserved unchanged; publication does not replace test
+history with a new result.
+
+| App | Restored state and original capture |
+| --- | --- |
+| GitHub Notes | [Unicode Markdown and rendered preview](native-store/notes-restored-preview.png) |
+| Inbox Assistant | [Revision-2 fictional reply retained across Reply/Chat](native-store/inbox-restored-reply.png) |
+| Google Calendar | [Local event draft](native-store/calendar-restored-draft.png) and [timezone](native-store/calendar-restored-timezone.png) |
+
+The [Store](native-store/official-store.png) and [installed Library](native-store/installed-library.png)
+captures are also original pixels. No image was edited.
+
+The run retained **14 read-only frame-capture errors**, zero input errors or
+replays, and one stop/resume after the driver used coordinates from before a
+scroll had settled. The corrected driver observed a new frame before computing
+the next target. This proves the stated local workflows, not an uninterrupted
+instrument run, a latency result or a clean UX soak. It used no OAuth connection,
+live provider data, model call, remote write or physical send/save approval.

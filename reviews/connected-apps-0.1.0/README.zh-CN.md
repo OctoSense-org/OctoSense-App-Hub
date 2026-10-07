@@ -32,5 +32,30 @@
 
 这些记录证明准入和完整性，不证明真实 GitHub/Google 登录、提供方写入、物理
 点击确认、Android Google 登录、Windows/Linux 体验或长期运行无内存增长。
-历史原生/模拟提供方及模型证据在发布者仓库中保留原始源码摘要。发布后的官方
-HTTP 与原生商店验收单独记录，不从暂存目录推断。
+历史原生/模拟提供方及模型证据在发布者仓库中保留原始源码摘要。
+
+## 官方商店验收
+
+[公开 HTTP 检查](official-http.json)验证了全部 21 个目录、索引和工件地址，
+以及默认信任锚和未改动的发布者签名应用包。
+
+[macOS Apple Silicon 预览版](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-beta.2)
+对应源码 `84e3438b7ee25b43ba945bfe063db594a71e61ba`。普通打包应用在全新的隔离
+配置中，从官方目录搜索、安装并打开三款应用，没有替换目录或信任锚。
+[九项功能检查和六项独立视觉审查](native-store/receipt.json)通过，包括完整进程
+重启后本地草稿的精确恢复。记录绑定运行时、可执行文件、安装包、内核和应用包
+摘要。候选版本的原始记录保持不变，发布不会改写测试历史。
+
+| 应用 | 恢复状态与原始截图 |
+| --- | --- |
+| GitHub Notes | [Unicode Markdown 与渲染预览](native-store/notes-restored-preview.png) |
+| Inbox Assistant | [在 Reply/Chat 间保留的第 2 版虚构回复](native-store/inbox-restored-reply.png) |
+| Google Calendar | [本地事件草稿](native-store/calendar-restored-draft.png)及[时区](native-store/calendar-restored-timezone.png) |
+
+[商店](native-store/official-store.png)和[已安装应用库](native-store/installed-library.png)
+也保留原始像素，所有图片均未编辑。
+
+验收保留了 **14 次只读截图错误**、零输入错误或重放，以及一次因自动化使用滚动
+完成前的坐标而停止、恢复的记录。修正后的驱动先观察新画面，再计算点击位置。
+这证明上述本地功能，不是无中断的仪器测试、延迟结果或无故障 UX 长测。
+本次未连接 OAuth、读取真实提供方数据、调用模型、远程写入或测试物理发送/保存确认。
