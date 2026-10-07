@@ -101,7 +101,7 @@ my-app/
 
 - 引用应用包自带的素材时，使用 `{{assets}}`，例如 `Image{src: http_resource("{{assets}}/assets/logo.png")}`。宿主会把 `{{assets}}` 替换为一个本地回环地址，这个地址只提供本应用包的内容。不要自己写这个地址，也不要写 `file://` 路径或 `../` 路径。
 - `main.splash` 中的 `https://` 地址只能指向清单的 `network.hosts` 中列出的主机；应用请求了 `images` 或 `web` 时不受此限。准入检查拒绝 `http://`。
-- 不要让用户输入密码、PIN 或一次性验证码。准入检查会拒绝这类输入框，即使到了运行时，它们也不接受输入。登录由宿主服务负责，它在自己的面板上收集这些机密信息。面板是宿主覆盖在应用之上绘制的界面（详见[面板](PUBLISHING.zh-CN.md#面板应用从不收集机密信息)，英文）。
+- 不要让用户输入密码、PIN 或一次性验证码。准入检查会拒绝这类输入框，即使到了运行时，它们也不接受输入。登录由宿主服务负责，它在自己的面板上收集这些机密信息。面板是宿主覆盖在应用之上绘制的界面（详见[面板](PUBLISHING.zh-CN.md#面板应用从不收集机密信息)）。
 - `card-host` 不提供任何宿主服务：每个 `host.request` 都只会得到 `no service answers "<family>" on this device`。用到宿主服务的界面，请在 OctoSense 桌面版 0.1.0-beta.2 中测试（[开始之前](SUBMITTING.zh-CN.md#开始之前)）。
 
 ### 卡片应用
@@ -246,7 +246,7 @@ hub: the bundle was refused
 
 整个过程都要遵守两条规则：
 
-- **签名放在最后。** 签名之后的任何改动，都要重新写入摘要并重新签名（[签名](PUBLISHING.zh-CN.md#签名)，英文）。
+- **签名放在最后。** 签名之后的任何改动，都要重新写入摘要并重新签名（[签名](PUBLISHING.zh-CN.md#签名)）。
 - **发布者密钥只创建一次，放在所有仓库之外。** `hub keygen <key-file>` 创建密钥并输出公钥，之后可以用 `hub pubkey <key-file>` 再次输出公钥。`hub keygen` 不会覆盖已有文件，所以再次运行它也不会替换你的密钥。
 
 要在提交前用 OctoSense 桌面版试用应用，请用一个临时信任锚把它发布到本地签名目录（[在本地演练商店流程](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally)，英文）。
