@@ -158,9 +158,18 @@ array, is refused with
 Other directly named built-in fonts remain unsupported
 ([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). The
 renderer supplies a lazy Chinese fallback when the host packages its
-international font resources. A custom bundled face counts toward the
-8 MiB limit. The gate checks its path but does not decode the font, so test
-the complete bundle in `card-host`.
+international font resources. A bundled face counts toward the 8 MiB limit,
+so bundle a subset of a large CJK font. The gate checks its path but does
+not decode the font, so test the complete bundle in `card-host`.
+
+OctoSense desktop 0.1.0-beta.2 predates this font loading: it installs an app
+with a bundled font, but its cards do not load the font. For Chinese text
+there, build the card from the role kit and set no `font_src`. The role kit
+is the OctoScript module set behind `Surface`, `TextTitle` and `TextBody`:
+copy `_kit.octoscript`, `_derive.octoscript`, `_derive_color.octoscript`,
+`_palette_light.octoscript` and `_palette_dark.octoscript` from
+OctoScript-Makepad's `components/l0/` into the bundle's `kit/`. It draws
+Chinese with Makepad's built-in CJK face, LXGW WenKai.
 
 By default, Makepad draws a glyph that the card's fonts lack with one of the
 operating system's fonts, so on macOS a missing font can go unnoticed. Turn
@@ -805,7 +814,8 @@ host.request("mail.list", {…}, fn(r){ … })
 The isolate refuses the call unless the app's policy grants the family (`mail`
 for `mail.*`) or the exact service name. A granted call goes to the service
 the host registered for that family. The service does the work and answers
-with data, never with a credential or a connection. A call to a family that
+with data, never with a credential. A connection handle it returns is opaque
+and bound to the app. A call to a family that
 no service answers fails at once with `no service answers "<family>" on this device`;
 `card-host` registers no service, so only `runtime` discovery answers there.
 To see which shell serves which family, read

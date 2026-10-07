@@ -115,7 +115,9 @@ my-app/
 
 在原生 kit 中，`font_src` 也可以是一个 token 引用 `{"$token": "<name>"}`，它在 kit 的 `tokens` 中的 `value` 就是这样的路径。准入检查核对的是 token 解析后的路径；其他对象或数组一律拒绝，报 `font_src must be a bundled font path, a supported built-in font, or one token resolving to a string`。
 
-其他直接指定的内置字体仍不受支持（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。宿主打包了国际字体资源时，渲染器会提供按需加载的中文后备字体。自带字体文件计入 8 MiB 上限。准入检查验证路径但不解码字体，因此请在 `card-host` 中测试完整应用包。
+其他直接指定的内置字体仍不受支持（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。宿主打包了国际字体资源时，渲染器会提供按需加载的中文后备字体。自带字体文件计入 8 MiB 上限，所以较大的 CJK 字体请只打包所需的子集。准入检查验证路径但不解码字体，因此请在 `card-host` 中测试完整应用包。
+
+OctoSense 桌面版 0.1.0-beta.2 早于这项字体加载功能：它会安装带打包字体的应用，但卡片不会加载这些字体。要在那里显示中文，请用角色 kit 组合卡片，并且不设 `font_src`。角色 kit 是 `Surface`、`TextTitle`、`TextBody` 等组件背后的 OctoScript 模块集合：把 OctoScript-Makepad 的 `components/l0/` 中的 `_kit.octoscript`、`_derive.octoscript`、`_derive_color.octoscript`、`_palette_light.octoscript` 和 `_palette_dark.octoscript` 复制到应用包的 `kit/` 中。它会用 Makepad 内置的 CJK 字体 LXGW WenKai（霞鹜文楷）显示中文。
 
 默认情况下，卡片字体缺少的字形，Makepad 会改用操作系统的字体来绘制，所以在 macOS 上，字体没有加载也可能看不出来。检查卡片时，请关闭这项回退：
 
@@ -602,7 +604,7 @@ OctoSense `main`（尚未进入任何发布版）改变了三点：
 host.request("mail.list", {…}, fn(r){ … })
 ```
 
-除非应用的策略授予了相应的服务族（`mail.*` 对应 `mail`）或确切的服务名，否则隔离环境会拒绝调用。获准的调用会交给宿主为该服务族注册的服务。服务完成工作后返回数据，绝不返回凭据或连接。如果某个服务族没有任何服务响应，对它的调用会立即失败，返回 `no service answers "<family>" on this device`；`card-host` 不注册任何服务，因此只有用于发现宿主 API 的 `runtime` 会响应。哪个 Shell 提供哪个服务族，见 Design Flow 的[宿主服务](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。
+除非应用的策略授予了相应的服务族（`mail.*` 对应 `mail`）或确切的服务名，否则隔离环境会拒绝调用。获准的调用会交给宿主为该服务族注册的服务。服务完成工作后返回数据，绝不返回凭据；它返回的连接句柄不透明，并与该应用绑定。如果某个服务族没有任何服务响应，对它的调用会立即失败，返回 `no service answers "<family>" on this device`；`card-host` 不注册任何服务，因此只有用于发现宿主 API 的 `runtime` 会响应。哪个 Shell 提供哪个服务族，见 Design Flow 的[宿主服务](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。
 
 `card-host` 也没有实现 `host-api-v1`、`backend-api-v1` 和 `script-tools-v1` 所需的任何 API，因此会拒绝清单要求其中任何一项的应用：这类应用请在基于 `main` 构建的 OctoSense Shell 中测试。
 
