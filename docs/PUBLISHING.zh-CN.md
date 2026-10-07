@@ -430,6 +430,19 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | `gcalendar` | `gcalendar.calendars`、`gcalendar.sync`、`gcalendar.refresh`、`gcalendar.cached`、`gcalendar.get`、`gcalendar.prepare` | |
 | `gmail` | `gmail.labels`、`gmail.messages`、`gmail.message`、`gmail.draft.get`、`gmail.event.status` | `gmail.draft.open`、`gmail.draft.edit`、`gmail.event.decide` |
 | `glance` | `glance.list` | `glance.publish`、`glance.withdraw` |
+| `auth` | `auth.backend.me`、`auth.backend.request`（仅声明的 GET 操作） | |
+| `runtime` | `runtime.list`、`runtime.describe` | |
+| `camera` | `camera.permission.status` | |
+| `microphone` | `microphone.permission.status` | |
+| `location` | `location.permission.status`、`location.get` | |
+
+这八个后端、运行时和设备别名要求兼容的 Host API v1 集成，不代表 beta.2 或
+已经发布的宿主具有这些能力。所有别名（包括发现接口）仍须满足表中的能力声明
+和 `private_data: true` 要求。通过准入不等于已经配置账户、取得授权或实现缺少的
+API；应按[宿主 API 兼容性](HOST-API.zh-CN.md)检查实际宿主的发现结果和平台支持。
+`auth.backend.request` 别名只能执行已声明的 GET 操作；后端写入仍须从前台应用
+发起并经过原生审阅。权限申请和撤销、账户管理方法，以及 `app_tools.dispatch`
+等运行时 ABI，都不能作为已准入的 `host_method` 目标。
 
 提供商写入、登录、确认和批准都没有 `host_method`：这些操作由用户在应用自己的界面上发起。
 
@@ -686,12 +699,14 @@ my-notes 0.1.0 — PASSED
 通用运行器和 OctoSense 中继属于需要集成的改动；请使用公布
 `app_tools.dispatch@1` 的宿主版本。清单必须包含
 `"requires": ["script-tools-v1"]`。在 `tools.json` 中声明名称和 JSON schema，
-设置 `"implemented_by": "app"`，再在应用签名包的 Splash 入口源码中实现固定钩子：
+设置 `"implemented_by": "app"`，再在应用签名包的 Splash 入口源码中实现固定钩子。
+此示例假设清单 ID 为 `dev.example.notebook`，工具命名空间因此是 `notebook`；
+`notes` 是原生应用的保留名称，已安装的商店应用不能使用：
 
 ```text
 fn app_tool(name, call_id) {
     let request = mod.app_tools.request(call_id)
-    if name == "notes.read" {
+    if name == "notebook.read" {
         mod.app_tools.complete(call_id, {text: fs.read("note.txt")})
     } else {
         mod.app_tools.fail(call_id, "Unknown tool")

@@ -530,6 +530,22 @@ The gate refuses a `host_method` unless every rule holds:
 | `gcalendar` | `gcalendar.calendars`, `gcalendar.sync`, `gcalendar.refresh`, `gcalendar.cached`, `gcalendar.get`, `gcalendar.prepare` | |
 | `gmail` | `gmail.labels`, `gmail.messages`, `gmail.message`, `gmail.draft.get`, `gmail.event.status` | `gmail.draft.open`, `gmail.draft.edit`, `gmail.event.decide` |
 | `glance` | `glance.list` | `glance.publish`, `glance.withdraw` |
+| `auth` | `auth.backend.me`, `auth.backend.request` (declared GET operations only) | |
+| `runtime` | `runtime.list`, `runtime.describe` | |
+| `camera` | `camera.permission.status` | |
+| `microphone` | `microphone.permission.status` | |
+| `location` | `location.permission.status`, `location.get` | |
+
+The eight backend/runtime/device aliases require the compatible Host API v1
+integration; they are not a claim about beta.2 or an already released host.
+All retain the table's capability and `private_data: true` requirements,
+including discovery aliases. Admission does not configure an account, grant
+permission or implement a missing API. Check the actual host's discovery and
+platform support as described in [Host API compatibility](HOST-API.md).
+`auth.backend.request` aliases can execute only declared GET operations; backend
+writes still require the foreground app and native review. Permission request
+and revoke, account-management methods, and runtime ABI entries such as
+`app_tools.dispatch` are not admitted `host_method` targets.
 
 Provider writes, sign-in, reviews and approvals have no `host_method`: the
 person starts them from the app's own screen.
@@ -932,12 +948,14 @@ The generic runner and OctoSense relay are an integration change; use a host
 release that advertises `app_tools.dispatch@1`. A manifest must include
 `"requires": ["script-tools-v1"]`. Declare names and JSON schemas in
 `tools.json` with `"implemented_by": "app"`, then implement this fixed hook
-in the app's signed Splash entry source:
+in the app's signed Splash entry source. This example assumes manifest ID
+`dev.example.notebook`, so its tool namespace is `notebook`; `notes` is a
+reserved native-app namespace and cannot be used by an installed app:
 
 ```text
 fn app_tool(name, call_id) {
     let request = mod.app_tools.request(call_id)
-    if name == "notes.read" {
+    if name == "notebook.read" {
         mod.app_tools.complete(call_id, {text: fs.read("note.txt")})
     } else {
         mod.app_tools.fail(call_id, "Unknown tool")
