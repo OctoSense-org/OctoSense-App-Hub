@@ -6,9 +6,9 @@
 | --- | --- |
 | 分步提交应用 | [向 App Hub 提交应用](SUBMITTING.zh-CN.md) |
 | 开发并检查第一个应用 | [开发你的第一个 Hub 应用](FIRST-APP.zh-CN.md) |
-| 搭建工作区，构建 `hub` 和 `card-host`，运行应用并截图 | 应用开发工具集 Design Flow（OctoScript-App-Design-Flow）的[快速上手](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md) |
-| 在脚本中调用能力或宿主服务 | Design Flow 的[能力](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.md)和[脚本 API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md) |
-| 查询哪个 Shell 提供哪个宿主服务 | Design Flow 的[宿主服务](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md) |
+| 搭建工作区，构建 `hub` 和 `card-host`，运行应用并截图 | 应用开发工具集 Design Flow（OctoScript-App-Design-Flow）的[快速上手](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.zh-CN.md) |
+| 在脚本中调用能力或宿主服务 | Design Flow 的[能力](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.zh-CN.md)和[脚本 API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md) |
+| 查询哪个 Shell 提供哪个宿主服务 | Design Flow 的[宿主服务](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md) |
 | 准备图标 | [应用图标与随包素材](ICONS.zh-CN.md) |
 
 准入检查决定应用包能否进入 Hub。用 `hub check` 自行运行准入检查：每违反一条规则，它都会报告一条拒绝或警告。通过准入检查，并不能说明应用能正常渲染、图标在小尺寸下依然清晰，或商店信息属实。这些由审核人员检查（[审核检查什么](SUBMITTING.zh-CN.md#8-审核检查什么)）。
@@ -105,13 +105,31 @@ my-app/
 
 ### 字体
 
-卡片用 `font_src` 指定字体，写在 `page.data.json` 的布局项（placements）中，或原生 kit 的组件样式中。它的值必须是应用包中的字体文件，或者准入检查唯一允许的内置字体 `makepad_widgets:resources/Inter.ttf`。其他内置字体一律拒绝：
+卡片用 `font_src` 指定字体，写在 `page.data.json` 的布局项（placements）中，或原生 kit 的组件样式中。准入检查接受应用包中的字体文件，或它唯一允许的内置字体 `makepad_widgets:resources/Inter.ttf`。其他内置字体一律拒绝：
 
 ```text
 [refused] resource-invalid (kit/native/light/kit.json/components/detail/style/font_src): not a portable bundle path: "makepad_widgets:resources/LXGWWenKaiRegular.ttf"
 ```
 
-尚不支持：其他内置字体（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。对于 Inter 没有覆盖的文字（例如中文），请把 `.ttf` 或 `.otf` 文件打包进应用包；该文件计入 8 MiB 上限。准入检查不解码字体文件，所以请在 `card-host` 中测试字体。
+尚不支持：其他内置字体（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。
+
+`font_src` 指向的打包字体能通过准入检查，但目前在 `card-host` 中不会加载，`card-host` 的日志里也没有任何提示。不要为卡片附带字体文件。Inter 同样没有中文字形。卡片中要显示中文，请用角色 kit 组合卡片，并且不设 `font_src`。角色 kit 是 `Surface`、`TextTitle`、`TextBody` 等组件背后的 OctoScript kit 模块：把 OctoScript-Makepad 的 `components/l0/` 中的 `_kit.octoscript`、`_derive.octoscript`、`_derive_color.octoscript`、`_palette_light.octoscript` 和 `_palette_dark.octoscript` 复制到应用包的 `kit/` 中。它会用 Makepad 内置的 CJK 字体 LXGW WenKai（霞鹜文楷）显示中文。
+
+默认情况下，卡片字体缺少的字形，Makepad 会改用操作系统的字体来绘制，所以在 macOS 上，即使卡片自己的字体没有加载，中文也照样显示。检查卡片时，请关闭这项回退：
+
+```sh
+MAKEPAD_SYSTEM_FONTS=0 tools/octo run ~/apps/my-app/bundle --port 8141 --detach
+```
+
+这时，卡片字体缺少的每个字形都会显示成方框，就像在没有系统 CJK 字体的 Linux 上一样。
+
+脚本应用可以附带字体。在文字样式的 `FontMember` 中通过 `{{assets}}` 占位符指定字体文件；该文件计入 8 MiB 上限：
+
+```splash
+Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{latin := FontMember{res: http_resource("{{assets}}/fonts/<file>.ttf") asc: 0.0 desc: 0.0}} font_size: 20}}
+```
+
+未验证：OctoSense Shell 如何绘制这些字体。
 
 ## 清单
 
@@ -165,7 +183,7 @@ my-app/
 | `storage` | 应用自己的存储文件夹：`fs.*`、相机拍摄的内容，以及控件读取的本地文件。没有它，所有 `fs.*` 调用都会失败。 | Keep its own data on this device | 运行时，所有宿主都提供 |
 | `net` | 向 `network.hosts` 中的主机发出请求，不能访问其他主机。 | Reach only: *主机列表* | 运行时，所有宿主都提供 |
 | `images` | 显示任何公开 https 主机上的图片，不限于 `network.hosts`。 | Show pictures from any website | 运行时 |
-| `web` | 在系统网页视图中打开任何公开 https 页面；网页视图没有任何回到应用的通道。 | Open web pages in a browser view | 运行时 |
+| `web` | 在系统网页视图中打开任何公开 https 页面；网页视图没有任何回到应用的通道。 | Open web pages in a browser view | 运行时，仅限 macOS、iOS 和 Android 构建。桌面版 Linux 和 Windows 构建没有系统网页视图。 |
 | `location` | 设备的位置。 | Use your location | 运行时，限具备该功能的设备 |
 | `camera` | 相机。拍摄的内容保存在应用的存储中，所以应用还需要 `storage`。 | Use the camera | 运行时，限具备该功能的设备 |
 | `microphone` | 相机录像时的声音。 | Use the microphone | 运行时，限具备该功能的设备 |
@@ -188,7 +206,7 @@ my-app/
 | `research` | 通过系统工具箱搜索，不超出清单的 research 范围（[research 范围](#research-范围)）。每次搜索都由宿主执行。 | Search *范围允许的内容* | 仅系统应用，且只在手机版构建中 |
 | `crawl` | 通过系统工具箱抓取网站，深度和页数不超过范围中的 `max_depth` 和 `max_pages`，并遵守其中的域名列表。覆盖面比 `research` 更广。 | Crawl websites, *范围的限制*, which reaches more than searching | 同 `research` |
 
-任何能力都不隐含其他能力。尚不支持：面向商店应用的 `photos` 和 `youtube` 服务。脚本如何调用各项能力，见 Design Flow 的[能力](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.md)文档。
+任何能力都不隐含其他能力。尚不支持：面向商店应用的 `photos` 和 `youtube` 服务。脚本如何调用各项能力，见 Design Flow 的[能力](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.zh-CN.md)文档。
 
 源码：`crates/app-contract/src/manifest.rs` 中的 `KNOWN_CAPABILITIES`。
 
@@ -222,6 +240,8 @@ ID 由 1 到 64 个 `[a-z0-9.-]` 字符组成，不能以 `.` 开头，也不能
 
 系统应用自己的命名空间不在保留之列：`com.example.news` 是允许的。附带 `tools.json` 的应用，命名空间必须符合 `[a-z0-9_]{1,24}`：`com.example.mynotes` 可以声明工具，`com.example.my-notes` 则不能。
 
+ID 请以你能控制的反向域名前缀开头，例如把自己的域名倒过来写（`example.com` 写作 `com.example`），或者用 `io.github.<your-account>`；准入检查不会核实你是否控制这个前缀。
+
 源码：`crates/app-contract/src/manifest.rs` 中的 `RESERVED_NAMES`。
 
 ### 网络主机
@@ -231,6 +251,8 @@ ID 由 1 到 64 个 `[a-z0-9.-]` 字符组成，不能以 `.` 开头，也不能
 ```text
 [refused] policy: host "https://api.open-meteo.com/v1" must be a bare host name, with no scheme or path
 ```
+
+主机列表是每个签名版本的一部分，所以只列出稳定的主机：已发布的应用跟不上隧道换用的新名称，`localhost` 指向的也是用户自己的设备，而不是你的服务器。
 
 ### 存储与配额
 
@@ -378,6 +400,8 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 }
 ```
 
+准入检查接受这些工具，但在商店应用中，OctoSense 会拒绝运行它们，因为它们没有 `host_method`（见 [OctoSense 目前的支持情况](#octosense-目前的支持情况)）。
+
 | 字段 | 含义 |
 | --- | --- |
 | `name` | `<namespace>.<tool>`。命名空间是应用 ID 的最后一段：`os.news` 和 `dev.example.news` 的命名空间都是 `news`。每一段都由 `[a-z0-9_]` 组成。OctoSense 的工具代理（tool broker）负责注册和分派应用工具，它把命名空间之后的部分写成代理名称，用下划线代替点（`news.topics.get` 变为 `topics_get`）。准入检查拒绝超过 32 个字符的代理名称。 |
@@ -387,7 +411,7 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | `background` | 工具可以在并非由用户发起的一轮对话中运行。默认 `false`。 |
 | `shareable` | 可以授权给应用自身 Agent 以外的调用方，例如 OctoSense 的系统 Agent（覆盖整台设备，用户直接与它对话）和其他应用的 Agent。默认 `false`。 |
 | `private_data` | 结果中含有用户的私人数据。`local_only` 应用的可共享工具必须设为 `false`；带 `host_method` 的工具必须设为 `true`。 |
-| `implemented_by` | `host-service`：由宿主服务运行。`app`：由应用自己的脚本运行。必填。 |
+| `implemented_by` | `host-service`：由宿主服务运行。`app`：由应用自己的脚本运行，OctoSense 目前还不支持。必填。 |
 | `host_method` | 工具映射到的已审核共享服务方法（[把工具映射到共享服务](#把工具映射到共享服务host_method)）。可选。 |
 | `outward` | 如果 `act` 工具的调用会触及设备之外（发送、发帖、分享），就设置此项。这样每次调用都会像破坏性（`destructive`）调用一样，等待用户批准。默认 `false`；准入检查拒绝在 `read` 工具上设置它。 |
 | `auto_approvable` | 常设规则（例如“一小时内允许”）可以批准调用。默认 `true`。对于删除、付款、账户或安全设置的变更，以及向设备之外分享，请设为 `false`，让用户逐次当场批准。 |
@@ -491,7 +515,7 @@ OctoSense 桌面版 0.1.0-beta.2 的商店用一行说明代替前三行：“Ru
 | 组成部分 | 现状 |
 | --- | --- |
 | 与 Agent 对话 | 用户允许应用的 Agent 之后，在 Shell 的“Ask &lt;app&gt;”对话栏中进行。OctoSense 会在首次使用时询问。`card-host` 不运行 Agent。 |
-| `implemented_by: "host-service"` 的工具 | 以应用的身份，在工具命名空间对应的宿主服务上运行；设置了 `host_method` 时，则在该方法所属的宿主服务上运行。清单必须授予该服务族。工具调用从不弹出面板。 |
+| `implemented_by: "host-service"` 的工具 | 以应用的身份，在 `host_method` 指定的服务上运行，清单必须请求该服务。没有 `host_method` 的工具会调用以其命名空间命名的服务。系统应用（例如 `os.news`）可以这样调用，但商店应用的命名空间不是能力，调用会失败，返回 `not_granted`。工具调用从不弹出面板。 |
 | `implemented_by: "app"` 的工具 | 尚不支持：调用会失败，返回 `app_tool_unavailable`。 |
 | `AGENT.md` 和技能 | 作为指引，在每一轮对话中加载。它们不授予任何工具。 |
 | `agent.tools` | `ask_user_question` 可用。尚不支持：`ledger.read`、`ledger.write`、`net.fetch`、`storage.read`、`storage.write` 和 `card.render` 的执行器。 |
@@ -539,7 +563,7 @@ OctoSense `main`（尚未进入任何发布版）改变了三点：
 host.request("mail.list", {…}, fn(r){ … })
 ```
 
-除非应用的策略授予了相应的服务族（`mail.*` 对应 `mail`）或确切的服务名，否则隔离环境会拒绝调用。获准的调用会交给宿主为该服务族注册的服务。服务完成工作后返回数据，绝不返回凭据或连接。如果某个服务族没有任何服务响应，对它的调用会立即失败，返回 `no service answers "<family>" on this device`；`card-host` 不注册任何服务。哪个 Shell 提供哪个服务族，见 Design Flow 的[宿主服务](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md)。
+除非应用的策略授予了相应的服务族（`mail.*` 对应 `mail`）或确切的服务名，否则隔离环境会拒绝调用。获准的调用会交给宿主为该服务族注册的服务。服务完成工作后返回数据，绝不返回凭据或连接。如果某个服务族没有任何服务响应，对它的调用会立即失败，返回 `no service answers "<family>" on this device`；`card-host` 不注册任何服务。哪个 Shell 提供哪个服务族，见 Design Flow 的[宿主服务](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。
 
 ### 面板：应用从不收集机密信息
 
@@ -547,11 +571,11 @@ host.request("mail.list", {…}, fn(r){ … })
 
 面板显示期间，文本、按键、输入法输入、剪贴板和指针释放事件只发给面板；计时器和服务回复仍会送达应用。基于 App Hub `main` 构建的宿主会自己保存对面板的引用，因此应用中名为 `sheet` 的控件无法隐藏或替换面板。
 
-参见 Design Flow 的 [Mail 完整示例](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md#mail-the-worked-example)。
+参见 Design Flow 的 [Mail 完整示例](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md#完整示例mail)。
 
 ### 已连接账户
 
-使用 GitHub 或 Google 的应用要声明 `auth`，再加上它用到的提供商能力：`github`、`gcalendar` 或 `gmail`。用户在宿主面板上登录，应用拿到的是连接句柄，绝不是令牌。写操作要经过宿主确认。请设置 `storage.accounts: true`，让每个账户各自保存数据。哪些宿主支持这类应用，见[开始之前](SUBMITTING.zh-CN.md#开始之前)；具体如何调用，见 Design Flow 的[使用已连接账户](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.md#use-a-connected-account)。
+使用 GitHub 或 Google 的应用要声明 `auth`，再加上它用到的提供商能力：`github`、`gcalendar` 或 `gmail`。用户在宿主面板上登录，应用拿到的是连接句柄，绝不是令牌。写操作要经过宿主确认。请设置 `storage.accounts: true`，让每个账户各自保存数据。哪些宿主支持这类应用，见[开始之前](SUBMITTING.zh-CN.md#开始之前)；具体如何调用，见 Design Flow 的[使用已连接账户](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.zh-CN.md#使用已连接账户)。
 
 宿主执行哪些规则，取决于它的构建：
 
@@ -601,7 +625,7 @@ OctoSense `main` 可以让应用登录它自己的后端，但目前还没有任
 
 ## 命令
 
-`hub` 运行的就是准入检查本身的代码，Hub 依据的也正是它的报告。按 Design Flow 的[快速上手](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md)构建它。运行 `hub`、`hub help`，或在任何命令后加上 `--help` 或 `-h`，都会输出用法；这些命令都不会读取应用包，也不会写入文件。未知命令会失败，并输出 ``hub: unknown command "<name>"; run `hub help` for usage``。
+`hub` 运行的就是准入检查本身的代码，Hub 依据的也正是它的报告。按 Design Flow 的[快速上手](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.zh-CN.md)构建它。运行 `hub`、`hub help`，或在任何命令后加上 `--help` 或 `-h`，都会输出用法；这些命令都不会读取应用包，也不会写入文件。未知命令会失败，并输出 ``hub: unknown command "<name>"; run `hub help` for usage``。
 
 | 命令 | 作用 |
 | --- | --- |

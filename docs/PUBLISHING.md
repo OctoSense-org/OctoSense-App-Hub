@@ -135,19 +135,47 @@ admission. A warning does not.
 ### Fonts
 
 A card names a font with `font_src`, in the `page.data.json` placements or in
-a native kit's component styles. The value must be a font file in the bundle,
-or the one built-in font the gate allows,
-`makepad_widgets:resources/Inter.ttf`. Any other built-in font is refused:
+a native kit's component styles. The gate accepts a font file in the bundle,
+or the one built-in font it allows, `makepad_widgets:resources/Inter.ttf`. Any
+other built-in font is refused:
 
 ```text
 [refused] resource-invalid (kit/native/light/kit.json/components/detail/style/font_src): not a portable bundle path: "makepad_widgets:resources/LXGWWenKaiRegular.ttf"
 ```
 
 Not yet: other built-in fonts
-([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). For text
-that Inter does not cover, such as Chinese, bundle a `.ttf` or `.otf` file; it
-counts toward the 8 MiB limit. The gate does not decode font files, so test the
-font in `card-host`.
+([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)).
+
+A bundled font named in `font_src` passes the gate but does not load in
+`card-host` today, and `card-host` logs nothing about it. Do not ship one for a
+card. Inter has no Chinese glyphs either. For Chinese text in a card, build the
+card from the role kit and set no `font_src`. The role kit is the set of
+OctoScript kit modules behind components such as `Surface`, `TextTitle` and
+`TextBody`: copy `_kit.octoscript`, `_derive.octoscript`,
+`_derive_color.octoscript`, `_palette_light.octoscript` and
+`_palette_dark.octoscript` from OctoScript-Makepad's `components/l0/` into the
+bundle's `kit/`. It draws Chinese with Makepad's built-in CJK face, LXGW
+WenKai.
+
+By default, Makepad draws a glyph that the card's fonts lack with one of the
+operating system's fonts, so on macOS Chinese appears even when the card's own
+font did not load. Turn that fallback off when you check a card:
+
+```sh
+MAKEPAD_SYSTEM_FONTS=0 tools/octo run ~/apps/my-app/bundle --port 8141 --detach
+```
+
+Each glyph that the card's fonts lack now draws as a box, as it does on Linux
+without a system CJK font.
+
+A script app can bundle a font. Name the file through the `{{assets}}`
+placeholder in a text style's `FontMember`; it counts toward the 8 MiB limit:
+
+```splash
+Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{latin := FontMember{res: http_resource("{{assets}}/fonts/<file>.ttf") asc: 0.0 desc: 0.0}} font_size: 20}}
+```
+
+Unverified: how the OctoSense shells draw these fonts.
 
 ## The manifest
 
@@ -210,7 +238,7 @@ OctoSense desktop 0.1.0-beta.2.
 | `storage` | The app's own storage folder: `fs.*`, camera captures and local files a widget reads. Without it every `fs.*` call fails. | Keep its own data on this device | The runtime, in every host |
 | `net` | Requests to the hosts in `network.hosts`, and no others. | Reach only: *hosts* | The runtime, in every host |
 | `images` | Pictures from any public https host, not only `network.hosts`. | Show pictures from any website | The runtime |
-| `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime |
+| `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime, only in macOS, iOS and Android builds. Desktop Linux and Windows builds have no system web view. |
 | `location` | The device's location. | Use your location | The runtime, where the device has it |
 | `camera` | The camera. A capture is saved in the app's storage, so the app also needs `storage`. | Use the camera | The runtime, where the device has it |
 | `microphone` | Sound with a camera video. | Use the microphone | The runtime, where the device has it |
@@ -280,6 +308,10 @@ A system app's own namespace is not reserved: `com.example.news` is allowed.
 An app that ships `tools.json` needs a namespace of `[a-z0-9_]{1,24}`:
 `com.example.mynotes` can declare tools, and `com.example.my-notes` cannot.
 
+Begin the id with a reverse-DNS prefix you control, such as your reversed
+domain (`com.example` for `example.com`) or `io.github.<your-account>`; the
+gate does not check that you control it.
+
 Source: `RESERVED_NAMES` in `crates/app-contract/src/manifest.rs`.
 
 ### Network hosts
@@ -294,6 +326,10 @@ scheme, path, port or wildcard:
 ```text
 [refused] policy: host "https://api.open-meteo.com/v1" must be a bare host name, with no scheme or path
 ```
+
+The host list is part of each signed version, so list only stable hosts: a
+published app cannot follow a tunnel's new name, and `localhost` is the
+person's own device, not your server.
 
 ### Storage and quotas
 
@@ -468,6 +504,10 @@ abridged:
 }
 ```
 
+The gate admits these tools, but in a store app each call fails with
+`not_granted`, because they have no `host_method`
+([What OctoSense runs today](#what-octosense-runs-today)).
+
 | Field | Meaning |
 | --- | --- |
 | `name` | `<namespace>.<tool>`. The namespace is the last segment of the app's id: `news` for both `os.news` and `dev.example.news`. Each segment is `[a-z0-9_]`. OctoSense's tool broker, which registers and dispatches app tools, spells the part after the namespace with underscores for dots (`news.topics.get` becomes `topics_get`). The gate refuses a broker name over 32 characters. |
@@ -477,7 +517,7 @@ abridged:
 | `background` | The tool may run in a turn the person did not start. Default `false`. |
 | `shareable` | Callers other than the app's own agent may be granted it, such as OctoSense's system agent (the device-wide agent the person talks to) and other apps' agents. Default `false`. |
 | `private_data` | The result carries the person's private data. A shareable tool of a `local_only` app must say `false`; a `host_method` tool must say `true`. |
-| `implemented_by` | `host-service`: a host service runs it. `app`: the app's own script runs it. Required. |
+| `implemented_by` | `host-service`: a host service runs it. `app`: the app's own script runs it, which OctoSense does not support yet. Required. |
 | `host_method` | A reviewed shared-service method the tool runs on ([Map a tool to a shared service](#map-a-tool-to-a-shared-service-host_method)). Optional. |
 | `outward` | Set it on an `act` tool whose call reaches outside the device (sends, posts, shares). Each call then waits for the person, as a destructive call does. Default `false`; refused on a `read` tool. |
 | `auto_approvable` | A standing rule ("allow for an hour") may approve a call. Default `true`. Say `false` for deletion, payments, account or security changes and sharing outside the device, so the person approves each call as it happens. |
@@ -613,7 +653,7 @@ On OctoSense desktop 0.1.0-beta.2, each part works as follows:
 | Part | Today |
 | --- | --- |
 | Talking to the agent | The shell's "Ask &lt;app&gt;" panel, once the person allows the app's agent. OctoSense asks at first use. `card-host` runs no agent. |
-| Tools with `implemented_by: "host-service"` | Run as the app on the host service of their namespace, or of their `host_method`. The manifest must grant that family. A tool call never raises a sheet. |
+| Tools with `implemented_by: "host-service"` | Run as the app on the service that their `host_method` names, which the manifest must request. Without `host_method`, a tool calls the service named by its namespace. That works for a system app, such as `os.news`, but a store app's namespace is not a capability, so the call fails with `not_granted`. A tool call never raises a sheet. |
 | Tools with `implemented_by: "app"` | Not yet: a call fails with `app_tool_unavailable`. |
 | `AGENT.md` and skills | Loaded as guidance for every turn. They grant no tools. |
 | `agent.tools` | `ask_user_question` works. Not yet: an executor for `ledger.read`, `ledger.write`, `net.fetch`, `storage.read`, `storage.write` or `card.render`. |

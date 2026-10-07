@@ -24,7 +24,7 @@
 | `tools/octo` | [Design Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) | 创建、运行应用并截图。它封装了 `card-host` 和 `hub`。 |
 | OctoSense 桌面版 | 面向 macOS（Apple 芯片）的 [0.1.0-beta.2](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-beta.2) 发布版 | 运行使用宿主服务（包括[连接账户](PUBLISHING.zh-CN.md#已连接账户)）的应用。 |
 
-按 [QUICKSTART §1](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md#1-prerequisites) 准备好工作区，然后从最新的 `main` 构建 `hub` 和 `card-host`：
+按 [QUICKSTART §1](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.zh-CN.md#1-前置条件) 准备好工作区，然后从最新的 `main` 构建 `hub` 和 `card-host`：
 
 ```sh
 cd ~/octosense-ws/OctoSense-App-Hub
@@ -57,12 +57,12 @@ OctoSense `main` 与 desktop-v0.1.0-beta.2 有以下不同，这些改动尚未�
 - 应用 Agent 调用 `glance.publish` 时，宿主拒绝可执行的 Splash（`script`）和 L1 卡片源码。
 - 宿主只保留从 30 天前到 366 天后的 Google 日历日程，而不是日历的全部历史。
 
-想在提交前把应用装进 Shell 试用，可以先把它发布到本地签名目录（[演练步骤](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally)）。演练只在从源码构建的 Shell 上验证过。
+想在提交前把应用装进 Shell 试用，可以先把它发布到本地签名目录（[演练步骤](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)）。演练只在从源码构建的 Shell 上验证过。
 
 ### 确认你的平台
 
 - **macOS（Apple 芯片）**：已验证，本文所有命令都在这个平台上运行过。
-- **Windows**：尚未在当前 `main` 上验证。用 `python tools/octo` 运行 Design Flow 的工具，它能找到 `hub.exe` 和 `card-host.exe`。commit 应用包之前，先加上[第 1 步](#1-安排仓库结构)的 `.gitattributes`；最后一次检查要在全新克隆上做（[第 6 步](#6-冻结并验证发布)）。
+- **Windows**：尚未在当前 `main` 上验证。开放中的 issue [#41](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/41) 记录了在较早版本上完成的 Windows 11 原生构建和运行，由社区成员而非维护者验证。用 `python tools/octo` 运行 Design Flow 的工具，它能找到 `hub.exe` 和 `card-host.exe`。commit 应用包之前，先加上[第 1 步](#1-安排仓库结构)的 `.gitattributes`；最后一次检查要在全新克隆上做（[第 6 步](#6-冻结并验证发布)）。
 - **Linux**：未经验证。另有报告称，在软件渲染（llvmpipe、WSL）下截取画面（`/g`）会超时，这一点同样未经验证。
 
 ### 保护发布者密钥
@@ -125,6 +125,8 @@ git check-attr text -- bundle/manifest.json
 ```
 
 成功时输出 `bundle/manifest.json: text: unset`。如果应用包已经 commit 过，运行 `git add --renormalize bundle`，再重做[第 5 步](#5-生成最终字节)。
+
+Git 从仓库根目录开始匹配这个模式，所以 `bundle/**` 只覆盖根目录下的应用包。如果应用包在更深的目录中，就写出它的实际路径，例如 `apps/my-app/bundle/** -text`；也可以写 `**/bundle/** -text`，覆盖任意层级的 `bundle/`。然后对这个应用包的 `manifest.json` 运行 `git check-attr`，对它的目录运行 `git add --renormalize`。输出 `text: unspecified` 说明这个模式没有覆盖应用包，Git 仍可能转换其中的文件。
 
 ## 2. 写对清单
 
@@ -194,7 +196,7 @@ python3 -c 'import json; p = json.load(open("bundle/listing.json"))["publisher"]
 
 ## 4. 截图
 
-商店信息里，只有截图能让审核人员对照运行中的应用核实。在 `card-host` 中运行未签名的应用包，通过远程控制接口把应用驱动到要展示的每个状态（路由见 [QUICKSTART](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md)），逐一截图。在 Design Flow 的检出目录中运行：
+商店信息里，只有截图能让审核人员对照运行中的应用核实。在 `card-host` 中运行未签名的应用包，通过远程控制接口把应用驱动到要展示的每个状态（路由见 [QUICKSTART](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.zh-CN.md)），逐一截图。在 Design Flow 的检出目录中运行：
 
 ```sh
 tools/octo run ~/apps/my-app/bundle --port 8141 --detach
@@ -209,7 +211,9 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 {"ok":1}
 ```
 
-使用前逐张打开 PNG 查看。不要发布错误画面、空白的首帧或效果图。如果应用一直在播放动画，`shot` 仍会保存最后一帧，并在输出中注明 `(still changing after 2s, e.g. an animation; this is the last frame)`；请检查这一帧。其他截图问题见 [QUICKSTART 的故障排查](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md#troubleshooting)。
+使用前逐张打开 PNG 查看。不要发布错误画面、空白的首帧或效果图。如果应用一直在播放动画，`shot` 仍会保存最后一帧，并在输出中注明 `(still changing after 2s, e.g. an animation; this is the last frame)`；请检查这一帧。其他截图问题见 [QUICKSTART 的故障排查](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.zh-CN.md#故障排查)。
+
+未验证，仅限 Linux：如果在软件渲染（llvmpipe、WSL）下 `shot` 超时，请在启动 `tools/octo run` 或 `card-host` 之前设置 `MAKEPAD_WRITE_FRAMEBUFFER_PNG=<file>`，Makepad 的 OpenGL 后端每次绘制窗口时都会把窗口画面保存到这个 PNG 文件；在 macOS 上，`shot` 仍是经过验证的截图方式。
 
 需要宿主服务或原生控件（例如 GitHub Notes 的 Markdown 编辑器）的界面，在 `card-host` 中渲染不出来。这样的界面，请在提供该服务或控件的 Shell 中用虚构数据截图；否则，截下它的不可用状态，就像 Google Calendar 的 `03-host-required.png` 那样。在描述中注明哪些截图用了虚构数据。
 
@@ -448,7 +452,7 @@ mkdir -p build review
 | `hub: manifest is not valid: unknown field …`，没有报告 | `hub stamp` 和 `hub check` 无法解析清单。 | 删除该字段，或改用正确的字段名。消息中列出了合法字段。 |
 | `contents: <file> has extension "…", which a bundle may not hold` | `.DS_Store`、`LICENSE`，或其他扩展名不在允许范围内的文件。 | 删除它，或移出 `bundle/`。 |
 | `contents-invalid (<file>): cannot decode the image: …` | 图片损坏、其他格式改名成了 `.png`，或者单边超过 4096 像素。 | 重新截图或导出。 |
-| `resource-invalid (…/font_src): not a portable bundle path: "makepad_widgets:resources/…"` | 卡片 kit 引用了 `makepad_widgets:resources/Inter.ttf` 以外的内置字体，例如内置的 CJK 字体（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。 | 把字体子集打包进应用包，并让 `font_src` 指向它。 |
+| `resource-invalid (…/font_src): not a portable bundle path: "makepad_widgets:resources/…"` | 卡片 kit 引用了 `makepad_widgets:resources/Inter.ttf` 以外的内置字体，例如内置的 CJK 字体（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。 | 拉丁文字用 `makepad_widgets:resources/Inter.ttf`。中文请改用角色 kit 组合卡片，并且不设 `font_src`（见发布参考的[字体](PUBLISHING.zh-CN.md#字体)一节）。打包的字体能通过准入检查，但在卡片中不会加载。 |
 | `assets: <file> contains https://…`，或 `assets: main.splash reaches <host>, which the manifest does not declare in network.hosts` | 应用包中的 `.txt`、`.md`、`.json` 或 `.card` 文件（例如许可证）含有 URL，或者脚本访问的主机没有列在 `network.hosts` 中。 | 把文件移出 `bundle/`，或删掉 URL。在 `network.hosts` 中声明脚本访问的每个主机，并请求 `net`。 |
 | `identity: … is under os.`，或 `identity: app id "…" ends in "…", which is reserved` | ID 以 `os.` 开头，或者 ID 本身或其最后一段是以下名称之一：`agents` `apphub` `appcard` `browser` `calculator` `card` `clock` `dev` `notes` `octos` `octoscode` `os` `reference` `reminders` `rinx` `sheets` `shell` `system` `task` `terminal` `toolbox` `weather` `workflow`。 | 在首次发布之前换一个 ID。 |
 | `listing: listing has more than 10 keywords`、`… more than 8 screenshots` 或 `listing platform "…" is not one of […]` | 商店信息超出上限，或名称拼错。 | 精简列表，或使用消息中给出的名称。 |
@@ -467,9 +471,9 @@ mkdir -p build review
 | 在应用中保存 API 密钥或令牌 | 不支持。准入检查只拒绝密码和一次性验证码字段，因此发现不了输入到普通字段或存放在存储中的密钥。 | 不要附带任何密钥。生成文本请用 `model`，它调用的是用户自己的 AI 提供商。 |
 | 生成图片、音频、视频或向量嵌入 | 尚不支持。`model` 只提供 `model.complete` 和 `model.budget`；`model.image`、`model.audio`、`model.video` 和 `model.embeddings` 都是未知能力（[#85](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/85)–[#88](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/88)）。 | 用 `model.complete` 生成文本。 |
 | 使用 `llm`、`news`、`calendar`、`prompt`、`ledger.read`、`clipboard` 或 `palpo.*` | 准入检查接受它们，但没有宿主向商店应用提供这些服务。`llm` 和 `news` 只响应 `os.*` 应用，`calendar` 只响应 `os.calendar`，其余的没有任何宿主处理。 | 不要请求它们。访问 Google 日历请用 `gcalendar`。 |
-| 附带 `implemented_by: "app"` 的工具 | 准入检查接受，但 OctoSense 拒绝运行它们。 | 使用 `host-service` 工具。 |
+| 附带运行应用自身逻辑的工具 | 不支持。OctoSense 拒绝 `implemented_by: "app"` 的工具，返回 `app_tool_unavailable`。没有 `host_method` 的 `host-service` 工具会调用以应用的命名空间命名的服务，而命名空间不是能力，所以调用失败，返回 `not_granted`。准入检查接受这两种工具。 | 用 `host_method` 把每个工具映射到 `github`、`gcalendar`、`gmail` 或 `glance` 的某个方法，OctoSense 会运行这样的工具（见发布参考的[把工具映射到共享服务](PUBLISHING.zh-CN.md#把工具映射到共享服务host_method)一节）。 |
 | 提交系统应用（`os.*`）或原生应用 | 这里没有提交途径。系统应用随 Shell 一起发布，原生代码需要随 Shell 新版本发布（[交付路径](DEVELOPMENT.zh-CN.md#选择合适的交付路径)）。 | 用自己的 ID 做一个商店应用。 |
 | 在手机上安装 `auth` 应用 | 目前没有任何已发布的手机版本能做到。 | 在 desktop-v0.1.0-beta.2 上测试。 |
-| 在卡片 kit 中引用 Makepad 内置的 CJK 字体 | 尚不支持（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。 | 打包该字体的子集。未验证：子集在各个宿主中的渲染效果。 |
+| 在卡片 kit 中引用 Makepad 内置的 CJK 字体 | 尚不支持（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。打包的字体能通过准入检查，但在卡片中不会加载。 | 用角色 kit 组合卡片，并且不设 `font_src`：角色 kit 会用内置的 CJK 字体显示中文（见发布参考的[字体](PUBLISHING.zh-CN.md#字体)一节）。未验证：OctoSense Shell 中的显示效果。 |
 
-哪个 Shell 提供哪项宿主服务，见 Design Flow 的 [HOST-SERVICES.md](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md)。
+哪个 Shell 提供哪项宿主服务，见 Design Flow 的 [HOST-SERVICES.zh-CN.md](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。
