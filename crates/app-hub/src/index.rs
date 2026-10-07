@@ -39,9 +39,11 @@ pub struct Entry {
     pub listing: Option<Listing>,
     /// The app's tool manifest (`tools.json`) as reviewed, so a store can
     /// say which tools wait for approval or may be shared before anything is
-    /// installed. Omitted when the app ships no tools, so an entry without
-    /// them serialises, and signs, as it did before the field existed. The
-    /// bundle's copy is authoritative on the device: the digest pins it.
+    /// installed. A display projection: `entry_for` omits `host_method` so
+    /// older stores can still read the catalog. It is never a dispatch table.
+    /// Omitted when the app ships no tools, so an entry without them serialises,
+    /// and signs, as it did before the field existed. The bundle's exact copy,
+    /// including its dispatch bindings, is authoritative: the digest pins it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tools: Vec<ToolSpec>,
     /// Where the hub's own copy of the bundle lives, relative to the catalog.

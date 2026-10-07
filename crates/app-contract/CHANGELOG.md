@@ -5,6 +5,10 @@ within `1.x` it only grows.
 
 ## 1.5.0
 
+- Admit the `auth`, `github`, `gcalendar` and `gmail` host-service capabilities.
+  Each remains an independent grant. OAuth returns app-bound connection handles;
+  provider tokens stay in the host. These declarations require corresponding
+  OctoSense implementations and do not make a provider available by themselves.
 - Add the `photos` and `youtube` capabilities for the contained Photos and
   YouTube UIs to call their owning host services. Neither grants Android
   Gallery access, a YouTube account or another app's agent tools; cross-app

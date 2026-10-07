@@ -71,6 +71,24 @@ fn an_unknown_required_feature_needs_a_newer_host() {
 }
 
 #[test]
+fn oauth_provider_services_are_independent_grants() {
+    let limits = HostLimits::default().with_require_signature(false);
+    let capabilities = ["auth", "github", "gcalendar", "gmail"];
+    for granted in capabilities {
+        let manifest = parse(&manifest_with(&format!(r#""capabilities":["{granted}"]"#))).unwrap();
+        let policy = resolve(&manifest, &limits).unwrap();
+        for candidate in capabilities {
+            assert_eq!(policy.allows(candidate), candidate == granted);
+        }
+        for unrelated in ["mail", "calendar", "net", "glance", "auth.*"] {
+            assert!(!policy.allows(unrelated));
+        }
+        let wildcard = parse(&manifest_with(&format!(r#""capabilities":["{granted}.*"]"#))).unwrap();
+        assert!(resolve(&wildcard, &limits).is_err());
+    }
+}
+
+#[test]
 fn resolve_checks_requires_even_for_a_manifest_not_read_by_parse() {
     let manifest: AppManifest = serde_json::from_str(&manifest_with(r#""requires":["x"]"#)).unwrap();
     let limits = HostLimits::default().with_require_signature(false);

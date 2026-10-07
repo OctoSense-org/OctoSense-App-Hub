@@ -43,6 +43,10 @@ pub struct CardAppView {
     #[rust]
     app_id: String,
     #[rust]
+    card_surface: SplashRef,
+    #[rust]
+    host_sheet: SplashRef,
+    #[rust]
     started: bool,
     #[rust]
     asset_server: Option<octosense_app_policy::AssetServer>,
@@ -56,6 +60,9 @@ pub struct CardAppView {
 
 impl CardAppView {
     fn start(&mut self, cx: &mut Cx) {
+        // Capture host identities before untrusted app widgets exist.
+        self.card_surface = self.view.splash(cx, ids!(body.card));
+        self.host_sheet = self.view.splash(cx, ids!(sheet));
         let root = crate::data_root(cx);
         // `.host` can never be an app id, so it is no app's jail.
         self.host_dir = root.join(".host");
@@ -106,7 +113,7 @@ impl CardAppView {
         settings.hosts.push(server.allowlist_entry());
         let origin = server.origin().to_string();
         self.asset_server = Some(server);
-        let splash = self.view.splash(cx, ids!(card));
+        let splash = self.card_surface.clone();
         let applied = octosense_app_policy::splash_adapter::apply(&splash, cx, &settings);
         log!(
             "card: {} running under {} capability(ies), {} host(s), {} bytes of storage, {} instructions, {} bytes of heap",
@@ -131,11 +138,11 @@ impl Widget for CardAppView {
             self.started = true;
             self.start(cx);
         }
-        let (card, sheet) = (self.view.splash(cx, ids!(card)), self.view.splash(cx, ids!(sheet)));
+        let (card, sheet) = (self.card_surface.clone(), self.host_sheet.clone());
         // A sheet is modal: while it is up, the person's input is for it, and
         // the app underneath must not take a tap meant for a password field.
         let sheet_up = sheet.borrow().map(|s| s.view.visible).unwrap_or(false);
-        if sheet_up && event.requires_visibility() {
+        if sheet_up && crate::services::is_sheet_input_event(event) {
             sheet.handle_event(cx, event, scope);
         } else {
             self.view.handle_event(cx, event, scope);
@@ -218,3 +225,53 @@ impl ServiceExecutor for CardExecutor {
 
 #[allow(dead_code)]
 fn _unused(_: PathBuf) {}
+
+#[cfg(test)]
+mod modal_tests {
+    use super::*;
+    use std::cell::RefCell;
+    thread_local! {static SEEN: RefCell<Vec<String>> = const {RefCell::new(Vec::new())};}
+    script_mod! {
+        use mod.prelude.widgets.*
+        mod.widgets.ModalInputProbe = set_type_default() do #(ModalInputProbe::register_widget(vm)) {}
+        mod.prelude.widgets.ModalInputProbe = mod.widgets.ModalInputProbe
+    }
+    #[derive(Script, ScriptHook, Widget)]
+    struct ModalInputProbe {
+        #[deref] view: View,
+        #[live] label: String,
+    }
+    impl Widget for ModalInputProbe {
+        fn handle_event(&mut self, _: &mut Cx, event: &Event, _: &mut Scope) {
+            if matches!(event, Event::TextInput(_) | Event::KeyDown(_)) {
+                SEEN.with(|seen| seen.borrow_mut().push(self.label.clone()));
+            }
+        }
+        fn draw_walk(&mut self, _: &mut Cx2d, _: &mut Scope, _: Walk) -> DrawStep {DrawStep::done()}
+    }
+    #[test]
+    fn host_sheet_exclusively_receives_text_and_keys_above_installed_app() {
+        let mut cx = Cx::new(Box::new(|_, _| {}));
+        widget_async::register_splash_isolate_mod(|vm| {script_mod(vm);});
+        let root = cx.with_vm(|vm| {
+            makepad_widgets::script_mod(vm);
+            super::script_mod(vm);
+            let value = script_eval!(vm, {use mod.widgets.* CardAppView {}});
+            WidgetRef::script_from_value(vm, value)
+        });
+        {
+            let mut runner = root.borrow_mut::<CardAppView>().unwrap();
+            runner.started = true;
+            runner.app_id = "org.example.modal-input".into();
+            runner.card_surface = runner.view.splash(&mut cx, ids!(body.card));
+            runner.host_sheet = runner.view.splash(&mut cx, ids!(sheet));
+            runner.card_surface.set_text(&mut cx, "ModalInputProbe {label: \"app\"}");
+            runner.host_sheet.set_text(&mut cx, "ModalInputProbe {label: \"host\"}");
+            runner.host_sheet.borrow_mut().unwrap().view.visible = true;
+        }
+        SEEN.with(|seen| seen.borrow_mut().clear());
+        root.handle_event(&mut cx, &Event::TextInput(TextInputEvent {input: "private sheet text".into(), ..Default::default()}), &mut Scope::empty());
+        root.handle_event(&mut cx, &Event::KeyDown(KeyEvent {key_code: KeyCode::KeyA, ..Default::default()}), &mut Scope::empty());
+        assert_eq!(SEEN.with(|seen| seen.borrow().clone()), ["host", "host"], "underlying app must not receive host-sheet text or keys");
+    }
+}

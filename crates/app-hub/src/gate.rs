@@ -486,11 +486,19 @@ pub fn entry_for(
         None => {}
     }
     let listing = std::fs::read_to_string(bundle.join(LISTING_FILE)).ok().and_then(|t| Listing::parse(&t).ok());
+    let mut tools = octosense_app_policy::agent::read_tools(bundle)?.map(|t| t.tools).unwrap_or_default();
+    // Catalog tools describe permissions; dispatch reads the digest-pinned
+    // bundle instead. Older stores strictly parse ToolSpec, so including this
+    // new routing field here would make them reject the entire catalog.
+    // Keep every permission field, and leave the signed bundle untouched.
+    for tool in &mut tools {
+        tool.host_method = None;
+    }
     Ok(Entry {
         artifact: format!("artifacts/{}-{}.bundle", report.app_id, report.version),
         manifest,
         listing,
-        tools: octosense_app_policy::agent::read_tools(bundle)?.map(|t| t.tools).unwrap_or_default(),
+        tools,
         publisher: publisher.to_string(),
         publisher_key: publisher_key.to_string(),
         source: crate::index::Source { repository: repository.to_string(), commit: commit.to_string() },

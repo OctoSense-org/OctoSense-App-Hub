@@ -21,7 +21,7 @@ templates and test fixtures.
 | Path | What it is |
 | --- | --- |
 | `catalog.json` | The signed catalog. Stores verify it against the anchor below before showing anything. |
-| `index/<app>-<version>.json` | One admitted entry per app version: its manifest, publisher, source and status. Created by `hub publish`; absent while no app is published. |
+| `index/<app>-<version>.json` | One admitted entry per app version: its manifest, publisher, source and status. A maintainer exports the admitted entry from the catalog after `hub publish`; absent while no app is published. |
 | `artifacts/<app>-<version>.bundle/` | The hub's copy of the bundle, exactly the bytes that were reviewed. Created by `hub publish`. |
 | `artifacts/<app>-<version>.bundle.pack.json` | The same bundle as one file, which stores download. |
 | `docs/FIRST-APP.md` | First-app walkthrough for a card app or a script app: author, package, run, capture, validate and submit. |
@@ -61,10 +61,39 @@ app id. Only requested names are eligible; owner sharing, caller grants and a
 real executor remain separate shell checks. An offer neither starts an agent
 nor gives script UI code raw host-service access. Store defaults are unchanged.
 
+App contract 1.5 admits four additional, independent host-service capabilities:
+`auth` for GitHub/Google connection management, `github` for repository operations,
+`gcalendar` for Google Calendar, and `gmail` for Gmail. OAuth tokens belong to the
+host; apps receive handles bound to their own identity and authorized scopes.
+The declarations do not register services: standalone `card-host` has none of
+these providers. The OctoSense host implementation and provider registrations
+must be installed before a sample can sign in. No OctoSense account is required.
+
+An ordinary app can bind its own agent tool to a reviewed shared service with
+`"implemented_by":"host-service", "host_method":"github.read"` in `tools.json`.
+The tool keeps its app namespace. Admission checks the target against
+`SHARED_HOST_METHODS`, the declared service grant, private-data disclosure and
+minimum risk; the shell must check the resolved grant again when executing it.
+Omitting `host_method` preserves the original dispatch behavior. Authentication,
+host sheets, direct saves and sends cannot be aliased. An admitted alias neither
+installs its service nor grants approval for an external action.
+
+Catalog tool summaries omit `host_method` so older stores can read the catalog.
+They retain permission and risk metadata, but are never used for dispatch.
+The signed bundle keeps the complete tools file; installation and launch still
+verify its exact digest and publisher signature before loading those bindings.
+
 The `calendar` capability (app contract 1.4) separately admits Calendar UI
 requests. OctoSense registers the Calendar service and checks its owning app
 identity. A declared capability alone does not provide a service, a calendar
 account, or agent tools.
+
+Host-owned account and review sheets are modal: text, keyboard, IME,
+clipboard and pointer-release events reach only the visible sheet. Timer and
+service callbacks continue to reach the app. The runner captures its own card
+and sheet references before evaluating app widgets, so a bundle cannot replace
+the host surface by reusing a widget ID. `services::is_sheet_input_event` supplies
+the same input boundary to integrated foreground Glance hosts.
 
 The `photos` and `youtube` capabilities (app contract 1.5) admit requests to
 the app-owned media services supplied by OctoSense. They do not grant Android

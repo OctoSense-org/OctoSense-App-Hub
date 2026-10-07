@@ -360,17 +360,16 @@ fn heap_of(cx: &mut Cx, splash: &SplashRef, only_visible: bool) -> Option<usize>
 }
 
 fn apply_sheet(cx: &mut Cx, sheet: &SplashRef, change: Option<String>) {
-    static OPENED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    // A non-empty Splash::set_text reuses its isolate. A new program string
+    // alone does not revoke the old sheet's callbacks, timers or queued work.
+    // Stop it first, including replies that a worker has not delivered yet.
+    if let Some(heap) = heap_of(cx, sheet, false) {
+        cancel_heap(heap);
+    }
+    sheet.set_text(cx, "");
     let up = change.is_some();
-    match change {
-        Some(body) => {
-            // Every sheet starts empty: the same body again would keep the
-            // last one's fields, a password typed into a cancelled sign-in
-            // among them. The counter makes each opening a new program.
-            let n = OPENED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            sheet.set_text(cx, &format!("let sheet_opening = {n}\n{body}"));
-        }
-        None => sheet.set_text(cx, ""),
+    if let Some(body) = change {
+        sheet.set_text(cx, &body);
     }
     // After the text: a new program, or tearing the old one down, replaces
     // the sheet's view, and the replacement is visible. A sheet left
@@ -380,6 +379,19 @@ fn apply_sheet(cx: &mut Cx, sheet: &SplashRef, change: Option<String>) {
         s.view.visible = up;
     }
     cx.redraw_all();
+}
+
+/// Input owned exclusively by a visible host sheet. Makepad's visibility
+/// classification omits keyboard, text and pointer-up events; it is not a
+/// modal-input boundary. Timers and service replies still reach the app.
+pub fn is_sheet_input_event(event: &makepad_widgets::Event) -> bool {
+    use makepad_widgets::Event;
+    event.requires_visibility() || matches!(event,
+        Event::MouseUp(_) | Event::MouseLeave(_) | Event::LongPress(_)
+        | Event::KeyDown(_) | Event::KeyUp(_) | Event::TextInput(_)
+        | Event::TextRangeReplace(_) | Event::TextCopy(_) | Event::TextCut(_)
+        | Event::TextInputStateQuery(_) | Event::ImeAction(_)
+        | Event::SelectionHandleDrag(_) | Event::Drag(_) | Event::Drop(_) | Event::DragEnd)
 }
 
 /// One turn of a host running an app: hand the app's (and its sheet's) host
@@ -405,7 +417,21 @@ pub fn pump(cx: &mut Cx, app_id: &str, host_dir: &std::path::Path, card: &Splash
         expire_pending(now, |_| true);
         purge_replies(now, |_| true);
     }
+    // Requests drained together may span a replacement: the first request can
+    // open another service's sheet before a queued close/submit from the old
+    // sheet is visited. Heap addresses may also be reused after teardown, so
+    // invalidate this batch's sheet authority explicitly on every change.
+    // A replacement's startup requests remain queued for the next pump.
+    let mut original_sheet_valid = true;
     for request in makepad_widgets::splash_host::take_splash_host_requests_for(&heaps) {
+        let current_app = heap_of(cx, card, false);
+        let current_sheet = if original_sheet_valid { heap_of(cx, sheet, true) } else { None };
+        let from_sheet = Some(request.heap_key) == current_sheet;
+        if Some(request.heap_key) != current_app && !from_sheet {
+            // Its surface went away earlier in this batch. Never downgrade it
+            // to an app request: ordinary methods can also mutate host state.
+            continue;
+        }
         let args = match request_args(&request.service, &request.args_json) {
             Ok(args) => args,
             Err(refusal) => {
@@ -417,7 +443,7 @@ pub fn pump(cx: &mut Cx, app_id: &str, host_dir: &std::path::Path, card: &Splash
             app_id: app_id.to_string(),
             service: request.service.clone(),
             args,
-            from_sheet: Some(request.heap_key) == sheet_heap,
+            from_sheet,
             may_prompt: request.may_prompt,
             host_dir: host_dir.to_path_buf(),
         };
@@ -430,6 +456,7 @@ pub fn pump(cx: &mut Cx, app_id: &str, host_dir: &std::path::Path, card: &Splash
         };
         dispatch(call, request.heap_key, request.req_id, &mut ops);
         if let Some(change) = ops.change {
+            original_sheet_valid = false;
             apply_sheet(cx, sheet, change);
         }
     }
@@ -665,5 +692,76 @@ mod tests {
         dispatch(call("echo.read"), 7109, 1, &mut Host::default());
         purge_replies(later(REPLY_TTL + Duration::from_secs(1)), |h| h == 7109);
         assert!(take_replies_for(&[7109]).is_empty(), "an isolate that went away without closing leaves nothing behind");
+    }
+
+    #[test]
+    fn replacing_a_sheet_revokes_its_queued_requests_and_late_replies() {
+        use makepad_widgets::*;
+
+        struct LifecycleProbe {
+            family: &'static str,
+            seen: Arc<Mutex<Vec<String>>>,
+            held: Arc<Mutex<Option<Replier>>>,
+        }
+        impl HostService for LifecycleProbe {
+            fn family(&self) -> &'static str { self.family }
+            fn call(&mut self, call: ServiceCall, reply: Replier, host: &mut dyn ServiceHost) {
+                self.seen.lock().unwrap().push(call.service.clone());
+                match call.method() {
+                    "hold" => { *self.held.lock().unwrap() = Some(reply); return; }
+                    "open" => host.open_sheet(r#"
+                        let previous = try {mod.previous_sheet_secret} catch {nil}
+                        host.request("sheet_lifecycle_new.sheet.ready", {previous: previous}, fn(r){})
+                        Label {text: "replacement"}
+                    "#.into()),
+                    "sheet.close" => host.close_sheet(),
+                    "sheet.ready" => {
+                        assert!(call.from_sheet, "the replacement has its own sheet authority");
+                        assert!(call.args["previous"].is_null(), "old sheet state crossed into the replacement");
+                    }
+                    _ => {}
+                }
+                reply.send(Ok(Value::Null));
+            }
+        }
+
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let held = Arc::new(Mutex::new(None));
+        for family in ["sheet_lifecycle_old", "sheet_lifecycle_new"] {
+            register_host_service(Box::new(LifecycleProbe {family, seen: seen.clone(), held: held.clone()}));
+        }
+        let mut cx = Cx::new(Box::new(|_, _| {}));
+        let root = cx.with_vm(|vm| {
+            makepad_widgets::script_mod(vm);
+            let value = script_eval!(vm, {
+                use mod.widgets.*
+                View {card := Splash{} sheet := Splash{visible: false}}
+            });
+            WidgetRef::script_from_value(vm, value)
+        });
+        let card = root.splash(&mut cx, ids!(card));
+        let sheet = root.splash(&mut cx, ids!(sheet));
+        card.set_text(&mut cx, "Label{text: \"app\"}");
+        apply_sheet(&mut cx, &sheet, Some(r#"
+            mod.previous_sheet_secret = "must not survive"
+            host.request("sheet_lifecycle_old.hold", {}, fn(r){})
+            host.request("sheet_lifecycle_new.open", {}, fn(r){})
+            host.request("sheet_lifecycle_old.sheet.close", {}, fn(r){})
+            host.request("sheet_lifecycle_old.mutate", {}, fn(r){})
+            Label {text: "old sheet"}
+        "#.into()));
+        let old_heap = heap_of(&mut cx, &sheet, true).expect("old sheet has an isolate");
+        pump(&mut cx, "org.example.sheet-lifecycle", &std::env::temp_dir(), &card, &sheet);
+        assert_eq!(*seen.lock().unwrap(), ["sheet_lifecycle_old.hold", "sheet_lifecycle_new.open"]);
+        assert!(sheet.borrow().unwrap().view.visible, "the stale close must not hide the replacement");
+        held.lock().unwrap().take().unwrap().send(Ok(Value::Null));
+        assert!(take_replies_for(&[old_heap]).is_empty(), "the retired sheet's worker cannot reply late");
+
+        pump(&mut cx, "org.example.sheet-lifecycle", &std::env::temp_dir(), &card, &sheet);
+        assert_eq!(*seen.lock().unwrap(), [
+            "sheet_lifecycle_old.hold", "sheet_lifecycle_new.open", "sheet_lifecycle_new.sheet.ready"
+        ], "only the replacement's new request may reach a service");
+        apply_sheet(&mut cx, &sheet, None);
+        card.set_text(&mut cx, "");
     }
 }
