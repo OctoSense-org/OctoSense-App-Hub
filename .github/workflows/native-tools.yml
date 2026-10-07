@@ -80,3 +80,5 @@ jobs:
         run: |
           cargo test --locked --release -p octosense-card-host --test cli
           cargo test --locked --release -p octosense-appstore --no-default-features --lib
+          cargo test --locked --release -p octosense-app-hub-app --no-default-features --lib
+          cargo test --locked --release -p octosense-card-host --bin card-host

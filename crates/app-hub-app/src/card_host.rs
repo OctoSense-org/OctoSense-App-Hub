@@ -43,8 +43,7 @@ impl AppModule for CardModule {
         let root = WidgetRef::script_from_value(vm, value);
         {
             let mut hosted = root.borrow_mut::<HostedHubCard>().unwrap();
-            hosted.view.children.push((id!(runner), parts.root.clone()));
-            hosted.inner = parts.root;
+            hosted.attach(vm.cx_mut(), parts.root);
         }
         parts.root = root;
         parts
@@ -81,6 +80,12 @@ struct HostedHubCard {
     #[rust]
     inner: WidgetRef,
     #[rust]
+    card_surface: SplashRef,
+    #[rust]
+    host_sheet: SplashRef,
+    #[rust]
+    host_notice: LabelRef,
+    #[rust]
     positions: HashMap<WidgetUid, MountedPosition>,
     #[rust]
     pending_style: bool,
@@ -102,7 +107,7 @@ impl ScriptHook for HostedHubCard {
                 .and_then(|ty| vm.bx.heap.type_default_for_id(ty))
                 .unwrap_or_else(|| self.inner.script_source());
             if source != ScriptObject::ZERO {
-                let card = self.inner.splash(vm.cx_mut(), ids!(card));
+                let card = self.card_surface.clone();
                 let guest_source = card.borrow().map(|splash| splash.view.source.clone());
                 self.inner.script_apply(vm, apply, scope, source.into());
                 // The outer Splash declaration may restyle its shell, but
@@ -116,6 +121,18 @@ impl ScriptHook for HostedHubCard {
     }
 }
 impl HostedHubCard {
+    fn attach(&mut self, cx: &mut Cx, inner: WidgetRef) {
+        // The runner's trusted declaration exists, but no guest code has run.
+        // Never search its descendants by ID again: a guest may also name a
+        // widget `sheet`, `card`, or `notice` without owning these surfaces.
+        self.card_surface = inner.splash(cx, ids!(card));
+        self.host_sheet = inner.splash(cx, ids!(sheet));
+        self.host_notice = inner.label(cx, ids!(notice));
+        self.view.children.clear();
+        self.view.children.push((id!(runner), inner.clone()));
+        self.inner = inner;
+    }
+
     fn position_children(
         &mut self,
         cx: &mut Cx,
@@ -144,7 +161,7 @@ impl HostedHubCard {
 }
 impl Widget for HostedHubCard {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
-        let card = self.inner.splash(cx, ids!(card));
+        let card = self.card_surface.clone();
         let owner = card
             .borrow()
             .and_then(|splash| cx.script_ref_vm_id(&splash.view.source));
@@ -168,11 +185,11 @@ impl Widget for HostedHubCard {
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         cx.begin_turtle(walk, self.view.layout);
         let rect = cx.turtle().rect();
-        let notice = self.inner.label(cx, ids!(notice));
+        let notice = self.host_notice.clone();
         if notice_is_visible(&notice.text()) {
             self.inner.draw_walk_all(cx, scope, Walk::fill());
         } else {
-            let card = self.inner.splash(cx, ids!(card));
+            let card = self.card_surface.clone();
             if let Some(mut splash) = card.borrow_mut() {
                 if let Some(vm_id) = cx.script_ref_vm_id(&splash.view.source) {
                     with_isolate(cx, vm_id, |cx| {
@@ -206,7 +223,7 @@ impl Widget for HostedHubCard {
             };
             // A host service's sheet over the app (a sign-in), drawn on top
             // in its own isolate.
-            let sheet_ref = self.inner.splash(cx, ids!(sheet));
+            let sheet_ref = self.host_sheet.clone();
             let up = sheet_ref.borrow().filter(|s| s.view.visible).and_then(|s| cx.script_ref_vm_id(&s.view.source));
             if let Some(vm_id) = up {
                 if let Some(mut sheet) = sheet_ref.borrow_mut() {
@@ -224,6 +241,8 @@ impl Widget for HostedHubCard {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::RefCell;
+    thread_local! { static DRAWN: RefCell<Vec<String>> = const {RefCell::new(Vec::new())}; }
 
     script_mod! {
         use mod.prelude.widgets.*
@@ -240,6 +259,8 @@ mod tests {
         applied_style: Option<desktop_style::StyleSheet>,
         #[rust]
         edits: usize,
+        #[live]
+        draw_label: String,
     }
     impl ScriptHook for CardEventProbe {
         fn on_after_apply(&mut self, vm: &mut ScriptVm, _: &Apply, _: &mut Scope, _: ScriptValue) {
@@ -257,7 +278,43 @@ mod tests {
             }
         }
         fn draw_walk(&mut self, _: &mut Cx2d, _: &mut Scope, _: Walk) -> DrawStep {
+            if !self.draw_label.is_empty() {
+                DRAWN.with(|drawn| drawn.borrow_mut().push(self.draw_label.clone()));
+            }
             DrawStep::done()
+        }
+    }
+    #[test]
+    fn guest_sheet_id_cannot_hide_or_replace_the_real_host_sheet_on_draw() {
+        let mut cx = Cx::new(Box::new(|_, _| {}));
+        let (outer, root) = hosted_fixture(&mut cx);
+        for fake in ["View{}", "Splash{}"] {
+            with_isolate(&mut cx, outer, |cx| {
+                let hosted = root.borrow::<HostedHubCard>().unwrap();
+                let (inner, card, sheet) = (hosted.inner.clone(), hosted.card_surface.clone(), hosted.host_sheet.clone());
+                drop(hosted);
+                card.set_text(cx, &format!("sheet := {fake}\nCardEventProbe{{draw_label: \"app\"}}"));
+                sheet.set_text(cx, "CardEventProbe{draw_label: \"host\"}");
+                sheet.borrow_mut().unwrap().view.visible = true;
+                assert_ne!(inner.widget(cx, ids!(sheet)).widget_uid(), sheet.widget_uid(),
+                    "the fixture must really mask descendant lookup with the guest's ID");
+                DRAWN.with(|drawn| drawn.borrow_mut().clear());
+                let pass = DrawPass::new(cx);
+                pass.set_size(cx, dvec2(400.0, 700.0));
+                let mut draw_list = DrawList2d::new(cx);
+                let event = DrawEvent::default();
+                let mut draw = makepad_draw::cx_draw::CxDraw::new(cx, &event);
+                let mut cx = Cx2d::new(&mut draw);
+                cx.begin_pass(&pass, None);
+                draw_list.begin_always(&mut cx);
+                cx.begin_root_turtle(dvec2(400.0, 700.0), Layout::default());
+                root.draw_walk_all(&mut cx, &mut Scope::empty(), Walk::fill());
+                cx.end_turtle();
+                draw_list.end(&mut cx);
+                cx.end_pass(&pass);
+                assert_eq!(DRAWN.with(|drawn| drawn.borrow().clone()), ["app", "host"],
+                    "the real host sheet must draw last even when a guest uses its ID");
+            });
         }
     }
     fn hosted_fixture(cx: &mut Cx) -> (widget_async::SplashVmId, WidgetRef) {
@@ -273,12 +330,11 @@ mod tests {
             let value = script_eval!(vm, {
                 use mod.widgets.*
                 mod.probe_name = "outer"
-                CardEventProbe{notice := Label{text: ""} card := Splash{}}
+                CardEventProbe{notice := Label{text: ""} card := Splash{} sheet := Splash{visible:false}}
             });
             let inner = WidgetRef::script_from_value(vm, value);
             let mut hosted = root.borrow_mut::<HostedHubCard>().unwrap();
-            hosted.view.children.push((id!(runner), inner.clone()));
-            hosted.inner = inner;
+            hosted.attach(vm.cx_mut(), inner);
             drop(hosted);
             root
         });
@@ -381,9 +437,7 @@ mod tests {
             let value = script_eval!(vm, {use mod.widgets.* CardAppView{}});
             let inner = WidgetRef::script_from_value(vm, value);
             let mut hosted = root.borrow_mut::<HostedHubCard>().unwrap();
-            hosted.inner = inner.clone();
-            hosted.view.children.clear();
-            hosted.view.children.push((id!(runner), inner));
+            hosted.attach(vm.cx_mut(), inner);
         });
         let card = with_isolate(&mut cx, outer, |cx| {
             let card = root.splash(cx, ids!(card));

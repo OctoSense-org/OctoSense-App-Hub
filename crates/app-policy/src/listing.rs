@@ -144,9 +144,17 @@ pub fn kernel_tool_words(tool: &str) -> Option<&'static str> {
     }
 }
 
-/// The privacy summary a store shows, derived from the manifest rather than
-/// written by the publisher: the app cannot understate what it does.
+/// Manifest-only privacy summary. Call [`privacy_summary_with_tools`] when
+/// reviewed tools are available: tools can offer host Ask without `agent`.
 pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
+    privacy_summary_with_tools(manifest, &[])
+}
+
+/// The store's privacy summary, derived from the admitted manifest and tools,
+/// never publisher prose. A tool-bearing app without an agent profile can
+/// still offer the host's consent-gated Ask surface; this does not start a
+/// peer, grant background execution, or register a service executor.
+pub fn privacy_summary_with_tools(manifest: &AppManifest, tools: &[ToolSpec]) -> Vec<String> {
     let has = |c: &str| manifest.capabilities.iter().any(|x| x == c);
     let mut lines = Vec::new();
     if has("storage") {
@@ -165,7 +173,7 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
             || cap.starts_with("matrix.")
             || octosense_app_contract::palpo::SERVICES.contains(&cap.as_str())
     });
-    let remote_agent_allowed = manifest.agent.as_ref().is_some_and(|agent| {
+    let remote_agent_allowed = manifest.agent.as_ref().map_or(!tools.is_empty(), |agent| {
         !agent.model.as_ref().is_some_and(|model| model.local_only)
     });
     if provider_services || remote_agent_allowed {
@@ -247,6 +255,10 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
             for words in agent.tools.iter().filter_map(|t| kernel_tool_words(t)) {
                 lines.push(format!("Its assistant may {}.", words.to_lowercase()));
             }
+        }
+        None if !tools.is_empty() => {
+            lines.push("Offers the host's Ask assistant for its admitted tools, only after you consent. Your conversation and tool results may be sent to your configured AI provider.".to_string());
+            lines.push("No app-declared background assistant or automatic triggers.".to_string());
         }
         None => lines.push("Runs no assistant.".to_string()),
     }
@@ -448,5 +460,25 @@ mod tests {
         let lines = privacy_summary(&m);
         assert!(lines.contains(&"No direct network access is granted.".into()));
         assert!(!lines.iter().any(|line| line.contains("may send data to their providers")));
+    }
+
+    #[test]
+    fn tool_only_ask_is_distinct_from_no_assistant_and_a_local_only_agent() {
+        let mut m = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A",
+            "integrity":{"bundle_blake3":"00"}}"#).unwrap();
+        let tools: Vec<ToolSpec> = serde_json::from_str(r#"[{
+            "name":"a.read","description":"Read local data",
+            "input_schema":{"type":"object"},"output_schema":{"type":"object"},
+            "risk":"read","implemented_by":"app"
+        }]"#).unwrap();
+        let lines = privacy_summary_with_tools(&m, &tools);
+        assert!(lines.iter().any(|line| line.contains("Ask assistant") && line.contains("consent")));
+        assert!(lines.iter().any(|line| line.contains("may send data to their providers")));
+        assert!(!lines.contains(&"Runs no assistant.".to_string()));
+        assert!(privacy_summary_with_tools(&m, &[]).contains(&"Runs no assistant.".to_string()));
+        m.agent = serde_json::from_str(r#"{"profile":"read-only","tools":[],"model":{"local_only":true}}"#).unwrap();
+        let lines = privacy_summary_with_tools(&m, &tools);
+        assert!(lines.iter().any(|line| line.contains("only models that run on your own devices")));
+        assert!(!lines.iter().any(|line| line.contains("may send data to their providers") || line.contains("Ask assistant")));
     }
 }

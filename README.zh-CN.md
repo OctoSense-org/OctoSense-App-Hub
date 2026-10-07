@@ -38,7 +38,12 @@
 
 这些 crate 基于固定版本的 OctoSense Makepad 与 Octoscript 分支构建，和启动器工作区一样，从同级检出目录（`../makepad`、`../octoscript-makepad`、`../octoscript`）解析依赖。[原生工具 CI](.github/workflows/native-tools.yml) 使用未经修改的固定版本构建 `hub` 和 `card-host`，并运行契约、策略、准入检查、签名、CLI 和商店测试。`cargo run -p octosense-app-hub --bin hub` 是发布工具。
 
-`appstore` 默认启用 `text-input-state-query`，用于 OctoSense 运行时补丁增加的 IME 事件；独立的 `card-host` 关闭此功能。使用未打补丁的运行时时，请遵循代码导读按包构建的命令：构建整个工作区会合并其他 shell 消费方的功能，因此需要该补丁。
+`appstore` 和 `app-hub-app` 默认启用 `text-input-state-query`，用于 OctoSense 运行时补丁增加的 IME 事件；独立的 `card-host` 关闭此功能。使用未打补丁的运行时时，请遵循代码导读按包构建的命令：构建整个工作区会合并其他 shell 消费方的功能，因此需要该补丁。CI 对这两个 crate 使用 `--no-default-features` 运行真实运行宿主与弹层测试。
+
+`hub keygen` 只创建新文件，拒绝覆盖已有文件或符号链接；Unix 下新密钥权限为 `0600`。
+其他平台应使用仅当前用户可访问的私有目录。`hub check --help`、`hub keygen --help`
+等帮助命令不会读取应用包或创建密钥。`hub scan` 允许未签名的开发包；已签名包仍需
+`--publisher-key id=hex` 或可信目录中的发布者密钥。
 
 ## 代码导读
 
@@ -55,7 +60,13 @@ Splash 脚本和 L0 卡片，并把 crate 索引放在最后。仓库协作规�
 主机账户和审核面板采用模态输入：文字、键盘、输入法、剪贴板和指针抬起事件
 只交给可见的主机面板，定时器及服务回调仍能到达应用。运行器在执行应用控件前
 保存自身卡片和面板引用，应用不能通过重复控件 ID 替换主机界面。
+移动端包装器、独立运行宿主及关闭路径在绘制、输入、请求和取消时都使用这些已保存的引用。
 `services::is_sheet_input_event` 为集成前台 Glance 主机提供相同输入边界。
+
+商店隐私说明同时依据清单和目录中已审核的工具。即使 `agent: null`，有效且非空的
+`tools.json` 仍可在用户同意后提供宿主 Ask 助手；对话和工具结果可能发送到已配置的
+AI 提供商。这不等于声明后台任务或自动触发器，也不会启动代理或安装执行器。
+既没有 agent 也没有工具的应用仍显示“Runs no assistant.”。
 
 ## 信任锚
 

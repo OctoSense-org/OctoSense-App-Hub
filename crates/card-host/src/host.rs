@@ -36,6 +36,10 @@ pub struct App {
     #[live]
     ui: WidgetRef,
     #[rust]
+    card_surface: SplashRef,
+    #[rust]
+    host_sheet: SplashRef,
+    #[rust]
     mounted: bool,
     /// Set when the bundle was refused: nothing of the bundle runs, and the
     /// window carries the reason instead of an empty frame.
@@ -333,7 +337,7 @@ impl App {
                 // window the author is already looking at, and stop there:
                 // nothing of the bundle is admitted, configured or served.
                 self.refused = true;
-                self.ui.splash(cx, ids!(card)).set_text(cx, &refusal_card(&e));
+                self.card_surface.set_text(cx, &refusal_card(&e));
                 return;
             }
         };
@@ -367,7 +371,7 @@ impl App {
         settings.hosts.push(server.allowlist_entry());
         let origin = server.origin().to_string();
         self.assets = Some(server);
-        let splash = self.ui.splash(cx, ids!(card));
+        let splash = self.card_surface.clone();
         let applied = octosense_app_policy::splash_adapter::apply(&splash, cx, &settings);
         log!(
             "card-host: isolate jailed at {} with {} bytes, {} capability(ies), {} host(s), {} instructions, {} bytes of heap, prompts {} — all enforced",
@@ -407,17 +411,24 @@ impl AppMain for App {
 
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
         if !self.mounted {
+            // Capture trusted surfaces before evaluating any bundle widgets.
+            self.card_surface = self.ui.splash(cx, ids!(card));
+            self.host_sheet = self.ui.splash(cx, ids!(sheet));
             self.mounted = true;
             register_card_vocabulary();
             self.mount(cx);
         }
-        self.ui.handle_event(cx, event, &mut Scope::empty());
+        let sheet_up = self.host_sheet.borrow().is_some_and(|sheet| sheet.view.visible);
+        if sheet_up && octosense_appstore::services::is_sheet_input_event(event) {
+            self.host_sheet.handle_event(cx, event, &mut Scope::empty());
+        } else {
+            self.ui.handle_event(cx, event, &mut Scope::empty());
+        }
         // Host services (a sheet the service raises, answers from its
         // workers), exactly as the Card runner does. A refused bundle has no
         // app to pump for.
         if !self.refused {
-            let (card, sheet) = (self.ui.splash(cx, ids!(card)), self.ui.splash(cx, ids!(sheet)));
-            octosense_appstore::services::pump(cx, &self.app_id, &self.host_dir, &card, &sheet);
+            octosense_appstore::services::pump(cx, &self.app_id, &self.host_dir, &self.card_surface, &self.host_sheet);
         }
     }
 }
@@ -425,6 +436,50 @@ impl AppMain for App {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::RefCell;
+    thread_local! { static INPUT: RefCell<Vec<String>> = const {RefCell::new(Vec::new())}; }
+    script_mod! {
+        use mod.prelude.widgets.*
+        mod.widgets.HostInputProbe = set_type_default() do #(HostInputProbe::register_widget(vm)) {}
+        mod.prelude.widgets.HostInputProbe = mod.widgets.HostInputProbe
+    }
+    #[derive(Script, ScriptHook, Widget)]
+    struct HostInputProbe {
+        #[deref] view: View,
+        #[live] label: String,
+    }
+    impl Widget for HostInputProbe {
+        fn handle_event(&mut self, _: &mut Cx, event: &Event, _: &mut Scope) {
+            if matches!(event, Event::TextInput(_)) {
+                INPUT.with(|input| input.borrow_mut().push(self.label.clone()));
+            }
+        }
+        fn draw_walk(&mut self, _: &mut Cx2d, _: &mut Scope, _: Walk) -> DrawStep { DrawStep::done() }
+    }
+
+    #[test]
+    fn standalone_sheet_keeps_its_identity_and_exclusive_input_after_guest_mount() {
+        let mut cx = Cx::new(Box::new(|_, _| {}));
+        widget_async::register_splash_isolate_mod(|vm| {script_mod(vm);});
+        let mut app = cx.with_vm(|vm| {
+            makepad_widgets::script_mod(vm);
+            let value = script_eval!(vm, {
+                use mod.widgets.*
+                {ui: View{card := Splash{} sheet := Splash{visible:false}}}
+            });
+            App::script_from_value(vm, value)
+        });
+        // Exercise normal first-event reference capture. With no CLI in the
+        // test process, mount returns before reading any real bundle/profile.
+        app.handle_event(&mut cx, &Event::Custom("mount fixture".into()));
+        app.card_surface.set_text(&mut cx, "sheet := View{}\nHostInputProbe{label:\"app\"}");
+        app.host_sheet.set_text(&mut cx, "HostInputProbe{label:\"host\"}");
+        app.host_sheet.borrow_mut().unwrap().view.visible = true;
+        assert_ne!(app.ui.widget(&mut cx, ids!(sheet)).widget_uid(), app.host_sheet.widget_uid());
+        INPUT.with(|input| input.borrow_mut().clear());
+        app.handle_event(&mut cx, &Event::TextInput(TextInputEvent{input:"sheet input".into(), ..Default::default()}));
+        assert_eq!(INPUT.with(|input| input.borrow().clone()), ["host"]);
+    }
 
     #[test]
     fn a_refusal_card_carries_the_reason() {

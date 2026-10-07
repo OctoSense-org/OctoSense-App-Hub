@@ -249,7 +249,7 @@ impl Store {
                 version: entry.version().to_string(),
                 publisher: entry.publisher.clone(),
                 permissions: entry.permissions_summary(),
-                privacy: octosense_app_policy::privacy_summary(&entry.manifest),
+                privacy: octosense_app_policy::privacy_summary_with_tools(&entry.manifest, &entry.tools),
                 about: entry.listing.clone(),
                 artifact: entry.artifact.clone(),
                 availability,

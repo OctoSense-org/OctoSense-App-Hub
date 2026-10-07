@@ -58,7 +58,7 @@ pub use assets::{rewrite_assets, AssetServer, StaticAssets};
 pub use bundle::{digest_dir, portable_path, MANIFEST_FILE};
 pub use containers::{IsolateSettings, Provenance, SessionProfile};
 pub use entry::{script_source, ASSETS_PLACEHOLDER, SCRIPT_ENTRY};
-pub use listing::{agent_permission_lines, kernel_tool_words, privacy_summary, Listing, Publisher, LISTING_FILE};
+pub use listing::{agent_permission_lines, kernel_tool_words, privacy_summary, privacy_summary_with_tools, Listing, Publisher, LISTING_FILE};
 pub use manifest::{
     check_reserved_id, short_id, AgentSpec, AgentWorkspace, AppManifest, ModelNeed, ModelSpec, ModelTier, ProfileMode, TaskModel, Triggers, KNOWN_CAPABILITIES,
     KNOWN_FEATURES, KNOWN_MODEL_NEEDS, RESERVED_NAMES, SCHEMA, SCHEMA_MINOR,
