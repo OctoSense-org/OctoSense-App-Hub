@@ -92,7 +92,9 @@ owns those.
   [`card-host` fails to build](docs/DEVELOPMENT.md#card-host-fails-to-build)
   lists the builds that need the patches.
 - [Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)
-  lists the `octosense-app-contract` releases; 1.5.0 matches this tree. This
+  lists the `octosense-app-contract` releases; this tree prepares 1.6.0,
+  ahead of published 1.5.0. Verify publication before claiming a released
+  consumer can use the new fields. This
   workspace's `[patch.crates-io]` points the crate at `crates/app-contract`.
   Never tell readers that a lock file holding 1.2.0 or older admits
   `calendar`, `auth`, `github`, `gcalendar`, `gmail`, `photos` or `youtube`;
