@@ -394,6 +394,16 @@ impl App {
             }
         }
 
+        let compatible = std::fs::read_to_string(args.bundle.join("manifest.json"))
+            .map_err(|error|error.to_string())
+            .and_then(|text|octosense_app_policy::AppManifest::parse(&text))
+            .and_then(|manifest|octosense_appstore::host_api::check_manifest(&manifest))
+            .and_then(|_|octosense_appstore::apply_device_consent(cx, &args.bundle, &splash));
+        if let Err(error) = compatible {
+            self.refused = true;
+            splash.set_text(cx, &refusal_card(&error));
+            return;
+        }
         match card_source(&args.bundle, &origin) {
             Ok(source) => splash.set_text(cx, &source),
             Err(e) => error!("card-host: the card did not lower: {e}"),

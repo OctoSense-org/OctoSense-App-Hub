@@ -52,8 +52,10 @@ owns those.
   `crates/shell/src/app_storage`, `crates/ai-host` and `crates/app-peers` at
   the revision the consumer pins. Do not claim a tool runs because
   `tools.json` passes the gate: OctoSense runs granted
-  `implemented_by: "host-service"` tools and refuses tools with
-  `implemented_by: "app"`.
+  `implemented_by: "host-service"` tools on their services. Hosts integrating
+  `script-tools-v1` execute `implemented_by: "app"` tools on the admitted full
+  app's existing Splash isolate; closed apps fail with `app_not_running`.
+  Never create a second state store or register a Glance copy as tool owner.
 - Preserve contract compatibility and refusal behavior. Consult
   [app-contract's compatibility rules](crates/app-contract/README.md#stability).
   Do not widen an app's resolved grants in a mounting path.

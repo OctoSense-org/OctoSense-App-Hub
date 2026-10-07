@@ -319,7 +319,7 @@ each declaration:
 | --- | --- | --- |
 | `agent`, model needs, background and triggers | Parsed and validated; budgets resolved | Runs two triggers: `mail.messages.new` for Mail, and `<namespace>.new_message` for a `background: true` store app granted `auth` and `gmail` with a connected Google account. Model needs do not select a model. |
 | `AGENT.md` and `skills/` | Reviewed and loaded into `AgentBundle` | Passed to the app's peer as per-turn guidance (`agent_events::install_guidance`). They are not installed as kernel skills and grant no tools. |
-| `tools.json` | Names, schemas and policy checked | `implemented_by: "host-service"` tools run on a registered service (below); `implemented_by: "app"` tools answer `app_tool_unavailable` |
+| `tools.json` | Names, schemas and policy checked | `implemented_by: "host-service"` tools run on a registered service (below); `implemented_by: "app"` tools use the full-app runner on hosts advertising `script-tools-v1`; closed apps return `app_not_running` |
 | Agent account data | The contract has `storage.accounts` and `agent_workspace` | The shell builds the account workspace and its bounded read tools |
 | Human or app conversation | No chat runtime in `card-host` | Shell consent, the app peer and the chat surfaces |
 
@@ -342,9 +342,14 @@ draws the implementation boundary. It loads each bundle with App Hub's
   family among the manifest's capabilities.
 - For the `github`, `gmail` and `gcalendar` families, the executor adds the
   app's active connection to the arguments; a tool cannot choose another.
-- A tool marked `implemented_by: "app"` answers `app_tool_unavailable`: no
-  host dispatches tools to a script yet. The generic `CardExecutor` in
-  [`cardapp.rs`](../crates/appstore/src/cardapp.rs) also answers unavailable.
+- A tool marked `implemented_by: "app"` uses the `script-tools-v1` runner:
+  `script_tools::submit` queues validated JSON with host identity; the full
+  `CardAppView` calls `script_tools::pump` on the UI thread and invokes the
+  signed `app_tool` hook in its existing Splash VM. The script reads its
+  request and completes through `mod.app_tools`. Closed apps fail explicitly.
+  Earlier host releases refuse script dispatch. The generic module bus
+  `CardExecutor` in [`cardapp.rs`](../crates/appstore/src/cardapp.rs) remains
+  unavailable; the admitted app-agent relay uses this dedicated queue.
 
 Existing system apps supply Rust service handlers; a store bundle cannot add
 one by shipping JSON.
@@ -444,7 +449,7 @@ own ([Versions on crates.io](../crates/app-contract/README.md#versions-on-crates
 | Bundle refused | `hub check`; `gate.rs`, contract and policy resolution, and the digest |
 | App admitted, blank UI | `card-host` log, `/snap`, script parse and lowering, and asset paths |
 | `no service answers` | `register_host_service` in the shell, not more bundle capabilities |
-| A store tool answers `app_tool_unavailable` | The tool is `implemented_by: "app"`; only `host-service` tools run (`script_apps.rs`) |
+| A store tool answers `app_tool_unavailable` or `app_not_running` | Check the host supports `script-tools-v1` and the owning full app is open; Glance alone does not start script tools (`script_apps.rs`, `script_tools.rs`) |
 | Agent tool appears but fails | Owner, grant and executor route in the shell's `host_tools`; JSON is not an implementation |
 | Agent cannot see app records | Active account workspace and file placement, then the read tools' limits |
 | App peer absent | Shell consent and peer preparation; `card-host` has no peer list |

@@ -58,6 +58,8 @@ pub struct CardAppView {
     /// from; held for as long as it is open, then removed.
     #[rust]
     launch: Option<octosense_app_hub::PreparedLaunch>,
+    #[rust]
+    tool_registration: Option<crate::script_tools::Registration>,
 }
 
 impl CardAppView {
@@ -83,7 +85,8 @@ impl CardAppView {
                 if let Err(e) = octosense_app_hub::adopt_legacy_install(&root, &self.app_id) {
                     return self.refuse(cx, &format!("Cannot open: {e}"));
                 }
-                let mut store = Store::new(&anchor, &root, HostLimits::default());
+                let mut store = Store::new(&anchor, &root, HostLimits::default())
+                    .with_host_api_versions(crate::host_api::available_versions());
                 // The catalog the store last verified. Without one, nothing
                 // runs: an app the device cannot show was offered is not run
                 // on trust.
@@ -122,8 +125,17 @@ impl CardAppView {
             "card: {} running under {} capability(ies), {} host(s), {} bytes of storage, {} instructions, {} bytes of heap",
             self.app_id, applied.capabilities, applied.hosts, applied.storage_quota, applied.instruction_budget, applied.memory_bytes
         );
+        if let Err(error) = crate::apply_device_consent(cx, &bundle, &splash) {
+            return self.refuse(cx, &format!("Cannot apply app permissions: {error}"));
+        }
         match crate::card_source(&bundle, &origin) {
-            Ok(source) => splash.set_text(cx, &source),
+            Ok(source) => {
+                splash.set_text(cx, &source);
+                match crate::script_tools::bind(cx, &self.app_id, &bundle, &splash) {
+                    Ok(registration) => self.tool_registration = registration,
+                    Err(error) => self.refuse(cx, &format!("App tools unavailable: {error}")),
+                }
+            },
             Err(e) => self.refuse(cx, &format!("The app did not open: {e}")),
         }
     }
@@ -150,6 +162,7 @@ impl Widget for CardAppView {
         } else {
             self.view.handle_event(cx, event, scope);
         }
+        crate::script_tools::pump(cx, &self.app_id, &card);
         crate::services::pump(cx, &self.app_id, &self.host_dir, &card, &sheet);
     }
 
@@ -177,6 +190,7 @@ impl AppModule for CardModule {
         OpenSchema::new(1).arg("app", OpenArgKind::Text, true)
     }
     fn register(&self, vm: &mut ScriptVm) {
+        crate::host_api::register_runtime_feature("app_tools.dispatch", 1);
         octoscript_widgets::design::script_mod(vm);
         octoscript_widgets::kit::script_mod(vm);
         script_mod(vm);
@@ -196,6 +210,7 @@ impl AppModule for CardModule {
             // does, not whenever its isolate is next collected.
             shutdown: Box::new(move |vm| {
                 let cx = vm.cx_mut();
+                if let Some(mut view) = closing.borrow_mut::<CardAppView>() { view.tool_registration = None; }
                 // Use the same identities as event delivery. A guest child
                 // named `sheet` must not redirect cancellation at shutdown.
                 let Some((splash, sheet)) = closing.borrow::<CardAppView>()

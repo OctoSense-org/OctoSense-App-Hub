@@ -24,6 +24,8 @@ use std::path::PathBuf;
 pub mod cardapp;
 pub mod host_api;
 pub mod services;
+pub mod script_tools;
+mod tool_schema;
 pub mod source;
 pub mod system;
 pub mod ui;
@@ -377,6 +379,10 @@ impl AppStoreView {
         };
         let splash = self.view.splash(cx, ids!(card));
         let applied = octosense_app_policy::splash_adapter::apply(&splash, cx, &settings);
+        if let Err(error) = apply_device_consent(cx, &bundle, &splash) {
+            self.status = format!("Cannot apply app permissions: {error}");
+            return self.refresh(cx);
+        }
         match card_source(&bundle, &origin) {
             Ok(code) => {
                 splash.set_text(cx, &code);
@@ -418,6 +424,7 @@ pub(crate) fn register_card_vocabulary() {
     fn kit(vm: &mut ScriptVm) {
         octoscript_widgets::kit::script_mod(vm);
     }
+    makepad_widgets::widget_async::register_splash_isolate_mod(crate::script_tools::script_mod);
     makepad_widgets::widget_async::register_splash_isolate_mod(design);
     makepad_widgets::widget_async::register_splash_isolate_mod(kit);
     // `sys`: places, routes, weather and the other live-data helpers a
@@ -426,6 +433,22 @@ pub(crate) fn register_card_vocabulary() {
     // `agent.notify`, which an app under a policy may call only with the
     // `agent` grant.
     makepad_widgets::widget_async::register_splash_isolate_mod(makepad_widgets::splash::register_agent_module);
+}
+
+/// Apply the host-only device consent marker before untrusted source runs.
+/// Plain Makepad hosts cannot advertise OctoSense's permission boundary.
+pub fn apply_device_consent(cx: &mut Cx, bundle: &std::path::Path, splash: &SplashRef) -> Result<(), String> {
+    let text = std::fs::read_to_string(bundle.join("manifest.json")).map_err(|error| error.to_string())?;
+    let manifest = octosense_app_policy::AppManifest::parse(&text)?;
+    let required = manifest.requires.iter().any(|feature| feature == "host-api-v1");
+    #[cfg(feature = "text-input-state-query")]
+    splash.set_device_consent(cx, required);
+    #[cfg(not(feature = "text-input-state-query"))]
+    {
+        let _ = (cx, splash);
+        if required { return Err("This standalone build does not implement the host-api-v1 device permission broker".into()); }
+    }
+    Ok(())
 }
 
 /// Lower a bundle to isolate source. Nothing outside the bundle is read. A

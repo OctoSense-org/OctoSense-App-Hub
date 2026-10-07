@@ -492,7 +492,7 @@ OctoSense 桌面版 0.1.0-beta.2 的商店用一行说明代替前三行：“Ru
 | --- | --- |
 | 与 Agent 对话 | 用户允许应用的 Agent 之后，在 Shell 的“Ask &lt;app&gt;”对话栏中进行。OctoSense 会在首次使用时询问。`card-host` 不运行 Agent。 |
 | `implemented_by: "host-service"` 的工具 | 以应用的身份，在工具命名空间对应的宿主服务上运行；设置了 `host_method` 时，则在该方法所属的宿主服务上运行。清单必须授予该服务族。工具调用从不弹出面板。 |
-| `implemented_by: "app"` 的工具 | 尚不支持：调用会失败，返回 `app_tool_unavailable`。 |
+| `implemented_by: "app"` 的工具 | 提供 `app_tools.dispatch@1` 的宿主在已打开的完整应用中执行签名处理函数。清单声明 `requires: ["script-tools-v1"]`；应用关闭时返回 `app_not_running`。旧宿主仍拒绝此类调用。 |
 | `AGENT.md` 和技能 | 作为指引，在每一轮对话中加载。它们不授予任何工具。 |
 | `agent.tools` | `ask_user_question` 可用。尚不支持：`ledger.read`、`ledger.write`、`net.fetch`、`storage.read`、`storage.write` 和 `card.render` 的执行器。 |
 | `background` 和 `triggers.events` | 只支持 `<namespace>.new_message` 事件，且仅限获得 `gmail` 和 `auth` 授权、设置了 `background: true` 的应用，并须在用户允许其 Agent 之后。 |
@@ -676,3 +676,46 @@ my-notes 0.1.0 — PASSED
 - **版本。** 已安装的应用运行的是已安装的那个版本，并沿用该版本的授权。较新的版本是用户可以选择安装的更新；在用户安装之前，打开的仍是已安装的版本。
 - **完整性。** 宿主把已安装的应用包存放在应用的存储之外，因此应用无法写入它。每次启动时，宿主都会对照签名目录检查应用包：清单、摘要和发布者签名。应用包一旦不再一致，宿主就会拒绝运行它，直到用户重新安装该应用。
 - **撤回。** 每台设备下次拉取签名目录时，已撤回的版本就会停止运行，其他版本照常运行（[提交之后](SUBMITTING.zh-CN.md#9-提交之后)）。
+
+### 脚本工具执行（`script-tools-v1`）
+
+通用运行器和 OctoSense 中继属于需要集成的改动；请使用公布
+`app_tools.dispatch@1` 的宿主版本。清单必须包含
+`"requires": ["script-tools-v1"]`。在 `tools.json` 中声明名称和 JSON schema，
+设置 `"implemented_by": "app"`，再在应用签名包的 Splash 入口源码中实现固定钩子：
+
+```text
+fn app_tool(name, call_id) {
+    let request = mod.app_tools.request(call_id)
+    if name == "notes.read" {
+        mod.app_tools.complete(call_id, {text: fs.read("note.txt")})
+    } else {
+        mod.app_tools.fail(call_id, "Unknown tool")
+    }
+}
+```
+
+`request.args` 是已验证的工具参数。`request.context` 包含宿主填写的 `app`、
+`account`、`caller` 和 `call_id`；脚本不能选择这些身份字段。结果必须符合工具的
+`output_schema`。输入和结果各限 1 MiB。`pattern` 和 `format` 仅作说明，
+与宿主中继既有的 JSON Schema 子集一致。
+
+钩子在 UI 线程运行，与应用界面共享**同一个活动 Splash VM 和存储沙箱**。
+也可在稍后的 `host.request` 回调中，使用相同令牌调用 `complete` 或 `fail`。
+异步处理函数可用 `mod.app_tools.active(call_id)` 检查调用是否仍有效。
+另一个应用或宿主面板即使知道令牌，也不能读取参数或完成该调用。
+
+仅经过准入验证的完整应用运行器持有工具。Glance 副本不会注册另一个所有者；
+多个完整应用实例同时争用工具时会被拒绝。关闭应用、切换宿主连接的账号、取消
+或超过期限都会使待处理调用失效；迟到或重复结果会被丢弃。期限最长为 60 秒，
+每个应用最多 16 个待处理调用，整个进程最多 128 个。取消不会撤销已经执行的
+操作。VM 的指令和内存限制仍然生效；其他线程不能抢占正在执行的同步钩子。
+
+首版 ABI **不会**启动已关闭的应用，也不会启动第二个后台 VM。
+`background: true` 不改变此限制。应用可见不代表工具可以弹出宿主权限面板。
+请使用默认的宿主确认方式；此 ABI 不实现 `confirm: "app"` 的真实人工批准证明。
+访问宿主 API 仍需应用已获得的授权。
+
+运行器测试执行真实 Splash 处理函数，覆盖共享 UI/存储状态、schema 错误、
+生命周期、取消、账号切换、堆隔离、禁止工具弹出权限面板和指令限制。
+新 ABI 的手机和真实模型验收在集成宿主实际执行前均为**未验证**。

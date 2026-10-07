@@ -614,7 +614,7 @@ On OctoSense desktop 0.1.0-beta.2, each part works as follows:
 | --- | --- |
 | Talking to the agent | The shell's "Ask &lt;app&gt;" panel, once the person allows the app's agent. OctoSense asks at first use. `card-host` runs no agent. |
 | Tools with `implemented_by: "host-service"` | Run as the app on the host service of their namespace, or of their `host_method`. The manifest must grant that family. A tool call never raises a sheet. |
-| Tools with `implemented_by: "app"` | Not yet: a call fails with `app_tool_unavailable`. |
+| Tools with `implemented_by: "app"` | Hosts advertising `app_tools.dispatch@1` execute the signed handler in the open full app. Declare `requires: ["script-tools-v1"]`; closed apps return `app_not_running`. Older hosts still refuse these calls. |
 | `AGENT.md` and skills | Loaded as guidance for every turn. They grant no tools. |
 | `agent.tools` | `ask_user_question` works. Not yet: an executor for `ledger.read`, `ledger.write`, `net.fetch`, `storage.read`, `storage.write` or `card.render`. |
 | `background` and `triggers.events` | Only the event `<namespace>.new_message`, for an app granted `gmail` and `auth`, with `background: true`, after the person allows its agent. |
@@ -915,3 +915,54 @@ Submit by opening an issue, never by a pull request that edits `catalog.json`,
 - **Withdrawal.** A withdrawn version stops running on each device's next
   catalog fetch, and other versions keep working
   ([After you submit](SUBMITTING.md#9-after-you-submit)).
+
+### Script tool execution (`script-tools-v1`)
+
+The generic runner and OctoSense relay are an integration change; use a host
+release that advertises `app_tools.dispatch@1`. A manifest must include
+`"requires": ["script-tools-v1"]`. Declare names and JSON schemas in
+`tools.json` with `"implemented_by": "app"`, then implement this fixed hook
+in the app's signed Splash entry source:
+
+```text
+fn app_tool(name, call_id) {
+    let request = mod.app_tools.request(call_id)
+    if name == "notes.read" {
+        mod.app_tools.complete(call_id, {text: fs.read("note.txt")})
+    } else {
+        mod.app_tools.fail(call_id, "Unknown tool")
+    }
+}
+```
+
+`request.args` contains validated tool arguments. `request.context` contains
+host-stamped `app`, `account`, `caller`, and `call_id`; scripts cannot choose
+these values. The result must match that tool's `output_schema`. Input and
+result data are each limited to 1 MiB. `pattern` and `format` remain descriptive,
+matching the host relay's existing JSON Schema subset.
+
+The hook runs on the UI thread in the **same live Splash VM and storage jail**
+as the app UI. It may finish later in a `host.request` callback by calling
+`complete` or `fail` with the same token. `mod.app_tools.active(call_id)` tells
+an asynchronous handler whether the call still exists. A token from another
+app or host sheet cannot read arguments or complete the call.
+
+Only the admitted full-app runner owns tools. A Glance copy does not register
+another owner, and simultaneous full-app owners are refused. Closing the app,
+switching its host-connected account, cancellation, or a deadline invalidates
+pending calls; late and duplicate completions are discarded. The maximum
+deadline is 60 seconds, with 16 calls per app and 128 process-wide. Cancellation
+does not roll back actions already performed. The VM's existing instruction
+and memory limits remain in force; an executing synchronous hook cannot be
+preempted from another thread.
+
+This first ABI does **not** start a closed app or a second background VM.
+`background: true` does not change that limitation. Tools cannot raise host
+permission sheets merely because their app is visible. Use host confirmation
+(the default); this ABI does not implement `confirm: "app"` proof of human
+approval. Access to host APIs still requires the app's existing grants.
+
+The runner tests execute real Splash handlers and cover shared UI/storage
+state, schema errors, lifecycle, cancellation, account changes, heap isolation,
+prompt suppression, and instruction limits. Phone and real-model acceptance
+of this new ABI are **unverified** until performed by the integrating host.
