@@ -184,8 +184,10 @@ my-app/
       01-main.png        # a real capture, added in section 4
 ```
 
-A card's fonts must be files in the bundle, or the built-in
-`makepad_widgets:resources/Inter.ttf` ([Fonts](PUBLISHING.md#fonts)).
+The gate accepts a card's `font_src` as a font file in the bundle or the
+built-in `makepad_widgets:resources/Inter.ttf`. This runner loads bundled
+fonts after resolving kit styles and tokens. Read [Fonts](PUBLISHING.md#fonts)
+for Chinese fallback and older-host limitations.
 
 ### Both kinds
 
