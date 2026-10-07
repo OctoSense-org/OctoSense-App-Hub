@@ -143,18 +143,19 @@ withdrawn with `hub withdraw`, and every store honours it on its next fetch;
 
 | App | Version | Category | Runs on | Publisher | Allowed to | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| [GitHub Notes](https://github.com/ymote/octosense-github-notes) | 0.1.0 | Productivity | macOS | ymote | Local drafts; host-managed GitHub login and reviewed commits | Preview |
+| [GitHub Notes](https://github.com/ymote/octosense-github-notes) | 0.1.0 | Productivity | macOS | ymote | Local drafts; host-managed GitHub login, reviewed commits and optional shell Ask | Preview |
 | [Inbox Assistant](https://github.com/ymote/octosense-inbox-assistant) | 0.1.0 | Productivity | macOS | ymote | Gmail, local drafts, configured model and consented Glance/agent work | Preview |
 | [Google Calendar](https://github.com/ymote/octosense-google-calendar) | 0.1.0 | Productivity | macOS | ymote | Google Calendar, local drafts, consented chat and Glance | Preview |
 
 These are **macOS developer previews**, admitted in catalog sequence 7. Install
-the connected-services OctoSense runtime, then search App Hub for the names above,
-review permissions, and choose Install → Open. See the [admission record](reviews/connected-apps-0.1.0/README.md)
-for exact publisher commits and validation boundaries. Old hosts can read the
-catalog but refuse capabilities they do not support; update the host first.
+[OctoSense desktop 0.1.0-beta.2](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-beta.2)
+on an Apple Silicon Mac. Search App Hub for a name above, choose Get, review
+permissions, then Install → Open. The [admission and acceptance record](reviews/connected-apps-0.1.0/README.md)
+identifies the publisher commits and tested runtime. Legacy catalog parsing was
+tested; running these apps on older desktop versions is unverified.
 
 Provider sign-in requires a host OAuth registration, stored outside app bundles;
-see [connected accounts](https://github.com/OctoSense-org/OctoSense/blob/main/crates/oauth-service/README.md).
+see [connected accounts](https://github.com/OctoSense-org/OctoSense/blob/desktop-v0.1.0-beta.2/crates/oauth-service/README.md).
 Live GitHub/Google login and remote writes remain unverified. The Calendar
 assistant is advisory; it does not book events. No OctoSense cloud account is
 required.

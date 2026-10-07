@@ -83,17 +83,18 @@ appstore
 
 | 应用 | 版本 | 分类 | 运行平台 | 发布者 | 允许的权限 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| [GitHub Notes](https://github.com/ymote/octosense-github-notes) | 0.1.0 | 效率 | macOS | ymote | 本地草稿；宿主管理的 GitHub 登录和提交审核 | 预览 |
+| [GitHub Notes](https://github.com/ymote/octosense-github-notes) | 0.1.0 | 效率 | macOS | ymote | 本地草稿；宿主管理的 GitHub 登录、提交审核及可选外壳 Ask | 预览 |
 | [Inbox Assistant](https://github.com/ymote/octosense-inbox-assistant) | 0.1.0 | 效率 | macOS | ymote | Gmail、本地草稿、已配置模型，以及授权后的 Glance/助手处理 | 预览 |
 | [Google Calendar](https://github.com/ymote/octosense-google-calendar) | 0.1.0 | 效率 | macOS | ymote | Google Calendar、本地草稿、授权后的聊天与 Glance | 预览 |
 
-以上为 **macOS 开发者预览**，在目录序列 7 中准入。先安装支持关联服务的
-OctoSense 运行时，在 App Hub 搜索上述名称，查看权限后选择 Install → Open。
-[准入记录](reviews/connected-apps-0.1.0/README.zh-CN.md)列出发布者的精确提交和验证边界。
-旧宿主可以读取目录，但会拒绝不支持的能力；请先更新宿主。
+以上为 **macOS 开发者预览**，在目录序列 7 中准入。在 Apple Silicon Mac 上安装
+[OctoSense 桌面版 0.1.0-beta.2](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-beta.2)，
+然后在 App Hub 搜索上述名称，选择 Get、查看权限，再选择 Install → Open。
+[准入与验收记录](reviews/connected-apps-0.1.0/README.zh-CN.md)列出发布者的精确提交和测试过的运行时。
+旧目录格式的解析已测试；尚未验证旧桌面版本能否运行这三款应用。
 
 提供方登录需要宿主 OAuth 应用注册，配置保存在应用包之外；参阅
-[关联账户说明](https://github.com/OctoSense-org/OctoSense/blob/main/crates/oauth-service/README.zh-CN.md)。
+[关联账户说明](https://github.com/OctoSense-org/OctoSense/blob/desktop-v0.1.0-beta.2/crates/oauth-service/README.zh-CN.md)。
 真实 GitHub/Google 登录和远程写入尚未验证。Calendar 助手仅提供建议，不能预约。
 无需 OctoSense 云端账户。
 
