@@ -141,7 +141,7 @@ impl HostApiMethod {
                 "linux",
                 "windows",
                 "ios",
-                "open_harmony",
+                "openharmony",
                 "web",
             ]
             .contains(&s.as_str())

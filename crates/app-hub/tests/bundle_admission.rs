@@ -310,3 +310,41 @@ fn a_nested_bundle_is_read_under_the_names_a_manifest_uses() {
         "no name carries the host's separator: {names:?}"
     );
 }
+
+#[test]
+fn kit_font_objects_and_tokens_cannot_bypass_asset_checks() {
+    use serde_json::json;
+    for (font, token, allowed) in [
+        (json!({"url":"missing.ttf"}), None, false),
+        (json!({"$token":"face"}), None, false),
+        (json!({"$token":"face"}), Some(json!("missing.ttf")), false),
+        (json!({"$token":"face"}), Some(json!({"$token":"nested"})), false),
+        (json!({"$token":"face"}), Some(json!("makepad_widgets:resources/Inter.ttf")), true),
+        (json!({"$token":"face"}), Some(json!("assets/body.ttf")), true),
+        (json!(["assets/body.ttf"]), None, false),
+    ] {
+        let mut f = Fixture::new(); f.card();
+        fs::create_dir_all(f.bundle.join("assets")).unwrap();
+        fs::write(f.bundle.join("assets/body.ttf"), b"asset-path fixture only").unwrap();
+        let path = f.bundle.join("kit/native/light/kit.json");
+        let mut pack: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        pack["components"]["title"]["style"]["font_src"] = font.clone();
+        if let Some(token) = token { pack["tokens"]["face"] = json!({"value":token}); }
+        fs::write(path, serde_json::to_vec(&pack).unwrap()).unwrap(); f.sign();
+        let report = f.report(None);
+        assert_eq!(report.passed(), allowed, "font {font}: {}", report.render());
+        if !allowed { assert!(report.findings.iter().any(|r| r.check == "resource-invalid")); }
+    }
+}
+
+#[test]
+fn theme_font_token_is_checked_even_without_a_component_reference() {
+    let mut f = Fixture::new(); f.card();
+    let path = f.bundle.join("kit/native/light/kit.json");
+    let mut pack: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    pack["tokens"]["typography.body.font_src"] = serde_json::json!({"value":"missing.ttf"});
+    fs::write(path, serde_json::to_vec(&pack).unwrap()).unwrap(); f.sign();
+    let report = f.report(None);
+    assert!(!report.passed());
+    assert!(report.findings.iter().any(|r| r.check == "resource-invalid" && r.path.as_deref() == Some("kit/native/light/kit.json/tokens/typography.body.font_src/value")));
+}

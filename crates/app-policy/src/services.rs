@@ -54,7 +54,7 @@ pub fn service_words(capability: &str) -> Option<&'static str> {
     if let Some(words) = octosense_app_contract::palpo::words(capability) { return Some(words); }
     Some(match capability {
         "runtime" => "Inspect available host APIs without gaining access to their data or permissions",
-        "auth" => "Connect and disconnect its own GitHub or Google accounts through the host",
+        "auth" => "Connect its own GitHub or Google accounts, or sign in to its developer’s backend, through the host",
         "github" => "Read authorized repositories and ask you to review Markdown commits",
         "gcalendar" => "Read authorized Google calendars and ask you to review event changes",
         "gmail" => "Read authorized Gmail messages, keep reply drafts and request native send review",

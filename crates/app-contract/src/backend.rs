@@ -89,6 +89,7 @@ impl BackendRegistration {
         }
         let mut origin = None;
         let mut endpoints = BTreeSet::new();
+        let mut credential_paths = BTreeSet::new();
         for raw in [
             &self.authorization_url,
             &self.token_url,
@@ -116,6 +117,7 @@ impl BackendRegistration {
                 return Err("backend endpoints must share one origin".into());
             }
             origin = Some(here);
+            credential_paths.insert(url.path().to_owned());
             if !endpoints.insert(url.to_string()) {
                 return Err("backend endpoints must be distinct".into());
             }
@@ -126,6 +128,9 @@ impl BackendRegistration {
         for (name, operation) in &self.operations {
             if !token(name) || !valid_path(&operation.path) || operation.query_keys.len() > 32 {
                 return Err(format!("invalid backend operation: {name}"));
+            }
+            if credential_paths.contains(&operation.path) {
+                return Err(format!("backend operation {name} cannot call an authentication endpoint"));
             }
             let keys: BTreeSet<_> = operation.query_keys.iter().collect();
             if keys.len() != operation.query_keys.len() || keys.iter().any(|key| !token(key)) {
@@ -161,6 +166,10 @@ mod tests {
             "/a/../orders",
             "/api/%2e%2e/orders",
             "/api/orders?admin=true",
+            "/token",
+            "/authorize",
+            "/logout",
+            "/me",
         ] {
             let mut r = registration();
             r.operations.get_mut("orders.list").unwrap().path = path.into();
