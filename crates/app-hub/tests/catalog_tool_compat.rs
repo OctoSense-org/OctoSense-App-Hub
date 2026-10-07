@@ -127,6 +127,13 @@ fn legacy_catalog_tools_roundtrip_without_changing_signed_bundle_dispatch() {
     store
         .accept_catalog(&serde_json::to_string(&catalog).unwrap())
         .unwrap();
+    assert!(f.manifest.agent.is_none());
+    assert!(!original.tools.is_empty());
+    let listing = store.listings().pop().unwrap();
+    assert!(listing.privacy.iter().any(|line| line.contains("Ask assistant") && line.contains("consent")));
+    assert!(listing.privacy.iter().any(|line| line.contains("configured AI provider")));
+    assert!(listing.privacy.iter().any(|line| line.contains("No app-declared background assistant")));
+    assert!(!listing.privacy.iter().any(|line| line == "Runs no assistant."));
     store
         .install_staged(&f.manifest.id, &f.bundle, &f.keys(), "2026-10-06")
         .unwrap();

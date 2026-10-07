@@ -34,15 +34,29 @@ fn main() {
 fn run() -> Result<(), String> {
     let argv: Vec<String> = std::env::args().collect();
     let command = argv.get(1).map(String::as_str).unwrap_or("help");
+    // Help never treats a flag as a bundle or key path and never mutates files.
+    if command == "help" || argv.iter().skip(1).any(|arg| matches!(arg.as_str(), "--help" | "-h")) {
+        println!("{}", include_str!("hub-usage.txt"));
+        return Ok(());
+    }
     let flag = |name: &str| argv.windows(2).find(|w| w[0] == format!("--{name}")).map(|w| w[1].clone());
     let has = |name: &str| argv.iter().any(|a| a == &format!("--{name}"));
-    let positional = argv.get(2).cloned();
+    let positional = argv.get(2).filter(|arg| !arg.starts_with('-')).cloned();
 
     match command {
         "keygen" => {
             let path = positional.ok_or("usage: hub keygen <path>")?;
             let key = HubKey::generate();
-            std::fs::write(&path, hex::encode(key.to_bytes())).map_err(|e| e.to_string())?;
+            let mut options = std::fs::OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                options.mode(0o600);
+            }
+            let mut file = options.open(&path).map_err(|e| format!("cannot create new signing key {path:?}: {e}"))?;
+            use std::io::Write;
+            file.write_all(hex::encode(key.to_bytes()).as_bytes()).and_then(|_| file.sync_all()).map_err(|e| e.to_string())?;
             println!("{}", key.public_hex());
             Ok(())
         }
@@ -260,10 +274,7 @@ fn run() -> Result<(), String> {
             println!("catalog sequence {} verified, {} entries", catalog.sequence, catalog.entries.len());
             Ok(())
         }
-        _ => {
-            println!("{}", include_str!("hub-usage.txt"));
-            Ok(())
-        }
+        _ => Err(format!("unknown command {command:?}; run `hub help` for usage")),
     }
 }
 

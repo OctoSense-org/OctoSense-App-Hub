@@ -47,10 +47,17 @@ builds `hub` and `card-host` against those unmodified pins and runs the
 contract, policy, gate, signing, CLI and store tests. `cargo run -p
 octosense-app-hub --bin hub` is the publishing tool.
 
-`appstore` enables `text-input-state-query` by default for OctoSense's IME
+`appstore` and `app-hub-app` enable `text-input-state-query` by default for OctoSense's IME
 runtime overlay. Standalone `card-host` disables it. Use the walkthrough's
 package-specific commands with the plain runtime: a workspace-wide build
-unifies features from other shell consumers and requires that overlay.
+unifies features from other shell consumers and requires that overlay. CI tests
+both runner crates with `--no-default-features` against the plain runtime.
+
+`hub keygen` creates a new file only, refusing existing files and symlinks; new
+keys have mode `0600` on Unix. On other platforms, use a directory private to
+your user. Help such as `hub check --help` or `hub keygen --help` never reads a
+bundle or creates a key. `hub scan` permits unsigned development bundles, but a
+signed bundle still needs `--publisher-key id=hex` or a trusted catalog key.
 
 ## Code walkthrough
 
@@ -98,8 +105,17 @@ Host-owned account and review sheets are modal: text, keyboard, IME,
 clipboard and pointer-release events reach only the visible sheet. Timer and
 service callbacks continue to reach the app. The runner captures its own card
 and sheet references before evaluating app widgets, so a bundle cannot replace
-the host surface by reusing a widget ID. `services::is_sheet_input_event` supplies
+the host surface by reusing a widget ID. The mobile wrapper, standalone runner,
+and shutdown path retain those same references for drawing, input, requests,
+and cancellation. `services::is_sheet_input_event` supplies
 the same input boundary to integrated foreground Glance hosts.
+
+Store privacy text uses both the manifest and the catalog's reviewed tools.
+Even with `agent: null`, a valid nonempty `tools.json` can offer the host's Ask
+assistant after consent; conversation and tool results may reach the configured
+AI provider. That does not declare background work or automatic triggers, start
+a peer, or install an executor. Apps with neither agent nor tools still show
+“Runs no assistant.”
 
 The `photos` and `youtube` capabilities (app contract 1.5) admit requests to
 the app-owned media services supplied by OctoSense. They do not grant Android

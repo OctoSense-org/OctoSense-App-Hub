@@ -47,6 +47,8 @@ pub struct CardAppView {
     #[rust]
     host_sheet: SplashRef,
     #[rust]
+    host_notice: LabelRef,
+    #[rust]
     started: bool,
     #[rust]
     asset_server: Option<octosense_app_policy::AssetServer>,
@@ -63,6 +65,7 @@ impl CardAppView {
         // Capture host identities before untrusted app widgets exist.
         self.card_surface = self.view.splash(cx, ids!(body.card));
         self.host_sheet = self.view.splash(cx, ids!(sheet));
+        self.host_notice = self.view.label(cx, ids!(body.notice));
         let root = crate::data_root(cx);
         // `.host` can never be an app id, so it is no app's jail.
         self.host_dir = root.join(".host");
@@ -127,7 +130,7 @@ impl CardAppView {
 
     fn refuse(&mut self, cx: &mut Cx, reason: &str) {
         error!("card: {reason}");
-        self.view.label(cx, ids!(notice)).set_text(cx, reason);
+        self.host_notice.set_text(cx, reason);
         self.view.redraw(cx);
     }
 }
@@ -193,14 +196,16 @@ impl AppModule for CardModule {
             // does, not whenever its isolate is next collected.
             shutdown: Box::new(move |vm| {
                 let cx = vm.cx_mut();
-                let splash = closing.splash(cx, ids!(card));
+                // Use the same identities as event delivery. A guest child
+                // named `sheet` must not redirect cancellation at shutdown.
+                let Some((splash, sheet)) = closing.borrow::<CardAppView>()
+                    .map(|view| (view.card_surface.clone(), view.host_sheet.clone())) else { return };
                 let heap = splash.borrow_mut().and_then(|mut s| s.isolate_heap_key(cx));
                 if let Some(heap) = heap {
                     makepad_widgets::camera_preview::release_isolate_devices(cx, heap);
                     crate::services::cancel_heap(heap);
                 }
                 // The sheet's own requests (a sign-in form's) end with it.
-                let sheet = closing.splash(cx, ids!(sheet));
                 if let Some(heap) = sheet.borrow_mut().and_then(|mut s| s.isolate_heap_key(cx)) {
                     crate::services::cancel_heap(heap);
                 }
@@ -265,7 +270,7 @@ mod modal_tests {
             runner.app_id = "org.example.modal-input".into();
             runner.card_surface = runner.view.splash(&mut cx, ids!(body.card));
             runner.host_sheet = runner.view.splash(&mut cx, ids!(sheet));
-            runner.card_surface.set_text(&mut cx, "ModalInputProbe {label: \"app\"}");
+            runner.card_surface.set_text(&mut cx, "sheet := View{}\nModalInputProbe {label: \"app\"}");
             runner.host_sheet.set_text(&mut cx, "ModalInputProbe {label: \"host\"}");
             runner.host_sheet.borrow_mut().unwrap().view.visible = true;
         }
@@ -273,5 +278,55 @@ mod modal_tests {
         root.handle_event(&mut cx, &Event::TextInput(TextInputEvent {input: "private sheet text".into(), ..Default::default()}), &mut Scope::empty());
         root.handle_event(&mut cx, &Event::KeyDown(KeyEvent {key_code: KeyCode::KeyA, ..Default::default()}), &mut Scope::empty());
         assert_eq!(SEEN.with(|seen| seen.borrow().clone()), ["host", "host"], "underlying app must not receive host-sheet text or keys");
+    }
+
+    #[test]
+    fn shutdown_cancels_the_real_sheet_even_when_a_guest_reuses_its_id() {
+        use crate::services::{self, HostService, Replier, ServiceHost};
+        use makepad_app_module::{InstanceScope, ModuleWindows, ReplySink, Viewport};
+        use std::sync::{Arc, Mutex};
+        struct Hold(Arc<Mutex<Vec<Replier>>>);
+        impl HostService for Hold {
+            fn family(&self) -> &'static str { "card_shutdown_probe" }
+            fn call(&mut self, _: services::ServiceCall, reply: Replier, _: &mut dyn ServiceHost) {
+                self.0.lock().unwrap().push(reply);
+            }
+        }
+        let held = Arc::new(Mutex::new(Vec::new()));
+        services::register_host_service(Box::new(Hold(held.clone())));
+        let mut cx = Cx::new(Box::new(|_, _| {}));
+        let mut parts = cx.with_vm(|vm| {
+            makepad_widgets::script_mod(vm);
+            CARD_MODULE.register(vm);
+            let handles = InstanceHandles {
+                scope: InstanceScope::new(932, 1),
+                storage: vm.cx_mut().storage("card-shutdown-test"),
+                viewport: Viewport::default(),
+                replies: ReplySink::pair().0,
+                windows: ModuleWindows::default(),
+            };
+            let open = CARD_MODULE.open_schema().validate(r#"{"app":"org.example.shutdown"}"#, &[]).unwrap();
+            CARD_MODULE.create(vm, open, handles)
+        });
+        let (card, sheet) = {
+            let mut runner = parts.root.borrow_mut::<CardAppView>().unwrap();
+            runner.started = true;
+            runner.card_surface = runner.view.splash(&mut cx, ids!(body.card));
+            runner.host_sheet = runner.view.splash(&mut cx, ids!(sheet));
+            (runner.card_surface.clone(), runner.host_sheet.clone())
+        };
+        card.set_text(&mut cx, "sheet := View{}\nhost.request(\"card_shutdown_probe.hold\", {}, fn(r){})");
+        sheet.set_text(&mut cx, "host.request(\"card_shutdown_probe.hold\", {}, fn(r){})\nLabel{text: \"Host sheet\"}");
+        sheet.borrow_mut().unwrap().view.visible = true;
+        assert_ne!(parts.root.widget(&mut cx, ids!(sheet)).widget_uid(), sheet.widget_uid());
+        let heaps = [
+            card.borrow_mut().unwrap().isolate_heap_key(&mut cx).unwrap(),
+            sheet.borrow_mut().unwrap().isolate_heap_key(&mut cx).unwrap(),
+        ];
+        services::pump(&mut cx, "org.example.shutdown", &std::env::temp_dir(), &card, &sheet);
+        assert_eq!(held.lock().unwrap().len(), 2);
+        cx.with_vm(|vm| (parts.shutdown)(vm));
+        for reply in held.lock().unwrap().drain(..) { reply.send(Ok(serde_json::Value::Null)); }
+        assert!(services::take_replies_for(&heaps).is_empty(), "neither the closed app nor its real sheet may receive a late answer");
     }
 }
