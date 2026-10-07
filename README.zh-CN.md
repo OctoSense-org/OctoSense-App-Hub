@@ -2,6 +2,8 @@
 
 [English](README.md) | 简体中文
 
+原生应用大厅在桌面和手机尺寸下共用控件：44 点操作区域、清晰的辅助文字、独立应用行卡片和导航选中背景。大窗口的内容栏最大宽度为 920 点。本机预览先运行 `cargo build --locked --release -p octosense-app-hub-app --example preview`，再通过 `OCTOSENSE_PREVIEW_SIZE=1200x860`（桌面）或 `406x820`（手机尺寸）运行示例，并指定独立的 `OCTOSENSE_APP_DATA`。自动检查使用 `MAKEPAD_HIDE_WINDOWS=1 MAKEPAD_REMOTE=<空闲端口>`。手机尺寸预览不代表真机验收；正式安装仍经过原有的同意和准入检查。
+
 这里是为 OctoSense 发布的应用索引、每个 OctoSense 商店都会读取的签名目录、App Hub 为每个已准入应用包保存的副本，以及运行 hub 和商店的代码。发布者的应用源码留在各自仓库中；本仓库也包含商店 UI、运行宿主、模板和测试夹具。
 
 | 想找 | 仓库 |

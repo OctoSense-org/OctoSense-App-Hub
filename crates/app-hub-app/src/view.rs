@@ -22,27 +22,27 @@ fn skin(vm: &mut ScriptVm, light: u32, dark: u32) -> Vec4f {
 script_mod! {
     use mod.prelude.widgets.*
     use mod.widgets.*
-    let ground = #(skin(vm, 0xf5f6f9ff, 0x11151dff))
-    let card = #(skin(vm, 0xffffffff, 0x1d2430ff))
+    let ground = #(skin(vm, 0xf3f5f9ff, 0x101722ff))
+    let card = #(skin(vm, 0xffffffff, 0x1b2636ff))
     let ink = #(skin(vm, 0x111b2bff, 0xf5f7fbff))
-    let secondary = #(skin(vm, 0x67758aff, 0xadb9cdff))
+    let secondary = #(skin(vm, 0x53647bff, 0xadb9cdff))
     let field = #(skin(vm, 0xe9eef6ff, 0x2c3545ff))
-    let accent = #087cf0
+    let accent = #(skin(vm, 0x285cd6ff, 0x96b7ffff))
     let clear = #00000000
     let Heavy = theme.font_bold{font_family +: {latin := FontMember{res: crate_resource("makepad_widgets:resources/Inter.ttf") weight: 800.0 asc: 0.0 desc: 0.0}}}
     let Text = Label{width: Fill padding: 0 draw_text +: {color: ink max_lines: 0 text_overflow: TextOverflow.Clip text_style: theme.font_regular{font_size: 14 line_spacing: 1.3}}}
     let Heading = Text{draw_text.text_style: Heavy{font_size: 22}}
-    let Meta = Text{draw_text +: {color: secondary text_style: theme.font_regular{font_size: 12 line_spacing: 1.3}}}
+    let Meta = Text{draw_text +: {color: secondary text_style: theme.font_regular{font_size: 13 line_spacing: 1.4}}}
     let Plain = ButtonFlat{height: 44 padding: Inset{left: 10 right: 10} margin: 0 text: "" align: Center
-        draw_bg +: {border_size: uniform(0.0) color: uniform(clear) color_hover: uniform(clear) color_down: uniform(#087cf020) color_focus: uniform(clear)
+        draw_bg +: {border_size: uniform(0.0) color: uniform(clear) color_hover: uniform(clear) color_down: uniform(#285cd620) color_focus: uniform(clear)
             border_color: uniform(clear) border_color_hover: uniform(clear) border_color_down: uniform(clear) border_color_focus: uniform(clear)}
         draw_text +: {color: accent color_hover: accent color_down: accent color_focus: accent text_style: theme.font_bold{font_size: 13}}
     }
-    let Pill = Plain{width: Fit height: 36 padding: Inset{left: 16 right: 16} draw_bg +: {border_radius: uniform(18.0) color: uniform(field) color_hover: uniform(field) color_focus: uniform(field)}}
-    let Primary = Plain{width: Fill height: 46 draw_bg +: {border_radius: uniform(14.0) color: uniform(accent) color_hover: uniform(accent) color_down: uniform(#0069d5) color_focus: uniform(accent)}
+    let Pill = Plain{width: Fit height: 44 padding: Inset{left: 16 right: 16} draw_bg +: {border_radius: uniform(18.0) color: uniform(field) color_hover: uniform(field) color_focus: uniform(field)}}
+    let Primary = Plain{width: Fill height: 46 draw_bg +: {border_radius: uniform(14.0) color: uniform(#285cd6) color_hover: uniform(#3468df) color_down: uniform(#204cb8) color_focus: uniform(#204cb8)}
         draw_text +: {color: #fff color_hover: #fff color_down: #fff color_focus: #fff}}
     let Card = RoundedAllView{width: Fill height: Fit flow: Down padding: 16 spacing: 10 draw_bg +: {color: card border_radius: vec4(16.0)}}
-    let Item = View{width: Fill height: Fit flow: Down padding: Inset{left: 20 right: 20}}
+    let Item = View{width: Fill height: Fit flow: Down padding: Inset{left: 24 right: 24 bottom: 12}}
     let AppMark = RoundedAllView{width: 54 height: 54 flow: Overlay align: Center draw_bg +: {color: #078be8 border_radius: vec4(12.0)}
         mark := View{width: Fit height: Fit Icon{icon_walk: Walk{width: 28 height: 28} draw_icon +: {svg: crate_resource("self:resources/icons/apps.svg") color: #fff}}}
         builtin := View{visible: false width: Fill height: Fill
@@ -51,41 +51,41 @@ script_mod! {
         image := Image{visible: false width: Fill height: Fill fit: ImageFit.Smallest}
     }
     let AppRow = Item{
-        row := Card{flow: Right padding: Inset{left: 12 right: 12 top: 12 bottom: 12} spacing: 12 align: Align{y: 0.5} cursor: MouseCursor.Hand
+        row := Card{flow: Right padding: Inset{left: 16 right: 16 top: 16 bottom: 16} spacing: 16 align: Align{y: 0.5} cursor: MouseCursor.Hand
             icon := AppMark{}
             View{width: Fill height: Fit flow: Down spacing: 4
-                name := Text{max_lines: 1 text_overflow: Ellipsis draw_text.text_style: theme.font_bold{font_size: 15}}
+                name := Text{max_lines: 1 text_overflow: Ellipsis draw_text.text_style: theme.font_bold{font_size: 17}}
                 subtitle := Meta{max_lines: 2 text_overflow: Ellipsis}
             }
             action := Pill{text: "Get"}
         }
     }
     let Tab = Plain{width: Fill height: 58 flow: Down spacing: 4 padding: 4 icon_walk: Walk{width: 22 height: 22}
-        draw_icon.color: secondary draw_text +: {color: secondary color_hover: accent color_down: accent color_focus: accent text_style: theme.font_bold{font_size: 10}}}
+        draw_icon.color: secondary draw_text +: {color: secondary color_hover: accent color_down: accent color_focus: accent text_style: theme.font_bold{font_size: 12}}}
 
     mod.widgets.AppHubView = set_type_default() do #(AppHubView::register_widget(vm)) {
-        width: Fill height: Fill flow: Overlay
+        width: Fill height: Fill flow: Overlay align: Align{x: 0.5}
         SolidView{width: Fill height: Fill draw_bg.color: ground}
-        content := View{width: Fill height: Fill flow: Down
-        brand_bar := View{width: Fill height: 50 flow: Right align: Align{y: 0.5} padding: Inset{left: 20 right: 16} spacing: 8
+        content := View{width: Fill max_width: 920 height: Fill flow: Down
+        brand_bar := View{width: Fill height: 64 flow: Right align: Align{y: 0.5} padding: Inset{left: 20 right: 16} spacing: 8
             AppIcon{width: 26 height: 26 name: "apphub"}
-            Text{width: Fill text: "App Hub" draw_text.text_style: theme.font_bold{font_size: 13}}
-            source := Pill{width: Fit text: "Live catalog" padding: Inset{left: 10 right: 10} draw_text.text_style.font_size: 11}
-            refresh := Plain{width: 28 padding: 0 icon_walk: Walk{width: 17 height: 17} draw_icon +: {svg: crate_resource("self:resources/icons/refresh.svg") color: accent}}
+            Text{width: Fill text: "App Hub" draw_text.text_style: theme.font_bold{font_size: 16}}
+            source := Pill{width: Fit text: "Live catalog" padding: Inset{left: 10 right: 10} draw_text.text_style.font_size: 13}
+            refresh := Plain{width: 44 padding: 0 icon_walk: Walk{width: 17 height: 17} draw_icon +: {svg: crate_resource("self:resources/icons/refresh.svg") color: accent}}
         }
         back_bar := View{visible: false width: Fill height: 44 padding: Inset{left: 10 right: 20} flow: Right
             back := Plain{text: "‹ Back"}
             View{width: Fill height: Fit}
         }
         search_bar := View{visible: false width: Fill height: Fit flow: Down spacing: 14 padding: Inset{left: 20 right: 20 top: 6 bottom: 10}
-            Heading{text: "Search" draw_text.text_style: Heavy{font_size: 32}}
+            Heading{text: "Search" draw_text.text_style: Heavy{font_size: 34}}
             search := TextInputFlat{width: Fill height: 44 empty_text: "Search apps" margin: 0 padding: Inset{left: 14 right: 14 top: 12 bottom: 12}
                 draw_bg +: {border_radius: 12.0 color: field color_hover: field color_focus: field color_empty: field border_size: 0.0}
                 draw_text +: {color: ink color_hover: ink color_focus: ink color_empty: secondary color_empty_hover: secondary color_empty_focus: secondary text_style: theme.font_regular{font_size: 15}}}
         }
         list := PortalList{width: Fill height: Fill
-            Title := Item{padding: Inset{left: 20 right: 20 top: 6 bottom: 18}
-                title := Heading{draw_text.text_style: Heavy{font_size: 32}}
+            Title := Item{padding: Inset{left: 20 right: 20 top: 12 bottom: 24}
+                title := Heading{draw_text.text_style: Heavy{font_size: 34}}
                 caption := Meta{margin: Inset{top: 5}}
             }
             Section := Item{padding: Inset{left: 20 right: 20 top: 22 bottom: 12}
@@ -94,10 +94,10 @@ script_mod! {
             Row := AppRow{}
             Hero := Item{padding: Inset{left: 20 right: 20 bottom: 8}
                 row := Card{padding: 0 spacing: 0 cursor: MouseCursor.Hand
-                    art := Image{width: Fill height: 194 fit: ImageFit.CropToFill src: crate_resource("self:resources/coast.jpg")}
-                    View{width: Fill height: Fit flow: Down padding: 18 spacing: 7
-                        eyebrow := Meta{text: "EXPLORE OCTOSENSE" draw_text +: {color: #009b84 text_style: theme.font_bold{font_size: 10}}}
-                        title := Heading{text: "A little more discovery." draw_text.text_style: Heavy{font_size: 25}}
+                    art := Image{width: Fill height: 220 fit: ImageFit.CropToFill src: crate_resource("self:resources/coast.jpg")}
+                    View{width: Fill height: Fit flow: Down padding: 22 spacing: 10
+                        eyebrow := Meta{text: "EXPLORE OCTOSENSE" draw_text +: {color: #(skin(vm, 0x146958ff, 0x78d7bfff)) text_style: theme.font_bold{font_size: 12}}}
+                        title := Heading{text: "Find your next favorite app." draw_text.text_style: Heavy{font_size: 25}}
                         caption := Meta{text: "Find your next favorite place with Maps."}
                         action := Plain{text: "Explore Maps  ›" width: Fit padding: 0}
                     }
@@ -481,13 +481,15 @@ impl AppHubView {
             (ids!(search_tab), Page::Search),
             (ids!(library), Page::Library),
         ] {
-            let color = Vec4f::from_u32(if self.page == page {
-                0x087cf0ff
-            } else {
-                0x8190a7ff
+            let (color, face) = cx.with_vm(|vm| {
+                let color = if self.page == page { skin(vm, 0x285cd6ff, 0x96b7ffff) }
+                    else { skin(vm, 0x53647bff, 0xadb9cdff) };
+                let face = if self.page == page { skin(vm, 0xe9eefaff, 0x293c59ff) }
+                    else { Vec4f::default() };
+                (color, face)
             });
             let mut tab = self.view.widget(cx, id);
-            script_apply_eval!(cx,tab,{draw_icon.color: #(color) draw_text.color: #(color)});
+            script_apply_eval!(cx,tab,{draw_icon.color: #(color) draw_text +: {color: #(color) color_hover: #(color) color_down: #(color) color_focus: #(color)} draw_bg +: {color: #(face) color_hover: #(face) color_focus: #(face) border_radius: 12}});
         }
         self.rows.clear();
         if !self.notice.is_empty() {
@@ -795,21 +797,6 @@ impl AppHubView {
                 continue;
             };
             let item = list.item(cx, index, row.template());
-            if matches!(row, Row::App(_)) {
-                let top = if index > 0 && matches!(self.rows.get(index - 1), Some(Row::App(_))) {
-                    0.5
-                } else {
-                    16.0
-                };
-                let bottom = if matches!(self.rows.get(index + 1), Some(Row::App(_))) {
-                    0.5
-                } else {
-                    16.0
-                };
-                let radius = vec4(top, top, bottom, bottom);
-                let mut segment = item.widget(cx, ids!(row));
-                script_apply_eval!(cx,segment,{draw_bg.border_radius: #(radius)});
-            }
             match row {
                 Row::Title(title, caption) | Row::Empty(title, caption) => {
                     item.label(cx, ids!(title)).set_text(cx, &title);

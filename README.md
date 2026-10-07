@@ -8,6 +8,15 @@ runs the hub and the store. Publisher app source stays in each publisher's
 repository; this repository also contains the store UI, runtime hosts,
 templates and test fixtures.
 
+The native App Hub shares its controls across desktop and phone layouts: 44-point
+actions, readable secondary text, separate app rows and a selected navigation pill.
+The content column stops at 920 points on large windows. Build its local preview
+with `cargo build --locked --release -p octosense-app-hub-app --example preview`.
+Set `OCTOSENSE_PREVIEW_SIZE=1200x860` for desktop or `406x820` for phone dimensions,
+a distinct `OCTOSENSE_APP_DATA`, and `MAKEPAD_HIDE_WINDOWS=1 MAKEPAD_REMOTE=<port>`
+for isolated automated inspection. A phone-size preview is not a physical-device
+test. Live installation retains the existing consent and admission checks.
+
 | Looking for | Repository |
 | --- | --- |
 | How to build an app: quickstart, script API, script-app template, design flows, examples | [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) |
