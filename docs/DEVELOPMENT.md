@@ -2,148 +2,145 @@
 
 English | [简体中文](DEVELOPMENT.zh-CN.md)
 
-For a downloadable Hub app, begin with [Build your first Hub app](FIRST-APP.md).
-The Hub owns publication requirements: the bundle format, the gate, signing
-and submission. Authoring lives in other repositories:
+To build your first downloadable Hub app, follow
+[Build your first Hub app](FIRST-APP.md). This repository owns what a bundle
+must satisfy to be published: the bundle format, the gate, signing and
+submission. Authoring tools and the shells that run apps live in other
+repositories:
 
 | Repository | What it owns |
 | --- | --- |
-| [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) | The app-development harness: quickstart, script API, the script-app template, the `tools/octo` command, the design flows (`flows/`) and example apps (`examples/`). Formerly Octoscript-AppCard. |
-| [OctoSense `apps/appcard`](https://github.com/OctoSense-org/OctoSense/tree/main/apps/appcard) | The AppCard assistant runtime (opt-in in the shells) and the L0 card language (`a2app-l0/framework/l0.md`). |
-| [OctoSense `apps/`](https://github.com/OctoSense-org/OctoSense/tree/main/apps) | The first-party system apps (News, Photos, Maps, Camera, Mail, AI providers), each a script app bundle under `apps/<name>/bundle/`, and their host services under `apps/mail/host-service/` and `apps/ai-providers/host-service/`. |
+| [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) | The app-development harness: quickstart, script API, the script-app template, the `tools/octo` command, the design flows (`flows/`) and the example apps (`examples/`). |
+| [OctoSense `apps/appcard`](https://github.com/OctoSense-org/OctoSense/tree/main/apps/appcard) | AppCard, an opt-in "Ask anything" agent the shells can link, and the L0 card language (`a2app-l0/framework/l0.md`). |
+| [OctoSense `apps/`](https://github.com/OctoSense-org/OctoSense/tree/main/apps) | The system apps (News, Photos, Maps, Camera, Mail, Calendar, AI providers, YouTube), each a script app bundle in `apps/<name>/bundle/`, and the host services of Mail, Calendar, News and AI providers in `apps/<name>/host-service/`. |
+| [OctoSense `crates/oauth-service`](https://github.com/OctoSense-org/OctoSense/tree/main/crates/oauth-service) | The connected-account host services: `auth`, `github`, `gmail` and `gcalendar`. |
+
+Find the guide for your task:
 
 | Task | Guide |
 | --- | --- |
-| Package, validate, sign and submit a bundle | [Publishing](PUBLISHING.md) |
-| Set up an app-owned icon and bundled artwork | [Icons](ICONS.md) |
-| Start a card app repository with metadata and agent instructions | [App starter](../templates/app/README.md) |
+| Set up the workspace and build `hub` and `card-host` | [Quickstart](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md) |
+| Prepare shared Makepad/Octoscript dependencies | [Native workspace](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/NATIVE-WORKSPACE.md) |
 | Start a script app from a runnable template | [Quickstart](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md) and [`templates/script-app/`](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/templates/script-app) |
+| Start a card app repository with metadata and agent instructions | [App starter](../templates/app/README.md) |
 | Write a script app: state, handlers, storage, requests, host services | [Script-app flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/script-app/FLOW.md) and [Script API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md) |
+| Find which shell serves a host service | [Host services](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md) |
 | Turn UI designs into native cards | [Image-to-card flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md) |
 | Understand card data, state, events, copy, themes and views | [L0 language](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md) and the [L0 notes](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/docs/l0) |
-| Prepare shared Makepad/Octoscript dependencies | [Native workspace](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/NATIVE-WORKSPACE.md) |
+| Run a bundle and drive it over HTTP | [`card-host`](#run-a-bundle-locally-card-host), below |
 | Test real native input, capture frames and clean up test instances | [Native instrument](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md) |
+| Set up an app-owned icon and bundled artwork | [Icons](ICONS.md) |
+| Package, validate and sign a bundle | [Publishing](PUBLISHING.md) |
+| Submit a bundle for review | [Submitting](SUBMITTING.md) |
 | Read worked examples | [Examples](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/examples) and the [system apps](https://github.com/OctoSense-org/OctoSense/tree/main/apps) |
 
-## Choose the appropriate delivery path
+<a id="choose-the-appropriate-delivery-path"></a>
 
-**Hub card app:** `page.card`, its data and kit, local artwork, manifest and
-listing. The host lowers the card to widgets: presentation, no logic of its
-own. It runs within the host's existing capabilities.
+## Choose a delivery path
 
-**Hub script app:** `main.splash`, local artwork, manifest and listing. A
-Splash program with its own state, handlers, requests and storage, run in its
-own isolate under the policy its manifest resolves to. It reaches the network
-only through the hosts it declares, and the person's world (location, camera,
-mail) only through the capabilities it is granted and the host services the
-shell offers.
+| Path | What you build | How it ships |
+| --- | --- | --- |
+| Hub card app | `page.card` with its data and `kit/`, local artwork, `manifest.json` and `listing.json`. The host converts (lowers) the card to native widgets: the card has no logic of its own and runs within the host's existing capabilities. | A store bundle, submitted to the Hub. |
+| Hub script app | `main.splash`, local artwork, `manifest.json` and `listing.json`. A Splash program with its own state, handlers, requests and storage, run in its own isolate (a separate script environment) under the policy its manifest resolves to. It reaches the network only through the hosts it declares, and the person's location, camera and mail only through the capabilities it is granted and the host services the shell offers. | A store bundle, submitted to the Hub. |
+| System app | A script app bundle under a reserved `os.` id, packed into a shell at build time. OctoSense's are in `apps/`. | With the shell release. A store bundle may not take an `os.` id. |
+| Built-in native app | Source compiled into a shell release, built with the native workspace and the owning app's instructions. The shared icon conventions apply. | With the shell release. An icon declaration does not make it installable from the Hub. |
+| Agent-generated app type | Specifications and lint rules in OctoSense `apps/appcard` that teach AppCard's agents to compose a new kind of app. | Not a bundle. |
 
-Both are store bundles. Neither may carry native code: new Rust/JNI code,
-Python services and browser controllers are not installed by either format.
+A store bundle carries no native code. New Rust or JNI code, Python services
+and browser controllers do not install as a card app or a script app.
 
-**System app:** a script app bundle that ships inside a shell release instead
-of the store, packed at build time, under an id in the reserved `os.`
-namespace. The first-party ones are in OctoSense (`apps/`); a store bundle
-may not take an `os.` id.
+Some Design Flow examples include a native service or a website integration.
+Before you base a Hub app on one, check that every behavior runs inside the
+app's isolate. Copying a service project's source directory does not make it
+installable.
 
-**Built-in native app:** source integrated into a shell release. Use the native
-workspace and the owning app's build instructions. Shared icon conventions
-still apply, but an icon declaration alone does not make the app
-Hub-installable.
+<a id="running-a-bundle-locally-card-host"></a>
 
-**Agent-generated app type:** specifications and lint rules teaching the agent
-to compose a new kind of app, in OctoSense (`apps/appcard`). Those specifications are
-not themselves a store bundle.
+## Run a bundle locally: `card-host`
 
-Some workflow examples include native services or website integration. Check
-that every behaviour of a proposed Hub app can run in the contained host; do
-not assume copying a service project's source directory makes it installable.
+`card-host` (`crates/card-host`) runs one bundle, a card app or a script app,
+under exactly the policy its manifest resolves to. It follows the order a
+device uses: admit, resolve, apply, evaluate.
 
-## Running a bundle locally: `card-host`
-
-`card-host` (this workspace, `crates/card-host`) runs one bundle, card or
-script app, under exactly the policy its manifest resolves to, with the same
-admission order a device uses: admit, resolve, apply, evaluate.
+Build it from this repository, in the prepared
+[native workspace](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/NATIVE-WORKSPACE.md):
 
 ```sh
 cargo build --release -p octosense-card-host --bin card-host
-card-host --bundle <dir> [--app-data <dir>] [--allow-unsigned] [--stamp] [--system] [--static <prefix>=<dir>]... [--size <w>x<h>]
+```
+
+If the build fails with `no variant … TextInputStateQuery`, see [`card-host` fails to build](#card-host-fails-to-build).
+
+The binary is `target/release/card-host`. Run it with:
+
+```sh
+card-host [--bundle <dir>] [--app-data <dir>] [--allow-unsigned] [--stamp] [--system] [--static <prefix>=<dir>]... [--size <w>x<h>] [--remote [<port>]]
 card-host --help
 ```
 
-`--help` prints the flags and exits 0; an unknown option prints them and
-exits 2. Neither opens a window.
+`--help` prints the usage and exits 0. An unknown or malformed option prints
+the problem and the usage, and exits 2. Neither opens a window.
 
 | Flag | Effect |
 | --- | --- |
-| `--bundle <dir>` | The bundle to run (default: the current directory). |
-| `--app-data <dir>` | Where the app's storage jail is made, at `<dir>/<app id>/`; host services keep their state in `<dir>/.host/`. Default: `$TMPDIR/octosense-card-apps`. |
-| `--allow-unsigned` | Admit a manifest with no signature. `card-host` verifies no publisher keys, so a **signed** manifest is refused even with this flag: run an unsigned development copy. |
-| `--stamp` | Rewrite the manifest's `integrity.bundle_blake3` to match the directory before admitting. Without it, a bundle whose bytes changed since the last `hub stamp` is refused. |
-| `--system` | Admit as a system app is admitted: by digest only, under the system ceilings. An empty digest is filled in memory. For developing a system app. |
-| `--static <prefix>=<dir>` | Serve `<dir>`'s files at `<prefix>/...` from memory, as a shell serves a system app's compiled-in artwork (Photos uses `--static photos=<dir>`). |
-| `--size <w>x<h>` | The window's inner size in layout points, with no caption bar, so the card gets exactly that viewport (glance tile, phone, desktop). `card-studio` launches one card-host per size with it. |
+| `--bundle <dir>` | The bundle to run. Default: the current directory. |
+| `--app-data <dir>` | Where the app's storage jail is made, at `<dir>/<app id>/`. Host services keep their state in `<dir>/.host/`. Default: `$TMPDIR/octosense-card-apps`. |
+| `--allow-unsigned` | Admit a manifest with no signature. `card-host` verifies no publisher keys, so it refuses a **signed** manifest even with this flag: `no signature verifier is installed, so the signature from key "<id>" cannot be checked`. Run and capture the unsigned bundle, and sign last. |
+| `--stamp` | Rewrite the manifest's `integrity.bundle_blake3` to match the directory before admitting. Without it, `card-host` refuses a bundle whose bytes changed since the last `hub stamp`. |
+| `--system` | Admit the bundle as a system app: by digest only, under the system ceilings. An empty digest is filled in memory. Use it to develop a system app. |
+| `--static <prefix>=<dir>` | Serve `<dir>`'s files at `<prefix>/...` from memory, as a shell serves a system app's compiled-in artwork. Photos uses `--static photos=<dir>`. Repeatable. |
+| `--size <w>x<h>` | The window's inner size in layout points, with no caption bar, so the card gets exactly that viewport. Default: `412x892`. `card-studio` starts one `card-host` per size with it. |
+| `--remote [<port>]` | Start the localhost HTTP control surface ([below](#drive-it-over-http-makepad_remote)) on `<port>`. Without a port, `card-host` picks a free one and logs it. `MAKEPAD_REMOTE=<port>` is equivalent to `--remote <port>`. |
 
-The log line `card-host: <id> <version> admitted — capabilities …, hosts …`
-is what the app got. A refusal is logged as `card-host: refused: …` and
-nothing is drawn.
+The log says what happened:
 
-An L0 card also logs one line `card-host: realize {json}` before it is
-drawn: `lint` (`check_ui_l0`: `valid`, `level`, `diagnostics`), `realize`
-(`nodes`, `truncated` — a bound was hit and the tree is partial —
-`diagnostics`), `sources` (each declared source's `$state`: the data's
-`$status` entry, else `ready` with a value and `pending` without), and
-`lowering` (`design` for a native kit pack, `l0-kit` for a card composed from
-the role kit, whose nodes get inspectable ids `beauty_0_1_…`) or
-`lower_error`. Read it with `/log`.
+| Log line | Meaning |
+| --- | --- |
+| `card-host: <id> <version> admitted — capabilities {…}, hosts {…}, storage <n> bytes, agent <profile>` | The bundle was admitted with these grants. |
+| `card-host: refused: <reason>` | The bundle was refused. The window shows "card-host refused this bundle" and the reason. None of the bundle's code runs. |
+| `card-host: realize {json}` | An L0 card's lint and realize report, logged before the card is drawn. A script app logs none. |
+| `card-host: the card did not lower: <error>` | The card was admitted but could not be lowered to widgets. |
 
-## Inspecting a card before publishing: `card-studio`
+The `realize` report has four parts. Read it with the `/log` route
+([below](#drive-it-over-http-makepad_remote)):
 
-`card-studio` (`crates/card-studio`, ADR 0002 section 7) renders a card in a
-hidden `card-host --remote` at the target sizes, runs the measured checks and
-prepares the vision critique. It drives card-host over HTTP and never links
-Makepad; its checks run on saved captures with no GPU.
+| Key | Content |
+| --- | --- |
+| `lint` | `check_ui_l0`: `valid`, `level` and `diagnostics`. |
+| `realize` | `nodes`, `truncated` (a bound was hit and the tree is partial) and `diagnostics`. |
+| `sources` | Each declared source's `$state`: the data's `$status` entry, else `ready` with a value and `pending` without one. |
+| `lowering` or `lower_error` | `design` for a native kit pack; `l0-kit` for a card composed from the role kit, whose nodes get inspectable ids `beauty_0_1_…`. |
 
-```sh
-cargo build --release -p octosense-card-host -p octosense-card-studio
-export CARD_STUDIO_KIT=../octoscript-makepad/components/l0   # the L0 kit a bare card is lowered with
-target/release/card-studio render --card news.card --data digest.json \
-    --size glance --size phone --size desktop --out out/
-target/release/card-studio critique --report out/report.json --rubric AGENT-rubric.md --inline > request.json
-target/release/card-studio check --snap out/glance.snap.json --tree out/glance.tree.txt --log out/glance.log.json --size glance
-```
+`card-host` registers no host services, including `model` and the `octos.*`
+services that reach octos, the agent kernel OctoSense runs. A script app that
+calls `host.request("mail.list", …)` gets
+`no service answers "mail" on this device`. Test a service-backed app in an
+OctoSense shell that registers the service.
+[Host services](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md)
+lists which shell serves which. The connected-account services need
+desktop-v0.1.0-beta.2 or later.
 
-`render` writes `out/report.json` with, per size, the PNG (`/gq`), the
-snapshot (`/snap?all=1`), the tree (`/d`), the log, card-host's realize
-report, the findings and the metrics, and exits 1 when any finding is an
-error. The checks, the severity model, the report and the critique payload
-are documented in the crate (`src/checks.rs`, `src/report.rs`,
-`src/critique.rs`); the octos skill is in `skills/card-studio`.
+### Drive it over HTTP: `MAKEPAD_REMOTE`
 
-`card-host` registers no host services. A script app that calls
-`host.request("mail.…", …)` gets `no service answers "mail" on this device`
-here; develop a service-backed app in a shell that links the service.
-
-### Driving it: `MAKEPAD_REMOTE`
-
-Launch with `MAKEPAD_REMOTE=<port>` (or `--remote`, which picks a free port
-and logs it) to get a localhost HTTP control surface. Every route is a GET
-and answers one line of JSON; coordinates are window-local layout points.
+Launch with `MAKEPAD_REMOTE=<port>` or `--remote [<port>]` to get a localhost
+HTTP control surface. Every route is a GET and, except `/g?raw=1`, answers one
+line of JSON. Coordinates are window-local layout points.
 
 | Route | What it does |
 | --- | --- |
-| `/snap[?q=text]` | Visible widgets with their rects and text, ready to click; `q` filters by id, type or text. |
-| `/click?x=&y=` | Click at a point. |
-| `/t?t=TEXT` | Type text into the focused widget. |
-| `/k?k=down\|up&c=KeyA` | Press or release a key (`ReturnKey`, `Backspace`, `Escape`, …); `/k?t=TEXT` types text. |
-| `/g` | Grab the window; answers `{"png": "<path>", …}`. `/g?raw=1` sends the PNG bytes. |
-| `/quit` | Shut the app down. Always end a session with it. |
+| `/snap[?q=text]` | Lists the visible widgets with their rects and text, ready to click. `q` filters by id, type or text. |
+| `/click?x=&y=` | Clicks at a point. |
+| `/t?t=TEXT` | Types text into the focused widget. |
+| `/k?k=down\|up&c=KeyA` | Presses or releases a key (`ReturnKey`, `Backspace`, `Escape`, …). `/k?t=TEXT` types text. |
+| `/g` | Grabs the window and answers `{"png": "<path>", …}`. `/g?raw=1` sends the PNG bytes. |
+| `/log` | Returns the latest log lines, including the `realize` report. |
+| `/quit` | Shuts the app down. End every session with it. |
 
-Add `&wait=1` to an input route to answer after the next frame is drawn, so a
-following `/g` sees the result. `GET /` prints the full list.
+Add `&wait=1` to an input route to get the answer after the next frame is
+drawn, so a following `/g` sees the result. `GET /` lists every route.
 
 ```sh
-MAKEPAD_REMOTE=8151 card-host --bundle my-app/bundle --allow-unsigned --app-data /tmp/my-app-data &
+MAKEPAD_REMOTE=8151 card-host --bundle my-app/bundle --allow-unsigned --app-data .local-state &
 sleep 7
 curl -s 127.0.0.1:8151/snap
 curl -s '127.0.0.1:8151/click?x=200&y=280&wait=1'
@@ -151,17 +148,152 @@ curl -s 127.0.0.1:8151/g          # {"png":"/…/grab-w0-00001.png",…}
 curl -s 127.0.0.1:8151/quit
 ```
 
-A hidden native window still requires the platform's graphical session.
+`card-host` needs the platform's graphical session even when its window is
+hidden. Unverified: frame capture with Linux software rendering (llvmpipe,
+including WSL). In reported runs there, `/g` answered `grab timeout`.
 
-## Keep instructions in sync
+<a id="inspecting-a-card-before-publishing-card-studio"></a>
 
-Use the starter's `AGENTS.md` as a short entry point to these shared documents.
-Merge it with an existing repository's instructions instead of overwriting them.
-Keep app-specific behaviour, data sources and tests in that app's repository.
-Record the Hub and runtime revisions used for a release. When working offline,
-an explicit versioned copy of the guides is preferable to an untracked copy
-that silently becomes stale.
+## Inspect a card before you publish: `card-studio`
 
-For native tests, follow the native-instrument guide. Passing a compilation or
-packaging stage does not imply visual acceptance, working input, or platform
-coverage.
+`card-studio` (`crates/card-studio`,
+[OctoSense ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0002-event-driven-app-agents.md)
+section 7) renders a card in a hidden `card-host --remote` at each target
+size, runs the measured checks and prepares a vision-critique request. It
+drives `card-host` over HTTP and never links Makepad, so it builds without the
+prepared runtime. Its checks also run on saved captures, with no GPU.
+
+1. Build [`card-host`](#run-a-bundle-locally-card-host) first, then
+   `card-studio`:
+
+   ```sh
+   cargo build --release -p octosense-card-studio
+   ```
+
+   `card-studio` looks for `card-host` in this order: `--card-host`, the
+   `card_host` key of `card-studio.json` next to its binary, `$CARD_HOST`, the
+   binary next to its own, then `PATH`.
+
+2. Render the card at the three named sizes: glance `350x160`, phone
+   `390x844` and desktop `1200x800`.
+
+   ```sh
+   export CARD_STUDIO_KIT=../octoscript-makepad/components/l0   # the L0 kit a bare card is lowered with
+   target/release/card-studio render --card news.card --data digest.json \
+       --size glance --size phone --size desktop --out out/
+   ```
+
+   `render` writes `out/report.json`. Per size, the report holds the PNG, the
+   widget snapshot, the widget tree, the log, `card-host`'s `realize` report,
+   the findings and the metrics. It exits 0 when no finding is an error and 1 when
+   one is. Fix every error, then render again.
+
+3. Prepare the vision-critique request:
+
+   ```sh
+   target/release/card-studio critique --report out/report.json --rubric skills/card-studio/rubric.md --inline > request.json
+   ```
+
+   `request.json` holds the prompt, the answer's JSON schema and, per size,
+   the PNG, the widget snapshot and the findings. Send it to a vision model
+   yourself: `card-studio` makes no model call.
+
+4. Re-run the measured checks on saved captures. This step needs no
+   `card-host`:
+
+   ```sh
+   target/release/card-studio check --snap out/glance.snap.json --tree out/glance.tree.txt --log out/glance.log.json --size glance
+   ```
+
+   It prints the findings and metrics as JSON, and exits 0 on a pass and 1 on
+   a failure. For a card with more rows than the glance tile holds, it prints
+   (trimmed):
+
+   ```text
+   {
+     "findings": [
+       {
+         "check": "text_truncated",
+         "message": "\"Artificial intelligence regulation\" gets 12x14pt, about 9.9x too small for 34 characters: it is cut or squeezed",
+         …
+         "severity": "error",
+         …
+       },
+       {
+         "check": "text_hidden",
+         "message": "\"Grid\" was not laid out: the card ran out of room before it",
+         …
+         "severity": "error",
+         …
+       },
+       …
+     ],
+     …
+     "summary": {
+       "errors": 7,
+       "infos": 0,
+       "pass": false,
+       "warnings": 0
+     },
+     …
+   }
+   ```
+
+The crate documents the checks, the severity model, the report and the
+critique payload in `src/checks.rs`, `src/report.rs` and `src/critique.rs`.
+[`skills/card-studio`](../skills/card-studio/SKILL.md) wraps `card-studio` as
+a skill for octos.
+
+## Maintain your app repository
+
+- Use the starter's `AGENTS.md` as the entry point to these guides. Merge it
+  into an existing repository's instructions; do not overwrite them.
+- Keep app-specific behavior, data sources and tests in the app's own
+  repository.
+- Record the Hub and runtime revisions each release was built and tested
+  with.
+- Offline, keep a copy of the guides pinned to a known Hub revision, not an
+  untracked copy that drifts.
+- A passing build or gate does not prove that the visuals are right, that
+  input works or that the app runs on a given platform. Test those with the
+  [native-instrument guide](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md).
+
+## Troubleshooting
+
+### `card-host` fails to build
+
+`cargo build -p octosense-card-host` stops while compiling `octosense-appstore`:
+
+```text
+error[E0599]: no variant, associated function, or constant named `TextInputStateQuery` found for enum `makepad_widgets::Event` in the current scope
+error: could not compile `octosense-appstore` (lib) due to 1 previous error
+```
+
+`crates/appstore/src/services.rs` matches `Event::TextInputStateQuery`, an
+IME event that plain Makepad `68d1f4ec` does not define. OctoSense's runtime
+patch (`tools/runtime-patches/makepad-settings.patch`) adds it. `octosense-appstore`
+matches the event only under the feature `text-input-state-query`, which
+`octosense-appstore` turns on by default. `octosense-app-hub-app` also turns
+it on by default and passes it to `octosense-appstore`. `card-host` depends on
+`octosense-appstore` with the feature off.
+
+If `card-host` fails on its own, your App Hub checkout predates that change.
+Update it and build again:
+
+```sh
+git pull
+cargo build --release -p octosense-card-host -p octosense-app-hub
+```
+
+Cargo unifies features across the packages of one build, so the feature is on
+whenever any package in the build keeps it on. Without OctoSense's runtime
+patches:
+
+| Packages | Build without the patches |
+| --- | --- |
+| `octosense-card-host`, `octosense-app-hub`, `octosense-card-studio` | Yes |
+| `octosense-appstore`, `octosense-app-hub-app` | Only with `--no-default-features` |
+| `octosense-appstore-app`, or the whole workspace (`cargo test --workspace`) | No |
+
+To build the last row, apply OctoSense's runtime patches to `../makepad`, in
+the order OctoSense's `runtime-patches.lock.json` lists them.

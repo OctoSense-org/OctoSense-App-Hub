@@ -1,8 +1,11 @@
 # App icons and bundled artwork
 
-This is the shared icon convention for apps published through App Hub. Start
-with [your first app](FIRST-APP.md); use [publishing](PUBLISHING.md) for the full
-listing and admission contract.
+English | [简体中文](ICONS.zh-CN.md)
+
+Every app published through App Hub owns one icon, ships it in its bundle and
+declares it in `listing.json`. Start with
+[Build your first Hub app](FIRST-APP.md); the
+full listing and admission contract is in [Publishing](PUBLISHING.md).
 
 ## Own one canonical icon
 
@@ -18,78 +21,92 @@ bundle/
     01-main.png
 ```
 
-Set `"icon": "assets/icon.svg"` in the **complete** `listing.json`. PNG is also
-supported: use `assets/icon.png` and update the field. The path is relative to
-the bundle root, not the repository root. These filenames are conventions;
-another valid local path is accepted. Do not add unrecognized fields such as
-`dark_icon` or `adaptive_icon` to schema 1.
+Set `"icon": "assets/icon.svg"` in `listing.json`. For a PNG,
+use `assets/icon.png` and update the field. The path is relative to the bundle
+root, not the repository root. These file names are conventions; any valid
+bundle-relative path works. Listing schema 1 has no `dark_icon` or
+`adaptive_icon` field, and the listing parser refuses fields it does not know.
 
-The installed app's launcher and store artwork should resolve this same
-declaration. Do not maintain independently edited copies for the launcher,
-Recents, store rows or detail page. Export artwork from one source when a build
-needs another format.
+The launcher and the store both read this one declaration. Do not keep
+separately edited copies for the launcher, Recents, store rows or the detail
+page. When a build needs another format, export it from the same source.
 
-## Technical requirements and current enforcement
+<a id="technical-requirements-and-current-enforcement"></a>
 
-| Requirement | Where it is checked today |
+## Technical requirements and who checks them
+
+`hub check` runs the gate, including the listing parser, before publication.
+The installed-icon loader is the code every OctoSense shell links to draw an
+installed app's icon; when it rejects the artwork, the shell draws its generic
+icon instead.
+
+| Requirement | Checked by |
 | --- | --- |
-| Declare an icon and include the referenced file | Hub admission gate |
-| Use a bundle-relative PNG/SVG path, without an absolute path, `..` or URL | Listing validator |
-| No symlinks; bundle contents within the 8 MiB limit | Hub admission gate |
-| Icon at most 1 MiB; positive square dimensions | Hub admission gate, and the OctoSense mobile installed-icon loader |
-| PNG no larger than 1024×1024; valid PNG bytes | Hub admission gate (decodes it), and the mobile loader |
-| SVG parses, with square numeric dimensions or `viewBox`; no script, foreign content or external `url()`/`@import` | Hub admission gate, and the mobile SVG loader |
-| Clear silhouette, suitable padding and readable contrast | Author's visual review |
+| Declare an icon and include the file it names | `hub check` |
+| Use a bundle-relative PNG or SVG path: no leading `/`, no `..`, no URL | The listing parser |
+| Ship no symlinks; keep the whole bundle within 8 MiB | `hub check` |
+| Keep the icon file within 1 MiB and square | `hub check`, and the installed-icon loader |
+| Keep a PNG within 1024×1024 pixels, with valid PNG bytes | `hub check` decodes it; the loader checks its header and size |
+| Use an SVG that parses, with square numeric `width` and `height` or a square `viewBox`; use no `<script>`, `<foreignObject>` or `on…` event attribute; load nothing from outside the file in CSS (no external `url()`, no `@import`); use no CSS escapes or comments, which can hide a URL | `hub check`; the loader checks that it parses and is square |
+| Give the icon a clear silhouette, suitable padding and readable contrast | Your own visual review |
 
-`hub check` decodes the icon and checks the rules above, **not its visual
-quality**. A `<style>` block in an SVG is fine as long as it loads nothing
-from outside the file. A gate pass does not prove that an icon looks right. The mobile bounds above describe its current installed-icon loader;
-invalid artwork falls back to a generic icon. Test in the target shell.
+`hub check` checks the file rules in the table, **not how the icon looks**.
+Test the icon in the target shell.
 
-Sources: [listing parser](../crates/app-policy/src/listing.rs),
-[admission gate](../crates/app-hub/src/gate.rs), and the mobile repository's
-`apps/app-hub/src/icons.rs` implementation. Keep this table aligned with those
-implementations when requirements change.
+Sources: the [listing parser](../crates/app-policy/src/listing.rs), the
+[gate](../crates/app-hub/src/gate.rs), the
+[admission checks](../crates/app-hub/src/admission.rs) and the
+[installed-icon loader](../crates/app-hub-app/src/icons.rs).
+
+<!-- Maintainers: update the table above when these sources change. -->
 
 ## Design and export recommendations
 
 - Prefer SVG for geometric marks. Use a square `viewBox`, such as `0 0 64 64`,
-  explicit fill/stroke colors, and simple paths, rectangles and circles.
-- Keep SVGs self-contained: outline any lettering, embed no scripts, and avoid
-  external fonts, stylesheets or image references. The SVG namespace URI is
-  markup, not an external artwork dependency. Avoid filters, masks and other
-  advanced features unless verified in Makepad's native renderer.
-- For raster artwork, export a square PNG, normally 512×512 or 1024×1024, within
-  the 1 MiB limit. Preserve transparency when it is part of the design.
-- Use one recognizable mark. Keep the app name in the launcher/store label.
-  Avoid small text, fine details and photographic clutter.
-- Leave balanced internal space; roughly 10–15% inset is a useful starting
-  point, then compare optical size with adjacent launcher icons. This is a
-  recommendation, not a measured admission rule.
-- Include any branded background tile in the artwork. Do not assume every
-  surface adds a background, mask, shadow or tint. Check both light and dark
-  backgrounds; retain the artwork's own colors.
+  explicit fill and stroke colors, and simple paths, rectangles and circles.
+- Keep SVGs self-contained: outline any lettering, embed no scripts and
+  reference no external fonts, stylesheets or images. The SVG namespace URI is
+  markup, not an external dependency. Avoid filters, masks and other advanced
+  features unless you have verified them in Makepad's native renderer.
+- For raster artwork, export a square PNG of 512×512 or 1024×1024 pixels,
+  within 1 MiB. Keep transparency when it is part of the design.
+- Use one recognizable mark. Leave the app name to the launcher and store
+  labels; do not draw it in the icon. Avoid small text, fine detail and
+  photographic clutter.
+- Leave balanced internal space. Start with a 10–15% inset, then compare the
+  optical size with neighboring launcher icons. The gate does not measure
+  this.
+- Include any branded background tile in the artwork. Do not assume the
+  launcher or the store adds a background, mask, shadow or tint. Keep the
+  artwork's own colors.
+- Keep authoring files and provenance outside the release bundle unless the
+  app needs them at runtime.
 
-Each app uses its own identity. The OctoSense-logo shopping bag identifies the
-App Hub store itself; other apps do not need that bag or the OctoSense logo.
-Keep authoring files and provenance outside the release bundle unless needed at
-runtime. A screenshot must show the actual app, not an icon concept or mockup.
+Give each app its own identity. The shopping bag with the OctoSense logo
+identifies the App Hub store itself; do not use the bag or the logo in another
+app's icon.
 
 ## Review and release
 
-1. Inspect the icon at 24, 32, 48 and 64 pixels on light and dark backgrounds.
-2. Verify the native launcher and Hub list/detail use the intended artwork,
-   without clipping, unwanted tint or a fallback icon.
-3. Test an update from the previous version if changing an installed icon.
-4. After the final artwork or screenshot change, run `hub stamp`, check again,
-   then sign. Reusing a published version number is not supported.
+1. Inspect the icon at 24, 32, 48 and 64 pixels on light and dark
+   backgrounds.
+2. Check that the native launcher and the Hub's list and detail views show the
+   intended artwork, without clipping, an unwanted tint or the generic icon.
+3. When you change an installed icon, test an update from the previous
+   version.
+4. After the final artwork or screenshot change, run `hub stamp`, run
+   `hub check` again, then sign, as
+   [Produce the final bytes](SUBMITTING.md#5-produce-the-final-bytes)
+   describes. Give every release a new version: the gate refuses a version
+   that is already published.
 
 ## Built-in native apps
 
-Native apps compiled into the shell can use this ownership convention too:
-declare a canonical asset and embed it through their build resource mapping.
-The mobile App Hub's two-field `listing.json` is an **icon-only native build
-declaration**, not a complete publishable Card listing. Native binaries are
-distributed with the shell, rather than installed as Hub Card bundles.
-Existing host theme overrides may remain during migration; use a shared
-resolver so all surfaces agree. Theme variants are not new schema-1 fields.
+Apply the same ownership convention to native apps compiled into a shell:
+declare one canonical asset and embed it through the build's resource mapping.
+App Hub's own native store does this with a two-field `listing.json`
+(`schema` and `icon`, in `crates/app-hub-app/`). That file is an **icon-only
+native build declaration**, not a complete publishable listing. Native apps
+ship with the shell; they are not installed as Hub bundles. If a native app
+has theme variants, resolve them in one shared function so the launcher and
+the store agree.
