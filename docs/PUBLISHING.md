@@ -258,16 +258,16 @@ OctoSense desktop 0.1.0-beta.2.
 | `storage` | The app's own storage folder: `fs.*`, camera captures and local files a widget reads. Without it every `fs.*` call fails. | Keep its own data on this device | The runtime, in every host |
 | `net` | Requests to the hosts in `network.hosts`, and no others. | Reach only: *hosts* | The runtime, in every host |
 | `images` | Pictures from any public https host, not only `network.hosts`. | Show pictures from any website | The runtime |
-| `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime, in macOS, iOS and Android builds. The desktop Linux and Windows implementation is in [OctoSense PR #361](https://github.com/OctoSense-org/OctoSense/pull/361) (`feat/desktop-embedded-browser`, not yet released): on Linux under X11 or XWayland with WebKitGTK installed, and on Windows with the WebView2 Runtime installed. |
-| `location` | The device's location. In [OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360) only, an app that declares `host-api-v1` must first ask with `location.permission.request`; on Android it can then read the last-known fix with `location.get` ([Host API compatibility](HOST-API.md)). | Use your location | The runtime, where the device has it |
-| `camera` | The camera. A capture is saved in the app's storage, so the app also needs `storage`. In [OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360) only, an app that declares `host-api-v1` must first ask with `camera.permission.request`. | Use the camera | The runtime, where the device has it |
-| `microphone` | Sound with a camera video. In [OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360) only, an app that declares `host-api-v1` must first ask with `microphone.permission.request`. | Use the microphone | The runtime, where the device has it |
+| `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime, in macOS, iOS and Android builds. Among desktop Linux and Windows builds, only OctoSense `main` (in no release yet) has one: on Linux under X11 or XWayland with WebKitGTK installed, and on Windows with the WebView2 Runtime installed. |
+| `location` | The device's location. On OctoSense `main` only, an app that declares `host-api-v1` must first ask with `location.permission.request`; on Android it can then read the last-known fix with `location.get` ([Host API compatibility](HOST-API.md)). | Use your location | The runtime, where the device has it |
+| `camera` | The camera. A capture is saved in the app's storage, so the app also needs `storage`. On OctoSense `main` only, an app that declares `host-api-v1` must first ask with `camera.permission.request`. | Use the camera | The runtime, where the device has it |
+| `microphone` | Sound with a camera video. On OctoSense `main` only, an app that declares `host-api-v1` must first ask with `microphone.permission.request`. | Use the microphone | The runtime, where the device has it |
 | `library` | Offering captures to the system photo library, where other apps can see them. | Save to your photo library, where other apps can see it | The runtime, where the device has it |
 | `clipboard` | The clipboard. | Use the clipboard | Not yet: no API uses it |
 | `prompt` | Questions the app asks the person. | Ask you questions | Not yet: no host reads it. An app agent asks with `ask_user_question`. |
 | `ledger.read` | Reading the shared ledger. | Read your shared data | Not yet: no `ledger` service |
 | `mail` | Mail through the host's `mail` service, from accounts the person signs in to on a host [sheet](#sheets-apps-never-collect-secrets). | Read and send mail from accounts you sign in to on the device | OctoSense |
-| `auth` | Connecting the app's own GitHub or Google accounts. In [OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360) only, also signing in to the app's own backend and calling the operations the manifest declares ([Sign in to your own backend](#sign-in-to-your-own-backend)). | Connect its own GitHub or Google accounts, or sign in to its developer’s backend, through the host | OctoSense, with OAuth client registrations on the host ([Connected accounts](#connected-accounts)) |
+| `auth` | Connecting the app's own GitHub or Google accounts. On OctoSense `main` only, also signing in to the app's own backend and calling the operations the manifest declares ([Sign in to your own backend](#sign-in-to-your-own-backend)). | Connect its own GitHub or Google accounts, or sign in to its developer’s backend, through the host | OctoSense, with OAuth client registrations on the host ([Connected accounts](#connected-accounts)) |
 | `github` | Reading repositories; each Markdown commit waits for the person's review. | Read authorized repositories and ask you to review Markdown commits | As `auth` |
 | `gcalendar` | Reading Google calendars; each event change waits for the person's review. | Read authorized Google calendars and ask you to review event changes | As `auth` |
 | `gmail` | Reading Gmail and keeping reply drafts; each send waits for the person's review. Separate from `mail`. | Read authorized Gmail messages, keep reply drafts and request native send review | As `auth` |
@@ -618,8 +618,8 @@ Source: `SHARED_HOST_METHODS` in `crates/app-policy/src/agent.rs`.
 
 A script tool is a tool with `"implemented_by": "app"`: the app's own Splash
 code runs it, inside the open app. It needs a host that advertises
-`app_tools.dispatch@1`, such as the `feat/host-api-contract` implementation in
-[OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360) (not yet released). OctoSense desktop 0.1.0-beta.2 refuses these tools with
+`app_tools.dispatch@1`, such as an OctoSense shell built from `main` (in no
+release yet). OctoSense desktop 0.1.0-beta.2 refuses these tools with
 `app_tool_unavailable`.
 
 To add one:
@@ -782,7 +782,10 @@ On OctoSense desktop 0.1.0-beta.2, each part works as follows:
 | `agent.model` | Not yet: OctoSense ignores it. |
 | Glance cards from the agent | Any card the app may publish, a `script` card included. |
 
-OctoSense `main` (in no release yet) changes three things:
+OctoSense `main` (in no release yet) changes four things:
+
+- Tools with `implemented_by: "app"` run in the open app
+  ([Script tool execution](#script-tool-execution-script-tools-v1)).
 - A tool call that publishes a Glance card (`glance.publish`, directly or
   through `host_method`) accepts only a template with an `initial` object, or
   L0 `source`. It refuses `script` and L1 source with the error kind
@@ -790,9 +793,6 @@ OctoSense `main` (in no release yet) changes three things:
 - Approving a GitHub or Google Calendar save takes a physical press
   ([Connected accounts](#connected-accounts)).
 - The host keeps Google Calendar events from 30 days back to 366 days ahead.
-
-The PR #360 implementation additionally runs `implemented_by: "app"` tools
-in the open app ([Script tool execution](#script-tool-execution-script-tools-v1)).
 
 ## The listing
 
@@ -853,8 +853,8 @@ Design Flow's
 
 `card-host` also implements none of the APIs that `host-api-v1`,
 `backend-api-v1` and `script-tools-v1` require, so it refuses an app whose
-manifest requires one of them: test such an app in the `feat/host-api-contract`
-implementation in [OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360).
+manifest requires one of them: test such an app in an OctoSense shell built
+from `main`.
 
 ### Sheets: apps never collect secrets
 
@@ -906,8 +906,7 @@ Sign-in needs the provider's OAuth registration in the host:
 
 ### Sign in to your own backend
 
-The `feat/host-api-contract` implementation in [OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360)
-(not yet released) can sign an app in to its developer's
+OctoSense `main` (in no release yet) can sign an app in to its developer's
 backend and call the backend operations that the app declares. Declare the
 backend in the manifest. The declaration is public and holds no credential:
 
@@ -973,7 +972,7 @@ sessions, and the person signs in again.
 Where it works:
 
 - Only a host that implements `auth.backend.request@1` installs the app:
-  the PR #360 implementation on macOS and Android. Other stores refuse it; one built from
+  OctoSense `main` on macOS and Android. Other stores refuse it; one built from
   App Hub `main` says `app <id> needs a host implementing auth.backend.request@1`.
   iOS has no backend sign-in.
 - An app without a `backend` block signs in only on devices whose operator
