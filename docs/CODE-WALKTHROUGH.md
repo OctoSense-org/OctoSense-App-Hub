@@ -432,14 +432,14 @@ The remaining crates and directories complete the delivery path:
 | [`templates/app`](../templates/app/README.md) | Card-app scaffold with bundle metadata and contributor instructions |
 
 OctoSense consumes a git revision of App Hub, selected by its `Cargo.toml`.
-App Hub's `app-policy` requires `octosense-app-contract = "1.6"`, and OctoSense
-asks for `"1.6"`. OctoSense `main` does not patch the contract, so its
-`Cargo.lock` resolves 1.6.0 from crates.io. OctoSense desktop 0.1.0-beta.2
-patched crates.io's copy with its App Hub revision (`[patch.crates-io]`) and
-resolved 1.5.0 from git. This workspace patches the dependency to
-`crates/app-contract` for development. Cargo applies patches only from the
-top-level workspace, so no patch reaches a consumer: each consumer sets its
-own ([Versions on crates.io](../crates/app-contract/README.md#versions-on-cratesio)).
+App Hub's `app-policy` requires `octosense-app-contract = "1.7"`. OctoSense
+`main` does not patch the contract: its `Cargo.lock` resolves the version it
+asks for from crates.io, and the host API work needs 1.6 or later. OctoSense
+desktop 0.1.0-beta.2 patched crates.io's copy with its App Hub revision
+(`[patch.crates-io]`) and resolved 1.5.0 from git. This workspace patches the
+dependency to `crates/app-contract` for development. Cargo applies patches
+only from the top-level workspace, so no patch reaches a consumer: each
+consumer sets its own ([Versions on crates.io](../crates/app-contract/README.md#versions-on-cratesio)).
 
 ## 8. Debug by boundary
 
