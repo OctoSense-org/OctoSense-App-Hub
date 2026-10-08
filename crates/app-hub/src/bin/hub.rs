@@ -47,6 +47,44 @@ fn run() -> Result<(), String> {
     }
 
     match command {
+        "catalog-prepare" => {
+            use sha2::{Digest, Sha256};
+            let read = |name: &str, max| -> Result<Vec<u8>, String> {
+                admission::read_bounded(Path::new(&flag(name).ok_or_else(|| format!("--{name} <file>"))?), max)
+            };
+            let base_bytes = read("base", github_catalog::MAX_DOCUMENT_BYTES as u64)?;
+            let base = github_catalog::authenticated_base(&base_bytes)?;
+            let candidate = read("candidate", github_catalog::MAX_CATALOG_BYTES as u64)?;
+            let root = PathBuf::from(flag("artifact-root").ok_or("--artifact-root <reviewed directory>")?);
+            let payload = github_catalog::prepare(&base, &candidate, &root)?;
+            let output = PathBuf::from(flag("out").ok_or("--out <catalog-v2.payload.json>")?);
+            if output.file_name().and_then(|v| v.to_str()) != Some(github_catalog::CATALOG_SUBJECT) {
+                return Err("prepared catalog filename must be catalog-v2.payload.json".into());
+            }
+            let catalog: Catalog = serde_json::from_slice(&payload).map_err(|e| e.to_string())?;
+            let added: Vec<_> = catalog.entries.iter().filter(|entry| !base.entries.iter().any(|old| old.app_id() == entry.app_id() && old.version() == entry.version()))
+                .map(|entry| serde_json::json!({"bundle":entry.artifact,"pack":format!("{}.pack.json",entry.artifact),"index":format!("index/{}-{}.json",entry.app_id(),entry.version())})).collect();
+            std::fs::write(&output, &payload).map_err(|e| e.to_string())?;
+            println!("{}", serde_json::json!({"schema":1,"base_sequence":base.sequence,"sequence":catalog.sequence,
+                "base_sha256":hex::encode(Sha256::digest(&base_bytes)),"candidate_sha256":hex::encode(Sha256::digest(&candidate)),
+                "payload_sha256":hex::encode(Sha256::digest(&payload)),"subject":github_catalog::CATALOG_SUBJECT,"added_artifacts":added}));
+            Ok(())
+        }
+        "catalog-envelope" => {
+            let payload = admission::read_bounded(Path::new(&flag("catalog").ok_or("--catalog <catalog-v2.payload.json>")?), github_catalog::MAX_CATALOG_BYTES as u64)?;
+            let proof = admission::read_bounded(Path::new(&flag("attestation").ok_or("--attestation <bundle.json>")?), github_catalog::MAX_PROOF_BYTES as u64)?;
+            let envelope = github_catalog::envelope(&payload, &proof)?;
+            let verified = github_catalog::verify_document(envelope.as_bytes())?;
+            std::fs::write(flag("out").ok_or("--out <catalog-v2.json>")?, envelope.as_bytes()).map_err(|e| e.to_string())?;
+            println!("{}", serde_json::json!({"schema":2,"sequence":verified.catalog().sequence,"payload_sha256":verified.sha256()}));
+            Ok(())
+        }
+        "catalog-verify" => {
+            let document = admission::read_bounded(Path::new(&positional.ok_or("usage: hub catalog-verify <catalog-v2.json>")?), github_catalog::MAX_DOCUMENT_BYTES as u64)?;
+            let verified = github_catalog::verify_document(&document)?;
+            println!("{}", serde_json::json!({"schema":2,"sequence":verified.catalog().sequence,"payload_sha256":verified.sha256()}));
+            Ok(())
+        }
         "keygen" => {
             let path = positional.ok_or("usage: hub keygen <path>")?;
             let key = HubKey::generate();

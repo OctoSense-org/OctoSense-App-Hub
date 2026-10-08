@@ -16,6 +16,7 @@
 pub mod admission;
 pub mod client;
 pub mod gate;
+pub mod github_catalog;
 pub mod index;
 pub(crate) mod launch;
 pub mod pack;

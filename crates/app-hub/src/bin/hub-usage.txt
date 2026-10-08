@@ -15,6 +15,11 @@ hub — the OctoSense app hub command (ADR 0003)
   hub scan <bundle> [--reviewer <cmd>] [--packet <out.json>]
              [--publisher-key id=hex] [--catalog <f> [--anchor <hex>]] [--system-app]
   hub verify <catalog> --anchor <hex>
+  hub catalog-prepare --base <authenticated-catalog> --candidate <catalog.json>
+              --artifact-root <reviewed-tree> --out <catalog-v2.payload.json>
+  hub catalog-envelope --catalog <catalog-v2.payload.json> --attestation <bundle.json>
+              --out <catalog-v2.json>
+  hub catalog-verify <catalog-v2.json>
 
 Use hub help or --help / -h with any command for this usage (no files changed).
 keygen refuses existing files and symlinks. New keys are owner-only (0600)

@@ -119,6 +119,7 @@ pub struct Store {
     limits: HostLimits,
     catalog: Option<Catalog>,
     host_api_versions: BTreeMap<String, u32>,
+    github_catalog_required: bool,
 }
 
 /// An installed release, verified and copied out of its jail, ready to
@@ -183,6 +184,7 @@ impl Store {
             limits,
             catalog: None,
             host_api_versions: BTreeMap::new(),
+            github_catalog_required: false,
         }
     }
 
@@ -193,15 +195,41 @@ impl Store {
         self
     }
 
+    /// Select the GitHub-attested v2 channel. This is a host decision, never a
+    /// field supplied by a downloaded catalog. Legacy documents are refused
+    /// even before this instance has seen its first valid v2 catalog.
+    pub fn with_github_catalog(mut self) -> Self {
+        self.github_catalog_required = true;
+        self.catalog = None;
+        self
+    }
+
+    /// Reuse this host's authenticated state for a staging install directory.
+    /// This does not accept a catalog or change its trust mode or permissions.
+    pub fn for_install_root(&self, app_data_root: &Path) -> Self {
+        let mut staged = self.clone();
+        staged.app_data_root = app_data_root.to_path_buf();
+        staged
+    }
+
     /// Accept a catalog if it verifies and is not older than the one held.
     /// The sequence check is what stops a replayed catalog un-withdrawing an
     /// app that was pulled.
     pub fn accept_catalog(&mut self, json: &str) -> Result<(), String> {
-        let catalog: Catalog = serde_json::from_str(json).map_err(|e| format!("catalog is not valid: {e}"))?;
+        let catalog = if self.github_catalog_required {
+            crate::github_catalog::verify_document(json.as_bytes())?.into_catalog()
+        } else {
+            let catalog: Catalog = serde_json::from_str(json).map_err(|e| format!("catalog is not valid: {e}"))?;
+            verify_catalog(&catalog, &self.anchor_public_hex)?;
+            catalog
+        };
+        self.accept_authenticated_catalog(catalog)
+    }
+
+    fn accept_authenticated_catalog(&mut self, catalog: Catalog) -> Result<(), String> {
         if catalog.schema != crate::index::CATALOG_SCHEMA {
             return Err(format!("catalog schema {} is not {}", catalog.schema, crate::index::CATALOG_SCHEMA));
         }
-        verify_catalog(&catalog, &self.anchor_public_hex)?;
         if let Some(held) = &self.catalog {
             if catalog.sequence < held.sequence {
                 return Err(format!(
@@ -209,8 +237,39 @@ impl Store {
                     catalog.sequence, held.sequence
                 ));
             }
+            if catalog.sequence == held.sequence && catalog.signing_bytes()? != held.signing_bytes()? {
+                return Err("refusing different catalog contents at the same sequence".into());
+            }
         }
         self.catalog = Some(catalog);
+        Ok(())
+    }
+
+    /// Verify first, then atomically persist the complete document (proof and
+    /// sequence included), and only then replace this instance's accepted state.
+    /// Hosts must keep v2 and legacy channel cache paths separate.
+    pub fn accept_catalog_and_cache(&mut self, json: &str, path: &Path) -> Result<(), String> {
+        use fs2::FileExt;
+        let lock_path = path.with_extension("lock");
+        let mut options = std::fs::OpenOptions::new();
+        options.create(true).read(true).write(true).truncate(false);
+        #[cfg(unix)] { use std::os::unix::fs::OpenOptionsExt; options.mode(0o600); }
+        if std::fs::symlink_metadata(&lock_path).is_ok_and(|m| !m.is_file()) {
+            return Err("catalog cache lock is not a regular file".into());
+        }
+        let lock = options.open(&lock_path).map_err(|_| "cannot open catalog cache lock")?;
+        lock.try_lock_exclusive().map_err(|_| "catalog cache is busy")?;
+        let mut next = self.clone();
+        // Re-read under the lock: another instance may have accepted a newer
+        // catalog since this worker last refreshed its in-memory Store.
+        match std::fs::symlink_metadata(path) {
+            Ok(_) => next.accept_catalog(&crate::admission::read_text(path, crate::github_catalog::MAX_DOCUMENT_BYTES as u64)?)?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {},
+            Err(_) => return Err("cannot read current catalog cache".into()),
+        }
+        next.accept_catalog(json)?;
+        crate::github_catalog::write_atomic(path, json.as_bytes())?;
+        *self = next;
         Ok(())
     }
 
@@ -506,4 +565,112 @@ fn copy_tree(from: &Path, to: &Path) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod catalog_cache_tests {
+    use super::*;
+    use crate::HubKey;
+
+    fn fixture() -> (PathBuf, HubKey, HubKey) {
+        let anchor = HubKey::generate();
+        let working = HubKey::generate();
+        let root = std::env::temp_dir().join(format!("hub-catalog-cache-{}", &working.public_hex()[..20]));
+        std::fs::create_dir(&root).unwrap();
+        (root, anchor, working)
+    }
+    fn signed(sequence: u64, anchor: &HubKey, working: &HubKey) -> String {
+        let mut catalog = Catalog::new(sequence, &crate::today(), vec![]);
+        working.sign_catalog(&mut catalog, &anchor.certify(&working.public_hex()).unwrap()).unwrap();
+        serde_json::to_string(&catalog).unwrap()
+    }
+
+    #[test]
+    fn v2_required_rejects_valid_legacy_even_before_first_success() {
+        let (root, anchor, working) = fixture();
+        let mut store = Store::new(&anchor.public_hex(), &root, HostLimits::default()).with_github_catalog();
+        let legacy = signed(3, &anchor, &working);
+        assert!(store.accept_catalog(&legacy).is_err());
+        assert!(store.accept_catalog(r#"{"schema":2,"kind":"github-attested-catalog","catalog":"e30=","attestation":{}}"#).is_err());
+        assert!(store.accept_catalog(&legacy).is_err());
+        assert!(store.catalog().is_none());
+        let cache = root.join("catalog-v2.json");
+        std::fs::write(&cache, &legacy).unwrap();
+        assert!(store.accept_catalog_and_cache(&legacy, &cache).is_err());
+        assert_eq!(std::fs::read_to_string(cache).unwrap(), legacy);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn authenticated_catalogs_cannot_roll_back_or_equivocate_at_a_sequence() {
+        let (root, anchor, _) = fixture();
+        let mut store = Store::new(&anchor.public_hex(), &root, HostLimits::default()).with_github_catalog();
+        // This isolates the post-verification state gate. Real Sigstore proof
+        // acceptance is exercised separately against a public upstream fixture.
+        let current = Catalog::new(5, "2026-10-08", vec![]);
+        store.accept_authenticated_catalog(current.clone()).unwrap();
+        store.accept_authenticated_catalog(current).unwrap();
+        assert!(store.accept_authenticated_catalog(Catalog::new(4, "2026-10-08", vec![])).is_err());
+        assert!(store.accept_authenticated_catalog(Catalog::new(5, "2026-10-09", vec![])).is_err());
+        assert_eq!(store.catalog().unwrap().sequence, 5);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn staged_install_retains_authenticated_state_and_v2_requirement() {
+        let (root, anchor, working) = fixture();
+        let mut original = Store::new(&anchor.public_hex(), &root, HostLimits::default())
+            .with_host_api_versions(BTreeMap::from([("model.image".into(), 1)]))
+            .with_github_catalog();
+        // Isolate cloning the post-verification state, without inventing a
+        // successful production App Hub Sigstore proof for this unit test.
+        original.accept_authenticated_catalog(Catalog::new(5, &crate::today(), vec![])).unwrap();
+        let staging = root.join("staging");
+        let mut staged = original.for_install_root(&staging);
+        assert_eq!(staged.app_data_root, staging);
+        assert_eq!(original.app_data_root, root);
+        assert_eq!(staged.catalog().unwrap().sequence, 5);
+        assert_eq!(staged.host_api_versions, original.host_api_versions);
+        assert_eq!(staged.anchor_public_hex, original.anchor_public_hex);
+        assert!(staged.github_catalog_required);
+        assert!(staged.accept_catalog(&signed(6, &anchor, &working)).is_err());
+        assert!(staged.accept_authenticated_catalog(Catalog::new(4, &crate::today(), vec![])).is_err());
+        assert_eq!(original.catalog().unwrap().sequence, 5);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn atomic_cache_retains_proof_and_rechecks_persisted_high_watermark() {
+        let (root, anchor, working) = fixture();
+        let path = root.join("catalog.json");
+        let mut first = Store::new(&anchor.public_hex(), &root, HostLimits::default());
+        first.accept_catalog_and_cache(&signed(4, &anchor, &working), &path).unwrap();
+        let mut stale = Store::new(&anchor.public_hex(), &root, HostLimits::default());
+        assert!(stale.accept_catalog_and_cache(&signed(3, &anchor, &working), &path).is_err());
+        assert!(stale.catalog().is_none());
+        let before = std::fs::read(&path).unwrap();
+        assert!(first.accept_catalog_and_cache("{broken", &path).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+        assert_eq!(first.catalog().unwrap().sequence, 4);
+        let impossible = root.join("missing").join("catalog.json");
+        assert!(first.accept_catalog_and_cache(&signed(5, &anchor, &working), &impossible).is_err());
+        assert_eq!(first.catalog().unwrap().sequence, 4);
+        assert!(std::fs::read_dir(&root).unwrap().all(|e| !e.unwrap().file_name().to_string_lossy().ends_with(".tmp")));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn cache_contention_fails_bounded_without_overwriting() {
+        use fs2::FileExt;
+        let (root, anchor, working) = fixture();
+        let path = root.join("catalog.json");
+        let lock = std::fs::OpenOptions::new().create_new(true).write(true).open(path.with_extension("lock")).unwrap();
+        lock.lock_exclusive().unwrap();
+        let mut store = Store::new(&anchor.public_hex(), &root, HostLimits::default());
+        assert_eq!(store.accept_catalog_and_cache(&signed(1, &anchor, &working), &path).unwrap_err(), "catalog cache is busy");
+        assert!(!path.exists());
+        assert!(store.catalog().is_none());
+        drop(lock);
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }
