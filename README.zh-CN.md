@@ -77,7 +77,7 @@ OCTOSENSE_PREVIEW_SIZE=1200x860 OCTOSENSE_APP_DATA="$(mktemp -d)" target/release
 
 ## 宿主目前提供什么
 
-准入检查接受 104 个能力名称，但只有宿主提供了对应的服务，能力才会生效。[能力](docs/PUBLISHING.zh-CN.md#能力)一节列出了每项能力目前由谁提供。
+准入检查接受 105 个能力名称，但只有宿主提供了对应的服务，能力才会生效。[能力](docs/PUBLISHING.zh-CN.md#能力)一节列出了每项能力目前由谁提供。
 
 - 除了用于发现宿主 API 的 `runtime`，`card-host` 不提供任何宿主服务，也不运行 Agent。
 - OctoSense 向每个获得授权的应用提供 `mail`、`model` 和 `glance`。

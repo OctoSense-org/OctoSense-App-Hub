@@ -179,7 +179,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 
 ### 能力
 
-准入检查能识别 104 个能力名称：下表中的 26 个，以及[精确的服务名](#精确的服务名octosmatrixpalpo)一节中的 78 个。其他名称一律拒绝：
+准入检查能识别 105 个能力名称：下表中的 27 个，以及[精确的服务名](#精确的服务名octosmatrixpalpo)一节中的 78 个。其他名称一律拒绝：
 
 ```text
 [refused] policy: app com.example.forecast requests unknown capability "model.image"

@@ -240,7 +240,7 @@ install.
 
 ### Capabilities
 
-The gate knows 104 capability names: the 26 below and the 78 in
+The gate knows 105 capability names: the 27 below and the 78 in
 [Exact service names](#exact-service-names-octos-matrix-palpo). It refuses any
 other name:
 
