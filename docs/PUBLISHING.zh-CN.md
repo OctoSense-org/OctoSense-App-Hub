@@ -95,7 +95,7 @@ my-app/
 | `contents-invalid`（SVG） | SVG 无法解析；既没有数值形式的 `width` 和 `height`，也没有 `viewBox`；单边超过 4096 像素；或含有脚本、`foreignObject` 或 `on…` 事件属性。SVG 的样式（`style` 属性或 `<style>` 块）导入样式表、使用转义或注释，或让 `url()` 指向同一文件内 `#fragment` 以外的任何位置。 | |
 | `entry` | 应用包中既没有 `main.splash` 也没有 `page.card`；`page.card` 不是有效的 L0；`page.data.json` 不是 JSON；应用包中既没有 `kit/native/<theme>/kit.json`，卡片所需的 OctoScript kit 模块也不齐全。 | |
 | `resource-invalid` | 卡片对图片或字体的引用，或 SVG 的 `href`，指向应用包中没有的文件。检查结果会给出对应的 JSON 指针。见[字体](#字体)。 | |
-| `assets` | 除 `manifest.json`、`listing.json` 和 Agent 文件外，某个 `.card`、`.json`、`.l0`、`.octoscript`、`.txt` 或 `.md` 文件含有 `http://`、`https://`、`file://` 或 `../`，包括随包附带的 README 或字体许可证中的 URL。`.splash` 文件或 Agent 文件含有 `http://`、`file://`、`../`，或不在 `network.hosts` 中的 `https://` 主机（应用请求了 `images` 或 `web` 时，允许任何公开主机）。 | |
+| `assets` | 除 `manifest.json`、`listing.json` 和 Agent 文件外，某个 `.card`、`.json`、`.l0` 或 `.octoscript` 文件含有 `http://`、`https://`、`file://` 或 `../`。普通文档中的链接不属于素材加载。`.splash` 文件或 Agent 文件含有 `http://`、`file://`、`../`，或不在 `network.hosts` 中的 `https://` 主机（应用请求了 `images` 或 `web` 时，允许任何公开主机）。 | |
 | `secrets` | `.card`、`.l0`、`.octoscript` 或 `.splash` 文件声明了 `is_password: true`，或把 `TextInputContentType` 设为 `Password`、`NewPassword` 或 `OneTimeCode`。 | |
 | `storage` | | 没有 `storage` 能力时，某个 `.splash` 文件调用了 `fs.*`，或应用请求了 `camera`。此时 `grants:` 行显示 `storage none`。 |
 | `listing` | 缺少 `listing.json`，或它违反了[商店信息](#商店信息)中的规则；商店信息未指定截图或未指定图标；指定的截图或图标不在应用包中。 | |
@@ -106,17 +106,21 @@ my-app/
 
 ### 字体
 
-卡片用 `font_src` 指定字体，写在 `page.data.json` 的布局项（placements）中，或原生 kit 的组件样式中。准入检查接受应用包中的字体文件，或它唯一允许的内置字体 `makepad_widgets:resources/Inter.ttf`。其他内置字体一律拒绝：
+卡片用 `font_src` 指定字体，写在 `page.data.json` 的布局项（placements）中，或原生 kit 的组件样式中。准入检查接受应用包中的字体文件，以及锁定运行时提供的以下内置资源名称：
 
 ```text
-[refused] resource-invalid (kit/native/light/kit.json/components/detail/style/font_src): not a portable bundle path: "makepad_widgets:resources/LXGWWenKaiRegular.ttf"
+makepad_widgets:resources/Inter.ttf
+makepad_widgets:resources/LXGWWenKaiRegular.ttf
+makepad_widgets:resources/LXGWWenKaiBold.ttf
 ```
 
 打包的 `.ttf` 或 `.otf` 字体用相对于应用包的路径指定，例如 `"font_src": "assets/Body.ttf"`。已安装应用的卡片运行器和 `card-host` 先对 kit 样式和字体 token 求值，再解析路径，并从该应用包的宿主素材服务加载文件。不要在应用包中填写 HTTP 地址；加载打包字体既不需要网络权限，也不需要外部字体 URL。
 
 在原生 kit 中，`font_src` 也可以是一个 token 引用 `{"$token": "<name>"}`，只要 kit 的 `tokens` 中这个 token 的 `value` 是这样的路径。准入检查核对的是 token 解析后的路径；其他对象或数组一律拒绝，报 `font_src must be a bundled font path, a supported built-in font, or one token resolving to a string`。
 
-尚不支持：其他内置字体（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。
+其他内置名称和 crate 路径仍会被拒绝。如果需要上述资源以外的字体，请在许可允许的范围内随包提供字体子集。
+
+请随包保留字体所要求的许可证和来源说明。普通 `.txt` 和 `.md` 文档中的链接不属于素材加载，也不会授予网络权限。Agent 指令和技能仍受声明主机检查约束；卡片数据、脚本代码和 SVG 素材继续执行各自的资源检查。
 
 打包字体计入 8 MiB 上限，所以较大的 CJK 字体请只打包所需的子集。准入检查只核对字体路径，不解码字体文件，因此请在 `card-host` 中测试完整的应用包。用 Makepad 的 International 字体集构建的宿主（例如 `card-host`）还会用内置的 CJK 后备字体显示中文，这个字体在首次用到时才加载。
 
@@ -751,8 +755,8 @@ OctoSense `main`（尚未进入任何发布版）可以让应用登录其开发�
 | 命令 | 作用 |
 | --- | --- |
 | `hub stamp <bundle>` | 用准入检查的解析器解析 `manifest.json`，然后把应用包摘要写入 `integrity.bundle_blake3` 并输出。准入检查无法读取的清单，它会拒绝处理。 |
-| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json]` | 准入检查本身。输出 `PASSED` 或 `REFUSED`、每个检查结果，以及应用将获得的授权。有拒绝时退出码为 1。`--json` 以 JSON 输出报告（`schema`、`stage`、`passed`、`app_id`、`version`、`digest`、`findings` 和 `resources`）。 |
-| `hub scan <bundle> [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--packet <out.json>] [--reviewer <cmd>]` | 先运行准入检查，再写出审核包，还可以把审核包交给一条审核命令。准入检查拒绝的应用包不会进入扫描。 |
+| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app]` | 准入检查本身。输出 `PASSED` 或 `REFUSED`、每个检查结果，以及应用将获得的授权。有拒绝时退出码为 1。`--json` 以 JSON 输出报告（`schema`、`stage`、`passed`、`app_id`、`version`、`digest`、`findings` 和 `resources`）。 |
+| `hub scan <bundle> [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--packet <out.json>] [--reviewer <cmd>] [--system-app]` | 先运行准入检查，再写出审核包，还可以把审核包交给一条审核命令。准入检查拒绝的应用包不会进入扫描。 |
 | `hub keygen <key-file>` | 新建一个密钥文件，以十六进制写入签名密钥，并输出公钥。如果路径已存在（包括符号链接），则拒绝执行。在 macOS 和 Linux 上，该文件只有你自己能读取（权限模式 `0600`）。 |
 | `hub pubkey <key-file>` | 输出密钥的公钥。 |
 | `hub sign-manifest <bundle> --key <key-file> --key-id <publisher-id>` | 为清单签名，签名覆盖其中的摘要。 |
@@ -788,6 +792,12 @@ my-notes 0.1.0 — PASSED
 8. 处理方式：pass、human-review 或 reject，并给出发布者可以据此采取行动的理由。
 
 审核人员也会问同样的问题。
+
+### 开发随 Shell 发布的系统应用
+
+对本地 `os.*` 应用包运行 `hub check <bundle> --system-app` 或 `hub scan <bundle> --system-app`。该模式采用与 `card-host --system` 相同的资源上限，允许未签名的开发包，但仍检查摘要、内容、工具和已有签名。已签名的包需要提供 `--publisher-key`。该模式拒绝商店应用 ID，`publish` 也始终拒绝 `--system-app` 和 `os.*` 应用包。该模式不会安装宿主服务，也不会添加 Shell 额外提供的工具。系统应用开发检查报告不能转成签名目录条目。
+
+可选审核命令在 Unix 上通过 `sh -c` 运行，在 Windows 上通过 `cmd.exe /D /S /C` 运行。请使用适合当前平台的命令；审核包通过标准输入传入。命令失败或输出无效时，仍需人工审核。
 
 ## 签名
 

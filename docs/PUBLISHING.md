@@ -124,7 +124,7 @@ admission. A warning does not.
 | `contents-invalid` (SVG) | An SVG does not parse; lacks a numeric `width` and `height` or a `viewBox`; is over 4096 px a side; or holds a script, a `foreignObject` or an `on…` handler. Its styling (a `style` attribute or a `<style>` block) imports a stylesheet, uses an escape, uses a comment or points `url()` anywhere but a `#fragment` in the same file. | |
 | `entry` | The bundle has neither `main.splash` nor `page.card`; `page.card` is not valid L0; `page.data.json` is not JSON; neither `kit/native/<theme>/kit.json` nor every OctoScript kit module the card needs is in the bundle. | |
 | `resource-invalid` | A card's image or font reference, or an SVG `href`, names a file that is not in the bundle. The finding names the JSON pointer. See [Fonts](#fonts). | |
-| `assets` | A `.card`, `.json`, `.l0`, `.octoscript`, `.txt` or `.md` file other than `manifest.json`, `listing.json` and the agent files contains `http://`, `https://`, `file://` or `../`, including a URL in a bundled readme or font license. A `.splash` file or an agent file contains `http://`, `file://`, `../` or an `https://` host that is not in `network.hosts` (any public host is allowed when the app requests `images` or `web`). | |
+| `assets` | A `.card`, `.json`, `.l0` or `.octoscript` file other than `manifest.json`, `listing.json` and the agent files contains `http://`, `https://`, `file://` or `../`. Plain documentation links are not asset loads. A `.splash` file or an agent file contains `http://`, `file://`, `../` or an `https://` host that is not in `network.hosts` (any public host is allowed when the app requests `images` or `web`). | |
 | `secrets` | A `.card`, `.l0`, `.octoscript` or `.splash` file declares `is_password: true` or a `TextInputContentType` of `Password`, `NewPassword` or `OneTimeCode`. | |
 | `storage` | | A `.splash` file calls `fs.*`, or the app requests `camera`, without the `storage` capability. The `grants:` line then says `storage none`. |
 | `listing` | `listing.json` is missing or breaks a rule in [The listing](#the-listing); the listing names no screenshot or no icon; it names a screenshot or icon that is not in the bundle. | |
@@ -137,11 +137,12 @@ admission. A warning does not.
 
 A card names a font with `font_src`, in the `page.data.json` placements or in
 a native kit's component styles. The gate accepts a font file in the bundle,
-or the one built-in font it allows, `makepad_widgets:resources/Inter.ttf`. Any
-other built-in font is refused:
+or one of these exact built-in resource names from the pinned runtime:
 
 ```text
-[refused] resource-invalid (kit/native/light/kit.json/components/detail/style/font_src): not a portable bundle path: "makepad_widgets:resources/LXGWWenKaiRegular.ttf"
+makepad_widgets:resources/Inter.ttf
+makepad_widgets:resources/LXGWWenKaiRegular.ttf
+makepad_widgets:resources/LXGWWenKaiBold.ttf
 ```
 
 Use a bundle-relative path such as `"font_src": "assets/Body.ttf"` for a
@@ -156,8 +157,13 @@ gate checks the path that the token resolves to. Any other object, or an
 array, is refused with
 `font_src must be a bundled font path, a supported built-in font, or one token resolving to a string`.
 
-Not yet: other built-in fonts
-([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)).
+Other built-in names and crate paths are refused. Bundle a licensed font
+subset when it is not one of these shipped resources.
+
+Keep the font's required license and attribution with the bundle. Links in
+plain `.txt` and `.md` documentation are not asset loads and grant no network
+access. Agent instructions and skills still follow the declared-host checks;
+card data, script code and SVG resources keep their own resource checks.
 
 A bundled font counts toward the 8 MiB limit, so bundle a subset of a large
 CJK font. The gate checks the font's path but does not decode the file, so
@@ -1039,8 +1045,8 @@ none of them reads a bundle or writes a file. An unknown command fails with
 | Command | What it does |
 | --- | --- |
 | `hub stamp <bundle>` | Parses `manifest.json` with the gate's parser, then writes the bundle's digest into `integrity.bundle_blake3` and prints it. Refuses a manifest the gate cannot read. |
-| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json]` | The gate. Prints `PASSED` or `REFUSED`, every finding and what the app will be granted. Exits 1 on a refusal. `--json` prints the report as JSON (`schema`, `stage`, `passed`, `app_id`, `version`, `digest`, `findings` and `resources`). |
-| `hub scan <bundle> [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--packet <out.json>] [--reviewer <cmd>]` | Runs the gate, then writes the review packet and optionally hands it to a reviewer command. A bundle the gate refuses gets no scan. |
+| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app]` | The gate. Prints `PASSED` or `REFUSED`, every finding and what the app will be granted. Exits 1 on a refusal. `--json` prints the report as JSON (`schema`, `stage`, `passed`, `app_id`, `version`, `digest`, `findings` and `resources`). |
+| `hub scan <bundle> [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--packet <out.json>] [--reviewer <cmd>] [--system-app]` | Runs the gate, then writes the review packet and optionally hands it to a reviewer command. A bundle the gate refuses gets no scan. |
 | `hub keygen <key-file>` | Creates a new key file, writes a signing key into it as hex and prints the public half. Refuses a path that already exists, including a symlink. On macOS and Linux the file is readable only by you (mode `0600`). |
 | `hub pubkey <key-file>` | Prints a key's public half. |
 | `hub sign-manifest <bundle> --key <key-file> --key-id <publisher-id>` | Signs the manifest, which covers the digest. |
@@ -1092,6 +1098,21 @@ The questions, abridged from `crates/app-hub/src/scan.rs`:
 8. Route: pass, human-review or reject, with reasons a publisher can act on.
 
 Reviewers ask the same questions.
+
+### Developing a shipped system app
+
+Use `hub check <bundle> --system-app` or `hub scan <bundle> --system-app`
+for a local `os.*` bundle. This mode uses the same resource ceilings as
+`card-host --system`, accepts an unsigned development bundle, and still
+checks its digest, contents, tools and any supplied signature. Supply
+`--publisher-key` when the bundle is signed. Store-app IDs are refused in
+this mode, and `publish` refuses both `--system-app` and `os.*` bundles.
+The mode does not install host services or add the shell's extra tool offers.
+A passing system-development report cannot become a catalog entry.
+
+The optional reviewer command runs in `sh -c` on Unix and `cmd.exe /D /S /C`
+on Windows. Configure a command for the host platform; it receives the review
+packet on stdin. Its failure or invalid output still requires human review.
 
 ## Signing
 

@@ -157,7 +157,8 @@ pub fn scan(packet: &Packet, reviewer: &str) -> Verdict {
         Ok(json) => json,
         Err(e) => return fallback(format!("the packet did not serialise: {e}")),
     };
-    let mut child = match Command::new("sh").arg("-c").arg(reviewer).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::inherit()).spawn() {
+    let mut command = reviewer_command(reviewer);
+    let mut child = match command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::inherit()).spawn() {
         Ok(child) => child,
         Err(e) => return fallback(format!("the reviewer could not start: {e}")),
     };
@@ -186,6 +187,26 @@ pub fn scan(packet: &Packet, reviewer: &str) -> Verdict {
     }
 }
 
+/// The reviewer is a command configured by the operator, never bundle input.
+/// Windows does not require Git Bash or translate POSIX shell syntax.
+fn reviewer_command(reviewer: &str) -> Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let mut command = Command::new("cmd.exe");
+        // /S removes the command string's outer quote pair. Supply that pair
+        // ourselves so a quoted executable path keeps its own quotes.
+        command.args(["/D", "/S", "/C"]).raw_arg(format!("\"{reviewer}\""));
+        command
+    }
+    #[cfg(not(windows))]
+    {
+        let mut command = Command::new("sh");
+        command.args(["-c", reviewer]);
+        command
+    }
+}
+
 fn fallback(reason: String) -> Verdict {
     Verdict { route: Route::HumanReview, reasons: vec![reason] }
 }
@@ -211,18 +232,55 @@ mod tests {
         }
     }
 
+    fn reply(text: &str) -> String {
+        if cfg!(windows) {
+            format!("more >NUL & echo {text}")
+        } else {
+            format!("cat >/dev/null; printf '%s\\n' '{text}'")
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_reviewer_fixture_process() {
+        // Normal test-suite invocation is inert; the parent below selects
+        // exactly this test in a separate process whose stdin holds a packet.
+        if !std::env::args().any(|arg| arg == "--exact") { return; }
+        use std::io::Read;
+        let mut input = String::new();
+        std::io::stdin().read_to_string(&mut input).unwrap();
+        let packet: serde_json::Value = serde_json::from_str(&input).unwrap();
+        assert_eq!(packet["app_id"], "t");
+        println!("{}", r#"{"route":"pass","reasons":["native process received the packet"]}"#);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_reviewer_supports_a_quoted_executable_path_with_spaces() {
+        let dir = std::env::temp_dir().join(format!("hub reviewer spaces {}", std::process::id()));
+        std::fs::create_dir(&dir).unwrap();
+        let exe = dir.join("review tool.exe");
+        std::fs::copy(std::env::current_exe().unwrap(), &exe).unwrap();
+        let command = format!("\"{}\" --exact scan::tests::windows_reviewer_fixture_process --nocapture", exe.display());
+        let result = scan(&packet_stub(), &command);
+        std::fs::remove_dir_all(dir).unwrap();
+        assert_eq!(result.route, Route::Pass, "{result:?}");
+        assert_eq!(result.reasons, ["native process received the packet"]);
+    }
+
     #[test]
     fn a_reviewer_verdict_is_parsed_even_when_wrapped_in_prose() {
-        let verdict = scan(&packet_stub(), r#"cat >/dev/null; echo 'Looks fine. {"route":"pass","reasons":["does what it says"]} bye'"#);
+        let verdict = scan(&packet_stub(), &reply(r#"Looks fine. {"route":"pass","reasons":["does what it says"]} bye"#));
         assert_eq!(verdict.route, Route::Pass);
         assert_eq!(verdict.reasons, vec!["does what it says"]);
     }
 
     #[test]
     fn a_broken_reviewer_never_produces_a_pass() {
-        assert_eq!(scan(&packet_stub(), "cat >/dev/null; exit 3").route, Route::HumanReview);
-        assert_eq!(scan(&packet_stub(), "cat >/dev/null; echo nonsense").route, Route::HumanReview);
-        assert_eq!(scan(&packet_stub(), r#"cat >/dev/null; echo '{"route":"pass","extra":1}'"#).route, Route::HumanReview, "unknown fields are refused");
+        let failed = if cfg!(windows) { "more >NUL & exit /b 3" } else { "cat >/dev/null; exit 3" };
+        assert_eq!(scan(&packet_stub(), failed).route, Route::HumanReview);
+        assert_eq!(scan(&packet_stub(), &reply("nonsense")).route, Route::HumanReview);
+        assert_eq!(scan(&packet_stub(), &reply(r#"{"route":"pass","extra":1}"#)).route, Route::HumanReview, "unknown fields are refused");
         assert_eq!(scan(&packet_stub(), "/nonexistent/reviewer").route, Route::HumanReview);
     }
 
@@ -246,7 +304,7 @@ mod tests {
 
     #[test]
     fn a_reject_is_a_reject() {
-        let verdict = scan(&packet_stub(), r#"cat >/dev/null; echo '{"route":"reject","reasons":["imitates a payment sheet"]}'"#);
+        let verdict = scan(&packet_stub(), &reply(r#"{"route":"reject","reasons":["imitates a payment sheet"]}"#));
         assert_eq!(verdict.route, Route::Reject);
     }
 }

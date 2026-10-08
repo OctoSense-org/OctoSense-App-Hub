@@ -185,8 +185,8 @@ my-app/
       01-main.png        # a real capture, added in section 4
 ```
 
-The gate accepts a card's `font_src` only as a font file in the bundle or the
-built-in `makepad_widgets:resources/Inter.ttf`. OctoSense desktop
+The gate accepts a card's `font_src` as a font file in the bundle or one of
+the three shipped resources: Inter, LXGW WenKai Regular and LXGW WenKai Bold. OctoSense desktop
 0.1.0-beta.2 does not load a bundled font. Read [Fonts](PUBLISHING.md#fonts)
 before you set a font or show Chinese text.
 
@@ -194,10 +194,10 @@ before you set a font or show Chinese text.
 
 - Keep every asset reference inside the bundle. Check exported kit and data
   files for author-machine paths and development-server URLs.
-- Keep readmes and license files outside `bundle/`. The gate refuses a URL in
-  any bundled `.txt`, `.md`, `.json`, `.card`, `.l0` or `.octoscript` file
-  except `manifest.json`, `listing.json` and the agent's files. Like
-  `main.splash`, the agent's files may name only the hosts the app declares.
+- Keep development notes outside `bundle/`; retain required asset licenses
+  and attribution as `.txt` or `.md`. Documentation links do not grant network
+  access. URLs in card data still face the asset checks. Like `main.splash`,
+  the agent's files may name only the hosts the app declares.
 - Adapt any flow that relies on an external Python or browser controller to
   the contained runtime before you submit.
 

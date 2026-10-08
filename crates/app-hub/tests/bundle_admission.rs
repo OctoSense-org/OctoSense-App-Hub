@@ -180,6 +180,25 @@ fn displayed_url_is_not_a_resource_reference_but_remains_conservatively_denied()
 }
 
 #[test]
+fn font_attribution_links_are_documentation_not_network_grants() {
+    let mut f = Fixture::new();
+    fs::create_dir_all(f.bundle.join("assets/fonts")).unwrap();
+    fs::write(f.bundle.join("assets/fonts/OFL.txt"), "Copyright Example (http://example.test/). Reserved Font Name 'Example'.").unwrap();
+    fs::write(f.bundle.join("assets/fonts/README.md"), "Source: https://example.test/fonts\n").unwrap();
+    f.sign();
+    let report = f.report(None);
+    assert!(report.passed(), "{}", report.render());
+    let policy = report.policy.unwrap();
+    assert!(policy.capabilities.is_empty());
+    assert!(policy.hosts.is_empty());
+
+    // Moving the same URL into executable/resource-bearing text still refuses.
+    fs::write(f.bundle.join("extra.json"), r#"{"src":"https://example.test/fonts"}"#).unwrap();
+    f.sign();
+    assert!(!f.report(None).passed());
+}
+
+#[test]
 fn image_dimensions_are_bounded_before_decode() {
     let mut f = Fixture::new();
     let mut bytes = std::io::Cursor::new(Vec::new());
@@ -320,6 +339,11 @@ fn kit_font_objects_and_tokens_cannot_bypass_asset_checks() {
         (json!({"$token":"face"}), Some(json!("missing.ttf")), false),
         (json!({"$token":"face"}), Some(json!({"$token":"nested"})), false),
         (json!({"$token":"face"}), Some(json!("makepad_widgets:resources/Inter.ttf")), true),
+        (json!("makepad_widgets:resources/LXGWWenKaiRegular.ttf"), None, true),
+        (json!({"$token":"face"}), Some(json!("makepad_widgets:resources/LXGWWenKaiBold.ttf")), true),
+        (json!("makepad_widgets:resources/../private.ttf"), None, false),
+        (json!("makepad_widgets:resources/Unshipped.ttf"), None, false),
+        (json!("other_crate:resources/LXGWWenKaiRegular.ttf"), None, false),
         (json!({"$token":"face"}), Some(json!("assets/body.ttf")), true),
         (json!(["assets/body.ttf"]), None, false),
     ] {

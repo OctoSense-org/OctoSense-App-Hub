@@ -123,12 +123,12 @@ my-app/
       01-main.png        # 真实截图，在第 4 节添加
 ```
 
-卡片的 `font_src`，准入检查只接受应用包中的字体文件或内置的 `makepad_widgets:resources/Inter.ttf`。OctoSense 桌面版 0.1.0-beta.2 不加载打包字体。设置字体或显示中文之前，请先阅读[字体](PUBLISHING.zh-CN.md#字体)。
+卡片的 `font_src` 可以引用应用包中的字体文件，或三种已随运行时提供的字体：Inter、LXGW WenKai Regular 和 LXGW WenKai Bold。OctoSense 桌面版 0.1.0-beta.2 不加载打包字体。设置字体或显示中文之前，请先阅读[字体](PUBLISHING.zh-CN.md#字体)。
 
 ### 两类应用都适用
 
 - 所有素材引用都只能指向应用包内的文件。检查导出的 kit 文件和数据文件，确保其中没有作者本机的路径，也没有开发服务器的 URL。
-- README 和许可证文件放在 `bundle/` 之外。应用包中的 `.txt`、`.md`、`.json`、`.card`、`.l0` 或 `.octoscript` 文件只要含有 URL，准入检查就会拒绝，`manifest.json`、`listing.json` 和应用 Agent 的文件除外。应用 Agent 的文件与 `main.splash` 一样，只能引用应用声明过的主机。
+- 开发笔记放在 `bundle/` 之外；所用素材要求保留的许可证和来源说明应以 `.txt` 或 `.md` 随包提供。文档链接不会授予网络权限，卡片数据中的 URL 仍受素材检查约束。应用 Agent 的文件与 `main.splash` 一样，只能引用应用声明过的主机。
 - 如果某个流程依赖外部的 Python 或浏览器控制器，提交之前先改造它，让它能在应用的隔离环境中运行。
 
 ## 3. 选择 ID、能力和素材

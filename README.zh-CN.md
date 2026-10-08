@@ -58,7 +58,7 @@ App Hub 为 OctoSense 发布应用。本仓库包含：
 cargo build --release -p octosense-card-host -p octosense-app-hub
 ```
 
-不做 release 构建时，可以直接从源码运行 `hub`：`cargo run -p octosense-app-hub --bin hub`。[运行合适的宿主](docs/CODE-WALKTHROUGH.md#2-run-the-right-host)（英文）列出了各个包的测试。[原生工具 CI](.github/workflows/native-tools.yml) 在 macOS 上运行这条构建命令和这些测试，所用的同级检出目录没有打 OctoSense 的运行时补丁。
+不做 release 构建时，可以直接从源码运行 `hub`：`cargo run -p octosense-app-hub --bin hub`。[运行合适的宿主](docs/CODE-WALKTHROUGH.md#2-run-the-right-host)（英文）列出了各个包的测试。[原生工具 CI](.github/workflows/native-tools.yml) 在 macOS、Windows 和 Linux 上运行这条构建命令和这些测试，所用的同级检出目录没有打 OctoSense 的运行时补丁。原生字体渲染检查在 macOS 图形会话中运行；其他任务覆盖构建和测试。
 
 只构建你需要的包。如果一次构建包含按默认特性编译的商店相关包（例如 `cargo test --workspace`），`../makepad` 还必须打上 OctoSense 的运行时补丁。如果构建失败并出现 `no variant … TextInputStateQuery`，请参阅 [`card-host` 构建失败](docs/DEVELOPMENT.zh-CN.md#card-host-构建失败)。
 

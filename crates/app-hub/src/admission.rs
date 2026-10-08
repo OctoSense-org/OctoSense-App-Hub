@@ -239,7 +239,12 @@ pub fn validate(root: &Path, files: &[BundleFile]) -> (Vec<Finding>, Vec<Resourc
         if matches!(reference.kind, ResourceKind::DisplayUrl) {
             continue;
         }
-        if matches!(reference.kind, ResourceKind::Font) && reference.target == "makepad_widgets:resources/Inter.ttf" {
+        // These exact assets ship in the pinned Makepad widget resources.
+        // Do not admit an arbitrary crate URI or a path below resources/.
+        if matches!(reference.kind, ResourceKind::Font) && matches!(reference.target.as_str(),
+            "makepad_widgets:resources/Inter.ttf"
+            | "makepad_widgets:resources/LXGWWenKaiRegular.ttf"
+            | "makepad_widgets:resources/LXGWWenKaiBold.ttf") {
             continue;
         }
         if matches!(reference.kind, ResourceKind::SvgReference) && reference.target.starts_with('#') {
