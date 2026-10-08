@@ -31,6 +31,25 @@
 
 商店在安装应用时检查这些要求，之后每次打开应用时再检查一次。宿主无法满足的应用，商店会拒绝，报 `app <id> needs a host implementing <method>@1` 或 `this host does not implement required APIs: <method>@<version>`。签名目录中的新版本即使需要更新的 API，也不会撤下宿主仍能运行的已安装版本。
 
+## 用户选择的文件传输（contract 1.9，尚未发布）
+
+`files` 能力允许应用使用宿主的文件选择窗口，不允许访问任意宿主路径。
+导入和导出还需要 `storage`，两种授权互不隐含。通过 `host_api.required`
+要求 `files.import@1` 或 `files.export@1`，也可以将其声明为可选并检查
+`runtime.list`。仅支持新 contract 不代表发布版宿主已实现这些 API；
+`files.status` 返回当前平台适配器是否可用。
+
+配套的 OctoSense 实现将用户选中的单个文件导入应用内的新路径，或将现有
+应用文件的快照导出。应用只收到应用内路径和字节数，不会收到系统路径或
+Android 文档提供方 URI。传输仅限前台，agent 和后台任务不能发起选择窗口。
+原生 `fs.write_bytes` 对应 `storage.binary_write@1` 运行时 ABI，不能通过
+`host.request` 调用。
+
+导入保留现有的单文件 1 MiB 上限和应用存储配额，并拒绝覆盖已有文件。
+取消选择返回 `{"cancelled":true}`。当前适配器覆盖 macOS、Windows、Android
+及安装了原生文件对话框辅助程序的 Linux；暂不支持 iOS、OpenHarmony、web
+和直接使用 framebuffer 的 Linux。编译与真机验证状态以宿主状态和发布说明为准。
+
 ## 查询宿主实现了什么
 
 应用声明 `runtime` 能力后，可以用 `{}` 调用 `runtime.list` 列出所有已描述的方法，或用 `{"method":"location.get"}` 调用 `runtime.describe` 查询单个方法：

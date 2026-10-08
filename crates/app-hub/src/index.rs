@@ -87,6 +87,7 @@ impl Entry {
         for capability in &self.manifest.capabilities {
             lines.push(match capability.as_str() {
                 "storage" => "Keep its own data on this device".to_string(),
+                "files" => "Import and export files you choose in the system file dialog".to_string(),
                 "net" if self.manifest.network.hosts.is_empty() => "Reach the network: nothing listed".to_string(),
                 "net" => format!("Reach only: {}", self.manifest.network.hosts.join(", ")),
                 "prompt" => "Ask you questions".to_string(),

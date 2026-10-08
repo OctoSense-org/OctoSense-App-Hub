@@ -121,6 +121,14 @@ fn queue_reply(heap_key: usize, req_id: u64, result: Result<String, String>) {
 }
 
 impl Replier {
+    /// Native-only identity of the requesting isolate. A service may use this
+    /// to snapshot that isolate's existing storage policy before asynchronous
+    /// work. It is not authorization, must never come from script arguments,
+    /// and must not be retained as proof that an isolate is still alive.
+    pub fn isolate_key(&self) -> usize {
+        self.heap_key
+    }
+
     /// Services must check this before opening a delayed OS prompt or doing work
     /// after the owning isolate closed. It is not permission to perform a write.
     pub fn is_pending(&self) -> bool {

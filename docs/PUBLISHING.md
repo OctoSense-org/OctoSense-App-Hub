@@ -264,6 +264,7 @@ platform and provider limits; historical beta differences are explicit.
 | Capability | Grants | The store says | Served today |
 | --- | --- | --- | --- |
 | `storage` | The app's own storage folder: `fs.*`, camera captures and local files a widget reads. Without it every `fs.*` call fails. | Keep its own data on this device | The runtime, in every host |
+| `files` | Import and export files selected in the host's native dialog. Import/export also needs `storage`; the app receives an app-relative file, never general filesystem access. Require the specific `files.*` methods the app uses. | Import and export files you choose in the system file dialog | Contract 1.9, not yet published; requires a compatible host implementation |
 | `net` | Requests to the hosts in `network.hosts`, and no others. | Reach only: *hosts* | The runtime, in every host |
 | `images` | Pictures from any public https host, not only `network.hosts`. | Show pictures from any website | The runtime |
 | `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime on supported platforms, including RC1 Windows/WebView2 and Linux X11/XWayland/WebKitGTK; native Wayland embedding is unsupported ([requirements](../README.md#download-a-compatible-host)). |

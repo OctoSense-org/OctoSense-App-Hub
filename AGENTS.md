@@ -97,7 +97,8 @@ owns those.
   [`card-host` fails to build](docs/DEVELOPMENT.md#card-host-fails-to-build)
   lists the builds that need the patches.
 - [Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)
-  lists the `octosense-app-contract` releases; 1.8.0 is published on
+  lists the `octosense-app-contract` releases; source 1.9.0 adds `files` but is
+  unpublished. Consumers need the exact git patch until it is released. 1.8.0 is published on
   crates.io and satisfies App Policy's minimum version. Do
   not take a published contract as proof that a released host implements its
   APIs. This workspace's `[patch.crates-io]` points the crate at

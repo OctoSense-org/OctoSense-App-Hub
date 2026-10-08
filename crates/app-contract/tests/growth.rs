@@ -29,6 +29,27 @@ fn host_api_requirements_need_the_feature_and_do_not_grant_access() {
 }
 
 #[test]
+fn selected_file_access_needs_its_own_grant_and_an_implemented_host() {
+    let limits = HostLimits::default().with_require_signature(false);
+    let manifest = parse(&manifest_with(r#""requires":["host-api-v1"],"capabilities":["files"],"host_api":{"required":{"files.import":1}}"#)).unwrap();
+    let policy = resolve(&manifest, &limits).unwrap();
+    assert!(policy.allows("files"));
+    for other in ["storage", "photos", "library", "camera", "net"] {
+        assert!(!policy.allows(other), "files must not imply {other}");
+    }
+    let storage = resolve(&parse(&manifest_with(r#""capabilities":["storage"]"#)).unwrap(), &limits).unwrap();
+    assert!(!storage.allows("files"));
+    let mut versions = std::collections::BTreeMap::from([("app_policy.device_consent".into(), 1)]);
+    assert!(manifest.check_host_apis(&versions).unwrap_err().contains("files.import@1"));
+    versions.insert("files.import".into(), 1);
+    assert!(manifest.check_host_apis(&versions).is_ok());
+    for near in ["files.*", "files.import", "FILES"] {
+        let manifest = parse(&manifest_with(&format!(r#""capabilities":["{near}"]"#))).unwrap();
+        assert!(resolve(&manifest, &limits).is_err(), "{near} must be unknown");
+    }
+}
+
+#[test]
 fn host_api_marker_requires_the_policy_abi_even_without_a_device_method() {
     let manifest = parse(&manifest_with(r#""requires":["host-api-v1"]"#)).unwrap();
     let mut versions = std::collections::BTreeMap::new();
