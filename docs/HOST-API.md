@@ -11,8 +11,7 @@ run its own agent tools
 ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)).
 
 Contract 1.6.0 is on crates.io, but no released OctoSense build implements
-these APIs yet. Test the `feat/host-api-contract` implementation branch in
-[OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360). Building `main` alone does not provide these APIs while that PR is unmerged.
+these APIs yet. Until one does, test in an OctoSense shell built from `main`.
 An older host, such as OctoSense desktop 0.1.0-beta.2, serves none of these
 APIs and refuses an app that requires them.
 
@@ -92,13 +91,14 @@ registration.
   and a closed app answers `app_not_running`.
 - **Platforms.** The device-permission methods cover Android and macOS, and
   `location.get` covers Android only. It returns the last-known fix, of
-  unknown age. The `feat/desktop-embedded-browser` implementation in
-  [OctoSense PR #361](https://github.com/OctoSense-org/OctoSense/pull/361), not yet released, embeds `WebReader`
-  on Linux (X11 or XWayland, with WebKitGTK installed) and Windows (with the
-  WebView2 Runtime installed), but not under native Wayland.
+  unknown age. `WebReader` opens embedded pages only on macOS, iOS and
+  Android; on other platforms, OctoSense answers `open` with `false`.
 - **Permission requests.** Only an app in the foreground can request a
-  permission. A request from an agent or from the background returns
-  `authorization_required`.
+  permission. A request from an agent or a background card fails with
+  `<method> is unavailable to agents/background surfaces`. A request still
+  waiting when the host goes to the background fails with
+  `authorization_required`, as does `location.get` until the person grants
+  the app location access.
 - **Device widgets.** With `host-api-v1`, `CameraPreview`,
   `sys.request_location`, `sys.gps` and map GPS reads need the app's device
   consent too. After the host starts, they stay closed until the app calls a
