@@ -95,8 +95,11 @@ registration.
   on Linux (X11 or XWayland, with WebKitGTK installed) and Windows (with the
   WebView2 Runtime installed), but not under native Wayland.
 - **Permission requests.** Only an app in the foreground can request a
-  permission. A request from an agent or from the background returns
-  `authorization_required`.
+  permission. A request from an agent or a background card fails with
+  `<method> is unavailable to agents/background surfaces`. A request still
+  waiting when the host goes to the background fails with
+  `authorization_required`, as does `location.get` until the person grants
+  the app location access.
 - **Device widgets.** With `host-api-v1`, `CameraPreview`,
   `sys.request_location`, `sys.gps` and map GPS reads need the app's device
   consent too. After the host starts, they stay closed until the app calls a
