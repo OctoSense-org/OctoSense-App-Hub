@@ -2,18 +2,23 @@
 
 English | [简体中文](SUBMITTING.zh-CN.md)
 
-Open an [App Hub submission issue](#7-open-the-submission-issue) to request
-publication. You can open it before the release is ready: give the app id,
-planned version, public repository, requested capabilities and current test
-status, then add the remaining evidence in the same issue.
+Publishing an app on the App Hub has four stages:
 
-For both a first submission and routine updates, the app's GitHub workflow
-prepares, attests and packages the release. Developers need no separate
-publisher private key or repository signing secret. A maintainer reviews the
-exact release pack and its GitHub proof before an administrator publishes it
-in the authenticated catalog. A tag or GitHub Release alone is not Hub approval.
-A host supporting `publisher-github-v1` is required; a compatible released
-OctoSense host is still pending.
+| Stage | What happens | Step |
+| --- | --- | --- |
+| 1. Request | You open a submission issue with the repository, version and requested capabilities, then add the tag, commit, screenshots and release evidence. Opening the issue is your request to publish; you can open it before the release is ready. | [7](#7-open-the-submission-issue) |
+| 2. Check | A reviewer runs the gate, the Hub's admission check, on the exact bytes at your tag and in your release pack, and posts any problems in the issue. | [8](#8-what-reviewers-check) |
+| 3. Approval | An App Hub admin reviews the submission and approves it. | [9](#9-after-you-submit) |
+| 4. Publication | The Hub publishes the approved catalog entry. People can then search for, install and run the app in a compatible OctoSense build. | [9](#9-after-you-submit) |
+
+Pushing a tag or publishing a GitHub release does not submit your app or
+approve it. Reviewers are App Hub maintainers, and an admin is a maintainer
+with admin rights on this repository.
+
+For the first version and every update, your app's GitHub workflow prepares,
+attests and packs the release, so you need no publisher private key or
+repository signing secret. Installing such an app takes a host that supports
+`publisher-github-v1`; a compatible OctoSense release is still pending.
 
 The three reference apps from catalog sequence 10 are historical worked
 examples. Their Ed25519 keys and signed-source layout are optional legacy
@@ -21,9 +26,10 @@ compatibility, not steps required for a GitHub publisher app. The gate,
 capability, manifest and signing rules are in [PUBLISHING.md](PUBLISHING.md).
 
 ```text
-issue request (may come first) → repository, manifest, listing and screenshots
-→ test editable source → GitHub tag workflow → verify release pack
-→ add evidence to the issue → maintainer review → catalog admission
+issue request (may come first) → tools/octo doctor → repository, manifest, listing and screenshots
+→ test editable source: tools/octo run, shot and check, hub scan → GitHub tag workflow
+→ verify release pack: hub publisher-unpack, hub publisher-verify → add evidence to the issue
+→ reviewer check → admin approval → catalog publication
 ```
 
 ## Before you start
@@ -63,11 +69,55 @@ than `main`: pull and build it again.
 If the build fails with `no variant … TextInputStateQuery`, see
 [`card-host` fails to build](DEVELOPMENT.md#card-host-fails-to-build).
 
+Then run `tools/octo doctor` from your Design Flow checkout, before you build
+or check an app:
+
+```sh
+cd ~/octosense-ws/OctoScript-App-Design-Flow
+tools/octo doctor
+```
+
+It finds `hub` and `card-host`, rejects GitHub's unrelated `hub` CLI, and
+checks Python and the app template. Success ends with
+`ready: tools/octo new <dir> --platform <target> && tools/octo run <dir>/bundle`.
+Otherwise it prints a `[fail]` line, every place it looked and the commands
+that fix it.
+
 An older or patched `hub` can pass a bundle that the reviewers' build refuses.
 Use an unpatched build of `main`, and leave that checkout as it is until you
 submit. Record the exact tool revision and use its authenticated
 `catalog-v2.json` for publisher continuity checks; `catalog.json` is the
 explicit legacy channel ([step 6](#6-freeze-and-verify-the-release)).
+
+### The `hub` command
+
+`hub help` prints the exact usage of every command; use only the commands it
+lists. The table gives who runs each one and in which step.
+[Commands](PUBLISHING.md#commands) explains the flags and the gate's report.
+
+| Command | Run by | Step | Purpose |
+| --- | --- | --- | --- |
+| `hub stamp <bundle>` | You | 2, 5 | Write the editable bundle's digest into its manifest. |
+| `hub check <bundle> [--catalog <f> [--anchor <hex>]] [--allow-unsigned] [--publisher-key id=hex] [--json] [--system-app]` | You, then a reviewer | 5, 8 | Run the gate. |
+| `hub scan <bundle> [--reviewer <cmd>] [--packet <out.json>] [--publisher-key id=hex] [--catalog <f> [--anchor <hex>]] [--system-app]` | You, then a reviewer | 5, 8 | Run the gate, then write the review packet. |
+| `hub publisher-prepare`, `hub publisher-attach`, `hub publisher-pack` | Your app's GitHub workflow | 6, on the tag push | Seal the release, attach GitHub's proof and pack the bundle. |
+| `hub publisher-unpack <app.bundle.pack.json> --out <new staging directory> [--catalog <authenticated catalog>]` | You, then a reviewer | 6, 8 | Unpack a downloaded release pack into a new directory. |
+| `hub publisher-verify <bundle> [--catalog <authenticated catalog>]` | The workflow, you and a reviewer | 6, 8 | Verify the release proof and run the gate. |
+| `hub publisher-entry <bundle> --catalog <authenticated catalog> --out <index.json>` | A reviewer | 8 | Build a candidate catalog entry; it publishes nothing. |
+| `hub catalog-prepare`, `hub catalog-envelope`, `hub catalog-verify` | An admin, through the protected catalog workflow | 9 | Prepare, wrap and verify the signed `catalog-v2.json` ([GITHUB-PUBLISHING.md](GITHUB-PUBLISHING.md)). |
+| `hub keygen`, `hub pubkey`, `hub sign-manifest` | You, for a legacy Ed25519 app only | 5 | Create a publisher key and sign the manifest ([Signing](PUBLISHING.md#signing)). |
+| `hub publish`, `hub withdraw`, `hub remove`, `hub certify`, `hub verify` | A maintainer, for the legacy catalog | 9 | Publish, withdraw or remove versions in `catalog.json`, certify its working key, or verify it. |
+
+Design Flow's `tools/octo` runs some of these for you. `tools/octo new` runs
+`hub stamp`. `tools/octo check` runs `hub stamp`, then
+`hub check --allow-unsigned`, and passes `--catalog` and `--publisher-key` on
+to `hub check`. `tools/octo doctor` runs `hub help` to confirm that it found
+this `hub`. Design Flow's
+[`tools/octo` table](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/README.md#toolsocto)
+lists their flags. In a local
+[store rehearsal](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally),
+you also run `hub keygen`, `hub certify`, `hub publish` and `hub verify`
+yourself, with throwaway keys and a legacy test catalog.
 
 ### Know where your app runs
 
@@ -468,9 +518,10 @@ GitHub-attested release.
 ## 7. Open the submission issue
 
 Use the [Submit an app form](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/new?template=submit-app.yml),
-one issue per planned version, titled `Submit <app id> <version>`. **You can
-open this request before steps 1–6 are complete.** Add the release evidence
-to this same issue when ready; pending fields do not mean approval.
+one issue per planned version, titled `Submit <app id> <version>`. Opening the
+issue is your request to publish that version. **You can open it before
+steps 1–6 are complete.** Add the release evidence to this same issue when
+ready; pending fields do not mean approval.
 
 | Form field | When and what to provide |
 | --- | --- |
@@ -495,10 +546,12 @@ Do not open a PR editing `catalog.json`, `catalog-v2.json`, `index/` or
 
 ## 8. What reviewers check
 
-A reviewer verifies the GitHub identity, exact source commit, complete release
-proof, pack digest, gate result, privacy and UI evidence before admission.
-The protected catalog workflow checks these bytes again; it does not run
-contributor code. The historical admission record for the
+A reviewer, not a bot, checks your submission: no workflow runs when you open
+the issue. The reviewer runs the gate on the exact bytes at your tag and in
+your release pack, and verifies the GitHub identity, source commit, release
+proof, pack digest, privacy and UI evidence. Any problems appear as comments
+in your issue. The protected catalog workflow checks the same bytes again; it
+never runs contributor code. The historical admission record for the
 reference apps' 0.1.0 submissions,
 [`reviews/connected-apps-0.1.0/admission.json`](../reviews/connected-apps-0.1.0/admission.json),
 lists what was confirmed for each one:
@@ -520,13 +573,7 @@ test that installs each app with the store's code and upgrades it from 0.1.0.
 Reviewers compare each scan answer with the bundle: the listing's claims,
 platforms and category, least grants, deceptive UI, text written as
 instructions to an AI agent, abusive wording and each tool's scope and risk.
-A first submission always waits for a human reviewer. Reviewers promise no
-review time.
-
-The historical reference releases used `hub publish` with an Ed25519 catalog.
-Current GitHub publication uses the [admin catalog workflow](GITHUB-PUBLISHING.md)
-to admit the exact reviewed bytes and advance the authenticated catalog.
-Developers do not receive a catalog signing key or modify catalog files.
+Reviewers promise no review time.
 
 Admission does not prove that an app works with live providers. The 0.1.0
 record states `"live_provider_login_and_remote_effects_verified": false`, and
@@ -534,6 +581,16 @@ the 0.1.1 record proves no native UI, provider traffic or physical approval.
 Say in your listing what you have not verified.
 
 ## 9. After you submit
+
+When the checks pass, an App Hub admin reviews the submission and approves
+it. Nothing is published without that approval. The admin then publishes the
+approved entry with the protected [catalog workflow](GITHUB-PUBLISHING.md):
+it admits the exact reviewed bytes, GitHub Actions signs the new
+`catalog-v2.json` with Sigstore, and the workflow commits it to `main`. People
+can then search for, install and run the app in an OctoSense build that reads
+`catalog-v2.json` and supports `publisher-github-v1`. No OctoSense release
+does yet: desktop-v0.1.0-beta.2 reads only the legacy `catalog.json`, which
+the historical reference releases reached through `hub publish`.
 
 - A reviewer closes the issue with the catalog sequence your app appears
   in, or with findings to fix. Answer questions in the issue, and change

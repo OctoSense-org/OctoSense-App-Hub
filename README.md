@@ -27,14 +27,20 @@ follow [Build your first Hub app](docs/FIRST-APP.md) and
 your Design Flow checkout to build `hub` and `card-host`. Do not edit
 `catalog.json`, `index/` or `artifacts/`.
 
-**Submitting an app?** Follow [Submit an app to the App Hub](docs/SUBMITTING.md):
-open an issue here with the repository, version/commit, screenshots and
-permissions. You may open it before the release is ready, then add its verified
-release pack. A GitHub release alone is not App Hub approval. The catalog's
-[three reference apps](docs/SUBMITTING.md#the-three-reference-apps) (GitHub
-Notes, Inbox Assistant and Google Calendar) passed admission end to end; their
-repositories show a complete submission. Look up rules, capabilities and
-fields in the [publishing reference](docs/PUBLISHING.md).
+**Submitting an app?** Follow [Submit an app to the App Hub](docs/SUBMITTING.md).
+To request publication, open an issue here with the repository, version and
+requested capabilities; you can open it before the release is ready, then add
+the tag, commit, screenshots and verified release pack. A tag or GitHub
+release alone submits nothing. A reviewer checks the release and posts
+findings in the issue, an App Hub admin approves it, and the Hub publishes it
+([How the Hub publishes an app](#how-the-hub-publishes-an-app)).
+[The `hub` command](docs/SUBMITTING.md#the-hub-command) lists who runs each
+command and when.
+
+The catalog's [three reference apps](docs/SUBMITTING.md#the-three-reference-apps)
+(GitHub Notes, Inbox Assistant and Google Calendar) passed admission end to
+end; their repositories show a complete submission. Look up rules,
+capabilities and fields in the [publishing reference](docs/PUBLISHING.md).
 
 **Using host APIs?** [Host API compatibility](docs/HOST-API.md) shows how an
 app declares the host APIs it needs and checks which ones a host implements.
@@ -49,7 +55,7 @@ app declares the host APIs it needs and checks which ones a host implements.
 | `artifacts/<app>-<version>.bundle/` | App Hub's copy of the bundle, exactly the bytes that were reviewed. `hub publish` creates it. |
 | `artifacts/<app>-<version>.bundle.pack.json` | The same bundle as one file, which stores download. |
 | `docs/FIRST-APP.md` | A first-app walkthrough for a card app or a script app: create, run, capture and check. |
-| `docs/SUBMITTING.md` | The submission, step by step: repository, manifest, listing, screenshots, signing, release, issue and review. |
+| `docs/SUBMITTING.md` | The submission: its four stages, the `hub` command and each step, from repository and listing to release, issue, review, approval and publication. |
 | `docs/PUBLISHING.md` | The reference: gate rules; capabilities and who serves them; manifest, listing and tool fields; host services; `hub` commands; signing. |
 | `docs/GITHUB-PUBLISHING.md` | Admin-authorized GitHub signing, exact candidate review and v2 migration. |
 | `docs/HOST-API.md` | Declaring the host APIs an app needs, `runtime` discovery and what today's hosts implement. |
@@ -192,15 +198,18 @@ access (or an explicitly supplied mirror containing a verified v2 envelope).
 Fetch/proof failure never falls back to legacy. Older released hosts continue
 to use `catalog.json`; a compatible OctoSense release is still pending.
 
-## How a maintainer publishes an app
+## How the Hub publishes an app
 
-After you submit ([Submit an app to the App Hub](docs/SUBMITTING.md)), a
-maintainer reviews the exact bytes of your tagged commit.
-[GitHub admin publication](docs/GITHUB-PUBLISHING.md) signs a new v2 catalog
-without a separate Hub private key. See its delivery-status receipt for
-production publication and consumer acceptance; a compatible host release
-remains pending. The existing `hub publish` path still produces
-the legacy anchor-signed catalog.
+After you open a submission issue
+([Submit an app to the App Hub](docs/SUBMITTING.md)), a reviewer runs the gate
+on the exact bytes of your release and posts findings in the issue. An App
+Hub admin then approves the submission; nothing is published without that
+approval. The admin publishes the approved entry with
+[GitHub admin publication](docs/GITHUB-PUBLISHING.md): GitHub Actions signs
+the new `catalog-v2.json` with Sigstore, so no admin keeps a separate Hub
+private key. New compatible hosts read that catalog; a compatible OctoSense
+release is still pending. The existing `hub publish` path still produces the
+legacy anchor-signed `catalog.json`, which older hosts read.
 
 For v2, publish a reviewed withdrawal candidate through the same protected
 workflow, retaining history and a reason. Stores honor it after accepting the
