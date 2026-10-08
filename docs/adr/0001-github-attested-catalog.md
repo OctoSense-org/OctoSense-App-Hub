@@ -72,7 +72,9 @@ serialized and refuses a stale main/base catalog before a non-force update.
 
 Before enabling publication, maintainers must protect changes to `main` and this
 workflow, restrict environment approval to trusted administrators, and prevent
-self-approval. The certificate binds the workflow path and environment, not a
+approval by a user who is no longer an administrator. The dispatching administrator
+may approve their own publication; a second person is not required. The
+certificate binds the workflow path and environment, not a
 specific reviewed implementation commit or the approver's role. These GitHub
 controls therefore remain part of the trust boundary; an unprotected workflow
 must not be treated as administrator authorization.
