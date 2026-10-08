@@ -129,7 +129,7 @@ pub fn check_bundle(
     verifier: &dyn SignatureVerifier,
     previous: Option<&Catalog>,
 ) -> Result<GateReport, String> {
-    check_bundle_for(bundle, limits, verifier, previous, false)
+    check_bundle_for(bundle, limits, verifier, previous, false, None)
 }
 
 /// Check a shipped system app during development, using the same resource
@@ -139,7 +139,19 @@ pub fn check_system_bundle(
     bundle: &Path,
     verifier: &dyn SignatureVerifier,
 ) -> Result<GateReport, String> {
-    check_bundle_for(bundle, &HostLimits::system(), verifier, None, true)
+    check_bundle_for(bundle, &HostLimits::system(), verifier, None, true, None)
+}
+
+/// Check against an opaque authenticated publication history, without losing the
+/// authenticated publisher bindings.
+pub fn check_authenticated_bundle(bundle:&Path,limits:&HostLimits,verifier:&dyn SignatureVerifier,
+    base:&crate::github_catalog::AuthenticatedCatalog)->Result<GateReport,String>{
+    check_bundle_with_registry(bundle,limits,verifier,base.catalog(),base.publishers())
+}
+
+pub(crate) fn check_bundle_with_registry(bundle:&Path, limits:&HostLimits, verifier:&dyn SignatureVerifier,
+    previous:&Catalog, registry:&dyn crate::PublisherRegistry)->Result<GateReport,String> {
+    check_bundle_for(bundle,limits,verifier,Some(previous),false,Some(registry))
 }
 
 fn check_bundle_for(
@@ -148,6 +160,7 @@ fn check_bundle_for(
     verifier: &dyn SignatureVerifier,
     previous: Option<&Catalog>,
     system_development: bool,
+    registry: Option<&dyn crate::PublisherRegistry>,
 ) -> Result<GateReport, String> {
     // Metadata first: nothing is read or hashed beyond the limits.
     let files = crate::admission::inventory(bundle)?;
@@ -164,16 +177,15 @@ fn check_bundle_for(
             format!("the bundle hashes to {digest}, the manifest claims {}", manifest.integrity.bundle_blake3),
         ));
     }
-    match &manifest.integrity.signature {
-        Some(signature) => {
-            if let Err(e) = verifier.verify(&signature.key_id, &signature.value, &manifest.signing_bytes()?) {
-                findings.push(Finding::refuse("publisher-signature", e));
-            }
+    if let Err(e) = octosense_app_policy::verify::verify_manifest(&manifest, verifier) {
+        findings.push(Finding::refuse("publisher-signature", e));
+    }
+    if manifest.integrity.signature.is_none() && manifest.integrity.github.is_none() {
+        if limits.require_signature {
+            findings.push(Finding::refuse("publisher-signature", "this hub requires a signed manifest"));
+        } else {
+            findings.push(Finding::warn("publisher-signature", "unsigned: accountability rests on the hub alone"));
         }
-        None if limits.require_signature => {
-            findings.push(Finding::refuse("publisher-signature", "this hub requires a signed manifest"))
-        }
-        None => findings.push(Finding::warn("publisher-signature", "unsigned: accountability rests on the hub alone")),
     }
 
     // ---- identity ------------------------------------------------------
@@ -349,8 +361,11 @@ fn check_bundle_for(
                 ));
             }
         }
-        let continuity = crate::publishers::CatalogPublishers::from_catalog(catalog)
-            .and_then(|registry| crate::publishers::verify_continuity(&manifest, &registry));
+        let continuity = match registry {
+            Some(registry) => crate::publishers::verify_continuity(&manifest, registry),
+            None => crate::publishers::CatalogPublishers::from_catalog(catalog)
+                .and_then(|registry| crate::publishers::verify_continuity(&manifest, &registry)),
+        };
         if let Err(e) = continuity {
             findings.push(Finding::refuse("continuity", e));
         }
@@ -546,6 +561,15 @@ pub fn entry_for(
         None if publisher.is_empty() => return Err("an entry needs a publisher".into()),
         None if !publisher_key.is_empty() => return Err("an unsigned release records no publisher key".into()),
         None => {}
+    }
+    if let Some(github) = &manifest.integrity.github {
+        if publisher != format!("github:{}",github.repository_id) {
+            return Err("GitHub publisher must be github: followed by its authenticated repository id".into());
+        }
+        crate::github_publisher::verify(github, &manifest.signing_bytes()?)?;
+        if repository != github.repository_url() || commit != github.commit {
+            return Err("entry source does not match authenticated publisher repository and commit".into());
+        }
     }
     let listing = std::fs::read_to_string(bundle.join(LISTING_FILE)).ok().and_then(|t| Listing::parse(&t).ok());
     let mut tools = octosense_app_policy::agent::read_tools(bundle)?.map(|t| t.tools).unwrap_or_default();

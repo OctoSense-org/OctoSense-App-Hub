@@ -7,13 +7,19 @@
 //! one of those rather than invent a third. Until then a host that sets
 //! `require_signature` and installs no verifier admits nothing, which is the
 //! safe direction to be wrong in.
-use crate::manifest::AppManifest;
+use crate::manifest::{AppManifest, GithubPublisher};
 
 /// Verifies a detached signature over the canonical manifest bytes.
 pub trait SignatureVerifier {
     /// `key_id` names the key as the host knows it. Return an error with a
     /// reason; returning `Ok(())` admits the bundle.
     fn verify(&self, key_id: &str, signature_hex: &str, signed_bytes: &[u8]) -> Result<(), String>;
+
+    /// Default-refusing extension: linking a newer contract never silently
+    /// admits a provenance scheme that a host does not implement.
+    fn verify_github(&self, _identity: &GithubPublisher, _signed_bytes: &[u8]) -> Result<(), String> {
+        Err("this host has no GitHub publisher verifier".into())
+    }
 }
 
 /// The default: refuses every signature. A host without a real verifier can
@@ -52,9 +58,20 @@ pub fn admit_digest(manifest: &AppManifest, digest: &str, verifier: &dyn Signatu
             manifest.id, manifest.version
         ));
     }
+    verify_manifest(manifest, verifier)
+}
+
+/// Verify every declared authentication scheme. A missing or invalid GitHub
+/// proof cannot be rescued by an Ed25519 signature or an unsigned host mode.
+pub fn verify_manifest(manifest: &AppManifest, verifier: &dyn SignatureVerifier) -> Result<(), String> {
+    manifest.check_requires()?;
     if let Some(signature) = &manifest.integrity.signature {
         let signed = manifest.signing_bytes()?;
         verifier.verify(&signature.key_id, &signature.value, &signed)?;
+    }
+    if let Some(github) = &manifest.integrity.github {
+        if github.attestation.is_none() { return Err("GitHub publisher attestation is missing".into()); }
+        verifier.verify_github(github, &manifest.signing_bytes()?)?;
     }
     Ok(())
 }

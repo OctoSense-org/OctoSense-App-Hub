@@ -5,6 +5,14 @@ hub — the OctoSense app hub command (ADR 0003)
   hub certify --anchor <f> --working <f>   anchor certifies a working key
   hub stamp <bundle>                    write the bundle's digest into its manifest
   hub sign-manifest <bundle> --key <f> --key-id <id>
+  hub publisher-prepare <bundle> --repository <owner/repo> --repository-id <id> --owner-id <id>
+              --workflow <.github/workflows/publish-app.yml> --tag <vVERSION> --commit <sha>
+              --out <outside-bundle/octosense-app-manifest.json>
+  hub publisher-attach <bundle> --attestation <Sigstore-v0.3-bundle.json>
+  hub publisher-verify <bundle> [--catalog <authenticated catalog>]
+  hub publisher-pack <bundle> --out <outside-bundle/app.bundle.pack.json> [--catalog <authenticated catalog>]
+  hub publisher-unpack <app.bundle.pack.json> --out <new staging directory> [--catalog <authenticated catalog>]
+  hub publisher-entry <bundle> --catalog <authenticated catalog> --out <index.json>
   hub check <bundle> [--catalog <f> [--anchor <hex>]] [--allow-unsigned] [--publisher-key id=hex] [--json] [--system-app]
   hub publish <bundle> --catalog <f> --key <f> --anchor-cert <hex>
               --publisher <id> [--repo <url>] [--commit <sha>] [--out <dir>]
@@ -37,3 +45,8 @@ publish, human-review stops it until --reviewed) and writes
 check is the gate: a publisher runs it before submitting, the hub runs the
 same code after. publish re-runs it, copies the bundle into the artifact
 store and signs the catalog.
+
+GitHub publisher commands require public GitHub-hosted tag-push provenance.
+prepare refuses sealed manifests; attach and pack never restamp. Candidate
+entries confer no authority until the protected admin workflow attests the
+exact catalog. Legacy app ownership cannot be adopted by GitHub provenance. No catalog is published by these commands.

@@ -513,9 +513,7 @@ impl Store {
         if !same_manifest(&entry.manifest, &prepared.manifest)? {
             return Err("the release changed while it was opening; try again".into());
         }
-        if let Some(signature) = &entry.manifest.integrity.signature {
-            self.publisher_keys().verify(&signature.key_id, &signature.value, &entry.manifest.signing_bytes()?)?;
-        }
+        octosense_app_policy::verify::verify_manifest(&entry.manifest, &self.publisher_keys())?;
         Ok(())
     }
 

@@ -16,7 +16,7 @@ fn manifest_with(body: &str) -> String {
 fn palpo_extension_preserves_schema_and_declares_its_host_feature() {
     assert_eq!(SCHEMA, 1);
     assert_eq!(SCHEMA_MINOR, 0);
-    assert_eq!(KNOWN_FEATURES, &["palpo-admin-v1", "host-api-v1", "backend-api-v1", "script-tools-v1"]);
+    assert_eq!(KNOWN_FEATURES, &["palpo-admin-v1", "host-api-v1", "backend-api-v1", "script-tools-v1", "publisher-github-v1"]);
 }
 
 #[test]

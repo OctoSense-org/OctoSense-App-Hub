@@ -1614,7 +1614,7 @@ dependencies = [
 
 [[package]]
 name = "octosense-app-contract"
-version = "1.7.1"
+version = "1.8.0"
 dependencies = [
  "blake3",
  "serde",
@@ -1644,6 +1644,7 @@ dependencies = [
  "octosense-app-policy",
  "rand_core 0.9.5",
  "roxmltree",
+ "semver",
  "serde",
  "serde_json",
  "sha2 0.10.9",

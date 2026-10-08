@@ -47,16 +47,45 @@ fn run() -> Result<(), String> {
     }
 
     match command {
+        "publisher-prepare" => {
+            let bundle=PathBuf::from(positional.ok_or("publisher-prepare <bundle>")?);
+            let required=|name:&str|flag(name).ok_or_else(||format!("--{name} is required"));
+            let identity=serde_json::from_value(serde_json::json!({
+                "repository":required("repository")?,"repository_id":required("repository-id")?,"owner_id":required("owner-id")?,
+                "workflow":required("workflow")?,"tag":required("tag")?,"commit":required("commit")?
+            })).map_err(|e|e.to_string())?;
+            let receipt=publisher_tools::prepare(&bundle,identity,Path::new(&required("out")?))?;
+            println!("{receipt}"); Ok(())
+        }
+        "publisher-attach" => {
+            let bundle=PathBuf::from(positional.ok_or("publisher-attach <bundle>")?);
+            println!("{}",publisher_tools::attach(&bundle,Path::new(&flag("attestation").ok_or("--attestation <bundle.json>")?))?); Ok(())
+        }
+        "publisher-verify" | "publisher-pack" | "publisher-unpack" | "publisher-entry" => {
+            let bundle=PathBuf::from(positional.ok_or("publisher command requires <bundle>")?);
+            let base=flag("catalog").map(|path|{
+                let bytes=admission::read_bounded(Path::new(&path),github_catalog::MAX_DOCUMENT_BYTES as u64)?;
+                github_catalog::authenticated_publication_base(&bytes,&flag("anchor").unwrap_or_else(||DEFAULT_ANCHOR.into()))
+            }).transpose()?;
+            if command=="publisher-verify" {println!("{}",publisher_tools::verify(&bundle,base.as_ref())?.json());return Ok(());}
+            let output=PathBuf::from(flag("out").ok_or("--out <outside-bundle file>")?);
+            if command=="publisher-pack" {println!("{}",publisher_tools::pack(&bundle,base.as_ref(),&output)?);return Ok(());}
+            if command=="publisher-unpack" {println!("{}",publisher_tools::unpack(&bundle,base.as_ref(),&output)?.json());return Ok(());}
+            let base=base.as_ref().ok_or("--catalog <authenticated catalog> is required")?;
+            publisher_tools::entry(&bundle,base,&output)?;
+            println!("{}",serde_json::json!({"schema":1,"status":"candidate-only-awaiting-admin-catalog-approval"})); Ok(())
+        }
         "catalog-prepare" => {
             use sha2::{Digest, Sha256};
             let read = |name: &str, max| -> Result<Vec<u8>, String> {
                 admission::read_bounded(Path::new(&flag(name).ok_or_else(|| format!("--{name} <file>"))?), max)
             };
             let base_bytes = read("base", github_catalog::MAX_DOCUMENT_BYTES as u64)?;
-            let base = github_catalog::authenticated_base(&base_bytes)?;
+            let authenticated = github_catalog::authenticated_publication_base(&base_bytes,DEFAULT_ANCHOR)?;
+            let base=authenticated.catalog();
             let candidate = read("candidate", github_catalog::MAX_CATALOG_BYTES as u64)?;
             let root = PathBuf::from(flag("artifact-root").ok_or("--artifact-root <reviewed directory>")?);
-            let payload = github_catalog::prepare(&base, &candidate, &root)?;
+            let payload = github_catalog::prepare_authenticated(&authenticated, &candidate, &root)?;
             let output = PathBuf::from(flag("out").ok_or("--out <catalog-v2.payload.json>")?);
             if output.file_name().and_then(|v| v.to_str()) != Some(github_catalog::CATALOG_SUBJECT) {
                 return Err("prepared catalog filename must be catalog-v2.payload.json".into());
@@ -330,7 +359,10 @@ fn run() -> Result<(), String> {
 fn stamp_bundle(bundle: &Path) -> Result<String, String> {
     let path = bundle.join(octosense_app_policy::MANIFEST_FILE);
     let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    AppManifest::parse(&text)?;
+    let manifest=AppManifest::parse(&text)?;
+    if manifest.integrity.github.as_ref().is_some_and(|g|g.attestation.is_some()) {
+        return Err("GitHub-attested bundle is sealed; prepare a new unsigned version".into());
+    }
     let digest = octosense_app_policy::digest_dir(bundle)?;
     let mut value: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
     value["integrity"]["bundle_blake3"] = serde_json::Value::String(digest.clone());
@@ -346,20 +378,16 @@ fn gate_for(bundle: &Path, argv: &[String], allow_unsigned: bool, catalog: Optio
     }
     let limits = HostLimits::default().with_require_signature(!allow_unsigned);
     let previous = match catalog {
-        Some(path) if Path::new(&path).exists() => Some(trusted_catalog(Path::new(&path), argv)?),
-        _ => None,
+        Some(path) if !Path::new(&path).exists() && argv.get(1).is_some_and(|s|s=="publish") => None,
+        Some(path) => Some(github_catalog::authenticated_publication_base(
+            &admission::read_bounded(Path::new(&path),github_catalog::MAX_DOCUMENT_BYTES as u64)?,
+            argv.windows(2).find(|w|w[0]=="--anchor").map(|w|w[1].as_str()).unwrap_or(DEFAULT_ANCHOR))?),
+        None => None,
     };
-    // Known publishers verify against their recorded keys; a conflicting
-    // --publisher-key stays beside the recorded one and both are refused.
-    // History that disagrees with itself is the gate's continuity finding.
-    if let Some(Ok(registry)) = previous.as_ref().map(CatalogPublishers::from_catalog) {
-        keys = registry.trusted_keys(keys);
-    }
-    if argv.iter().any(|arg| arg == "--system-app") {
-        octosense_app_hub::gate::check_system_bundle(bundle, &keys)
-    } else {
-        check_bundle(bundle, &limits, &keys, previous.as_ref())
-    }
+    if let Some(base)=&previous { keys=base.publishers().trusted_keys(keys); }
+    if argv.iter().any(|arg|arg=="--system-app") {octosense_app_hub::gate::check_system_bundle(bundle,&keys)}
+    else if let Some(base)=&previous {octosense_app_hub::gate::check_authenticated_bundle(bundle,&limits,&keys,base)}
+    else {check_bundle(bundle,&limits,&keys,None)}
 }
 
 /// The catalog at `path`, once it verifies against the trusted anchor.
