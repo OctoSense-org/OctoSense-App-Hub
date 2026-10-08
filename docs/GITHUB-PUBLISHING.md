@@ -8,10 +8,12 @@ the signature in a public transparency log. No admin stores a separate Hub
 private key. This is GitHub-managed artifact signing, not an SSH signature or
 the green Verified badge on a commit.
 
-**Delivery status:** the workflow and native verifier are implemented here.
-An official workflow run, production environment protection and an updated
-OctoSense release must be verified before the new channel replaces the old
-one. This document does not claim that migration has happened.
+**Delivery status:** [production workflow 37736098082](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37736098082)
+published catalog sequence 11 at commit
+`27eeec5b3abc3f9c2aa06a3894bab2f15228f116`. This source selects the GitHub
+channel by default for new compatible hosts; an updated OctoSense binary
+release remains pending. Old installed hosts and reference-app bundle bytes
+are unchanged. See Validation for the exact proof/consumer evidence.
 
 ## Who authorizes publication
 
@@ -59,8 +61,8 @@ After [preparing the native workspace](FIRST-APP.md#1-prepare-the-tools-and-an-a
 
 ```sh
 cargo build --locked --release -p octosense-app-hub
-# Use catalog-v2.json as the base once it exists.
-target/release/hub catalog-prepare --base catalog.json \
+# Use the current authenticated v2 catalog as the base.
+target/release/hub catalog-prepare --base catalog-v2.json \
   --candidate catalog-candidates/<name>/catalog.json \
   --artifact-root catalog-candidates/<name> \
   --out /tmp/catalog-v2.payload.json
@@ -69,8 +71,8 @@ target/release/hub catalog-prepare --base catalog.json \
 Record `payload_sha256` from the JSON receipt and the full 40-character
 candidate commit. Review the resulting payload and all added files before
 authorizing that digest. Re-prepare if the base changes or the UTC date rolls
-over. The command itself is covered by native integration tests; production
-dispatch remains unverified until recorded separately.
+over. The command itself is covered by native integration tests; the production
+dispatch above is separate evidence for its reviewed candidate.
 
 ## Sign, verify and publish
 
@@ -101,10 +103,15 @@ proof, GitHub issuer, App Hub repository and owner numeric IDs, workflow path,
 The signed statement must describe the exact catalog subject and approved
 workflow. Network mirrors cannot substitute another repository or workflow.
 
-For pre-release acceptance, set `OCTOSENSE_HUB_CATALOG=github-v2` before
-starting the host. The default remains legacy until production proof and
-consumer acceptance pass. Once a library caches v2, removing the environment
-variable retains v2; explicitly requesting `legacy` refuses the downgrade.
+New compatible hosts select `github-v2` by default; setting
+`OCTOSENSE_HUB_CATALOG=github-v2` is optional. A custom legacy test hub requires
+`OCTOSENSE_HUB_CATALOG=legacy` and a fresh library. Any existing v2 cache,
+including a damaged one, makes an explicit legacy selection fail closed.
+
+An old `catalog.json` cache is not converted into trusted v2 data offline.
+The first v2 load needs a network fetch or an explicitly supplied v2 mirror.
+It cannot use the legacy cache as a fallback. Reference-app bundle bytes and
+publisher signatures remain unchanged.
 
 The v2 client is selected by host configuration before fetching. It
 refuses legacy or malformed documents instead of falling back. Cache the whole
@@ -115,16 +122,35 @@ refused. The existing 14-day freshness limit still gates new installations.
 ## Migration and app publishers
 
 Older releases understand the anchor-signed `catalog.json` only. They need a
-host update to consume `catalog-v2.json`; replacing the old file in place would
-break them. Maintain separate channel caches during migration.
+host update to consume `catalog-v2.json`; the two files and cache names remain
+separate. A new default does not update an already installed host or convert
+its offline legacy cache.
 
-This change replaces the **Hub's catalog signing key**. It does not replace
-existing app publisher signatures or transfer ownership of published apps.
-Their [continuity rules](PUBLISHING.md#signing) still apply. A GitHub-based app
-publisher identity flow is separate work; do not drop a recorded publisher
-key merely because an admin can authorize a catalog.
+Catalog signing and app publisher proofs are different boundaries. New apps
+use the [GitHub publisher workflow](PUBLISHING.md#signing), without a developer
+key; routine updates retain the verified repository/owner/workflow identity.
+Existing reference entries and signatures are preserved as historical releases.
+Opening the submission issue remains the publication request, and administrator
+approval still controls catalog publication.
 
 ## Validation
+
+The [production receipt](evidence/catalog-v2-production-37736098082.json) records
+an independent fetch of the immutable public envelope: 59,745 bytes, SHA-256
+`90576462177341de69eae4737f1e36bd16efce5e474223c1f74182b4b150d5e2`, equal to
+the Actions artifact. Its sequence is 11 and payload SHA-256 is
+`d7a43c63ca3219691f0879b3637aef7088963c579812228a9afa82967437de0c`.
+
+| Native consumer | Exact App Hub source | Result |
+| --- | --- | --- |
+| macOS CLI | `af0cf7f3c8e4e8eb91829bd8ac44219508ba7f0c` | 6/6 passed |
+| Android arm64 CLI on OnePlus 6 | `6e3b8ffefff018269efb45f7d2c9b08fe75c4d74` | 6/6 passed |
+
+Each accepted the real production proof and refused altered payload, altered
+signature, altered transparency log, missing log, and a legacy document.
+The receipt includes each binary hash and completed cleanup. These are
+native proof-consumer checks at the recorded sources, not app installation,
+GUI/account acceptance or a test of this later default-channel build.
 
 Run `python3 -m unittest discover -s tools -p test_catalog_publish.py` for
 admin authorization, input/path refusal, exact-packet binding and real Git

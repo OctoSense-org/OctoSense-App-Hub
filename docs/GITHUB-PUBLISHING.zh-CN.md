@@ -7,9 +7,10 @@ App Hub 仓库管理员批准目录的确切摘要。GitHub Actions 使用短期
 保存额外的 Hub 私钥。这是 GitHub 管理的制品签名，不是 SSH 签名，
 也不是 commit 上的绿色 Verified 标记。
 
-**交付状态：** 本分支已实现工作流和原生验证器。启用新渠道之前，
-还必须验证正式工作流、生产环境保护和更新后的 OctoSense 发布版。
-本文不表示迁移已经完成。
+**交付状态：** [生产工作流 37736098082](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37736098082)
+已在 commit `27eeec5b3abc3f9c2aa06a3894bab2f15228f116` 发布序号 11 的目录。
+本源码让新兼容宿主默认选择 GitHub 渠道；更新后的 OctoSense 二进制版本仍待发布。
+旧已安装宿主及参考应用的包字节保持原样。确切证明和消费者证据见“验证”。
 
 ## 谁能批准发布
 
@@ -53,8 +54,8 @@ withdrawn；不能删除历史、替换既有字节或重新上架已撤回版�
 
 ```sh
 cargo build --locked --release -p octosense-app-hub
-# catalog-v2.json 存在后，改用它作为基准。
-target/release/hub catalog-prepare --base catalog.json \
+# 使用当前已验证的 v2 目录作为基准。
+target/release/hub catalog-prepare --base catalog-v2.json \
   --candidate catalog-candidates/<name>/catalog.json \
   --artifact-root catalog-candidates/<name> \
   --out /tmp/catalog-v2.payload.json
@@ -62,8 +63,7 @@ target/release/hub catalog-prepare --base catalog.json \
 
 记录 JSON 回执中的 `payload_sha256` 和候选完整的 40 位 commit。
 批准摘要之前，审核生成的载荷及所有新增文件。基准改变或 UTC 日期
-跨天时重新准备。命令本身有原生集成测试；正式派发在另行记录前
-仍属于未验证。
+跨天时重新准备。命令本身有原生集成测试；上面的生产派发是该已审核候选的独立证据。
 
 ## 签名、验证和发布
 
@@ -90,9 +90,13 @@ target/release/hub catalog-prepare --base catalog.json \
 环境。签名声明必须描述确切的目录对象和获准工作流。网络镜像无法用
 其他仓库或工作流替换它。
 
-发布前验收时，在启动宿主前设置 `OCTOSENSE_HUB_CATALOG=github-v2`。
-生产证明和消费者验收通过之前，默认仍为旧格式。应用库一旦缓存 v2，
-移除环境变量仍保持 v2；显式请求 `legacy` 会因降级而被拒绝。
+新兼容宿主默认选择 `github-v2`，无需额外设置
+`OCTOSENSE_HUB_CATALOG=github-v2`。自定义旧格式测试 Hub 必须显式设置
+`OCTOSENSE_HUB_CATALOG=legacy`，并使用新的应用库。只要已有 v2 缓存，即使
+损坏，显式选择旧格式也会拒绝继续。
+
+旧 `catalog.json` 缓存不会离线转换成可信 v2 数据。第一次加载 v2 需要网络，
+或者显式提供 v2 镜像，不能回退使用旧缓存。参考应用的包字节和发布者签名保持不变。
 
 宿主在拉取之前选定 v2 客户端模式。它拒绝旧格式或畸形文档，
 不自动回退。缓存必须原子保存整个信封及证明，并在重启后保留最大
@@ -102,15 +106,29 @@ target/release/hub catalog-prepare --base catalog.json \
 ## 迁移与应用发布者
 
 旧发布版只理解信任锚签署的 `catalog.json`，需要更新宿主才能读取
-`catalog-v2.json`。直接替换旧文件会破坏旧客户端。迁移时保留独立
-的渠道缓存。
+`catalog-v2.json`；两个文件及缓存名称保持独立。改变默认值不会更新已经安装的
+宿主，也不会转换它的离线旧缓存。
 
-本改动替换的是 **Hub 目录签名密钥**，不替换既有应用发布者签名，
-也不转移已发布应用的所有权。[连续性规则](PUBLISHING.zh-CN.md#签名)
-仍然有效。基于 GitHub 的应用发布者身份流程是独立工作；不能因为
-管理员可批准目录，就删除已登记的发布者密钥。
+目录签名与应用发布者证明是不同边界。新应用使用 [GitHub 发布工作流](PUBLISHING.zh-CN.md#签名)，
+无需开发者密钥；日常更新保留经过验证的仓库、所有者和工作流身份。既有参考条目
+及签名作为历史版本保留。开提交 issue 仍是发布请求，目录发布仍由管理员批准控制。
 
 ## 验证
+
+[生产回执](evidence/catalog-v2-production-37736098082.json)记录了对不可变公开信封的
+独立拉取：59,745 字节，SHA-256 为
+`90576462177341de69eae4737f1e36bd16efce5e474223c1f74182b4b150d5e2`，与 Actions
+产物一致。目录序号为 11，载荷 SHA-256 为
+`d7a43c63ca3219691f0879b3637aef7088963c579812228a9afa82967437de0c`。
+
+| 原生消费者 | 确切 App Hub 源码 | 结果 |
+| --- | --- | --- |
+| macOS CLI | `af0cf7f3c8e4e8eb91829bd8ac44219508ba7f0c` | 6/6 通过 |
+| OnePlus 6 上的 Android arm64 CLI | `6e3b8ffefff018269efb45f7d2c9b08fe75c4d74` | 6/6 通过 |
+
+两者均接受真实生产证明，拒绝载荷篡改、签名篡改、透明日志篡改、缺失日志和旧格式
+文档。回执包含各二进制摘要及完成清理的记录。这是所记录源码的原生证明验证，
+不是应用安装、GUI/账户验收，也不是对之后这个默认渠道构建的测试。
 
 运行 `python3 -m unittest discover -s tools -p test_catalog_publish.py`，
 检查管理员授权、输入和路径拒绝、准备包的确切绑定，以及真实 Git

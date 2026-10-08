@@ -20,7 +20,7 @@ App Hub 为 OctoSense 发布应用。本仓库包含：
 
 **要开发应用？** 请从 [OctoSense-org 主页](https://github.com/OctoSense-org)上的“先读这些”列表开始：先读 OctoScript-App-Design-Flow（下称 Design Flow）的 `AGENTS.md`，再读其 `docs/QUICKSTART.md`。接着按照[开发你的第一个 Hub 应用](docs/FIRST-APP.zh-CN.md)和[应用图标与随包素材](docs/ICONS.zh-CN.md)操作。把本仓库克隆到 Design Flow 检出目录旁边，用来构建 `hub` 和 `card-host`。不要修改 `catalog.json`、`index/` 或 `artifacts/`。
 
-**要提交应用？** 请按照[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)操作：在本仓库开一个 issue，提交一个已签名的应用包；它必须位于打了 tag 的 commit 上。目录中的[三个参考应用](docs/SUBMITTING.zh-CN.md#三个参考应用)（GitHub Notes、Inbox Assistant 和 Google Calendar）完整通过了准入，它们的仓库展示了一次完整的提交。规则、能力和字段请查阅[发布参考](docs/PUBLISHING.zh-CN.md)。
+**要提交应用？** 请按照[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)操作：在本仓库开 issue，提供仓库、版本/commit、截图和权限。可以先开 issue，再补充经过验证的 release pack；GitHub release 本身不代表 App Hub 批准。目录中的[三个参考应用](docs/SUBMITTING.zh-CN.md#三个参考应用)（GitHub Notes、Inbox Assistant 和 Google Calendar）完整通过了准入，它们的仓库展示了一次完整的提交。规则、能力和字段请查阅[发布参考](docs/PUBLISHING.zh-CN.md)。
 
 **要使用宿主 API？** [宿主 API 兼容性](docs/HOST-API.zh-CN.md)说明应用如何声明所需的宿主 API，以及如何查询宿主实现了哪些 API。
 
@@ -28,7 +28,8 @@ App Hub 为 OctoSense 发布应用。本仓库包含：
 
 | 路径 | 说明 |
 | --- | --- |
-| `catalog.json` | 旧格式签名目录。商店在展示任何内容之前，先用下方的信任锚验证它。 |
+| `catalog-v2.json` | 新兼容宿主默认选择的 GitHub 证明目录；商店使用前验证完整证明。 |
+| `catalog.json` | 保持原样的旧格式签名目录，供旧宿主和显式选择旧格式的镜像使用。 |
 | `index/<app>-<version>.json` | 每个应用版本对应一条已准入条目：清单、发布者、源码位置与状态。维护者在 `hub publish` 之后从目录导出。 |
 | `artifacts/<app>-<version>.bundle/` | App Hub 保存的应用包副本，与审核时的字节完全一致。由 `hub publish` 生成。 |
 | `artifacts/<app>-<version>.bundle.pack.json` | 打成单个文件的同一应用包，商店下载的就是它。 |
@@ -101,19 +102,28 @@ OCTOSENSE_PREVIEW_SIZE=1200x860 OCTOSENSE_APP_DATA="$(mktemp -d)" target/release
 
 ## 让商店读取其他 Hub
 
-商店构建默认读取本 App Hub，并信任上述锚。如需读取镜像，把 `OCTOSENSE_HUB` 设为镜像目录或基础 URL；用自己的锚签名的开发用 Hub 还需要设置 `OCTOSENSE_HUB_ANCHOR`。下面的命令把这两个变量都设为默认值：
+新兼容宿主默认选择 `github-v2`，从本 Hub 获取 `catalog-v2.json`。
+`OCTOSENSE_HUB` 可指定另一个目录或基础 URL，但更换来源不会更换可信 GitHub
+身份或渠道。镜像必须提供同一份可验证的 v2 信封和产物。
+
+使用**旧格式本地测试 Hub** 时，显式选择 `legacy`、提供测试信任锚，并使用新的应用数据目录：
 
 ```sh
-OCTOSENSE_HUB=https://raw.githubusercontent.com/OctoSense-org/OctoSense-App-Hub/main/ \
-OCTOSENSE_HUB_ANCHOR=6000284a069ba7cada2925094074e8e0baae07e25d1b7fc31f396c993f363e11 \
+OCTOSENSE_HUB_CATALOG=legacy OCTOSENSE_HUB=/path/to/legacy-mirror \
+OCTOSENSE_HUB_ANCHOR="<test-anchor-hex>" OCTOSENSE_APP_DATA="<fresh-test-directory>" \
 appstore
 ```
 
+此示例仅按源码核对；运行前替换占位符。应用库只要已有 v2 缓存，即使损坏，也会
+拒绝降级到旧格式。旧缓存不会离线转换：第一次获取 v2 需要网络，或显式提供含
+有效 v2 信封的镜像。拉取或证明失败不会回退。旧发布宿主继续读取 `catalog.json`，
+兼容的 OctoSense 版本仍待发布。
+
 ## 维护者如何发布应用
 
-你提交应用（[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)）之后，维护者审核你打了 tag 的 commit 中的原样字节。[GitHub 管理员发布](docs/GITHUB-PUBLISHING.zh-CN.md)为新的 v2 目录签名，无需额外的 Hub 私钥；正式启用和兼容宿主发布仍待完成。现有 `hub publish` 路径继续生成旧的信任锚签名目录。
+你提交应用（[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)）之后，维护者审核你打了 tag 的 commit 中的原样字节。[GitHub 管理员发布](docs/GITHUB-PUBLISHING.zh-CN.md)为新的 v2 目录签名，无需额外的 Hub 私钥。生产发布和消费者验收见该文档的交付状态回执；兼容宿主版本仍待发布。现有 `hub publish` 路径继续生成旧的信任锚签名目录。
 
-维护者用 `hub withdraw` 撤回某个版本，每个商店下次拉取目录时都会撤下该版本。`hub remove` 用于删除本不该发布的条目。
+v2 的撤回通过相同的受保护工作流发布带理由的新候选，保留历史。商店在获取并验证新目录后执行撤回。`hub withdraw` / `hub remove` 仅修改旧格式目录，不能代替 v2 发布。
 
 ## 应用
 
