@@ -70,14 +70,16 @@ It reads the approved immutable candidate commit and digest as data; it never
 runs that candidate's workflows, build scripts, or app code. Publication is
 serialized and refuses a stale main/base catalog before a non-force update.
 
-Before enabling publication, maintainers must protect changes to `main` and this
-workflow, restrict environment approval to trusted administrators, and prevent
-approval by a user who is no longer an administrator. The dispatching administrator
+Before enabling publication, maintainers must restrict environment approval to
+current administrators and disable environment protection bypass. The administrator
+must review the exact workflow commit, candidate digest and publication receipt;
+approval cannot rely only on the workflow's name. The dispatching administrator
 may approve their own publication; a second person is not required. The
-certificate binds the workflow path and environment, not a
-specific reviewed implementation commit or the approver's role. These GitHub
-controls therefore remain part of the trust boundary; an unprotected workflow
-must not be treated as administrator authorization.
+certificate binds the workflow path and environment, not a specific reviewed
+implementation commit or the approver's role. The protected environment and this
+review are therefore the authorization boundary. Branch protection and mandatory
+workflow review are recommended governance controls; mandatory pull-request
+review would also require adapting the direct non-force publication transaction.
 
 The native `hub` commands are the workflow's validation boundary:
 
