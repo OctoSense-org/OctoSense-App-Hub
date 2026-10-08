@@ -277,7 +277,7 @@ OctoSense desktop 0.1.0-beta.2.
 | `photos` | Photos' own library and collections. | Read Photos's own library and publish collections | System apps only: OctoSense serves just `photos.notify`, to `os.photos` |
 | `youtube` | YouTube search and music recommendations. | Search YouTube and manage music recommendations | System apps only: OctoSense serves just `youtube.notify`, to `os.youtube` |
 | `glance` | Publishing Glance cards to the Glance screen (`glance.publish`, `glance.withdraw`, `glance.list`). The host checks, caps and expires the cards; a card opens only its own app. | Show cards on your glance screen | OctoSense |
-| `model` | `model.complete` and `model.budget`, within a daily budget per app. `model.complete` takes a model class (`fast` or `strong`) and a JSON Schema. No image, audio, video or embedding calls. | Send what you give it to the AI provider you configured, within a daily budget | OctoSense |
+| `model` | `model.complete` and `model.budget`, within a daily budget per app. `model.complete` takes a model class (`fast` or `strong`) and a JSON Schema. Image, audio, video and embedding methods are implemented in [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368), not in a released host. | Send what you give it to the AI provider you configured, within a daily budget | OctoSense; media methods require the new implementation and a compatible configured provider |
 | `research` | Searching through the system toolbox, within the manifest's research scope ([The research scope](#the-research-scope)). The host runs every search. | Search *what the scope allows* | System apps only, in phone builds |
 | `crawl` | Crawling sites through the system toolbox, up to the scope's `max_depth` and `max_pages`, inside its domain lists. More reach than `research`. | Crawl websites, *within the scope*, which reaches more than searching | As `research` |
 | `runtime` | Asking which APIs the host implements, with `runtime.list` and `runtime.describe` ([Host API compatibility](HOST-API.md)). It grants none of the APIs it lists. | Inspect available host APIs without gaining access to their data or permissions | Not on OctoSense desktop 0.1.0-beta.2, whose store refuses the name. App Hub's request dispatcher answers it in every host built from App Hub `main`, `card-host` included. |
@@ -584,6 +584,7 @@ The gate refuses a `host_method` unless every rule holds:
 | `glance` | `glance.list` | `glance.publish`, `glance.withdraw` |
 | `auth` | `auth.backend.me`, `auth.backend.request` (declared `GET` operations only) | |
 | `runtime` | `runtime.list`, `runtime.describe` | |
+| `model` | `model.capabilities`, `model.video.status` | `model.image`, `model.audio`, `model.embeddings`, `model.video`, `model.video.cancel` |
 | `camera` | `camera.permission.status` | |
 | `microphone` | `microphone.permission.status` | |
 | `location` | `location.permission.status`, `location.get` | |
@@ -601,8 +602,19 @@ person's approval on the host's native review screen. Permission `request` and
 `revoke`, account management and runtime ABIs such as `app_tools.dispatch@1`
 have no `host_method`.
 
-Provider writes, sign-in, reviews and approvals have no `host_method`: the
-person starts them from the app's own screen.
+The seven media aliases above require [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368);
+no released host implements them. They keep the `model` capability and
+`private_data: true` requirements. Generation and embeddings may be billable,
+so they and video cancellation require `act` risk and use the bounded model
+service. Discovery does not prove provider entitlement; video cancellation
+can fail when the remote job is already running. See the bilingual
+[media contract](https://github.com/OctoSense-org/OctoSense/blob/feat/model-media-services/apps/ai-providers/host-service/MEDIA.md)
+for quotas and process-local job lifetime. Live provider/device validation is
+not claimed by these policy aliases.
+
+Account/business writes, sign-in, reviews and approvals have no `host_method`:
+the person starts them from the app's own screen. The bounded model jobs above
+are the explicit exception for model-provider submissions.
 
 For a tool mapped to `glance.publish`, let `input_schema` accept only
 `template` with `initial`, or an L0 `source` with `data`. Never accept

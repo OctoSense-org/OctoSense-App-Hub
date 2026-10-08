@@ -211,7 +211,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | `photos` | 相册应用自己的图库和合集。 | Read Photos's own library and publish collections | 仅系统应用：OctoSense 只向 `os.photos` 提供 `photos.notify` |
 | `youtube` | YouTube 搜索和音乐推荐。 | Search YouTube and manage music recommendations | 仅系统应用：OctoSense 只向 `os.youtube` 提供 `youtube.notify` |
 | `glance` | 向速览栏发布速览卡片（`glance.publish`、`glance.withdraw`、`glance.list`）。宿主会检查卡片，为卡片设置上限和有效期；卡片只能打开它自己的应用。 | Show cards on your glance screen | OctoSense |
-| `model` | `model.complete` 和 `model.budget`，受每个应用的每日预算限制。`model.complete` 接受一个模型类别（`fast` 或 `strong`）和一个 JSON Schema。不支持图片、音频、视频或向量嵌入调用。 | Send what you give it to the AI provider you configured, within a daily budget | OctoSense |
+| `model` | `model.complete` 和 `model.budget`，受每个应用的每日预算限制。`model.complete` 接受一个模型类别（`fast` 或 `strong`）和一个 JSON Schema。图片、音频、视频和向量方法在 [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368) 中实现，尚未进入发布版宿主。 | Send what you give it to the AI provider you configured, within a daily budget | OctoSense；媒体方法需要新实现及已配置的兼容供应商 |
 | `research` | 通过系统工具箱搜索，不超出清单的 research 范围（[research 范围](#research-范围)）。每次搜索都由宿主执行。 | Search *范围允许的内容* | 仅系统应用，且只在手机版构建中 |
 | `crawl` | 通过系统工具箱抓取网站，深度和页数不超过范围中的 `max_depth` 和 `max_pages`，并遵守其中的域名列表。覆盖面比 `research` 更广。 | Crawl websites, *范围的限制*, which reaches more than searching | 同 `research` |
 | `runtime` | 用 `runtime.list` 和 `runtime.describe` 查询宿主实现了哪些 API（[宿主 API 兼容性](HOST-API.zh-CN.md)）。它不授予所列的任何 API。 | Inspect available host APIs without gaining access to their data or permissions | OctoSense 桌面版 0.1.0-beta.2 不提供，它的商店会拒绝这个名称。在基于 App Hub `main` 构建的每个宿主中（包括 `card-host`），由 App Hub 的请求分派器响应。 |
@@ -463,6 +463,7 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | `glance` | `glance.list` | `glance.publish`、`glance.withdraw` |
 | `auth` | `auth.backend.me`、`auth.backend.request`（仅声明的 `GET` 操作） | |
 | `runtime` | `runtime.list`、`runtime.describe` | |
+| `model` | `model.capabilities`、`model.video.status` | `model.image`、`model.audio`、`model.embeddings`、`model.video`、`model.video.cancel` |
 | `camera` | `camera.permission.status` | |
 | `microphone` | `microphone.permission.status` | |
 | `location` | `location.permission.status`、`location.get` | |
@@ -470,7 +471,15 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 `wasm.<function>` 运行应用自带的函数之一（`fns/*.wasm`，`wasm` 能力）；目前还没有任何 OctoSense 发布版提供它。
 目前还没有任何 OctoSense 发布版提供上表中的 `auth`、`runtime`、`camera`、`microphone` 和 `location` 方法（[宿主 API 兼容性](HOST-API.zh-CN.md)）。上面的规则同样适用于这些方法，`runtime.list` 和 `runtime.describe` 也不例外。通过准入不等于已经配置账户、取得权限或补上缺少的 API：请用 `runtime.describe` 查询宿主实现了什么。映射到 `auth.backend.request` 的工具只能执行后端声明的 `GET` 操作；写操作仍须应用在前台，并由用户在宿主的原生审阅界面上批准。权限的 `request` 和 `revoke`、账户管理，以及 `app_tools.dispatch@1` 等运行时 ABI，都没有 `host_method`。
 
-提供商写入、登录、确认和批准都没有 `host_method`：这些操作由用户在应用自己的界面上发起。
+上述七个媒体别名需要 [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368)，
+尚无发布版宿主实现它们。它们仍要求 `model` 能力和 `private_data: true`。
+生成与向量请求可能计费，因此它们和视频取消至少需要 `act` 风险，并使用有资源上限的
+模型服务。发现 API 不代表供应商账户已有权益；远端视频任务已运行时，取消可能失败。
+额度和进程内任务生命周期见双语[媒体契约](https://github.com/OctoSense-org/OctoSense/blob/feat/model-media-services/apps/ai-providers/host-service/MEDIA.zh-CN.md)。
+这些策略别名不构成真实供应商或设备验证。
+
+账户/业务写入、登录、确认和批准都没有 `host_method`：这些操作由用户在应用自己的
+界面上发起。上述有上限的模型任务是模型供应商提交的明确例外。
 
 对于映射到 `glance.publish` 的工具，让 `input_schema` 只接受 `template` 加 `initial`，或 L0 `source` 加 `data`。绝不要接受 `script`。OctoSense 桌面版 0.1.0-beta.2 按应用自身的策略发布 Agent 提交的脚本卡片，因此模型写出的 `script` 会作为你的应用运行。OctoSense `main`（尚未进入任何发布版）会拒绝这类卡片，报错 `Agents cannot publish executable Splash; choose an admitted template with initial data, or L0 source`；它也拒绝 L1 的 `source`。
 

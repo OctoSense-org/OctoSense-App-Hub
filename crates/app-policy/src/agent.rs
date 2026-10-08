@@ -429,6 +429,15 @@ impl ToolManifest {
 pub const SHARED_HOST_METHODS: &[(&str, Risk)] = &[
     ("runtime.list", Risk::Read),
     ("runtime.describe", Risk::Read),
+    ("model.capabilities", Risk::Read),
+    ("model.video.status", Risk::Read),
+    // Generation submits potentially billable work using host-owned provider
+    // credentials. Cancellation changes a remote job; none is a read alias.
+    ("model.image", Risk::Act),
+    ("model.audio", Risk::Act),
+    ("model.embeddings", Risk::Act),
+    ("model.video", Risk::Act),
+    ("model.video.cancel", Risk::Act),
     ("auth.backend.me", Risk::Read),
     // Agent tools always carry may_prompt=false. The backend service permits
     // only declared GET operations in that context; mutations require the

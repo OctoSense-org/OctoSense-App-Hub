@@ -274,6 +274,8 @@ fn host_api_read_aliases_load_only_with_the_owning_apps_capability_and_privacy_d
     for method in [
         "runtime.list",
         "runtime.describe",
+        "model.capabilities",
+        "model.video.status",
         "auth.backend.me",
         "auth.backend.request",
         "camera.permission.status",
@@ -377,6 +379,11 @@ fn shared_local_mutations_keep_risk_and_private_data_floors() {
     };
     for method in [
         "gmail.draft.open",
+        "model.image",
+        "model.audio",
+        "model.embeddings",
+        "model.video",
+        "model.video.cancel",
         "gmail.draft.edit",
         "gmail.event.decide",
         "glance.publish",
@@ -862,4 +869,26 @@ fn an_outward_tool_waits_for_the_person_and_may_forbid_standing_rules() {
         t["tools"][last]["risk"] = json!("read");
     });
     refused_with(&dir, &manifest, "news.share is outward but its risk is read");
+}
+
+#[test]
+fn billable_media_aliases_need_model_capability_and_explicit_private_data() {
+    for method in ["model.image", "model.audio", "model.embeddings", "model.video", "model.video.cancel"] {
+        let dir = scratch(&format!("media-alias-{method}"));
+        edit_tools(&dir, |tools| {
+            tools["tools"][0]["host_method"] = json!(method);
+            tools["tools"][0]["risk"] = json!("act");
+            tools["tools"][0]["private_data"] = json!(true);
+        });
+        let manifest = stamp(&dir, |_| {});
+        assert!(AgentBundle::load(&dir, &manifest).unwrap_err().contains("requires the declared \"model\" service capability"), "{method}");
+        let manifest = stamp(&dir, |manifest| {
+            manifest["capabilities"].as_array_mut().unwrap().push(json!("model"));
+        });
+        assert_eq!(AgentBundle::load(&dir, &manifest).unwrap().unwrap().tool("news.list").unwrap().service_method(), method);
+        edit_tools(&dir, |tools| tools["tools"][0]["private_data"] = json!(false));
+        let manifest = stamp(&dir, |_| {});
+        assert!(AgentBundle::load(&dir, &manifest).unwrap_err().contains("private_data: true"), "{method}");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }
