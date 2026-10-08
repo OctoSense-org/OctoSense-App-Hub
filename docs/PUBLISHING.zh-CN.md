@@ -220,7 +220,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | `research` | 通过系统工具箱搜索，不超出清单的 research 范围（[research 范围](#research-范围)）。每次搜索都由宿主执行。 | Search *范围允许的内容* | 仅系统应用，且只在手机版构建中 |
 | `crawl` | 通过系统工具箱抓取网站，深度和页数不超过范围中的 `max_depth` 和 `max_pages`，并遵守其中的域名列表。覆盖面比 `research` 更广。 | Crawl websites, *范围的限制*, which reaches more than searching | 同 `research` |
 | `runtime` | 用 `runtime.list` 和 `runtime.describe` 查询宿主实现了哪些 API（[宿主 API 兼容性](HOST-API.zh-CN.md)）。它不授予所列的任何 API。 | Inspect available host APIs without gaining access to their data or permissions | OctoSense 桌面版 0.1.0-beta.2 不提供，它的商店会拒绝这个名称。在基于 App Hub `main` 构建的每个宿主中（包括 `card-host`），由 App Hub 的请求分派器响应。 |
-| `wasm` | 应用自带的函数：应用包 `fns/` 中的 WebAssembly 模块（最多 8 个），由宿主的 `wasm` 服务在沙盒中运行，有截止时间和内存上限。函数只拿到自己的输入，接触不到文件、网络、时钟或其他应用。Agent 工具可以用 `host_method: "wasm.<function>"` 运行它。 | Run its own sandboxed functions on this device | 尚未进入发布版本：OctoSense 只在启用 `wasm-lab` 特性的构建中提供 |
+| `wasm` | 应用自带的函数：应用包 `fns/` 中的 WebAssembly 模块（最多 8 个），由宿主的 `wasm` 服务在沙盒中运行，有截止时间和内存上限。函数只拿到自己的输入，接触不到文件、网络、时钟或其他应用。Agent 工具可以用 `host_method: "wasm.<function>"` 运行它。函数的编写、构建和调用方法见 Design Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/RUST.zh-CN.md)。 | Run its own sandboxed functions on this device | 尚未进入发布版本：OctoSense 只在启用 `wasm-lab` 特性的构建中提供 |
 
 任何能力都不隐含其他能力。尚不支持：面向商店应用的 `photos` 和 `youtube` 服务。脚本如何调用各项能力，见 Design Flow 的[能力](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.zh-CN.md)文档。
 
@@ -426,7 +426,7 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | `risk` | `read`（只读取）、`act`（修改应用自身的状态）或 `destructive`（发送、发帖、分享、购买、删除，即任何超出应用本身的操作）。必填。也接受工具代理的写法 `Read`、`Act` 和 `Destructive`。 |
 | `background` | 工具可以在并非由用户发起的一轮对话中运行。默认 `false`。 |
 | `shareable` | 可以授权给应用自身 Agent 以外的调用方，例如 OctoSense 的系统 Agent（覆盖整台设备，用户直接与它对话）和其他应用的 Agent。默认 `false`。 |
-| `private_data` | 结果中含有用户的私人数据。`local_only` 应用的可共享工具必须设为 `false`；带 `host_method` 的工具必须设为 `true`。 |
+| `private_data` | 结果中含有用户的私人数据。`local_only` 应用的可共享工具必须设为 `false`；带 `host_method` 的工具必须设为 `true`，但运行 `wasm.<function>` 的工具除外，因为函数只能看到自己的输入。 |
 | `implemented_by` | `host-service`：由宿主服务运行。`app`：由应用自己的脚本在已打开的应用中运行（[脚本工具执行](#脚本工具执行script-tools-v1)）。必填。 |
 | `host_method` | 工具映射到的已审核共享服务方法（[把工具映射到共享服务](#把工具映射到共享服务host_method)）。可选。 |
 | `outward` | 如果 `act` 工具的调用会触及设备之外（发送、发帖、分享），就设置此项。这样每次调用都会像破坏性（`destructive`）调用一样，等待用户批准。默认 `false`；准入检查拒绝在 `read` 工具上设置它。 |
@@ -473,8 +473,7 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | `microphone` | `microphone.permission.status` | |
 | `location` | `location.permission.status`、`location.get` | |
 
-`wasm.<function>` 运行应用自带的函数之一（`fns/*.wasm`，`wasm` 能力）；目前还没有任何 OctoSense 发布版提供它。
-目前还没有任何 OctoSense 发布版提供上表中的 `auth`、`runtime`、`camera`、`microphone` 和 `location` 方法（[宿主 API 兼容性](HOST-API.zh-CN.md)）。上面的规则同样适用于这些方法，`runtime.list` 和 `runtime.describe` 也不例外。通过准入不等于已经配置账户、取得权限或补上缺少的 API：请用 `runtime.describe` 查询宿主实现了什么。映射到 `auth.backend.request` 的工具只能执行后端声明的 `GET` 操作；写操作仍须应用在前台，并由用户在宿主的原生审阅界面上批准。权限的 `request` 和 `revoke`、账户管理，以及 `app_tools.dispatch@1` 等运行时 ABI，都没有 `host_method`。
+`wasm.<function>` 运行应用自带的函数之一（`fns/*.wasm`，`wasm` 能力）。目前还没有任何 OctoSense 发布版提供它，也没有提供上表中的 `auth`、`runtime`、`camera`、`microphone` 和 `location` 方法（[宿主 API 兼容性](HOST-API.zh-CN.md)）。上面的规则同样适用于这些方法，`runtime.list` 和 `runtime.describe` 也不例外。通过准入不等于已经配置账户、取得权限或补上缺少的 API：请用 `runtime.describe` 查询宿主实现了什么。映射到 `auth.backend.request` 的工具只能执行后端声明的 `GET` 操作；写操作仍须应用在前台，并由用户在宿主的原生审阅界面上批准。权限的 `request` 和 `revoke`、账户管理，以及 `app_tools.dispatch@1` 等运行时 ABI，都没有 `host_method`。
 
 上述七个媒体别名需要 [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368)，
 尚无发布版宿主实现它们。它们仍要求 `model` 能力和 `private_data: true`。

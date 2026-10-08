@@ -288,7 +288,7 @@ OctoSense desktop 0.1.0-beta.2.
 | `research` | Searching through the system toolbox, within the manifest's research scope ([The research scope](#the-research-scope)). The host runs every search. | Search *what the scope allows* | System apps only, in phone builds |
 | `crawl` | Crawling sites through the system toolbox, up to the scope's `max_depth` and `max_pages`, inside its domain lists. More reach than `research`. | Crawl websites, *within the scope*, which reaches more than searching | As `research` |
 | `runtime` | Asking which APIs the host implements, with `runtime.list` and `runtime.describe` ([Host API compatibility](HOST-API.md)). It grants none of the APIs it lists. | Inspect available host APIs without gaining access to their data or permissions | Not on OctoSense desktop 0.1.0-beta.2, whose store refuses the name. App Hub's request dispatcher answers it in every host built from App Hub `main`, `card-host` included. |
-| `wasm` | The app's own functions: WebAssembly modules in the bundle's `fns/` (at most 8), run by the host's `wasm` service in a sandbox with a deadline and a memory cap. A function gets only its input and reaches no file, network, clock or other app. An agent tool can run one with `host_method: "wasm.<function>"`. | Run its own sandboxed functions on this device | Not in a release: OctoSense serves it only in builds with its `wasm-lab` feature |
+| `wasm` | The app's own functions: WebAssembly modules in the bundle's `fns/` (at most 8), run by the host's `wasm` service in a sandbox with a deadline and a memory cap. A function gets only its input and reaches no file, network, clock or other app. An agent tool can run one with `host_method: "wasm.<function>"`. To write, build and call a function, see Design Flow's [Run your own Rust code](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/RUST.md). | Run its own sandboxed functions on this device | Not in a release: OctoSense serves it only in builds with its `wasm-lab` feature |
 
 No capability implies another. Not yet: `photos` and `youtube` services for
 store apps. For how a script calls each capability, see Design Flow's
@@ -545,7 +545,7 @@ The gate admits these tools, but in a store app each call fails with
 | `risk` | `read` (only reads), `act` (changes the app's own state) or `destructive` (sends, posts, shares, buys, deletes: anything past the app). Required. The tool broker's `Read`, `Act` and `Destructive` spellings are accepted. |
 | `background` | The tool may run in a turn the person did not start. Default `false`. |
 | `shareable` | Callers other than the app's own agent may be granted it, such as OctoSense's system agent (the device-wide agent the person talks to) and other apps' agents. Default `false`. |
-| `private_data` | The result carries the person's private data. A shareable tool of a `local_only` app must say `false`; a `host_method` tool must say `true`. |
+| `private_data` | The result carries the person's private data. A shareable tool of a `local_only` app must say `false`; a `host_method` tool must say `true`, except one that runs `wasm.<function>`, which sees only its input. |
 | `implemented_by` | `host-service`: a host service runs it. `app`: the app's own script runs it, in the open app ([Script tool execution](#script-tool-execution-script-tools-v1)). Required. |
 | `host_method` | A reviewed shared-service method the tool runs on ([Map a tool to a shared service](#map-a-tool-to-a-shared-service-host_method)). Optional. |
 | `outward` | Set it on an `act` tool whose call reaches outside the device (sends, posts, shares). Each call then waits for the person, as a destructive call does. Default `false`; refused on a `read` tool. |
@@ -597,9 +597,9 @@ The gate refuses a `host_method` unless every rule holds:
 | `location` | `location.permission.status`, `location.get` | |
 
 `wasm.<function>` runs one of the app's own functions (`fns/*.wasm`, the
-`wasm` capability); no OctoSense release serves it yet.
-No OctoSense release serves the `auth`, `runtime`, `camera`, `microphone`
-and `location` methods above yet ([Host API compatibility](HOST-API.md)).
+`wasm` capability). No OctoSense release serves it, or the `auth`,
+`runtime`, `camera`, `microphone` and `location` methods above yet
+([Host API compatibility](HOST-API.md)).
 The rules above apply to them too, `runtime.list` and `runtime.describe`
 included. Admission does not configure an account, grant a permission or
 add a missing API: check what the host implements with `runtime.describe`.

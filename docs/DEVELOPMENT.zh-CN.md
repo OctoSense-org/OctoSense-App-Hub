@@ -40,7 +40,7 @@
 | 内置原生应用 | 编译进 Shell 版本的源码，按原生工作区和所属应用的构建说明构建。共享的图标约定同样适用。 | 随 Shell 版本发布。仅声明图标，并不能让它通过 Hub 安装。 |
 | Agent 生成的应用类型 | 位于 OctoSense `apps/appcard` 的规格说明和 lint 规则，教 AppCard 的 Agent 组合出一种新的应用类型。 | 不是应用包。 |
 
-商店应用包不含原生代码。新的 Rust 或 JNI 代码、Python 服务和浏览器控制器，都无法作为卡片应用或脚本应用安装。
+商店应用包不含原生代码。新的原生 Rust 或 JNI 代码、Python 服务和浏览器控制器，都无法作为卡片应用或脚本应用安装。编译成 WebAssembly 模块的 Rust 代码可以借助 `wasm` 能力随商店应用发布，在没有文件、网络和时钟的沙盒中运行。只有启用 `wasm-lab` 特性的 OctoSense 构建会运行它，目前还没有任何发布版启用这项特性（见 Design Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/RUST.zh-CN.md)）。
 
 有些 Design Flow 示例包含原生服务或网站集成。以这类示例为基础开发 Hub 应用之前，先确认每一项行为都能在应用的隔离环境中运行。复制某个服务项目的源码目录，并不能让它变得可安装。
 
