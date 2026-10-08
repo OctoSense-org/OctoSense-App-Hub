@@ -42,8 +42,9 @@ install and launch; admission alone does not prove runtime support.
 
 `backend::BackendRegistration` describes an app's public HTTPS login and named
 business operations. Credentials remain in the host. Backend and device access
-still require separate grants, supported native adapters and user consent.
-See [host API compatibility](../../docs/HOST-API.md) for examples and limits.
+still require separate grants, supported native adapters and the person's
+consent. See [Host API compatibility](../../docs/HOST-API.md) for examples and
+limits.
 
 ## Versions on crates.io
 
@@ -58,10 +59,10 @@ app org.example.connect requests unknown capability "auth"
 
 `cargo update -p octosense-app-contract` moves an unconstrained 1.x consumer
 to 1.6.0. Hosts using the new API declarations must select 1.6 or later;
-older checked-in lock files remain on their existing version. OctoSense desktop 0.1.0-beta.2
-patched the crate to an App Hub revision. To build against a contract newer
-than the latest release, patch crates.io's copy with an App Hub revision, then
-update the lock file:
+older checked-in lock files remain on their existing version. OctoSense
+desktop 0.1.0-beta.2 patched the crate to an App Hub revision. To build
+against a contract newer than the latest release, patch crates.io's copy with
+an App Hub revision, then update the lock file:
 
 ```toml
 [patch.crates-io]

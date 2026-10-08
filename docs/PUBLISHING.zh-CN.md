@@ -111,13 +111,15 @@ my-app/
 [refused] resource-invalid (kit/native/light/kit.json/components/detail/style/font_src): not a portable bundle path: "makepad_widgets:resources/LXGWWenKaiRegular.ttf"
 ```
 
-随包附带的 `.ttf` 或 `.otf` 使用相对路径，例如 `"font_src": "assets/Body.ttf"`。已安装应用的卡片运行器和 `card-host` 会在 kit 样式及字体 token 求值后解析资源字段，再从这个应用包的宿主素材服务加载文件。不要在应用包中填写 HTTP 地址；加载自带字体不需要网络权限或外部字体 URL。
+打包的 `.ttf` 或 `.otf` 字体用相对于应用包的路径指定，例如 `"font_src": "assets/Body.ttf"`。已安装应用的卡片运行器和 `card-host` 先对 kit 样式和字体 token 求值，再解析路径，并从该应用包的宿主素材服务加载文件。不要在应用包中填写 HTTP 地址；加载打包字体既不需要网络权限，也不需要外部字体 URL。
 
-在原生 kit 中，`font_src` 也可以是一个 token 引用 `{"$token": "<name>"}`，它在 kit 的 `tokens` 中的 `value` 就是这样的路径。准入检查核对的是 token 解析后的路径；其他对象或数组一律拒绝，报 `font_src must be a bundled font path, a supported built-in font, or one token resolving to a string`。
+在原生 kit 中，`font_src` 也可以是一个 token 引用 `{"$token": "<name>"}`，只要 kit 的 `tokens` 中这个 token 的 `value` 是这样的路径。准入检查核对的是 token 解析后的路径；其他对象或数组一律拒绝，报 `font_src must be a bundled font path, a supported built-in font, or one token resolving to a string`。
 
-其他直接指定的内置字体仍不受支持（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。宿主打包了国际字体资源时，渲染器会提供按需加载的中文后备字体。自带字体文件计入 8 MiB 上限，所以较大的 CJK 字体请只打包所需的子集。准入检查验证路径但不解码字体，因此请在 `card-host` 中测试完整应用包。
+尚不支持：其他内置字体（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。
 
-OctoSense 桌面版 0.1.0-beta.2 早于这项字体加载功能：它会安装带打包字体的应用，但卡片不会加载这些字体。要在那里显示中文，请用角色 kit 组合卡片，并且不设 `font_src`。角色 kit 是 `Surface`、`TextTitle`、`TextBody` 等组件背后的 OctoScript 模块集合：把 OctoScript-Makepad 的 `components/l0/` 中的 `_kit.octoscript`、`_derive.octoscript`、`_derive_color.octoscript`、`_palette_light.octoscript` 和 `_palette_dark.octoscript` 复制到应用包的 `kit/` 中。它会用 Makepad 内置的 CJK 字体 LXGW WenKai（霞鹜文楷）显示中文。
+打包字体计入 8 MiB 上限，所以较大的 CJK 字体请只打包所需的子集。准入检查只核对字体路径，不解码字体文件，因此请在 `card-host` 中测试完整的应用包。用 Makepad 的 International 字体集构建的宿主（例如 `card-host`）还会用内置的 CJK 后备字体显示中文，这个字体在首次用到时才加载。
+
+OctoSense 桌面版 0.1.0-beta.2 发布时还没有加载打包字体的功能：它会安装带打包字体的应用，但卡片不会加载这些字体。要在该版本上显示中文，请用角色 kit 组合卡片，并且不设 `font_src`。角色 kit 是 `Surface`、`TextTitle`、`TextBody` 等组件背后的 OctoScript 模块集合：把 OctoScript-Makepad 的 `components/l0/` 中的 `_kit.octoscript`、`_derive.octoscript`、`_derive_color.octoscript`、`_palette_light.octoscript` 和 `_palette_dark.octoscript` 复制到应用包的 `kit/` 中。它会用 Makepad 内置的 CJK 字体 LXGW WenKai（霞鹜文楷）显示中文。
 
 默认情况下，卡片字体缺少的字形，Makepad 会改用操作系统的字体来绘制，所以在 macOS 上，字体没有加载也可能看不出来。检查卡片时，请关闭这项回退：
 
@@ -125,7 +127,7 @@ OctoSense 桌面版 0.1.0-beta.2 早于这项字体加载功能：它会安装�
 MAKEPAD_SYSTEM_FONTS=0 tools/octo run ~/apps/my-app/bundle --port 8141 --detach
 ```
 
-这时，卡片字体和渲染器后备字体都没有覆盖的字形，都会显示成方框。
+这时，卡片字体和渲染器后备字体都不包含的字形会显示成方框。
 
 脚本应用可以附带字体。在文字样式的 `FontMember` 中通过 `{{assets}}` 占位符指定字体文件；该文件计入 8 MiB 上限：
 
@@ -165,9 +167,9 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | `compute` | `instruction_budget`、`memory_bytes`。 | 会限制在宿主的上限以内。 |
 | `agent` | 应用自己的 Agent。 | 可选（[清单中的 `agent`](#清单中的-agent)）。 |
 | `research` | `research` 和 `crawl` 的范围。 | 请求了 `research` 或 `crawl` 时必需；两者都没请求时，出现此字段即拒绝（[research 范围](#research-范围)）。 |
-| `requires` | 应用需要的宿主特性。 | 每一项都必须是宿主已知的特性；已知特性有 `palpo-admin-v1`、`host-api-v1`、`backend-api-v1` 和 `script-tools-v1`。后三项还要求宿主实现对应接口，见[宿主 API 兼容性](HOST-API.zh-CN.md)。 |
-| `host_api` | 可选的必需/可选 API 精确版本映射。 | 要求 `host-api-v1`，安装和启动时检查必需的实现。 |
-| `backend` | 可选的公开后端登录及具名业务操作声明。 | 要求 `backend-api-v1`、`auth` 和账户存储，不得包含凭据（[登录自己的后端](#登录自己的后端)）。 |
+| `requires` | 应用需要的宿主特性。 | 每一项都必须是宿主已知的特性：`palpo-admin-v1`、`host-api-v1`、`backend-api-v1` 或 `script-tools-v1`。后三项还需要宿主实现它们对应的 API（[宿主 API 兼容性](HOST-API.zh-CN.md)）。 |
+| `host_api` | 应用需要（`required`）或可以使用（`optional`）的宿主 API 方法，每个方法都写明 ABI 主版本。 | 可选；须在 `requires` 中声明 `host-api-v1`。商店在安装时和每次启动时检查 `required` 中的方法（[声明应用需要什么](HOST-API.zh-CN.md#声明应用需要什么)）。 |
+| `backend` | 应用自己的后端：公开的登录端点，以及应用可以调用的操作。 | 可选；须在 `requires` 中声明 `backend-api-v1`，并请求 `auth` 能力、设置 `storage.accounts: true`。不含任何凭据（[登录自己的后端](#登录自己的后端)）。 |
 | `schema_minor` | 清单用到了 schema 1 的哪些新增内容。 | 省略此字段。 |
 
 其他字段一律拒绝。运行 `hub sign-manifest` 之后，你省略的可选字段也会出现在清单中，值为 `null`，例如 `"agent": null`。这些字段不改变任何行为。
@@ -189,8 +191,8 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | `storage` | 应用自己的存储文件夹：`fs.*`、相机拍摄的内容，以及控件读取的本地文件。没有它，所有 `fs.*` 调用都会失败。 | Keep its own data on this device | 运行时，所有宿主都提供 |
 | `net` | 向 `network.hosts` 中的主机发出请求，不能访问其他主机。 | Reach only: *主机列表* | 运行时，所有宿主都提供 |
 | `images` | 显示任何公开 https 主机上的图片，不限于 `network.hosts`。 | Show pictures from any website | 运行时 |
-| `web` | 在系统网页视图中打开任何公开 https 页面；网页视图没有任何回到应用的通道。 | Open web pages in a browser view | 运行时，仅限 macOS、iOS 和 Android 构建。桌面版 Linux 和 Windows 构建没有系统网页视图。 |
-| `location` | 设备的位置。仅在 OctoSense `main` 上：声明了 `host-api-v1` 的应用须先用 `location.permission.request` 请求权限，之后在 Android 上可以用 `location.get` 读取最近一次已知的位置（[宿主 API 兼容性](HOST-API.zh-CN.md)）。 | Use your location | 运行时，限具备该功能的设备 |
+| `web` | 在系统网页视图中打开任何公开 https 页面；网页视图没有任何回到应用的通道。 | Open web pages in a browser view | 运行时，仅限 macOS、iOS 和 Android 构建。桌面版 Linux 和 Windows 构建没有系统网页视图。仅在 OctoSense `main` 上：Linux（X11 或 XWayland）和 Windows 构建会内嵌系统网页视图，前提是用户已安装 WebKitGTK 或 WebView2 Runtime。 |
+| `location` | 设备的位置。仅在 OctoSense `main` 上：声明了 `host-api-v1` 的应用须先用 `location.permission.request` 请求权限，之后在 Android 上可以用 `location.get` 读取上次已知的位置（[宿主 API 兼容性](HOST-API.zh-CN.md)）。 | Use your location | 运行时，限具备该功能的设备 |
 | `camera` | 相机。拍摄的内容保存在应用的存储中，所以应用还需要 `storage`。仅在 OctoSense `main` 上：声明了 `host-api-v1` 的应用须先用 `camera.permission.request` 请求权限。 | Use the camera | 运行时，限具备该功能的设备 |
 | `microphone` | 相机录像时的声音。仅在 OctoSense `main` 上：声明了 `host-api-v1` 的应用须先用 `microphone.permission.request` 请求权限。 | Use the microphone | 运行时，限具备该功能的设备 |
 | `library` | 把拍摄的内容提供给系统相册，其他应用也能看到。 | Save to your photo library, where other apps can see it | 运行时，限具备该功能的设备 |
@@ -418,11 +420,11 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | `background` | 工具可以在并非由用户发起的一轮对话中运行。默认 `false`。 |
 | `shareable` | 可以授权给应用自身 Agent 以外的调用方，例如 OctoSense 的系统 Agent（覆盖整台设备，用户直接与它对话）和其他应用的 Agent。默认 `false`。 |
 | `private_data` | 结果中含有用户的私人数据。`local_only` 应用的可共享工具必须设为 `false`；带 `host_method` 的工具必须设为 `true`。 |
-| `implemented_by` | `host-service`：由宿主服务运行。`app`：由应用自己的脚本在已打开的完整应用中运行，宿主须提供 `app_tools.dispatch@1`，清单须声明 `requires: ["script-tools-v1"]`。应用关闭时返回 `app_not_running`；更早的宿主（包括桌面版 0.1.0-beta.2）拒绝调用，返回 `app_tool_unavailable`（[脚本工具执行](#脚本工具执行script-tools-v1)）。必填。 |
+| `implemented_by` | `host-service`：由宿主服务运行。`app`：由应用自己的脚本在已打开的应用中运行（[脚本工具执行](#脚本工具执行script-tools-v1)）。必填。 |
 | `host_method` | 工具映射到的已审核共享服务方法（[把工具映射到共享服务](#把工具映射到共享服务host_method)）。可选。 |
 | `outward` | 如果 `act` 工具的调用会触及设备之外（发送、发帖、分享），就设置此项。这样每次调用都会像破坏性（`destructive`）调用一样，等待用户批准。默认 `false`；准入检查拒绝在 `read` 工具上设置它。 |
 | `auto_approvable` | 常设规则（例如“一小时内允许”）可以批准调用。默认 `true`。对于删除、付款、账户或安全设置的变更，以及向设备之外分享，请设为 `false`，让用户逐次当场批准。 |
-| `confirm` | 执行破坏性或对外的调用之前，由谁询问用户：`host`（默认，即宿主的批准流程）或 `app`（应用自己的确认界面）。只有应用自己实现的工具才能使用 `app`。 |
+| `confirm` | 执行破坏性或对外的调用之前，由谁询问用户：`host`（默认，即宿主的批准流程）或 `app`（应用自己的确认界面）。准入检查只允许应用自己实现的工具使用 `app`，而宿主会拒绝这类工具的破坏性或对外调用（[脚本工具执行](#脚本工具执行script-tools-v1)）。 |
 
 ### 把工具映射到共享服务：`host_method`
 
@@ -457,13 +459,13 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | `gcalendar` | `gcalendar.calendars`、`gcalendar.sync`、`gcalendar.refresh`、`gcalendar.cached`、`gcalendar.get`、`gcalendar.prepare` | |
 | `gmail` | `gmail.labels`、`gmail.messages`、`gmail.message`、`gmail.draft.get`、`gmail.event.status` | `gmail.draft.open`、`gmail.draft.edit`、`gmail.event.decide` |
 | `glance` | `glance.list` | `glance.publish`、`glance.withdraw` |
-| `auth` | `auth.backend.me`、`auth.backend.request`（仅声明的 GET 操作） | |
+| `auth` | `auth.backend.me`、`auth.backend.request`（仅声明的 `GET` 操作） | |
 | `runtime` | `runtime.list`、`runtime.describe` | |
 | `camera` | `camera.permission.status` | |
 | `microphone` | `microphone.permission.status` | |
 | `location` | `location.permission.status`、`location.get` | |
 
-这八个后端、运行时和设备别名要求兼容的 Host API v1 集成，不代表 beta.2 或已经发布的宿主具有这些能力。所有别名（包括发现接口）仍须满足表中的能力声明和 `private_data: true` 要求。通过准入不等于已经配置账户、取得授权或实现缺少的 API；应按[宿主 API 兼容性](HOST-API.zh-CN.md)检查实际宿主的发现结果和平台支持。`auth.backend.request` 别名只能执行已声明的 GET 操作；后端写入仍须从前台应用发起，并在宿主的原生审阅界面上确认。权限申请和撤销、账户管理方法，以及 `app_tools.dispatch` 等运行时 ABI，都不能作为已准入的 `host_method` 目标。
+目前还没有任何 OctoSense 发布版提供上表中的 `auth`、`runtime`、`camera`、`microphone` 和 `location` 方法（[宿主 API 兼容性](HOST-API.zh-CN.md)）。上面的规则同样适用于这些方法，`runtime.list` 和 `runtime.describe` 也不例外。通过准入不等于已经配置账户、取得权限或补上缺少的 API：请用 `runtime.describe` 查询宿主实现了什么。映射到 `auth.backend.request` 的工具只能执行后端声明的 `GET` 操作；写操作仍须应用在前台，并由用户在宿主的原生审阅界面上批准。权限的 `request` 和 `revoke`、账户管理，以及 `app_tools.dispatch@1` 等运行时 ABI，都没有 `host_method`。
 
 提供商写入、登录、确认和批准都没有 `host_method`：这些操作由用户在应用自己的界面上发起。
 
@@ -473,9 +475,15 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 
 ### 脚本工具执行（`script-tools-v1`）
 
-脚本工具需要提供 `app_tools.dispatch@1` 的宿主：App Hub 的运行器和 OctoSense 的中继需要配套发布，目前还没有任何 OctoSense 发布版包含它们。更早的宿主（包括桌面版 0.1.0-beta.2）拒绝这类工具，返回 `app_tool_unavailable`。清单必须包含 `"requires": ["script-tools-v1"]`。在 `tools.json` 中声明名称和 JSON schema，设置 `"implemented_by": "app"`，再在应用签名包的 Splash 入口源码中实现下面这个固定钩子。此示例假设清单 ID 为 `dev.example.notebook`，工具命名空间因此是 `notebook`；`notes` 是原生应用的保留名称，已安装的商店应用不能使用：
+脚本工具是 `"implemented_by": "app"` 的工具：由应用自己的 Splash 代码在已打开的应用中运行。它需要提供 `app_tools.dispatch@1` 的宿主，例如基于 `main` 构建的 OctoSense Shell；OctoSense `main` 尚未进入任何发布版。OctoSense 桌面版 0.1.0-beta.2 拒绝这类工具，返回 `app_tool_unavailable`。
 
-```text
+添加脚本工具：
+
+1. 在清单中加入 `"requires": ["script-tools-v1"]`。
+2. 在 `tools.json` 中声明工具的名称、schema 和 `"implemented_by": "app"`。
+3. 在 `main.splash` 中实现 `app_tool` 钩子。下例的应用 ID 是 `dev.example.notebook`，因此工具命名空间是 `notebook`。应用不能使用 `notes`，它是保留名称（[ID 与保留名称](#id-与保留名称)）。
+
+```splash
 fn app_tool(name, call_id) {
     let request = mod.app_tools.request(call_id)
     if name == "notebook.read" {
@@ -486,15 +494,27 @@ fn app_tool(name, call_id) {
 }
 ```
 
-`request.args` 是已验证的工具参数。`request.context` 包含宿主填写的 `app`、`account`、`caller` 和 `call_id`；脚本不能选择这些值。结果必须符合该工具的 `output_schema`。输入和结果各限 1 MiB。`pattern` 和 `format` 仅作说明，与宿主中继现有的 JSON Schema 子集一致。
+`mod.app_tools.request(call_id)` 返回 `args` 和 `context`：`args` 是宿主按 `input_schema` 检查过的参数，`context` 包含 `app`、`account`、`caller` 和 `call_id`。`context` 由宿主填写，脚本无法选择其中的值。用 `mod.app_tools.complete` 或 `mod.app_tools.fail` 结束调用。结果不符合 `output_schema` 时，调用方收到 `invalid_result`。调用 `fail`、钩子出现脚本错误或超出 VM 的指令限制时，调用方收到 `app_error`。宿主不强制检查 `pattern` 和 `format`。
 
-钩子在 UI 线程运行，与应用界面共享**同一个运行中的 Splash VM 和存储隔离目录**。钩子也可以稍后在 `host.request` 回调中，用同一个令牌调用 `complete` 或 `fail`。异步处理函数可以用 `mod.app_tools.active(call_id)` 检查这次调用是否仍然存在。其他应用或宿主面板即使拿到令牌，也不能读取参数或完成该调用。
+钩子在 UI 线程上运行，与应用界面共用同一个 Splash VM 和存储文件夹，并受 VM 的指令和内存限制约束。钩子也可以稍后再完成调用，例如在 `host.request` 回调中完成：`mod.app_tools.active(call_id)` 会告诉它这次调用是否仍未结束。其他应用或宿主面板无法凭 `call_id` 读取参数或完成调用。
 
-只有已准入的完整应用运行器持有工具。速览栏中的应用副本不会注册另一个所有者；同时出现多个完整应用所有者时，宿主会拒绝。关闭应用、切换宿主连接的账户、取消调用或超过期限，都会使待处理的调用失效；宿主会丢弃迟到或重复的结果。期限最长 60 秒，每个应用最多 16 个待处理调用，整个进程最多 128 个。取消不会撤销已经执行的操作。VM 现有的指令和内存限制仍然生效；其他线程不能抢占正在执行的同步钩子。
+| 限制项 | 取值 |
+| --- | --- |
+| 参数、结果 | 各 1 MiB |
+| 期限 | 最长 60 秒 |
+| 未结束的调用 | 每个应用 16 个，整个宿主进程 128 个 |
 
-首版 ABI **不会**启动已关闭的应用，也不会启动第二个后台 VM。`background: true` 不改变这一限制。应用处于可见状态，并不代表工具可以弹出宿主权限面板。请使用默认的宿主确认方式；此 ABI 不实现 `confirm: "app"` 所需的人工批准证明。调用宿主 API 仍需应用已获得的授权。
+应用关闭（`app_not_running`）、应用的账户发生变化（`account_scope`）、超过期限（`timeout`）或调用方取消时，调用会提前结束。调用结束既不会中止正在运行的钩子，也不会撤销它已经执行的操作；调用结束后再调用 `complete` 或 `fail`，宿主会忽略。
 
-运行器测试执行真实的 Splash 处理函数，覆盖共享的 UI/存储状态、schema 错误、生命周期、取消、账户切换、堆隔离、禁止弹出提示和指令限制。新 ABI 的手机验收和真实模型验收，在集成宿主实际完成之前均为**未验证**。
+脚本工具不能：
+
+- 在应用关闭时运行。宿主既不会启动应用，也不会启动它的后台副本，即使工具设置了 `background: true` 也一样，因此调用会返回 `app_not_running`。
+- 在速览栏中的应用副本或第二个已打开的副本中运行。只有最先打开的完整应用持有这些工具；第二个副本拿不到工具，并显示 `App tools unavailable: app_busy: …`。
+- 弹出宿主面板，例如权限申请面板。只要应用还有未结束的调用，应用自己的界面也无法弹出宿主面板。
+- 在应用自己的界面上确认调用。如果脚本工具写了 `confirm: "app"`，宿主会拒绝它的破坏性或对外调用，所以请保留默认的 `confirm: "host"`。
+- 使用应用未获授权的宿主 API。
+
+未验证：在手机上以及搭配真实模型运行脚本工具。
 
 ### 由谁确认调用
 
@@ -563,13 +583,12 @@ OctoSense 桌面版 0.1.0-beta.2 的商店用一行说明代替前三行：“Ru
 | `agent.model` | 尚不支持：OctoSense 会忽略它。 |
 | Agent 发布的速览卡片 | 应用可以发布的任何卡片，包括 `script` 卡片。 |
 
-OctoSense `main`（尚未进入任何发布版）改变了三点：
+OctoSense `main`（尚未进入任何发布版）改变了四点：
 
+- `implemented_by: "app"` 的工具在已打开的应用中运行（[脚本工具执行](#脚本工具执行script-tools-v1)）。
 - 发布速览卡片的工具调用（直接调用 `glance.publish`，或经由 `host_method`）只接受带 `initial` 对象的模板，或 L0 `source`。它拒绝 `script` 和 L1 源码，返回的错误类型为 `unsafe_card_source`。
 - 批准 GitHub 或 Google 日历的保存须亲手点按（见[已连接账户](#已连接账户)）。
 - 宿主只保留从 30 天前到 366 天后的 Google 日历日程。
-
-目前还没有任何 OctoSense 发布版提供 `app_tools.dispatch@1`。提供它的宿主还会运行 `implemented_by: "app"` 的工具：它在已打开的完整应用中调用应用签名的处理函数。清单需声明 `requires: ["script-tools-v1"]`；应用关闭时返回 `app_not_running`（[脚本工具执行](#脚本工具执行script-tools-v1)）。
 
 ## 商店信息
 
@@ -604,7 +623,7 @@ OctoSense `main`（尚未进入任何发布版）改变了三点：
 host.request("mail.list", {…}, fn(r){ … })
 ```
 
-除非应用的策略授予了相应的服务族（`mail.*` 对应 `mail`）或确切的服务名，否则隔离环境会拒绝调用。获准的调用会交给宿主为该服务族注册的服务。服务完成工作后返回数据，绝不返回凭据；它返回的连接句柄不透明，并与该应用绑定。如果某个服务族没有任何服务响应，对它的调用会立即失败，返回 `no service answers "<family>" on this device`；`card-host` 不注册任何服务，因此只有用于发现宿主 API 的 `runtime` 会响应。哪个 Shell 提供哪个服务族，见 Design Flow 的[宿主服务](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。
+除非应用的策略授予了相应的服务族（`mail.*` 对应 `mail`）或确切的服务名，否则隔离环境会拒绝调用。获准的调用会交给宿主为该服务族注册的服务。服务完成工作后返回数据，绝不返回凭据；它返回的连接句柄不透明，并与该应用绑定。如果某个服务族没有任何服务响应，对它的调用会立即失败，返回 `no service answers "<family>" on this device`；`card-host` 不注册任何服务，在那里只有 App Hub 用于发现宿主 API 的 `runtime` 会响应。哪个 Shell 提供哪个服务族，见 Design Flow 的[宿主服务](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。
 
 `card-host` 也没有实现 `host-api-v1`、`backend-api-v1` 和 `script-tools-v1` 所需的任何 API，因此会拒绝清单要求其中任何一项的应用：这类应用请在基于 `main` 构建的 OctoSense Shell 中测试。
 
@@ -680,7 +699,7 @@ OctoSense `main`（尚未进入任何发布版）可以让应用登录其开发�
 
 `GET` 操作会立即执行，即使调用来自主屏幕磁贴或 Agent 工具。`POST`、`PUT`、`PATCH` 和 `DELETE` 操作要等用户在宿主的原生审阅界面上亲手点按、批准这个确切的请求之后才会执行，因此应用必须在前台。来自磁贴或 Agent 工具的写操作会失败，返回 `Open the app to review this backend change`。请求体和应答都是不超过 64 KiB 的 JSON，宿主拒绝重定向。修改或删除 `backend` 块、更新应用或撤回应用，都会结束应用的后端会话，用户需要重新登录。
 
-仍然需要宿主或运维人员的部分：
+适用范围：
 
 - 只有实现了 `auth.backend.request@1` 的宿主才会安装这个应用，即 macOS 和 Android 上的 OctoSense `main`。其他商店会拒绝安装；基于 App Hub `main` 构建的商店会报 `app <id> needs a host implementing auth.backend.request@1`。iOS 不支持后端登录。
 - 没有 `backend` 块的应用，只能在运维人员已把其后端登记到宿主 `oauth/backends.json` 的设备上登录。Windows 和 Linux 上的这类登录使用浏览器（未经验证）。

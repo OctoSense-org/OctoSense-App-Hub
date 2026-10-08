@@ -123,7 +123,7 @@ my-app/
       01-main.png        # 真实截图，在第 4 节添加
 ```
 
-卡片的 `font_src`，准入检查只接受应用包中的字体文件或内置的 `makepad_widgets:resources/Inter.ttf`。设置字体或显示中文之前，请先阅读[字体](PUBLISHING.zh-CN.md#字体)。
+卡片的 `font_src`，准入检查只接受应用包中的字体文件或内置的 `makepad_widgets:resources/Inter.ttf`。OctoSense 桌面版 0.1.0-beta.2 不加载打包字体。设置字体或显示中文之前，请先阅读[字体](PUBLISHING.zh-CN.md#字体)。
 
 ### 两类应用都适用
 

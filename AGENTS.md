@@ -21,6 +21,7 @@ change, with the same sections, in the same order and with the same content.
 | Topic | Owner |
 | --- | --- |
 | Gate rules, capability names and who serves them, reserved ids, manifest, listing and tool fields, `hub` commands, signing | [docs/PUBLISHING.md](docs/PUBLISHING.md), the reference, and its `.zh-CN.md` twin |
+| Host API declarations, `runtime` discovery and which hosts implement them | [docs/HOST-API.md](docs/HOST-API.md) and its `.zh-CN.md` twin |
 | The submission step by step: repository layout, final bytes, release, issue fields, what reviewers check, common refusals | [docs/SUBMITTING.md](docs/SUBMITTING.md) and its `.zh-CN.md` twin |
 | A first app, from a template to an unsigned bundle that passes the gate | [docs/FIRST-APP.md](docs/FIRST-APP.md) and its `.zh-CN.md` twin |
 | The contract's versions and crates.io status | [crates/app-contract/README.md](crates/app-contract/README.md#versions-on-cratesio) |
@@ -53,10 +54,11 @@ owns those.
   `crates/shell/src/app_storage`, `crates/ai-host` and `crates/app-peers` at
   the revision the consumer pins. Do not claim a tool runs because
   `tools.json` passes the gate: OctoSense runs granted
-  `implemented_by: "host-service"` tools on their services. Hosts integrating
-  `script-tools-v1` execute `implemented_by: "app"` tools on the admitted full
-  app's existing Splash isolate; closed apps fail with `app_not_running`.
-  Never create a second state store or register a Glance copy as tool owner.
+  `implemented_by: "host-service"` tools on their services. A host that
+  advertises `app_tools.dispatch@1` runs `implemented_by: "app"` tools in the
+  admitted full app's existing Splash isolate; a closed app fails with
+  `app_not_running`. Never create a second state store, and never register a
+  Glance copy as a tool owner.
 - Preserve contract compatibility and refusal behavior. Consult
   [app-contract's compatibility rules](crates/app-contract/README.md#stability).
   Do not widen an app's resolved grants in a mounting path.
@@ -93,14 +95,14 @@ owns those.
   [`card-host` fails to build](docs/DEVELOPMENT.md#card-host-fails-to-build)
   lists the builds that need the patches.
 - [Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)
-  lists the `octosense-app-contract` releases; 1.6.0 matches this tree.
-  A published contract is not proof that a released host implements its APIs. This
-  workspace's `[patch.crates-io]` points the crate at `crates/app-contract`.
-  Never tell readers that a lock file holding 1.2.0 or older admits
-  `calendar`, `auth`, `github`, `gcalendar`, `gmail`, `photos` or `youtube`;
-  `cargo update -p octosense-app-contract` moves a compatible 1.x consumer to 1.6.0. When the tree
-  gets ahead of crates.io again, or a new version is published, update that
-  section.
+  lists the `octosense-app-contract` releases; 1.6.0 matches this tree. Do
+  not take a published contract as proof that a released host implements its
+  APIs. This workspace's `[patch.crates-io]` points the crate at
+  `crates/app-contract`. Never tell readers that a lock file holding 1.2.0 or
+  older admits `calendar`, `auth`, `github`, `gcalendar`, `gmail`, `photos`
+  or `youtube`; `cargo update -p octosense-app-contract` moves an
+  unconstrained 1.x consumer to 1.6.0. When the tree gets ahead of crates.io
+  again, or a new version is published, update that section.
 - Do not change pins or regenerate `Cargo.lock` in a documentation edit.
 - Match validation to the change:
 

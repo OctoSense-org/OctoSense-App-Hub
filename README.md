@@ -34,7 +34,8 @@ Notes, Inbox Assistant and Google Calendar) passed admission end to end; their
 repositories show a complete submission. Look up rules, capabilities and
 fields in the [publishing reference](docs/PUBLISHING.md).
 
-New host API declarations and availability checks are described in [Host API compatibility](docs/HOST-API.md).
+**Using host APIs?** [Host API compatibility](docs/HOST-API.md) shows how an
+app declares the host APIs it needs and checks which ones a host implements.
 
 ## Repository layout
 
@@ -47,6 +48,7 @@ New host API declarations and availability checks are described in [Host API com
 | `docs/FIRST-APP.md` | A first-app walkthrough for a card app or a script app: create, run, capture and check. |
 | `docs/SUBMITTING.md` | The submission, step by step: repository, manifest, listing, screenshots, signing, release, issue and review. |
 | `docs/PUBLISHING.md` | The reference: gate rules; capabilities and who serves them; manifest, listing and tool fields; host services; `hub` commands; signing. |
+| `docs/HOST-API.md` | Declaring the host APIs an app needs, `runtime` discovery and what today's hosts implement. |
 | `docs/ICONS.md` | Canonical icon ownership, export constraints and visual review. |
 | `docs/DEVELOPMENT.md` | The guide map, delivery paths, `card-host` and its remote-control routes, and `card-studio`. |
 | `templates/app/` | A card app repository scaffold with metadata, an example icon and linked agent instructions. |
@@ -119,16 +121,18 @@ each one today.
 - OctoSense desktop 0.1.0-beta.2 serves the connected-account capabilities
   (`auth`, `github`, `gcalendar`, `gmail`) once the host has OAuth client
   registrations. Tokens stay with the host; apps get connection handles.
-- OctoSense `main`, not yet in any release, also signs an app in, through
-  `auth`, to the backend that its manifest declares, and runs the backend
-  operations the manifest names, on macOS and Android. Each write waits for
-  the person's review ([Sign in to your own backend](docs/PUBLISHING.md#sign-in-to-your-own-backend)).
-- OctoSense `main` also serves device permissions on macOS and Android to an
-  app that declares `host-api-v1` and the matching capability:
+- OctoSense `main`, not yet in any release, also signs an app in through
+  `auth` to the backend that its manifest declares, on macOS and Android. It
+  then runs the backend operations that the manifest names, and each write
+  waits for the person's review
+  ([Sign in to your own backend](docs/PUBLISHING.md#sign-in-to-your-own-backend)).
+- OctoSense `main` also serves the device-permission methods on macOS and
+  Android to an app that declares `host-api-v1` and the matching capability:
   `camera.permission.*`, `microphone.permission.*` and
   `location.permission.*`, each with `status`, `request` and `revoke`. On
-  Android it also serves `location.get`. Only the app on screen can request a
-  permission, and the person approves it in the host's own dialog
+  Android it also serves `location.get`. Only an app in the foreground can
+  request a permission, and the person approves it on a host sheet, then in
+  the system prompt if the OS asks
   ([Host API compatibility](docs/HOST-API.md)).
 - OctoSense `main` also requires a physical press to approve a GitHub or
   Google Calendar save, refuses executable Splash (`script`) cards from app agents,
@@ -140,13 +144,14 @@ each one today.
   and `os.youtube`. Not yet: media services for store apps.
 - OctoSense runs an app agent's granted `implemented_by: "host-service"`
   tools, including tools mapped to a reviewed shared service with
-  `host_method`, and loads `AGENT.md` and skills as guidance. A host that
-  advertises `app_tools.dispatch@1` also runs `implemented_by: "app"` tools: it
-  calls the app's signed handler in the open full app. Declare
-  `requires: ["script-tools-v1"]`; a closed app answers `app_not_running`.
-  Older hosts, desktop 0.1.0-beta.2 included, refuse these tools with
-  `app_tool_unavailable`
+  `host_method`, and loads `AGENT.md` and skills as guidance
   ([The app's agent and tools](docs/PUBLISHING.md#the-apps-agent-and-tools)).
+- No OctoSense release runs `implemented_by: "app"` tools yet: desktop
+  0.1.0-beta.2 refuses them with `app_tool_unavailable`. OctoSense `main`
+  advertises `app_tools.dispatch@1` and runs them in the open app, for an app
+  that declares `requires: ["script-tools-v1"]`; a closed app answers
+  `app_not_running`
+  ([Script tool execution](docs/PUBLISHING.md#script-tool-execution-script-tools-v1)).
 
 ## Trust anchor
 

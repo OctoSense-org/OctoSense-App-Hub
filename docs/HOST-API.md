@@ -11,9 +11,9 @@ run its own agent tools
 ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)).
 
 Contract 1.6.0 is on crates.io, but no released OctoSense build implements
-these APIs yet. Until one does, test with a host built from the matching
-source revisions. An older host gains none of these services, and it refuses
-an app that requires them.
+these APIs yet. Until one does, test in an OctoSense shell built from `main`.
+An older host, such as OctoSense desktop 0.1.0-beta.2, serves none of these
+APIs and refuses an app that requires them.
 
 ## Declare what the app needs
 
@@ -35,7 +35,7 @@ the host has it:
 | --- | --- |
 | `host_api.required` | Methods the app cannot run without, each with its exact ABI major version. Version 2 does not satisfy a request for version 1, and a version is not a host release number. |
 | `host_api.optional` | Methods the app uses when the host has them. Give each one a fallback. |
-| `host-api-v1` | Needed for `host_api`. It also puts camera, microphone and location behind a per-app consent, so the host must implement the `app_policy.device_consent@1` runtime ABI. A plain Makepad runner cannot claim it just because it parses these fields. |
+| `host-api-v1` | Needed for `host_api`. It also puts camera, microphone and location behind a per-app consent, so the host must implement the `app_policy.device_consent@1` runtime ABI. A runner that only parses these fields does not satisfy it. |
 | `backend-api-v1` | Needed for `backend`. The host must implement `auth.backend.request@1`. |
 | `script-tools-v1` | Needed for `implemented_by: "app"` tools. The host must implement the `app_tools.dispatch@1` runtime ABI. |
 
@@ -61,10 +61,11 @@ one:
 - The result holds no account data or credentials.
 
 Availability is not configuration or permission. `configured: null` means the
-host does not know, and `authorization: "checked-on-call"` means every call
-still checks its own grants. To learn more, call the service's status or
-account methods. Declaring a requirement neither turns on an OS permission nor
-adds a provider registration.
+host does not know, and `authorization: "checked-on-call"` means the host
+checks the app's grants on every call. To learn whether a service is
+configured and authorized, call its status or account methods. Declaring a
+requirement neither turns on an OS permission nor adds a provider
+registration.
 
 ## Limits
 
@@ -77,22 +78,28 @@ adds a provider registration.
   An agent's call never prompts, so `auth.backend.request` runs only declared
   `GET` operations and refuses a write before any HTTP request; a write still
   needs the foreground app and the host's native review. Permission requests
-  and revocation, account management and sheet controls have no alias.
+  and revocation, account management and sheet controls have no `host_method`.
   Admission does not replace the host's account, consent and platform checks.
 - **Backends.** The host reads the `backend` block only from the admitted,
   signed bundle. It returns opaque connection handles, refuses redirects and
-  answers that carry a token, and reviews every write in its native UI. A
-  background read cannot approve a write. Changing the endpoints, updating the
-  app or withdrawing it ends its backend connections.
+  any backend answer that carries a token, and asks the person to approve
+  every write on its native review screen. A background or agent call
+  cannot approve a write. Changing the endpoints, updating the app or
+  withdrawing it ends the app's backend sessions.
 - **Script tools.** The signed `app_tool(name, call_id)` handler runs in the
-  open full app's own VM and storage jail. No native library or Wasm loads,
+  open full app's own VM and storage folder. No native library or Wasm loads,
   and a closed app answers `app_not_running`.
-- **Platforms.** The device-permission methods cover Android and macOS.
-  `location.get` returns Android's last-known fix, of unknown age. Embedded
-  `WebReader` is unsupported on Linux and Windows.
+- **Platforms.** The device-permission methods cover Android and macOS, and
+  `location.get` covers Android only. It returns the last-known fix, of
+  unknown age. OctoSense `main`, not yet in any release, embeds `WebReader`
+  on Linux (X11 or XWayland, with WebKitGTK installed) and Windows (with the
+  WebView2 Runtime installed), but not under native Wayland.
+- **Permission requests.** Only an app in the foreground can request a
+  permission. A request from an agent or from the background returns
+  `authorization_required`.
 - **Device widgets.** With `host-api-v1`, `CameraPreview`,
   `sys.request_location`, `sys.gps` and map GPS reads need the app's device
-  consent too. After each start they stay closed until the app calls a
+  consent too. After the host starts, they stay closed until the app calls a
   permission method, such as `camera.permission.status`, which loads the
   saved consent. Call it when the app opens.
 - **`card-host`.** It implements none of the APIs that the three markers need,

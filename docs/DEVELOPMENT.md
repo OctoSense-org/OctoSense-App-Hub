@@ -124,8 +124,8 @@ desktop-v0.1.0-beta.2 or later.
 `card-host` also refuses an app whose manifest requires `host-api-v1`,
 `backend-api-v1` or `script-tools-v1`, because it implements none of the APIs
 they need. The window shows "card-host refused this bundle" and
-`app <id> needs a host implementing <method>@1`. Such an app cannot run in
-`card-host`: test it in an OctoSense shell built from `main`.
+`app <id> needs a host implementing <method>@1`. Test such an app in an
+OctoSense shell built from `main`.
 
 ### Drive it over HTTP: `MAKEPAD_REMOTE`
 

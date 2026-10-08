@@ -186,8 +186,9 @@ my-app/
 ```
 
 The gate accepts a card's `font_src` only as a font file in the bundle or the
-built-in `makepad_widgets:resources/Inter.ttf`. Read
-[Fonts](PUBLISHING.md#fonts) before you set a font or show Chinese text.
+built-in `makepad_widgets:resources/Inter.ttf`. OctoSense desktop
+0.1.0-beta.2 does not load a bundled font. Read [Fonts](PUBLISHING.md#fonts)
+before you set a font or show Chinese text.
 
 ### Both kinds
 

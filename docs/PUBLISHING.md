@@ -144,10 +144,10 @@ other built-in font is refused:
 ```
 
 Use a bundle-relative path such as `"font_src": "assets/Body.ttf"` for a
-bundled `.ttf` or `.otf`. The installed card runner and `card-host` resolve
-resource fields after kit styles and font tokens have been evaluated, then
-load the file from that bundle's host-owned asset server. Keep HTTP URLs out
-of the bundle; neither a network grant nor an external font URL is needed.
+bundled `.ttf` or `.otf`. The installed card runner and `card-host` evaluate
+kit styles and font tokens first, then resolve the path and load the file
+from the bundle's host-owned asset server. Keep HTTP URLs out of the bundle;
+neither a network grant nor an external font URL is needed.
 
 In a native kit, `font_src` may also be one token reference,
 `{"$token": "<name>"}`, whose `value` in the kit's `tokens` is such a path. The
@@ -155,21 +155,24 @@ gate checks the path that the token resolves to. Any other object, or an
 array, is refused with
 `font_src must be a bundled font path, a supported built-in font, or one token resolving to a string`.
 
-Other directly named built-in fonts remain unsupported
-([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). The
-renderer supplies a lazy Chinese fallback when the host packages its
-international font resources. A bundled face counts toward the 8 MiB limit,
-so bundle a subset of a large CJK font. The gate checks its path but does
-not decode the font, so test the complete bundle in `card-host`.
+Not yet: other built-in fonts
+([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)).
 
-OctoSense desktop 0.1.0-beta.2 predates this font loading: it installs an app
-with a bundled font, but its cards do not load the font. For Chinese text
-there, build the card from the role kit and set no `font_src`. The role kit
-is the OctoScript module set behind `Surface`, `TextTitle` and `TextBody`:
-copy `_kit.octoscript`, `_derive.octoscript`, `_derive_color.octoscript`,
-`_palette_light.octoscript` and `_palette_dark.octoscript` from
-OctoScript-Makepad's `components/l0/` into the bundle's `kit/`. It draws
-Chinese with Makepad's built-in CJK face, LXGW WenKai.
+A bundled font counts toward the 8 MiB limit, so bundle a subset of a large
+CJK font. The gate checks the font's path but does not decode the file, so
+test the complete bundle in `card-host`. A host built with Makepad's
+International font set, such as `card-host`, also draws Chinese with a
+built-in CJK fallback font that it loads on first use.
+
+OctoSense desktop 0.1.0-beta.2 predates bundled-font loading: it installs an
+app with a bundled font, but its cards do not load the font. For Chinese text
+on that release, build the card from the role kit and set no `font_src`. The
+role kit is the OctoScript module set behind `Surface`, `TextTitle` and
+`TextBody`: copy `_kit.octoscript`, `_derive.octoscript`,
+`_derive_color.octoscript`, `_palette_light.octoscript` and
+`_palette_dark.octoscript` from OctoScript-Makepad's `components/l0/` into the
+bundle's `kit/`. It draws Chinese with Makepad's built-in CJK face, LXGW
+WenKai.
 
 By default, Makepad draws a glyph that the card's fonts lack with one of the
 operating system's fonts, so on macOS a missing font can go unnoticed. Turn
@@ -179,7 +182,7 @@ that fallback off when you check a card:
 MAKEPAD_SYSTEM_FONTS=0 tools/octo run ~/apps/my-app/bundle --port 8141 --detach
 ```
 
-Each glyph that neither the card's fonts nor the renderer's fallback cover now
+Each glyph that neither the card's fonts nor the renderer's fallback covers now
 draws as a box.
 
 A script app can bundle a font. Name the file through the `{{assets}}`
@@ -221,9 +224,9 @@ Unverified: how the OctoSense shells draw these fonts.
 | `compute` | `instruction_budget`, `memory_bytes`. | Clamped to the host's ceilings. |
 | `agent` | The app's own agent. | Optional ([The manifest's `agent`](#the-manifests-agent)). |
 | `research` | The scope of `research` and `crawl`. | Required with `research` or `crawl`; refused when the manifest requests neither ([The research scope](#the-research-scope)). |
-| `requires` | Host features the app needs. | Each must be a feature the host knows; known features are `palpo-admin-v1`, `host-api-v1`, `backend-api-v1` and `script-tools-v1`. The latter three require compatible host implementations; see [Host API compatibility](HOST-API.md). |
-| `host_api` | Optional required/optional exact API-version maps. | Requires `host-api-v1`; the installer and launcher check required implementations. |
-| `backend` | Optional public backend login and named-operation declaration. | Requires `backend-api-v1`, `auth` and account storage. Never include credentials ([Sign in to your own backend](#sign-in-to-your-own-backend)). |
+| `requires` | Host features the app needs. | Each must be a feature the host knows: `palpo-admin-v1`, `host-api-v1`, `backend-api-v1` or `script-tools-v1`. The last three also need a host that implements their APIs ([Host API compatibility](HOST-API.md)). |
+| `host_api` | The host API methods the app needs (`required`) or can use (`optional`), each with its ABI major version. | Optional; needs `host-api-v1` in `requires`. The store checks the `required` methods at install and at every launch ([Declare what the app needs](HOST-API.md#declare-what-the-app-needs)). |
+| `backend` | The app's own backend: its public sign-in endpoints and the operations the app may call. | Optional; needs `backend-api-v1` in `requires`, the `auth` capability and `storage.accounts: true`. Holds no credentials ([Sign in to your own backend](#sign-in-to-your-own-backend)). |
 | `schema_minor` | Which additions to schema 1 the manifest uses. | Leave it out. |
 
 Any other field is refused. After `hub sign-manifest`, the manifest also holds
@@ -254,7 +257,7 @@ OctoSense desktop 0.1.0-beta.2.
 | `storage` | The app's own storage folder: `fs.*`, camera captures and local files a widget reads. Without it every `fs.*` call fails. | Keep its own data on this device | The runtime, in every host |
 | `net` | Requests to the hosts in `network.hosts`, and no others. | Reach only: *hosts* | The runtime, in every host |
 | `images` | Pictures from any public https host, not only `network.hosts`. | Show pictures from any website | The runtime |
-| `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime, only in macOS, iOS and Android builds. Desktop Linux and Windows builds have no system web view. |
+| `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime, only in macOS, iOS and Android builds. Desktop Linux and Windows builds have no system web view. On OctoSense `main` only, Linux (X11 or XWayland) and Windows builds embed one, if the person has installed WebKitGTK or the WebView2 Runtime. |
 | `location` | The device's location. On OctoSense `main` only, an app that declares `host-api-v1` must first ask with `location.permission.request`; on Android it can then read the last-known fix with `location.get` ([Host API compatibility](HOST-API.md)). | Use your location | The runtime, where the device has it |
 | `camera` | The camera. A capture is saved in the app's storage, so the app also needs `storage`. On OctoSense `main` only, an app that declares `host-api-v1` must first ask with `camera.permission.request`. | Use the camera | The runtime, where the device has it |
 | `microphone` | Sound with a camera video. On OctoSense `main` only, an app that declares `host-api-v1` must first ask with `microphone.permission.request`. | Use the microphone | The runtime, where the device has it |
@@ -534,11 +537,11 @@ The gate admits these tools, but in a store app each call fails with
 | `background` | The tool may run in a turn the person did not start. Default `false`. |
 | `shareable` | Callers other than the app's own agent may be granted it, such as OctoSense's system agent (the device-wide agent the person talks to) and other apps' agents. Default `false`. |
 | `private_data` | The result carries the person's private data. A shareable tool of a `local_only` app must say `false`; a `host_method` tool must say `true`. |
-| `implemented_by` | `host-service`: a host service runs it. `app`: the app's own script runs it, in the open full app, on a host that advertises `app_tools.dispatch@1`; declare `requires: ["script-tools-v1"]`. A closed app answers `app_not_running`, and older hosts, desktop 0.1.0-beta.2 included, refuse the call with `app_tool_unavailable` ([Script tool execution](#script-tool-execution-script-tools-v1)). Required. |
+| `implemented_by` | `host-service`: a host service runs it. `app`: the app's own script runs it, in the open app ([Script tool execution](#script-tool-execution-script-tools-v1)). Required. |
 | `host_method` | A reviewed shared-service method the tool runs on ([Map a tool to a shared service](#map-a-tool-to-a-shared-service-host_method)). Optional. |
 | `outward` | Set it on an `act` tool whose call reaches outside the device (sends, posts, shares). Each call then waits for the person, as a destructive call does. Default `false`; refused on a `read` tool. |
 | `auto_approvable` | A standing rule ("allow for an hour") may approve a call. Default `true`. Say `false` for deletion, payments, account or security changes and sharing outside the device, so the person approves each call as it happens. |
-| `confirm` | Who asks the person before a destructive or outward call: `host` (the default, the host's approval path) or `app` (the app's own confirmation screen). `app` is allowed only for a tool the app implements itself. |
+| `confirm` | Who asks the person before a destructive or outward call: `host` (the default, the host's approval path) or `app` (the app's own confirmation screen). The gate allows `app` only for a tool the app implements itself, and the host refuses such a tool's destructive or outward calls ([Script tool execution](#script-tool-execution-script-tools-v1)). |
 
 ### Map a tool to a shared service: `host_method`
 
@@ -577,22 +580,22 @@ The gate refuses a `host_method` unless every rule holds:
 | `gcalendar` | `gcalendar.calendars`, `gcalendar.sync`, `gcalendar.refresh`, `gcalendar.cached`, `gcalendar.get`, `gcalendar.prepare` | |
 | `gmail` | `gmail.labels`, `gmail.messages`, `gmail.message`, `gmail.draft.get`, `gmail.event.status` | `gmail.draft.open`, `gmail.draft.edit`, `gmail.event.decide` |
 | `glance` | `glance.list` | `glance.publish`, `glance.withdraw` |
-| `auth` | `auth.backend.me`, `auth.backend.request` (declared GET operations only) | |
+| `auth` | `auth.backend.me`, `auth.backend.request` (declared `GET` operations only) | |
 | `runtime` | `runtime.list`, `runtime.describe` | |
 | `camera` | `camera.permission.status` | |
 | `microphone` | `microphone.permission.status` | |
 | `location` | `location.permission.status`, `location.get` | |
 
-The eight backend/runtime/device aliases require the compatible Host API v1
-integration; they are not a claim about beta.2 or an already released host.
-All retain the table's capability and `private_data: true` requirements,
-including discovery aliases. Admission does not configure an account, grant
-permission or implement a missing API. Check the actual host's discovery and
-platform support as described in [Host API compatibility](HOST-API.md).
-`auth.backend.request` aliases can execute only declared GET operations; backend
-writes still require the foreground app and native review. Permission request
-and revoke, account-management methods, and runtime ABI entries such as
-`app_tools.dispatch` are not admitted `host_method` targets.
+No OctoSense release serves the `auth`, `runtime`, `camera`, `microphone`
+and `location` methods above yet ([Host API compatibility](HOST-API.md)).
+The rules above apply to them too, `runtime.list` and `runtime.describe`
+included. Admission does not configure an account, grant a permission or
+add a missing API: check what the host implements with `runtime.describe`.
+A tool mapped to `auth.backend.request` runs only the backend's declared
+`GET` operations; a write still needs the app in the foreground and the
+person's approval on the host's native review. Permission `request` and
+`revoke`, account management and runtime ABIs such as `app_tools.dispatch@1`
+have no `host_method`.
 
 Provider writes, sign-in, reviews and approvals have no `host_method`: the
 person starts them from the app's own screen.
@@ -609,17 +612,23 @@ Source: `SHARED_HOST_METHODS` in `crates/app-policy/src/agent.rs`.
 
 ### Script tool execution (`script-tools-v1`)
 
-Script tools need a host that advertises `app_tools.dispatch@1`: App Hub's
-runner and OctoSense's relay ship together, and no OctoSense release has them
-yet. Older hosts, desktop 0.1.0-beta.2 included, refuse these tools with
-`app_tool_unavailable`. A manifest must include
-`"requires": ["script-tools-v1"]`. Declare names and JSON schemas in
-`tools.json` with `"implemented_by": "app"`, then implement this fixed hook
-in the app's signed Splash entry source. This example assumes manifest ID
-`dev.example.notebook`, so its tool namespace is `notebook`; `notes` is a
-reserved native-app namespace and cannot be used by an installed app:
+A script tool is a tool with `"implemented_by": "app"`: the app's own Splash
+code runs it, inside the open app. It needs a host that advertises
+`app_tools.dispatch@1`, such as an OctoSense shell built from `main`, which is
+not yet in any release. OctoSense desktop 0.1.0-beta.2 refuses these tools
+with `app_tool_unavailable`.
 
-```text
+To add one:
+
+1. Add `"requires": ["script-tools-v1"]` to the manifest.
+2. Declare the tool in `tools.json` with its name, its schemas and
+   `"implemented_by": "app"`.
+3. Implement the `app_tool` hook in `main.splash`. In this example the app id
+   is `dev.example.notebook`, so the tool namespace is `notebook`. An app
+   cannot use `notes`, which is a reserved name
+   ([Ids and reserved names](#ids-and-reserved-names)).
+
+```splash
 fn app_tool(name, call_id) {
     let request = mod.app_tools.request(call_id)
     if name == "notebook.read" {
@@ -630,37 +639,50 @@ fn app_tool(name, call_id) {
 }
 ```
 
-`request.args` contains validated tool arguments. `request.context` contains
-host-stamped `app`, `account`, `caller`, and `call_id`; scripts cannot choose
-these values. The result must match that tool's `output_schema`. Input and
-result data are each limited to 1 MiB. `pattern` and `format` remain descriptive,
-matching the host relay's existing JSON Schema subset.
+`mod.app_tools.request(call_id)` returns `args`, the arguments after the host
+has checked them against `input_schema`, and `context`, which holds `app`,
+`account`, `caller` and `call_id`. The host fills in `context`; the script
+cannot choose its values. Finish the call with `mod.app_tools.complete` or
+`mod.app_tools.fail`. A result that does not match `output_schema` reaches the
+caller as `invalid_result`. The caller gets `app_error` for a `fail`, a script
+error in the hook or a hook that exceeds the VM's instruction limit. The host
+does not enforce `pattern` or `format`.
 
-The hook runs on the UI thread in the **same live Splash VM and storage jail**
-as the app UI. It may finish later in a `host.request` callback by calling
-`complete` or `fail` with the same token. `mod.app_tools.active(call_id)` tells
-an asynchronous handler whether the call still exists. A token from another
-app or host sheet cannot read arguments or complete the call.
+The hook runs on the UI thread, in the same Splash VM and storage folder as
+the app's screens, within the VM's instruction and memory limits. It can also
+finish the call later, for example in a `host.request` callback:
+`mod.app_tools.active(call_id)` says whether the call is still open. Another
+app or a host sheet cannot use the `call_id` to read the arguments or finish
+the call.
 
-Only the admitted full-app runner owns tools. A Glance copy does not register
-another owner, and simultaneous full-app owners are refused. Closing the app,
-switching its host-connected account, cancellation, or a deadline invalidates
-pending calls; late and duplicate completions are discarded. The maximum
-deadline is 60 seconds, with 16 calls per app and 128 process-wide. Cancellation
-does not roll back actions already performed. The VM's existing instruction
-and memory limits remain in force; an executing synchronous hook cannot be
-preempted from another thread.
+| Limit | Value |
+| --- | --- |
+| Arguments, result | 1 MiB each |
+| Deadline | 60 s at most |
+| Open calls | 16 per app, 128 per host process |
 
-This first ABI does **not** start a closed app or a second background VM.
-`background: true` does not change that limitation. Tools cannot raise host
-permission sheets merely because their app is visible. Use host confirmation
-(the default); this ABI does not implement `confirm: "app"` proof of human
-approval. Access to host APIs still requires the app's existing grants.
+A call ends early when the app closes (`app_not_running`), the app's account
+changes (`account_scope`), the deadline passes (`timeout`) or the caller
+cancels. Ending a call neither stops a hook that is already running nor undoes
+what it did, and the host ignores a `complete` or `fail` that comes after the
+end.
 
-The runner tests execute real Splash handlers and cover shared UI/storage
-state, schema errors, lifecycle, cancellation, account changes, heap isolation,
-prompt suppression, and instruction limits. Phone and real-model acceptance
-of this new ABI are **unverified** until performed by the integrating host.
+A script tool cannot:
+
+- Run while the app is closed. The host starts neither the app nor a background
+  copy of it, even for a tool with `background: true`, so the call answers
+  `app_not_running`.
+- Run in a Glance copy of the app or in a second open copy. Only the full app
+  opened first owns the tools; a second copy gets none and shows
+  `App tools unavailable: app_busy: …`.
+- Raise a host sheet, such as a permission request. While any of the app's
+  calls is open, the app's own screens cannot raise one either.
+- Be confirmed on the app's own screen. The host refuses a destructive or
+  outward call to a script tool that says `confirm: "app"`, so keep the
+  default, `confirm: "host"`.
+- Use a host API that the app is not granted.
+
+Unverified: script tools on a phone and with a real model.
 
 ### Who confirms a call
 
@@ -750,8 +772,10 @@ On OctoSense desktop 0.1.0-beta.2, each part works as follows:
 | `agent.model` | Not yet: OctoSense ignores it. |
 | Glance cards from the agent | Any card the app may publish, a `script` card included. |
 
-OctoSense `main` (in no release yet) changes three things:
+OctoSense `main` (in no release yet) changes four things:
 
+- Tools with `implemented_by: "app"` run in the open app
+  ([Script tool execution](#script-tool-execution-script-tools-v1)).
 - A tool call that publishes a Glance card (`glance.publish`, directly or
   through `host_method`) accepts only a template with an `initial` object, or
   L0 `source`. It refuses `script` and L1 source with the error kind
@@ -759,12 +783,6 @@ OctoSense `main` (in no release yet) changes three things:
 - Approving a GitHub or Google Calendar save takes a physical press
   ([Connected accounts](#connected-accounts)).
 - The host keeps Google Calendar events from 30 days back to 366 days ahead.
-
-No OctoSense release advertises `app_tools.dispatch@1` yet. A host that does
-also runs tools with `implemented_by: "app"`: it calls the app's signed
-handler in the open full app. Declare `requires: ["script-tools-v1"]`; a
-closed app returns `app_not_running`
-([Script tool execution](#script-tool-execution-script-tools-v1)).
 
 ## The listing
 
@@ -817,7 +835,8 @@ the host registered for that family. The service does the work and answers
 with data, never with a credential. A connection handle it returns is opaque
 and bound to the app. A call to a family that
 no service answers fails at once with `no service answers "<family>" on this device`;
-`card-host` registers no service, so only `runtime` discovery answers there.
+`card-host` registers no service; only App Hub's `runtime` discovery
+answers there.
 To see which shell serves which family, read
 Design Flow's
 [Host services](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md).
@@ -906,7 +925,7 @@ backend in the manifest. The declaration is public and holds no credential:
 | --- | --- |
 | `id` | 1 to 64 characters of `[A-Za-z0-9._-]`. |
 | `client_id` | The backend's public client id: 1 to 256 characters, with no spaces or control characters. |
-| `authorization_url`, `token_url`, `me_url`, `logout_url` | Four different `https://` URLs on one origin and port 443, with no user name or password, query, fragment, `%` escape, `\` or `.` and `..` segments. |
+| `authorization_url`, `token_url`, `me_url`, `logout_url` | Four different `https://` URLs on one origin and port 443, with no user name, password, query, fragment, `%` escape or `\`, and no `.` or `..` segment. |
 | `scopes` | Exactly `["app.session"]`. |
 | `operations` | Up to 64, keyed by name (`[A-Za-z0-9._-]`). Each has a `method` (`GET`, `POST`, `PUT`, `PATCH` or `DELETE`), an exact `path` on the same origin that is not one of the four URLs' paths, and up to 32 distinct `query_keys`. |
 
@@ -940,7 +959,7 @@ at most 64 KiB of JSON, and the host refuses redirects. Changing or removing
 the `backend` block, updating the app or withdrawing it ends the app's backend
 sessions, and the person signs in again.
 
-What still needs the host or an operator:
+Where it works:
 
 - Only a host that implements `auth.backend.request@1` installs the app:
   OctoSense `main` on macOS and Android. Other stores refuse it; one built from
