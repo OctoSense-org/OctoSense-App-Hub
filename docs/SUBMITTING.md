@@ -203,8 +203,9 @@ octosense-github-notes/
   .gitignore       keeps keys, build/ and .local-state/ out of Git
 ```
 
-Keep everything that is not app content outside `bundle/`: license texts,
-READMEs, keys, review packets and `.local-state/`. The gate checks every file
+Keep development READMEs, keys, review packets and `.local-state/` outside
+`bundle/`. Keep required asset licenses and attribution inside as `.txt` or
+`.md`; links in that documentation do not grant network access. The gate checks every file
 in the bundle against its rules and the 8 MiB size limit. `tools/octo new`
 creates a `.gitignore` that already excludes `build/`, `.local-state/` and
 `*.key`.
@@ -698,8 +699,8 @@ cannot read gets no report, only one `hub: …` line. The full rules are in
 | `hub: manifest is not valid: unknown field …`, with no report | `hub stamp` and `hub check` cannot parse the manifest. | Remove or rename the field. The message lists the valid ones. |
 | `contents: <file> has extension "…", which a bundle may not hold` | `.DS_Store`, `LICENSE` or another file without an allowed extension. | Delete it or move it out of `bundle/`. |
 | `contents-invalid (<file>): cannot decode the image: …` | A corrupt image, another format renamed to `.png` or an image over 4096 pixels a side. | Capture or export it again. |
-| `resource-invalid (…/font_src): not a portable bundle path: "makepad_widgets:resources/…"` | A card kit names a built-in font other than `makepad_widgets:resources/Inter.ttf`, such as the CJK font ([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). | Use `makepad_widgets:resources/Inter.ttf` for Latin text. For other text, such as Chinese, bundle a `.ttf` or `.otf`, a subset if the font is large, and name it with a bundle-relative path, such as `"font_src": "assets/Body.ttf"`. OctoSense desktop 0.1.0-beta.2 does not load a bundled font; there, use the role kit and set no `font_src` ([Fonts](PUBLISHING.md#fonts)). |
-| `assets: <file> contains https://…`, or `assets: main.splash reaches <host>, which the manifest does not declare in network.hosts` | A URL in a bundled `.txt`, `.md`, `.json` or `.card` file, such as a license, or a script host missing from `network.hosts`. | Move the file out of `bundle/` or drop the URL. Declare each script host in `network.hosts` and request `net`. |
+| `resource-invalid (…/font_src): not a portable bundle path: "makepad_widgets:resources/…"` | A built-in font outside the shipped allowlist. | Use the exact Inter, LXGW WenKai Regular or Bold resource name, or bundle a licensed font subset. See [Fonts](PUBLISHING.md#fonts) for names and older-host limits. |
+| `assets: <file> contains https://…` | Card data names an external URL, or script/agent guidance names an undeclared host. | Bundle the asset; declare needed script hosts and `net`. Plain `.txt`/`.md` documentation links do not trigger this check or grant network access. |
 | `identity: … is under os.`, or `identity: app id "…" ends in "…", which is reserved` | The id is under `os.`, or the id or its last segment is one of `agents` `apphub` `appcard` `browser` `calculator` `card` `clock` `dev` `notes` `octos` `octoscode` `os` `reference` `reminders` `rinx` `sheets` `shell` `system` `task` `terminal` `toolbox` `weather` `workflow`. | Choose another id before your first release. |
 | `listing: listing has more than 10 keywords`, `… more than 8 screenshots` or `listing platform "…" is not one of […]` | The listing breaks a limit or misspells a name. | Trim the list, or use a name from the message. |
 | `listing: screenshots/01-main.png is named by the listing but is not in the bundle` | The file does not exist. | Capture it ([step 4](#4-capture-the-screenshots)) or fix the path. |
@@ -720,7 +721,7 @@ cannot read gets no report, only one `hub: …` line. The full rules are in
 | Run your app's own logic in agent tools | Not in any release. OctoSense `main` runs `implemented_by: "app"` tools while the full app is open; a closed app answers `app_not_running`. OctoSense desktop 0.1.0-beta.2 refuses these tools with `app_tool_unavailable`. A `host-service` tool without `host_method` calls the service named by your app's namespace, which is not a capability, so the call fails with `not_granted`. | To reach a shared service, map the tool with `host_method` to a method of `github`, `gcalendar`, `gmail` or `glance` ([Map a tool to a shared service](PUBLISHING.md#map-a-tool-to-a-shared-service-host_method)). For your own logic, declare `requires: ["script-tools-v1"]` and implement the `app_tool` hook ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)). Test it in an OctoSense shell built from `main`. |
 | Submit a system app (`os.*`) or a native app | No route here. System apps ship with the shells, and native code needs a shell release ([delivery paths](DEVELOPMENT.md#choose-a-delivery-path)). | Build a store app with an id of your own. |
 | Install an `auth` app on a phone | No released phone build can. | Test on desktop-v0.1.0-beta.2. |
-| Name Makepad's built-in CJK font in a card kit | Not yet ([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). | Bundle a `.ttf` or `.otf` and name it with a bundle-relative `font_src` ([Fonts](PUBLISHING.md#fonts)). A host built with Makepad's International font set, such as `card-host`, also draws Chinese with a built-in CJK fallback. OctoSense desktop 0.1.0-beta.2 loads no bundled font; on that release, build the card from the role kit and set no `font_src`. Unverified: how the OctoSense shells draw Chinese. |
+| Name Makepad's built-in CJK font in a card kit | Supported by the current Hub and pinned runtime for the exact Regular/Bold resources. | See [Fonts](PUBLISHING.md#fonts) for names, bundled fonts and older-host limits. Native `card-host` rendering is verified on Mac; every shell/platform is not yet verified. |
 
 Design Flow's
 [HOST-SERVICES.md](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md)

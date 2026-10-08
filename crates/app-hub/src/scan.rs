@@ -194,7 +194,9 @@ fn reviewer_command(reviewer: &str) -> Command {
     {
         use std::os::windows::process::CommandExt;
         let mut command = Command::new("cmd.exe");
-        command.args(["/D", "/S", "/C"]).raw_arg(reviewer);
+        // /S removes the command string's outer quote pair. Supply that pair
+        // ourselves so a quoted executable path keeps its own quotes.
+        command.args(["/D", "/S", "/C"]).raw_arg(format!("\"{reviewer}\""));
         command
     }
     #[cfg(not(windows))]
@@ -236,6 +238,34 @@ mod tests {
         } else {
             format!("cat >/dev/null; printf '%s\\n' '{text}'")
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_reviewer_fixture_process() {
+        // Normal test-suite invocation is inert; the parent below selects
+        // exactly this test in a separate process whose stdin holds a packet.
+        if !std::env::args().any(|arg| arg == "--exact") { return; }
+        use std::io::Read;
+        let mut input = String::new();
+        std::io::stdin().read_to_string(&mut input).unwrap();
+        let packet: serde_json::Value = serde_json::from_str(&input).unwrap();
+        assert_eq!(packet["app_id"], "t");
+        println!("{}", r#"{"route":"pass","reasons":["native process received the packet"]}"#);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_reviewer_supports_a_quoted_executable_path_with_spaces() {
+        let dir = std::env::temp_dir().join(format!("hub reviewer spaces {}", std::process::id()));
+        std::fs::create_dir(&dir).unwrap();
+        let exe = dir.join("review tool.exe");
+        std::fs::copy(std::env::current_exe().unwrap(), &exe).unwrap();
+        let command = format!("\"{}\" --exact scan::tests::windows_reviewer_fixture_process --nocapture", exe.display());
+        let result = scan(&packet_stub(), &command);
+        std::fs::remove_dir_all(dir).unwrap();
+        assert_eq!(result.route, Route::Pass, "{result:?}");
+        assert_eq!(result.reasons, ["native process received the packet"]);
     }
 
     #[test]

@@ -87,12 +87,12 @@ jobs:
             ~/.cargo/git
             app-hub/target
           key: ${{ runner.os }}-${{ runner.arch }}-native-tools-${{ steps.runtime.outputs.revision }}-${{ hashFiles('app-hub/Cargo.lock') }}
-      - name: Build the documented tools against plain Makepad
-        working-directory: app-hub
-        run: cargo build --locked --release -p octosense-card-host -p octosense-app-hub
       - name: Contract, policy and hub tests
         working-directory: app-hub
         run: cargo test --locked --release -p octosense-app-contract -p octosense-app-policy -p octosense-app-hub
+      - name: Build the documented tools against plain Makepad
+        working-directory: app-hub
+        run: cargo build --locked --release -p octosense-card-host -p octosense-app-hub
       - name: Standalone CLI and modal service tests
         working-directory: app-hub
         run: |

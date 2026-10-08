@@ -95,7 +95,7 @@ my-app/
 | `contents-invalid`（SVG） | SVG 无法解析；既没有数值形式的 `width` 和 `height`，也没有 `viewBox`；单边超过 4096 像素；或含有脚本、`foreignObject` 或 `on…` 事件属性。SVG 的样式（`style` 属性或 `<style>` 块）导入样式表、使用转义或注释，或让 `url()` 指向同一文件内 `#fragment` 以外的任何位置。 | |
 | `entry` | 应用包中既没有 `main.splash` 也没有 `page.card`；`page.card` 不是有效的 L0；`page.data.json` 不是 JSON；应用包中既没有 `kit/native/<theme>/kit.json`，卡片所需的 OctoScript kit 模块也不齐全。 | |
 | `resource-invalid` | 卡片对图片或字体的引用，或 SVG 的 `href`，指向应用包中没有的文件。检查结果会给出对应的 JSON 指针。见[字体](#字体)。 | |
-| `assets` | 除 `manifest.json`、`listing.json` 和 Agent 文件外，某个 `.card`、`.json`、`.l0`、`.octoscript`、`.txt` 或 `.md` 文件含有 `http://`、`https://`、`file://` 或 `../`，包括随包附带的 README 或字体许可证中的 URL。`.splash` 文件或 Agent 文件含有 `http://`、`file://`、`../`，或不在 `network.hosts` 中的 `https://` 主机（应用请求了 `images` 或 `web` 时，允许任何公开主机）。 | |
+| `assets` | 除 `manifest.json`、`listing.json` 和 Agent 文件外，某个 `.card`、`.json`、`.l0` 或 `.octoscript` 文件含有 `http://`、`https://`、`file://` 或 `../`。普通文档中的链接不属于素材加载。`.splash` 文件或 Agent 文件含有 `http://`、`file://`、`../`，或不在 `network.hosts` 中的 `https://` 主机（应用请求了 `images` 或 `web` 时，允许任何公开主机）。 | |
 | `secrets` | `.card`、`.l0`、`.octoscript` 或 `.splash` 文件声明了 `is_password: true`，或把 `TextInputContentType` 设为 `Password`、`NewPassword` 或 `OneTimeCode`。 | |
 | `storage` | | 没有 `storage` 能力时，某个 `.splash` 文件调用了 `fs.*`，或应用请求了 `camera`。此时 `grants:` 行显示 `storage none`。 |
 | `listing` | 缺少 `listing.json`，或它违反了[商店信息](#商店信息)中的规则；商店信息未指定截图或未指定图标；指定的截图或图标不在应用包中。 | |
