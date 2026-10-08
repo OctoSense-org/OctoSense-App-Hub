@@ -348,3 +348,65 @@ fn theme_font_token_is_checked_even_without_a_component_reference() {
     assert!(!report.passed());
     assert!(report.findings.iter().any(|r| r.check == "resource-invalid" && r.path.as_deref() == Some("kit/native/light/kit.json/tokens/typography.body.font_src/value")));
 }
+
+// ---- the app's own functions (fns/*.wasm, the wasm capability) ----------
+
+/// The smallest valid WebAssembly core module: magic and version, no sections.
+const MODULE: &[u8] = b"\0asm\x01\0\0\0";
+
+fn with_functions(capability: bool, files: &[(&str, &[u8])]) -> octosense_app_hub::GateReport {
+    let mut f = Fixture::new();
+    for (name, bytes) in files {
+        let path = f.bundle.join(name);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, bytes).unwrap();
+    }
+    if capability {
+        f.manifest.capabilities.push("wasm".into());
+    }
+    f.sign();
+    f.report(None)
+}
+
+#[test]
+fn an_apps_own_functions_pass_only_under_the_wasm_capability() {
+    let report = with_functions(true, &[("fns/rank.wasm", MODULE)]);
+    assert!(report.passed(), "{}", report.render());
+    let report = with_functions(false, &[("fns/rank.wasm", MODULE)]);
+    assert!(!report.passed());
+    assert!(report.findings.iter().any(|f| f.check == "functions"), "{}", report.render());
+}
+
+#[test]
+fn a_module_out_of_place_misnamed_or_not_wasm_is_refused() {
+    for (name, bytes) in [
+        ("rank.wasm", MODULE),
+        ("lib/rank.wasm", MODULE),
+        ("fns/deep/rank.wasm", MODULE),
+        ("fns/Rank.wasm", MODULE),
+        ("fns/.wasm", MODULE),
+        ("fns/rank.wasm", b"\0asm\x02\0\0\0".as_slice()),
+        ("fns/rank.wasm", b"\0asm".as_slice()),
+        ("fns/rank.wasm", b"#!/bin/sh\necho hi\n".as_slice()),
+    ] {
+        let report = with_functions(true, &[(name, bytes)]);
+        assert!(!report.passed(), "{name} {bytes:?} must be refused: {}", report.render());
+    }
+}
+
+#[test]
+fn a_bundle_carries_at_most_eight_modules_and_hears_about_none() {
+    let max = octosense_app_hub::gate::MAX_FUNCTION_MODULES;
+    let names: Vec<String> = (0..=max).map(|i| format!("fns/f{i}.wasm")).collect();
+    let files: Vec<(&str, &[u8])> = names.iter().map(|n| (n.as_str(), MODULE)).collect();
+    let report = with_functions(true, &files[..max]);
+    assert!(report.passed(), "{}", report.render());
+    assert!(!with_functions(true, &files).passed());
+    let report = with_functions(true, &[]);
+    assert!(report.passed(), "{}", report.render());
+    assert!(
+        report.findings.iter().any(|f| f.check == "functions" && f.severity == octosense_app_hub::Severity::Warning),
+        "{}",
+        report.render()
+    );
+}

@@ -118,7 +118,8 @@ admission. A warning does not.
 | `digest` | `integrity.bundle_blake3` does not match the bundle. Run `hub stamp` after every change. | |
 | `publisher-signature` | The signature does not verify against the key given with `--publisher-key` or recorded in the catalog; no key was given for a signed manifest (`publisher key "<id>" is not registered with this hub`); the manifest is unsigned and `--allow-unsigned` is absent. | The manifest is unsigned and `--allow-unsigned` is given. |
 | `identity` | The id starts with `os.`; the id, or its last segment, is a reserved name ([Ids and reserved names](#ids-and-reserved-names)). | |
-| `contents` | A file's extension is not one of `.card`, `.json`, `.l0`, `.octoscript`, `.splash`, `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.ttf`, `.otf`, `.txt` or `.md`. Files with no extension, such as `.DS_Store` and `LICENSE`, are refused too. | |
+| `contents` | A file's extension is not one of `.card`, `.json`, `.l0`, `.octoscript`, `.splash`, `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.ttf`, `.otf`, `.txt` or `.md`, and it is not a function module (`.wasm`, see `functions`). Files with no extension, such as `.DS_Store` and `LICENSE`, are refused too. | |
+| `functions` | The bundle carries a `.wasm` module without the `wasm` capability, or more than 8 modules. A module that is not at `fns/<name>.wasm` (the name `[a-z0-9_-]`, at most 64 characters) or is not a WebAssembly core module is refused as `contents-invalid`. | The app declares `wasm` but carries no `fns/*.wasm`. |
 | `contents-invalid` (text and images) | A text file (`.splash`, `.card`, `.json`, `.l0`, `.octoscript`, `.txt` or `.md`) is over 1 MiB or not UTF-8; JSON does not parse; a PNG, JPEG or WebP does not decode or is over 4096 px a side; the listing icon is not square, or is a bitmap over 1 MiB or 1024 px a side. | |
 | `contents-invalid` (SVG) | An SVG does not parse; lacks a numeric `width` and `height` or a `viewBox`; is over 4096 px a side; or holds a script, a `foreignObject` or an `on…` handler. Its styling (a `style` attribute or a `<style>` block) imports a stylesheet, uses an escape, uses a comment or points `url()` anywhere but a `#fragment` in the same file. | |
 | `entry` | The bundle has neither `main.splash` nor `page.card`; `page.card` is not valid L0; `page.data.json` is not JSON; neither `kit/native/<theme>/kit.json` nor every OctoScript kit module the card needs is in the bundle. | |
@@ -280,6 +281,7 @@ OctoSense desktop 0.1.0-beta.2.
 | `research` | Searching through the system toolbox, within the manifest's research scope ([The research scope](#the-research-scope)). The host runs every search. | Search *what the scope allows* | System apps only, in phone builds |
 | `crawl` | Crawling sites through the system toolbox, up to the scope's `max_depth` and `max_pages`, inside its domain lists. More reach than `research`. | Crawl websites, *within the scope*, which reaches more than searching | As `research` |
 | `runtime` | Asking which APIs the host implements, with `runtime.list` and `runtime.describe` ([Host API compatibility](HOST-API.md)). It grants none of the APIs it lists. | Inspect available host APIs without gaining access to their data or permissions | Not on OctoSense desktop 0.1.0-beta.2, whose store refuses the name. App Hub's request dispatcher answers it in every host built from App Hub `main`, `card-host` included. |
+| `wasm` | The app's own functions: WebAssembly modules in the bundle's `fns/` (at most 8), run by the host's `wasm` service in a sandbox with a deadline and a memory cap. A function gets only its input and reaches no file, network, clock or other app. An agent tool can run one with `host_method: "wasm.<function>"`. | Run its own sandboxed functions on this device | Not in a release: OctoSense serves it only in builds with its `wasm-lab` feature |
 
 No capability implies another. Not yet: `photos` and `youtube` services for
 store apps. For how a script calls each capability, see Design Flow's
@@ -569,9 +571,9 @@ The gate refuses a `host_method` unless every rule holds:
 | The tool says `implemented_by: "host-service"`. | `host_method is only valid for implemented_by "host-service"` |
 | The value is `family.method`, with `[a-z0-9_]` segments, at most 96 bytes. | `host_method must be family.method with nonempty [a-z0-9_] segments, at most 96 bytes` |
 | No segment is `sheet`. | `host_method cannot target a host sheet or approve an action` |
-| The method is in the table below. | `host_method "<m>" is not in the reviewed shared-service tool contract` |
-| The tool's `risk` is at least the method's minimum. | `host_method "<m>" requires at least <risk> risk` |
-| The tool says `"private_data": true`. | `shared-service tools must declare private_data: true` |
+| The method is in the table below, or is `wasm.<function>`: one of the app's own functions, one segment after `wasm.`. | `host_method "<m>" is not in the reviewed shared-service tool contract` |
+| The tool's `risk` is at least the method's minimum (not for `wasm.<function>`). | `host_method "<m>" requires at least <risk> risk` |
+| The tool says `"private_data": true` (not for `wasm.<function>`, which sees only its input). | `shared-service tools must declare private_data: true` |
 | The manifest declares the method's family as a capability, or the exact method. | `host_method "<m>" requires the declared "<family>" service capability` |
 
 | Family | Methods, minimum risk `read` | Methods, minimum risk `act` |
@@ -586,6 +588,8 @@ The gate refuses a `host_method` unless every rule holds:
 | `microphone` | `microphone.permission.status` | |
 | `location` | `location.permission.status`, `location.get` | |
 
+`wasm.<function>` runs one of the app's own functions (`fns/*.wasm`, the
+`wasm` capability); no OctoSense release serves it yet.
 No OctoSense release serves the `auth`, `runtime`, `camera`, `microphone`
 and `location` methods above yet ([Host API compatibility](HOST-API.md)).
 The rules above apply to them too, `runtime.list` and `runtime.describe`
