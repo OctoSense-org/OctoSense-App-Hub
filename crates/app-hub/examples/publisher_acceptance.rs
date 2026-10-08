@@ -1,7 +1,7 @@
 //! Exercise real publisher proofs without publishing or running app UI.
 //!
 //! cargo run --locked -p octosense-app-hub --example publisher_acceptance --
-//!   first.bundle.pack.json second.bundle.pack.json
+//!   first.bundle.pack.json [second.bundle.pack.json]
 //!
 //! Inputs must be real GitHub-attested releases of the same synthetic app.
 //! The local test catalog uses ephemeral in-memory keys; it is NOT an
@@ -66,8 +66,8 @@ fn sign(catalog: &mut Catalog, anchor: &HubKey, working: &HubKey) -> Result<Stri
 }
 fn run() -> Result<serde_json::Value, String> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
-    if args.len() != 2 {
-        return Err("usage: publisher_acceptance <first pack> <second pack>".into());
+    if args.is_empty() || args.len() > 2 {
+        return Err("usage: publisher_acceptance <first pack> [second pack]".into());
     }
     let anchor = HubKey::generate();
     let working = HubKey::generate();
@@ -79,16 +79,10 @@ fn run() -> Result<serde_json::Value, String> {
     let first = root.0.join("first");
     let second = root.0.join("second");
     publisher_tools::unpack(Path::new(&args[0]), None, &first)?;
-    publisher_tools::unpack(Path::new(&args[1]), None, &second)?;
     let one = entry(&first, None)?;
     let mut catalog = Catalog::new(1, &octosense_app_hub::today(), vec![one.clone()]);
     let first_json = sign(&mut catalog, &anchor, &working)?;
-    let two = entry(&second, Some(&catalog))?;
-    require(
-        one.app_id() == two.app_id(),
-        "fixture packs must be the same app",
-    )?;
-    let mut checks = vec!["two_real_publisher_proofs", "version_update_continuity"];
+    let mut checks = vec!["real_publisher_proof"];
     let app_id = one.app_id();
     let mut store = Store::new(
         &anchor.public_hex(),
@@ -195,6 +189,23 @@ fn run() -> Result<serde_json::Value, String> {
     }
     checks.push("real_identity_substitution_refused");
 
+    if args.len() == 1 {
+        drop(prepared_one);
+        let receipt = serde_json::json!({"schema":1,"passed":true,
+            "publisher_proof":"real-github-tag-push",
+            "catalog_authority":"ephemeral-local-test-catalog-not-official-v2",
+            "app_id":app_id,"versions":[one.version()],"checks":checks,
+            "update_tested":false,"production_publication":false,"owned_directory_cleanup":true});
+        fs::remove_dir_all(&root.0).map_err(|_| "owned acceptance directory cleanup failed")?;
+        return Ok(receipt);
+    }
+    publisher_tools::unpack(Path::new(&args[1]), None, &second)?;
+    let two = entry(&second, Some(&catalog))?;
+    require(
+        one.app_id() == two.app_id(),
+        "fixture packs must be the same app",
+    )?;
+    checks.push("second_real_publisher_proof_and_version_update_continuity");
     catalog.sequence = 2;
     catalog.entries.push(two.clone());
     let second_json = sign(&mut catalog, &anchor, &working)?;
@@ -273,7 +284,7 @@ fn run() -> Result<serde_json::Value, String> {
     drop(prepared_two);
     let receipt = serde_json::json!({"schema":1,"passed":true,"publisher_proof":"real-github-tag-push",
         "catalog_authority":"ephemeral-local-test-catalog-not-official-v2","app_id":app_id,
-        "versions":[one.version(),two.version()],"checks":checks,"production_publication":false,"owned_directory_cleanup":true});
+        "versions":[one.version(),two.version()],"checks":checks,"update_tested":true,"production_publication":false,"owned_directory_cleanup":true});
     fs::remove_dir_all(&root.0).map_err(|_| "owned acceptance directory cleanup failed")?;
     Ok(receipt)
 }

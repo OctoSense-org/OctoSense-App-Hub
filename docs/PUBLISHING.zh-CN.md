@@ -803,13 +803,13 @@ my-notes 0.1.0 — PASSED
 
 ## 签名
 
-新应用可以使用 GitHub 管理的发布者来源证明，无需开发者创建、保存或轮换发布者私钥。本源码实现准备契约 **1.8.0** 和 `publisher-github-v1`；兼容宿主发布版和真实发布者工作流验收仍待完成。下文保留历史包的 Ed25519 路径。
+新应用可以使用 GitHub 管理的发布者来源证明，无需开发者创建、保存或轮换发布者私钥。本源码实现准备契约 **1.8.0** 和 `publisher-github-v1`；兼容宿主发布版仍待完成。两个真实标签推送发布已通过下文记录的工作流与原生 Store 验收。下文保留历史包的 Ed25519 路径。
 
 ### GitHub 发布者来源证明
 
 公开仓库的 GitHub 托管工作流在推送 `v<manifest.version>` 标签时运行。宿主使用内置 public-good 信任快照离线验证完整 Sigstore v0.3 证明：证书、签发者、签名、证书时间戳和透明日志证据，并要求仓库及所有者 ID、仓库 URL、本仓库工作流路径、标签、源码 commit、工作流 commit 和规范化清单主题完全一致。GitHub 身份代表对仓库工作流的控制，不是对某个人现实身份的证明。应用不会获得 GitHub 凭证。
 
-工作流调用以下原生命令（完整真实工作流**尚未验证**）：
+工作流调用以下原生命令：
 
 ```sh
 hub publisher-prepare bundle --repository OWNER/REPO \
@@ -824,6 +824,8 @@ hub publisher-pack bundle --out build/app.bundle.pack.json
 ```
 
 `build/` 必须预先存在且位于 `bundle/` 外。`publisher-prepare` 添加 `requires: ["publisher-github-v1"]`，在 `integrity.github` 中记录身份，并为最终应用包写入摘要。规范化签名字节包含身份和应用包摘要，但不包含 `integrity.github.attestation`。随后附加证明；应用包摘要不包含清单，因此不存在哈希循环。证明最多 48 KiB，完整清单最多 64 KiB。Prepare 拒绝已经封存的发布包；Attach 和 Pack 验证最终字节且不会重新写入摘要，修改后需要生成新的发布证明。此流程无需 `keygen`、`sign-manifest` 或 `--publisher-key`。
+
+验证使用公开的合成测试应用的 [v0.1.0 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736273522)与 [v0.1.1 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736765473)，没有使用仓库 Secrets。两个发布均生成并验证了真实 GitHub 证明。[原生验收示例](../crates/app-hub/examples/publisher_acceptance.rs)随后安装两个发布包，准备并验证启动、保留完整证明，并拒绝内容／证明／身份篡改、回滚、未签名的归属替换和已撤回版本。[验收记录](../reviews/github-publisher-v1/acceptance.json)绑定输入摘要与原生源码版本。Store 使用的是临时本地测试目录；该测试应用没有 App Hub 投稿 issue 或目录条目。这不代表已执行应用界面、在手机上安装 GitHub 发布者应用，或已发布兼容宿主。
 
 请下载含有生成后证明清单的 **Release pack**；单独检出源码并不包含这些最终字节。审核人员可运行 `hub publisher-unpack app.bundle.pack.json --out review-bundle`，再运行 `hub publisher-verify review-bundle --catalog <authenticated-catalog>`。Unpack 要求新目录，拒绝路径穿越，失败时仅清理自己创建的输出。`hub publisher-entry review-bundle --catalog <authenticated-catalog> --out build/index.json` 生成审核候选条目，不会发布。
 

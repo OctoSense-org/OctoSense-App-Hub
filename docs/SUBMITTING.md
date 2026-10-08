@@ -96,7 +96,7 @@ The rehearsal is verified only with a shell built from source.
 ### Check your platform
 
 - **macOS on Apple silicon** verified the historical reference-app commands.
-  The new GitHub publisher workflow has the separate pending status in step 5.
+  The new GitHub publisher workflow has separate source and release status in step 5.
 - **Windows** is unverified on current `main`. Open issue
   [#41](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/41) records
   a native Windows 11 build and run at an earlier revision, verified by a
@@ -376,8 +376,10 @@ and in your issue.
 ## 5. Produce the final bytes
 
 For a **new app**, the GitHub publisher route removes developer key
-management. This implementation branch prepares contract 1.8.0; the real
-workflow acceptance and a compatible released host are still pending.
+management. This implementation branch prepares contract 1.8.0. Two real
+tag-push releases and native Store install/update/launch checks passed
+([evidence and limits](PUBLISHING.md#github-publisher-provenance)); a compatible
+released host is still pending.
 
 1. Open an App Hub submission issue to request publication. The issue may
    precede the release; preparation, review and publication remain separate.
