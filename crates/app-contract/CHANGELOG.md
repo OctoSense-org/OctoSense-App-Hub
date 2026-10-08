@@ -8,6 +8,13 @@ are unpublished, and 1.5.0 includes their changes.
 [README.md](README.md#versions-on-cratesio) shows how to update a lock file
 that holds 1.2.0.
 
+## 1.9.0 — unpublished
+
+- Adds the `files` capability for host-owned file selection and export dialogs.
+  It grants neither arbitrary filesystem access nor the separate `storage`
+  capability. Applications must discover or require the specific file methods
+  their host implements; the contract alone supplies no OS adapter.
+
 ## 1.8.0 — 2026-10-08
 
 Published through the [release workflow](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37739082884);

@@ -69,6 +69,27 @@ configured and authorized, call its status or account methods. Declaring a
 requirement neither turns on an OS permission nor adds a provider
 registration.
 
+## Selected-file transfer (contract 1.9, unreleased)
+
+The `files` capability grants access to host-owned file dialogs, not arbitrary
+host paths. Import/export also need `storage`; neither grant implies the other.
+Require `files.import@1` or `files.export@1` through `host_api.required`, or declare
+them optional and inspect `runtime.list`. Contract support alone does not mean a
+released host implements these APIs. `files.status` reports adapter availability.
+
+The matching OctoSense implementation imports one selected file into a new
+app-relative destination, and exports a snapshot of an existing app file. It
+returns a relative path and byte count, never an OS path or Android provider URI.
+Transfers are foreground-only and cannot be initiated by an agent/background
+turn. Native `fs.write_bytes` is identified by the `storage.binary_write@1`
+runtime ABI, not a callable `host.request` method.
+
+Imports keep the current 1 MiB file limit and app storage quota; they refuse
+existing destinations. A cancelled dialog returns `{"cancelled":true}`. Current
+adapters cover macOS, Windows, Android and Linux with a native dialog helper;
+iOS, OpenHarmony, web and direct-framebuffer Linux are unsupported. Check the
+host's status and release notes for build and device validation.
+
 ## Limits
 
 - **Agent tools.** A `host-service` tool can map with `host_method` to

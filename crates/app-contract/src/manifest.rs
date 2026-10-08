@@ -43,6 +43,9 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     "runtime",
     // Read and write inside the app's own storage jail.
     "storage",
+    // Import or export a file the person chooses in the host's native dialog.
+    // This grants no arbitrary path access and does not imply storage.
+    "files",
     // Make requests, but only to the hosts in `network.hosts`.
     "net",
     // Raise a prompt the person answers (a permission ask, a confirmation).

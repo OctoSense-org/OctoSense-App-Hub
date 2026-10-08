@@ -48,6 +48,13 @@ limits.
 
 ## Versions on crates.io
 
+This checkout develops **1.9.0, not yet published**. It adds `files` for
+host-owned import/export dialogs. The grant is separate from `storage` and
+does not provide arbitrary filesystem access. Consumers of this checkout's
+App Policy need the matching contract; until publication, use the git patch
+described below. Existing released hosts do not gain file APIs by parsing
+the new capability.
+
 crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0, 1.7.0, 1.7.1 and 1.8.0. Versions 1.3.0 and
 1.4.0 exist only in this repository ([CHANGELOG.md](CHANGELOG.md)); 1.5.0
 includes their changes. A lock file that still holds 1.2.0 refuses every capability added
@@ -63,7 +70,7 @@ app org.example.connect requests unknown capability "auth"
 `SignatureVerifier::verify_github` extension that refuses by default. Existing
 manifests and Ed25519 signing bytes remain unchanged. Hosts must supply a real
 provenance verifier; accepting the new marker alone does not authenticate an
-app. App Policy requires 1.8.0, which consumers can now resolve from crates.io.
+app. Released App Policy requires 1.8.0, which consumers can resolve from crates.io.
 The contract release does not deliver a compatible OctoSense shell binary.
 
 Published 1.7.1 reserves exactly four full app IDs, ignoring ASCII case:
