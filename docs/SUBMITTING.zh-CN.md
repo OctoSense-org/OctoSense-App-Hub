@@ -224,7 +224,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 
 ## 5. 生成最终字节
 
-对于**新应用**，GitHub 发布者路径不再要求开发者管理密钥。本实现分支准备契约 1.8.0；真实工作流验收和兼容宿主发布版仍待完成。
+对于**新应用**，GitHub 发布者路径不再要求开发者管理密钥。本实现分支准备契约 1.8.0。两个真实标签推送发布以及原生 Store 安装／更新／启动检查已通过（[证据与限制](PUBLISHING.zh-CN.md#github-发布者来源证明)）；兼容宿主发布版仍待完成。
 
 1. 创建 App Hub submission issue，发起发布请求。可以先开 issue、后生成 release；准备、审核和发布是不同步骤。
 2. 先测试未签名开发副本，再由公开仓库的标签推送工作流准备规范化清单、获取 GitHub 证明、附加证明并打包最终应用。原生命令及身份限制见 [GitHub 发布者来源证明](PUBLISHING.zh-CN.md#github-发布者来源证明)。

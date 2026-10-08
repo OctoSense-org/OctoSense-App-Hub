@@ -1122,8 +1122,9 @@ packet on stdin. Its failure or invalid output still requires human review.
 New apps can use GitHub-managed publisher provenance: developers do not
 create, store or rotate a publisher private key. This source implementation
 prepares contract **1.8.0** and `publisher-github-v1`; a compatible released
-host and a real publisher workflow acceptance run are still pending. The
-historical Ed25519 route remains below for existing packages.
+host is still pending. Two real tag-push releases passed the workflow and
+native Store acceptance described below. The historical Ed25519 route
+remains below for existing packages.
 
 ### GitHub publisher provenance
 
@@ -1136,8 +1137,7 @@ commit, workflow commit and the canonical manifest subject. A GitHub identity
 is authority over a repository workflow, not proof of a particular person's
 real-world identity. No app receives GitHub credentials.
 
-The workflow calls these native commands (the full live workflow is **not yet
-verified**):
+The workflow calls these native commands:
 
 ```sh
 hub publisher-prepare bundle --repository OWNER/REPO \
@@ -1160,6 +1160,18 @@ there is no hash cycle. The proof is at most 48 KiB and the complete manifest
 at most 64 KiB. Prepare refuses an already sealed release. Attach and pack
 verify the final bytes and never restamp; edits require a new release proof.
 No `keygen`, `sign-manifest` or `--publisher-key` belongs in this workflow.
+
+Validation used the public synthetic fixture's [v0.1.0 workflow](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736273522)
+and [v0.1.1 workflow](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736765473),
+without repository secrets. Both generated and verified real GitHub proofs.
+The [native acceptance example](../crates/app-hub/examples/publisher_acceptance.rs)
+then installed both release packs, prepared and validated launches, preserved
+the full proofs, and refused content/proof/identity tampering, rollback,
+unsigned ownership replacement and withdrawn releases. The [receipt](../reviews/github-publisher-v1/acceptance.json)
+binds the input hashes and native source. Its Store catalog was an ephemeral
+local test catalog; the fixture has no App Hub submission or catalog entry.
+This does not establish app UI execution, phone publisher installation or a
+compatible host release.
 
 Download the **release pack**, which contains the generated attested manifest;
 a source checkout alone does not contain those final bytes. A reviewer can
