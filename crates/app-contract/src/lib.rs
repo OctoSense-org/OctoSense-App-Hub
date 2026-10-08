@@ -109,7 +109,7 @@ pub use entry::{script_source, ASSETS_PLACEHOLDER, SCRIPT_ENTRY};
 pub use manifest::{
     check_reserved_id, parse, short_id, AgentSpec, AgentWorkspace, AppManifest, Compute, Integrity, ModelNeed, ModelSpec,
     ModelTier, Network, ProfileMode, Signature, Storage, TaskModel, Triggers, KNOWN_CAPABILITIES, KNOWN_FEATURES,
-    KNOWN_MODEL_NEEDS, RESERVED_NAMES, SCHEMA, SCHEMA_MINOR,
+    KNOWN_MODEL_NEEDS, RESERVED_HOST_FILE_IDS, RESERVED_NAMES, SCHEMA, SCHEMA_MINOR,
 };
 pub use policy::{resolve, AppPolicy, HostLimits, StorageGrant};
 pub use research::ResearchScope;

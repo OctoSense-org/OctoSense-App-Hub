@@ -21,6 +21,7 @@ change, with the same sections, in the same order and with the same content.
 | Topic | Owner |
 | --- | --- |
 | Gate rules, capability names and who serves them, reserved ids, manifest, listing and tool fields, `hub` commands, signing | [docs/PUBLISHING.md](docs/PUBLISHING.md), the reference, and its `.zh-CN.md` twin |
+| GitHub-admin catalog publication, environment protection and v2 migration | [docs/GITHUB-PUBLISHING.md](docs/GITHUB-PUBLISHING.md) and its `.zh-CN.md` twin |
 | Host API declarations, `runtime` discovery and which hosts implement them | [docs/HOST-API.md](docs/HOST-API.md) and its `.zh-CN.md` twin |
 | The submission step by step: repository layout, final bytes, release, issue fields, what reviewers check, common refusals | [docs/SUBMITTING.md](docs/SUBMITTING.md) and its `.zh-CN.md` twin |
 | A first app, from a template to an unsigned bundle that passes the gate | [docs/FIRST-APP.md](docs/FIRST-APP.md) and its `.zh-CN.md` twin |
@@ -95,7 +96,9 @@ owns those.
   [`card-host` fails to build](docs/DEVELOPMENT.md#card-host-fails-to-build)
   lists the builds that need the patches.
 - [Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)
-  lists the `octosense-app-contract` releases; 1.7.0 matches this tree. Do
+  lists the `octosense-app-contract` releases; this tree prepares 1.7.1,
+  while crates.io currently provides 1.7.0. Publish 1.7.1 before updating
+  a consumer to App Policy's new minimum version. Do
   not take a published contract as proof that a released host implements its
   APIs. This workspace's `[patch.crates-io]` points the crate at
   `crates/app-contract`. Never tell readers that a lock file holding 1.2.0 or
@@ -135,6 +138,9 @@ owns those.
 
 ## Catalog and publication
 
+- GitHub catalog publication uses the protected `app-hub-catalog` environment,
+  exact admin-approved digest and native proof verification. Never execute a
+  candidate bundle or weaken existing publisher continuity to publish it.
 - In documentation and development work, never change `catalog.json`,
   `index/`, `artifacts/`, publisher keys or publication status, and never run
   `hub publish`, `hub withdraw` or `hub remove`.

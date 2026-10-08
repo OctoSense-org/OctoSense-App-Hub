@@ -41,18 +41,19 @@ app declares the host APIs it needs and checks which ones a host implements.
 
 | Path | What it is |
 | --- | --- |
-| `catalog.json` | The signed catalog. Stores verify it against the anchor below before showing anything. |
+| `catalog.json` | The legacy signed catalog. Stores verify it against the anchor below before showing anything. |
 | `index/<app>-<version>.json` | One admitted entry per app version: its manifest, publisher, source and status. A maintainer exports it from the catalog after `hub publish`. |
 | `artifacts/<app>-<version>.bundle/` | App Hub's copy of the bundle, exactly the bytes that were reviewed. `hub publish` creates it. |
 | `artifacts/<app>-<version>.bundle.pack.json` | The same bundle as one file, which stores download. |
 | `docs/FIRST-APP.md` | A first-app walkthrough for a card app or a script app: create, run, capture and check. |
 | `docs/SUBMITTING.md` | The submission, step by step: repository, manifest, listing, screenshots, signing, release, issue and review. |
 | `docs/PUBLISHING.md` | The reference: gate rules; capabilities and who serves them; manifest, listing and tool fields; host services; `hub` commands; signing. |
+| `docs/GITHUB-PUBLISHING.md` | Admin-authorized GitHub signing, exact candidate review and v2 migration. |
 | `docs/HOST-API.md` | Declaring the host APIs an app needs, `runtime` discovery and what today's hosts implement. |
 | `docs/ICONS.md` | Canonical icon ownership, export constraints and visual review. |
 | `docs/DEVELOPMENT.md` | The guide map, delivery paths, `card-host` and its remote-control routes, and `card-studio`. |
 | `templates/app/` | A card app repository scaffold with metadata, an example icon and linked agent instructions. |
-| `crates/app-contract` | The app contract, `octosense-app-contract` ([OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)): the manifest, the policy an app gets, bundle integrity and running a bundle. Within `1.x` it only grows ([README](crates/app-contract/README.md)). Its latest version, 1.6.0, is on crates.io ([Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)). |
+| `crates/app-contract` | The app contract, `octosense-app-contract` ([OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)): the manifest, the policy an app gets, bundle integrity and running a bundle. Within `1.x` it only grows ([README](crates/app-contract/README.md)). This tree prepares 1.7.1; crates.io currently provides 1.7.0 ([Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)). |
 | `crates/app-policy` | The signed manifest and listing, admission, and resolution into an isolate's settings and an agent session profile ([OctoSense Home ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0002-agentic-app-security-model.md)); an app's own agent (`tools.json`, `AGENT.md`, skills) loaded as an `AgentBundle`; the `tools.json` parser and checks that native modules' tool manifests share (`ToolManifest::load`). It also re-exports the app contract. |
 | `crates/app-hub` | The index, the signed catalog, the gate, the agent scan, the device client and the `hub` command ([OctoSense Home ADR 0003](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0003-app-hub-and-store.md)). |
 | `crates/appstore` | The store as an OctoSense module, the `card` module that runs an installed app as its own client, system apps (`os.` ids) and host services with their sheets. |
@@ -158,8 +159,8 @@ each one today.
 
 ## Trust anchor
 
-Stores trust this anchor and follow its certificate to the working key that
-signs the catalog. Rotating the working key needs no store release.
+Legacy stores trust this anchor and follow its certificate to the working key
+that signs `catalog.json`. Rotating the working key needs no store release.
 
 ```text
 6000284a069ba7cada2925094074e8e0baae07e25d1b7fc31f396c993f363e11
@@ -181,9 +182,11 @@ appstore
 ## How a maintainer publishes an app
 
 After you submit ([Submit an app to the App Hub](docs/SUBMITTING.md)), a
-maintainer runs `hub publish` on the exact bytes of your tagged commit and
-commits the signed catalog. Not yet: a publishing action or a separate index
-repository.
+maintainer reviews the exact bytes of your tagged commit.
+[GitHub admin publication](docs/GITHUB-PUBLISHING.md) signs a new v2 catalog
+without a separate Hub private key; its production activation and compatible
+host release remain pending. The existing `hub publish` path still produces
+the legacy anchor-signed catalog.
 
 A maintainer withdraws a version with `hub withdraw`, and every store honors
 the withdrawal on its next catalog fetch. `hub remove` drops an entry that

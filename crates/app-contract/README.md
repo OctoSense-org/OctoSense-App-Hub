@@ -57,6 +57,15 @@ since, such as `auth`:
 app org.example.connect requests unknown capability "auth"
 ```
 
+This tree prepares **1.7.1; publication is pending**. It reserves exactly four
+full app IDs, ignoring ASCII case: `catalog.json`, `catalog.lock`,
+`catalog-v2.json` and `catalog-v2.lock`. These names collide with host catalog or
+cache-lock files. `json` and `lock` are not reserved namespaces;
+`org.example.json` and `org.example.lock` remain valid. This security fix changes
+no manifest fields, capability grants or signature bytes. App Hub's policy crate
+requires at least 1.7.1; git consumers need the local contract patch below until
+that version is published.
+
 `cargo update -p octosense-app-contract` moves an unconstrained 1.x consumer
 to 1.7.0. Hosts using the new API declarations must select 1.6 or later, and
 hosts serving `wasm` 1.7 or later;
@@ -129,6 +138,9 @@ Within `1.x` the contract only grows (ADR 0005 section 2):
 - **Older signatures still verify.** `requires` and `schema_minor` are left
   out of the canonical signing bytes when empty, so a manifest signed before
   they existed produces the same signing bytes.
+- **Security fixes may reject unsafe identities.** Version 1.7.1 closes the
+  host-file collision for the four exact IDs listed above; it does not reserve
+  additional tool namespaces or change valid apps' signature payloads.
 - **Fixtures pin the behavior.** [`tests/fixtures/`](tests/fixtures/README.md)
   holds real manifests and packages with their digest, signing bytes,
   ignored fields and resolved `AppPolicy`. Every `1.x` must reproduce all
