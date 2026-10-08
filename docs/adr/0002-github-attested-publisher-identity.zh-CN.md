@@ -21,7 +21,7 @@
 - **更新**：签名目录把发布者记录为 `github:<repository_id>`。每次更新都必须来自相同的仓库名、仓库 ID、所有者 ID 和工作流路径，且语义版本更高。准入检查和宿主都会拒绝重放和回滚。
 - **只用 GitHub 来源证明**：Release 带 GitHub 来源证明，不带 Ed25519 签名。审核人员不批准用密钥签名的 Release。
 - **批准**：提交 issue 仍是发布请求。仅有标签或 GitHub Release，既不构成提交，也不代表批准：每个版本都要由 App Hub 管理员批准，再通过 ADR 0001 规定的受保护工作流发布到签名目录。
-- **既有应用**：App Hub 正在撤回六个用密钥签名的参考条目，改由带 GitHub 证明的后继应用取代（见[修订](#2026-10-08-修订)）。GitHub 来源证明不能接管已登记为未签名或密钥签名的应用；以 GitHub 来源证明发布的应用也不能退回密钥签名或未签名版本。
+- **既有应用**：App Hub 已在签名目录第 14 版撤回六个用密钥签名的参考条目，改由带 GitHub 证明的后继应用取代（见[修订](#2026-10-08-修订)）。GitHub 来源证明不能接管已登记为未签名或密钥签名的应用；以 GitHub 来源证明发布的应用也不能退回密钥签名或未签名版本。
 - **不迁移**：应用只能换用新 ID 改走 GitHub 来源证明；参考应用就是这样做的，新 ID 为 `io.github.ymote.*`。已安装的应用及其数据不会迁移。
 
 ## 影响
@@ -53,7 +53,7 @@
 App Hub 对新应用和更新关闭了 Ed25519 发布者密钥路径。此前没有任何第三方应用用密钥发布过。
 
 - App Hub 只接受带 GitHub 证明的 Release（`publisher-github-v1`）。
-- 六个用密钥签名的参考条目正在通过新一轮发布从 `catalog-v2.json` 撤回：发布者 `ymote` 的 `org.octosense.samples.githubnotes`、`org.octosense.samples.inbox` 和 `org.octosense.samples.googlecalendar`，各有 0.1.0 和 0.1.1 两个版本。接替它们的是带 GitHub 证明的 `io.github.ymote.*` 应用。
+- 六个用密钥签名的参考条目已在 2026-10-08 发布的签名目录第 14 版中从 `catalog-v2.json` 撤回（[工作流运行 37852340163](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37852340163)）：发布者 `ymote` 的 `org.octosense.samples.githubnotes`、`org.octosense.samples.inbox` 和 `org.octosense.samples.googlecalendar`，各有 0.1.0 和 0.1.1 两个版本。接替它们的是带 GitHub 证明的 `io.github.ymote.*` 应用。
 - 准入检查尚未执行这项规则。要让准入检查拒绝新的用密钥签名的 Release，还需要一项改动；这项改动由 [App Hub #168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168) 跟踪，尚未合并。在它合并之前，准入检查仍会让用密钥签名的 Release 通过，只能靠审核让这条路径保持关闭。`hub keygen`、`hub pubkey` 和 `hub sign-manifest` 的去留也由这个 issue 决定。
 
 ## 参考

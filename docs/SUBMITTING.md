@@ -23,10 +23,10 @@ secret. Installing such an app takes a host that supports
 `publisher-github-v1`; use the
 [RC1 release and download guide](../README.md#download-a-compatible-host).
 
-Public catalog 13 offers the GitHub-attested `io.github.ymote.*` reference apps
-([current apps](../README.md#apps)). App Hub is withdrawing the older
-key-signed `org.octosense.samples.*` entries; later steps still cite them as
-examples ([The three reference apps](#the-three-reference-apps)). The
+Public catalog 14 offers the GitHub-attested `io.github.ymote.*` reference apps
+([current apps](../README.md#apps)). App Hub withdrew the older key-signed
+`org.octosense.samples.*` entries in catalog sequence 14; later steps still cite
+them as examples ([The three reference apps](#the-three-reference-apps)). The
 gate, capability, manifest and signing rules are in
 [PUBLISHING.md](PUBLISHING.md).
 
