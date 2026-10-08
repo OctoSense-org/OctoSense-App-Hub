@@ -3,12 +3,12 @@
 `octosense-app-contract` follows the rules in [README.md](README.md#stability):
 within `1.x` it only grows.
 
-crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0 and 1.6.0; 1.3.0 and 1.4.0 are
-unpublished, and 1.5.0 includes their changes. 1.7.0 is not published yet.
+crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0 and 1.7.0; 1.3.0 and 1.4.0
+are unpublished, and 1.5.0 includes their changes.
 [README.md](README.md#versions-on-cratesio) shows how to update a lock file
 that holds 1.2.0.
 
-## 1.7.0
+## 1.7.0 — 2026-10-07
 
 - `KNOWN_CAPABILITIES` gains `wasm`: the app's own functions, WebAssembly
   modules in its bundle's `fns/`, run by the host's `wasm` service in a
