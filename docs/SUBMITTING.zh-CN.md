@@ -292,7 +292,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 
 ## 5. 生成最终字节
 
-首次提交和更新都使用 GitHub 发布者来源证明。契约 1.8.0 新增 `publisher-github-v1`。两个由标签推送生成的真实 Release 及原生 Store 安装/更新/启动检查已通过（[证据与限制](PUBLISHING.zh-CN.md#github-发布者来源证明)）；当前公开目录使用 [RC1 发行版](../README.zh-CN.md#下载兼容宿主)。
+新应用的首次提交及其所有更新，都要使用公开仓库的 GitHub 发布者来源证明。OctoScript 应用默认开放：每个应用包本来就以可读文本的形式附带应用源码，所以公开仓库也不会多暴露多少内容（[ADR 0002](adr/0002-github-attested-publisher-identity.zh-CN.md)）。这条路径需要应用契约 1.8.0，以及支持 `publisher-github-v1` 的宿主。一个测试应用的两个 Release 均由标签推送生成，并通过了原生商店的安装、更新和启动检查（[证据与限制](PUBLISHING.zh-CN.md#github-发布者来源证明)）。如需当前的公开签名目录，请使用 [RC1 发行版](../README.zh-CN.md#下载兼容宿主)。
 
 1. 如果尚未开提交 issue，现在就可以开。Release 证据可以稍后补充；未完成的检查标为待完成，不要编造通过结果。
 2. 测试未签名的开发副本并截取真实界面。运行准入检查和 `hub scan bundle --packet build/review.json`，其中 `build/` 位于应用包外。逐题回答审核包中的问题：共七题，带 `tools.json`、`AGENT.md` 或技能时为八题。注明每个回答依据的文件及未测试的行为。

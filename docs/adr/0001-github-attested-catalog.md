@@ -2,8 +2,12 @@
 
 English | [简体中文](0001-github-attested-catalog.zh-CN.md)
 
-Status: implementation under review. Production publication, a compatible host
-release, and phone verification are **not completed** by this change.
+Status: accepted, implemented and in production. App Hub #150 implemented
+this decision. The protected workflow published catalog sequence 11
+([run 37736098082](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37736098082))
+and every later catalog through sequence 13. OctoSense desktop 0.1.0-rc.1
+is a compatible host release and selects the `catalog-v2.json` channel by
+default.
 
 ## Context
 
@@ -92,8 +96,9 @@ The native `hub` commands are the workflow's validation boundary:
 Existing entries can only change from offered to withdrawn with a reason.
 Re-offering, deletion, altered manifests, changed publisher keys, mismatching
 pack/index bytes and mutable source refs fail. The commands never replace a
-publisher signature with a catalog attestation. GitHub-based publisher identity
-is a separate future decision, including how existing publisher keys migrate.
+publisher signature with a catalog attestation.
+[ADR 0002](0002-github-attested-publisher-identity.md) defines GitHub-attested
+publisher identity; key-signed apps do not migrate to it.
 
 ## Client and cache boundary
 
@@ -129,11 +134,14 @@ failed-write behavior. The upstream fixture is **not** a production App Hub
 attestation. Cache policy tests isolate the post-verification state machine; they
 do not substitute for an actual GitHub signing run.
 
-Live protected-environment approval, production-format App Hub attestation,
-Android/iOS acceptance, and publication remain **unverified** until their separate
-receipts exist. Trust-root rotations currently require a compatible host update;
-the verifier does not fetch trust material from the catalog or silently enable
-online TUF. These are release gates, not reasons to accept unsigned catalogs.
+Production publication runs with live protected-environment approval and
+production-format App Hub attestations. Command-line checks of the
+production proof passed on macOS and on an Android phone
+([evidence](../GITHUB-PUBLISHING.md#validation)). A phone Store reading
+`catalog-v2.json` and any iOS host remain **unverified**. Trust-root rotations
+require a compatible host update; the verifier does not fetch trust material
+from the catalog or silently enable online TUF. These limits are not reasons
+to accept unsigned catalogs.
 
 ## References
 

@@ -22,6 +22,7 @@ change, with the same sections, in the same order and with the same content.
 | --- | --- |
 | Gate rules, capability names and who serves them, reserved ids, manifest, listing and tool fields, `hub` commands, signing | [docs/PUBLISHING.md](docs/PUBLISHING.md), the reference, and its `.zh-CN.md` twin |
 | GitHub-admin catalog publication, environment protection and v2 migration | [docs/GITHUB-PUBLISHING.md](docs/GITHUB-PUBLISHING.md) and its `.zh-CN.md` twin |
+| The rationale for GitHub publisher provenance over publisher keys, and for public app repositories | [docs/adr/0002-github-attested-publisher-identity.md](docs/adr/0002-github-attested-publisher-identity.md) and its `.zh-CN.md` twin |
 | Host API declarations, `runtime` discovery and which hosts implement them | [docs/HOST-API.md](docs/HOST-API.md) and its `.zh-CN.md` twin |
 | The submission's four stages and its steps: repository layout, release, issue fields, what reviewers check, approval and publication, common refusals, and who runs each `hub` command, in which step | [docs/SUBMITTING.md](docs/SUBMITTING.md) and its `.zh-CN.md` twin |
 | A first app, from a template to an unsigned bundle that passes the gate | [docs/FIRST-APP.md](docs/FIRST-APP.md) and its `.zh-CN.md` twin |

@@ -1143,6 +1143,12 @@ commit, workflow commit and the canonical manifest subject. A GitHub identity
 is authority over a repository workflow, not proof of a particular person's
 real-world identity. No app receives GitHub credentials.
 
+This route needs a public repository: GitHub signs a private repository's
+attestations with its own Sigstore instance, which hosts do not trust.
+OctoScript apps are open by default: each bundle already ships the app's
+source as readable text, so a public repository reveals little more
+([ADR 0002](adr/0002-github-attested-publisher-identity.md)).
+
 The workflow calls these native commands:
 
 ```sh
