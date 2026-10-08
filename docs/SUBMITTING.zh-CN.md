@@ -113,7 +113,7 @@ OctoSense `main` 与 desktop-v0.1.0-beta.2 有以下不同，这些改动尚未�
 
 ### 确认你的平台
 
-- **macOS（Apple 芯片）**：历史参考应用命令已验证；新的 GitHub 发布者工作流以第 5 步单独列出的源码与发布状态为准。
+- **macOS（Apple 芯片）**：历史参考应用命令已验证；新的 GitHub 发布者工作流以第 5 步单独列出的源码与 Release 状态为准。
 - **Windows**：尚未在当前 `main` 上验证。一位社区成员报告过在较早版本上完成的 Windows 11 原生构建和运行，维护者尚未验证。用 `python tools/octo` 运行 Design Flow 的工具，它能找到 `hub.exe` 和 `card-host.exe`。commit 应用包之前，先加上[第 1 步](#1-安排仓库结构)的 `.gitattributes`；最后一次检查要在全新克隆上做（[第 6 步](#6-冻结并验证发布)）。
 - **Linux**：未经验证。另有报告称，在软件渲染（llvmpipe、WSL）下截取画面（`/g`）会超时，这一点同样未经验证。
 
@@ -163,7 +163,7 @@ octosense-github-notes/
   bundle/          提交的内容：清单、商店信息、代码、工具、素材、截图
   PRIVACY.md       privacy_policy_url 指向的页面
   SUPPORT.md       如何报告问题
-  README.md        应用做什么，以及如何验证发布
+  README.md        应用做什么，以及如何验证 Release
   publisher.json   历史 Ed25519 发布者 ID、算法和公钥
   review/          签名后应用包的准入检查输出（GATE.txt）和扫描问题的回答（ANSWERS.md）
   LICENSE, NOTICE
@@ -281,20 +281,20 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 
 1. 如果尚未开提交 issue，现在就可以开。Release 证据可以稍后补充；未完成的检查标为待完成，不要编造通过结果。
 2. 测试未签名的开发副本并截取真实界面。运行准入检查和 `hub scan bundle --packet build/review.json`，其中 `build/` 位于应用包外。逐题回答审核包中的问题：共七题，带 `tools.json`、`AGENT.md` 或技能时为八题。注明每个回答依据的文件及未测试的行为。
-3. 用 Design Flow 的 `tools/octo publish-github <app-directory>` 安装并审核 `.github/workflows/publish-app.yml`（`tools/octo new` 也会提供）。此路径不需要 `keygen`、`sign-manifest`、`--publisher-key` 或仓库签名 Secret。原生命令见 [GitHub 发布者来源证明](PUBLISHING.zh-CN.md#github-发布者来源证明)。
+3. 用 Design Flow 的 `tools/octo publish-github <app-directory>` 安装并评审 `.github/workflows/publish-app.yml`（`tools/octo new` 也会提供）。此路径不需要 `keygen`、`sign-manifest`、`--publisher-key` 或仓库签名 Secret。原生命令见 [GitHub 发布者来源证明](PUBLISHING.zh-CN.md#github-发布者来源证明)。
 4. Commit 测试过的开发源码、截图、商店信息、隐私政策/支持页面、`.gitattributes` 和工作流。每个 Release 使用新的语义版本和精确的 `v<manifest.version>` 标签。工作流生成带证明的清单及最终 Release pack；不要把生成的字节覆盖提交到开发源码中。
 
 常规更新保留相同的仓库名、不可变仓库/所有者 ID 和工作流身份，并提高语义版本。更新同样无需发布者私钥。历史 Ed25519 应用身份继续使用原协议；这不是转移应用归属的流程。
 
 ### 可选的历史 Ed25519 路径
 
-只有明确选择兼容已有旧协议包或旧协议时才走这条路径。密钥管理与命令见[签名](PUBLISHING.zh-CN.md#签名)。带日期的 [0.1.0 准入记录](../reviews/connected-apps-0.1.0/admission.json)和 [0.1.1 记录](admissions/connected-apps-0.1.1/README.zh-CN.md)保持原样。它们是历史证据，不是要求新开发者创建密钥的步骤。不要给封存的发布包重新写入摘要；从未签名开发副本开始，发布一个新版本。
+只有明确选择兼容已有旧协议包或旧协议时才走这条路径。密钥管理与命令见[签名](PUBLISHING.zh-CN.md#签名)。带日期的 [0.1.0 准入记录](../reviews/connected-apps-0.1.0/admission.json)和 [0.1.1 记录](admissions/connected-apps-0.1.1/README.zh-CN.md)保持原样。它们是历史证据，不是要求新开发者创建密钥的步骤。不要给已封存的 Release 重新写入摘要；从未签名开发副本开始，发布一个新版本。
 
 ## 6. 冻结并验证发布
 
 标签标识测试过的开发源码和工作流。Release pack 包含最终带证明的清单；仅检查源码克隆并不能验证这个 pack。
 
-1. 审核测试过的 commit 后，推送新的 `v<version>` 标签。记录 `git rev-parse "v0.1.0^{commit}"`（换成你的版本），并用 `git ls-remote origin 'refs/tags/v0.1.0*'` 确认。附注标签的 `^{}` 行标识 commit。不要移动、删除或重建已推送的标签；修正需要更高版本和新标签。
+1. 评审测试过的 commit 后，推送新的 `v<version>` 标签。记录 `git rev-parse "v0.1.0^{commit}"`（换成你的版本），并用 `git ls-remote origin 'refs/tags/v0.1.0*'` 确认。附注标签的 `^{}` 行标识 commit。不要移动、删除或重建已推送的标签；修正需要更高版本和新标签。
 2. 等待 GitHub 工作流成功。保存工作流运行 URL、精确 commit、Release URL、`app.bundle.pack.json` 和 `release-receipt.json`。记录中的 `pack_sha256` 必须与下载的 pack 匹配，例如在 macOS/Linux 上运行 `shasum -a 256 app.bundle.pack.json`。
 3. 验证下载的最终字节，不要修改它们：
 
@@ -307,7 +307,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
    `review-bundle` 必须是尚不存在的目录。使用当前经过认证的目录，且拟提交版本尚未准入；这会同时核对发布者连续性和版本递增。保留完整验证输出及精确工具版本。拒绝结果是需要修复的问题，不能靠删除证明或添加 `--allow-unsigned` 绕过。
 4. 在已有的提交 issue 中补充这些产物及测试证据。审核人员会验证源码 commit 和下载的 pack。Release 工作流成功并不等于安装、提交或批准应用。
 
-只有可选的旧协议包才需要按[签名](PUBLISHING.zh-CN.md#签名)一节，用登记的公钥检查已签名源码标签的全新克隆。GitHub 证明发布不需要这种密钥检查。
+只有可选的旧协议包才需要按[签名](PUBLISHING.zh-CN.md#签名)一节，用登记的公钥检查已签名源码标签的全新克隆。带 GitHub 证明的 Release 不需要这种密钥检查。
 
 ## 7. 开提交 issue
 
@@ -320,7 +320,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 | Requested capabilities and app behavior（能力与行为） | 现在：应用用途及每项能力的理由 |
 | What is not verified（未验证项） | 现在及每次更新后：未完成检查、宿主/平台/提供商限制 |
 | Tag / Full commit SHA / Bundle path（标签/commit/路径） | 批准前：不可变源码标签及 commit、开发应用包路径 |
-| GitHub workflow run URL（工作流运行） | 批准前：这个 Release 对应的、成功的标签推送运行 |
+| GitHub workflow run URL（工作流运行） | 批准前：与这个 Release 对应的成功标签推送运行 |
 | Release and pack URL / Release pack SHA256（下载与摘要） | 批准前：最终 pack、receipt 及匹配的下载摘要 |
 | Bundle BLAKE3 digest（应用包摘要） | 批准前：带证明的 Release 清单中的摘要 |
 | Privacy policy URL / Support contact（隐私/支持） | 批准前：商店信息中的有效链接或支持邮箱 |
@@ -358,7 +358,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 - 审核人员关闭 issue 时，会注明应用所在的签名目录版本号，或者列出需要修复的问题。在 issue 中回答提问，但不要改动标签所指的内容。
 - **更新就是新版本加新 issue。** 要修复问题或推出改动：提高 `version` 并开一个链接旧 issue 的新 issue，可以先于 Release。重做第 4 到 6 步（界面有变化时才需要第 4 步），然后在新 issue 中补充这个 Release 的证据。不要在评论中提交新版本。Hub 从不替换已发布的版本。
 - GitHub 更新保留已登记的仓库/所有者/工作流身份，提高语义版本并运行同一标签工作流，无需单独的开发者私钥。只有历史 Ed25519 包继续使用登记的密钥（[可选旧协议说明](#保护发布者密钥)）。
-- 维护者 commit 经过评审的撤回候选之后，App Hub 管理员可以通过同一个受保护的工作流，发布附带理由的签名目录撤回记录。各商店下次拉取签名目录时，会停止运行该版本已安装的副本；其他版本不受影响。如需撤回，请开一个 issue，写明应用 ID、版本和要向用户展示的理由。撤回的版本号不能再用，修复请以新版本发布。
+- 维护者 commit 经过审核的撤回候选之后，App Hub 管理员可以通过同一个受保护的工作流，发布附带理由的签名目录撤回记录。各商店下次拉取签名目录时，会停止运行该版本已安装的副本；其他版本不受影响。如需撤回，请开一个 issue，写明应用 ID、版本和要向用户展示的理由。撤回的版本号不能再用，修复请以新版本发布。
 
 ## 常见拒绝原因及修复
 
@@ -366,7 +366,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 
 | 检查项或消息 | 原因 | 修复 |
 | --- | --- | --- |
-| `digest: the bundle hashes to …, the manifest claims …` | 写入摘要之后字节变了：有改动、在 commit 之后才写入摘要（`tools/octo check` 会重新写入）、Git 检出产生了 CRLF 换行，或者用了比 `main` 旧的 Windows 版 `hub`（它用 `\` 拼接路径来计算摘要）。 | 从 `main` 构建 `hub`，加上[第 1 步](#1-安排仓库结构)的 `.gitattributes`，然后为开发源码重新写入摘要并生成新的 GitHub 证明版本，验证下载的 pack；不要给封存发布重新写入摘要。 |
+| `digest: the bundle hashes to …, the manifest claims …` | 写入摘要之后字节变了：有改动、在 commit 之后才写入摘要（`tools/octo check` 会重新写入）、Git 检出产生了 CRLF 换行，或者用了比 `main` 旧的 Windows 版 `hub`（它用 `\` 拼接路径来计算摘要）。 | 从 `main` 构建 `hub`，加上[第 1 步](#1-安排仓库结构)的 `.gitattributes`，然后为开发源码重新写入摘要并生成新的 GitHub 证明版本，验证下载的 pack；不要给已封存的 Release 重新写入摘要。 |
 | `publisher-signature: publisher key "<id>" is not registered with this hub` | 仅可选的旧 Ed25519 路径：检查或扫描已签名包时没有提供密钥；加 `--allow-unsigned` 或通过 `tools/octo check` 运行也一样。 | 传入 `--publisher-key <publisher-id>=<hex public key>`。 |
 | `publisher-signature: the signature from key "<id>" does not match the manifest` | 仅可选的旧 Ed25519 路径：签名字节发生变化。 | 从未签名开发源码重建，用登记的密钥签一个新版本。 |
 | `continuity: not signed by the key on record for "<id>"`，或 `continuity: … is already published by "<id>"; an update must carry that key` | 仅可选的旧 Ed25519 路径：该发布者 ID 已登记了另一把密钥（要么是别人的 ID，要么是你的旧密钥），或者更新没有签名。 | 首个应用换一个没人用过的 ID；每次更新都用已登记的密钥签名。 |
