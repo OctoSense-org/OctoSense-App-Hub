@@ -416,6 +416,40 @@ fn shared_local_mutations_keep_risk_and_private_data_floors() {
 }
 
 #[test]
+fn an_apps_own_wasm_function_is_a_host_method_behind_the_wasm_capability() {
+    // `wasm.<function>` runs the bundle's own module, so it is in no shared
+    // list and has no risk or private-data floor.
+    let make = |method: &str| {
+        json!({"schema":1,"tools":[{
+            "name":"inbox.slots","description":"Find free slots in a day.",
+            "input_schema":{"type":"object"},"output_schema":{"type":"object"},
+            "risk":"read","implemented_by":"host-service","host_method":method
+        }]})
+        .to_string()
+    };
+    let (tools, _) =
+        ToolManifest::load(&make("wasm.find_slots"), "inbox", ToolHost::Contained, false).unwrap();
+    assert_eq!(tools.tools[0].service_method(), "wasm.find_slots");
+    for method in ["wasm.sheet", "wasm.find_slots.extra", "wasm.Find", "wasm."] {
+        assert!(
+            ToolManifest::load(&make(method), "inbox", ToolHost::Contained, false).is_err(),
+            "{method}"
+        );
+    }
+    let dir = scratch("wasm-host-method");
+    edit_tools(&dir, |tools| {
+        tools["tools"][0]["host_method"] = json!("wasm.find_slots");
+    });
+    let manifest = stamp(&dir, |_| {});
+    refused_with(&dir, &manifest, "requires the declared \"wasm\" service capability");
+    let manifest = stamp(&dir, |m| {
+        m["capabilities"].as_array_mut().unwrap().push(json!("wasm"))
+    });
+    let loaded = AgentBundle::load(&dir, &manifest).unwrap().unwrap();
+    assert_eq!(loaded.tool("news.list").unwrap().service_method(), "wasm.find_slots");
+}
+
+#[test]
 fn omitted_host_method_keeps_legacy_serialization_and_dispatch() {
     let original = read_json(&fixture().join(TOOLS_FILE));
     let tools = ToolManifest::parse(&original.to_string()).unwrap();
