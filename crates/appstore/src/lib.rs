@@ -171,6 +171,8 @@ pub struct AppStoreView {
     #[rust]
     store: Option<Store>,
     #[rust]
+    channel: Option<source::CatalogChannel>,
+    #[rust]
     origin: Option<source::Origin>,
     #[rust]
     app_data_root: PathBuf,
@@ -202,6 +204,7 @@ impl AppStoreView {
             }
         };
         let mut store = channel.configure(Store::new(&anchor, &self.app_data_root, HostLimits::default()).with_host_api_versions(crate::host_api::available_versions()));
+        self.channel = Some(channel);
 
         // A hub override on disk (`<data dir>/hub.txt`, a path or a base URL)
         // wins over the built-in hub: how a device with no route to the
@@ -323,6 +326,10 @@ impl AppStoreView {
     /// client makes is reported rather than swallowed: a refusal is the most
     /// useful thing the store can say.
     fn install(&mut self, cx: &mut Cx, index: usize) {
+        if let Err(error) = self.require_current_catalog_channel() {
+            self.status = error;
+            return self.refresh(cx);
+        }
         let Some(listing) = self.listings.get(index).cloned() else { return };
         let (Some(store), Some(origin)) = (self.store.as_ref(), self.origin.as_ref()) else { return };
         let Some(entry) = store.entry(&listing.app_id) else { return };
@@ -335,6 +342,7 @@ impl AppStoreView {
         self.status = match origin
             .stage(&artifact, &staging)
             .and_then(|staged| {
+                self.require_current_catalog_channel()?;
                 // The publisher's key comes from the signed catalog, so the
                 // store checks their signature itself rather than trusting
                 // that the hub did.
@@ -356,6 +364,10 @@ impl AppStoreView {
     /// Open an installed app: check it may still run, apply its policy to the
     /// isolate, then hand the card's source to that isolate.
     fn open(&mut self, cx: &mut Cx, app_id: &str) {
+        if let Err(error) = self.require_current_catalog_channel() {
+            self.status = error;
+            return self.refresh(cx);
+        }
         let Some(store) = self.store.as_ref() else { return };
         let policy = match store.may_run(app_id) {
             Ok(policy) => policy,
@@ -407,6 +419,11 @@ impl AppStoreView {
             Err(e) => self.status = format!("The app did not open: {e}"),
         }
         self.refresh(cx);
+    }
+
+    fn require_current_catalog_channel(&self) -> Result<(), String> {
+        self.channel.ok_or("No verified catalog channel is available")?
+            .require_current(&self.app_data_root)
     }
 }
 

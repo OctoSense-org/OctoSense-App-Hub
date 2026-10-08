@@ -4,7 +4,6 @@ use octosense_app_hub::{Availability, Listing, Store};
 use octosense_app_policy::HostLimits;
 use octosense_appstore::source::{CatalogChannel, Origin};
 use std::collections::BTreeMap;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock, TryLockError};
 
@@ -15,6 +14,21 @@ static CATALOG_IO: Mutex<()> = Mutex::new(());
 // persist it. Share the floor with existing and future workers for this root.
 type CatalogFloors = BTreeMap<(PathBuf, String), u64>;
 static VERIFIED_SEQUENCES: OnceLock<Mutex<CatalogFloors>> = OnceLock::new();
+
+/// Host-side agent and Glance admission must honor a verified withdrawal even
+/// when saving its catalog failed. This consults the shared process floor;
+/// it performs no network request and does not wait for the Hub I/O worker.
+pub fn check_verified_catalog_floor(root: &Path, anchor: &str, sequence: Option<u64>) -> Result<(), String> {
+    let key = (root_identity(root), anchor.to_owned());
+    let floors = VERIFIED_SEQUENCES.get_or_init(|| Mutex::new(BTreeMap::new()))
+        .lock().unwrap_or_else(|p| p.into_inner());
+    if let Some(floor) = floors.get(&key) {
+        if sequence.is_none_or(|sequence| sequence < *floor) {
+            return Err(format!("Catalog {floor} was verified but is not available here. Installs and opens pause until it can be saved."));
+        }
+    }
+    Ok(())
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CatalogKind {
@@ -192,15 +206,16 @@ impl Backend {
         // including when another Hub instance refreshed since this worker did.
         self.load_cache();
         match self.origin.catalog_for(channel).and_then(|json| {
+            // Inspect the next sequence without advancing the Store that will
+            // re-read the persisted old cache under its file lock.
+            let mut verified = self.store.clone();
+            verified.accept_catalog(&json)?;
+            self.remember_sequence(verified.catalog().unwrap().sequence)?;
             let mut candidate = self.store.clone();
-            candidate.accept_catalog(&json)?;
-            self.remember_sequence(candidate.catalog().unwrap().sequence)?;
-            let persistence = match channel {
-                CatalogChannel::Legacy => persist_catalog(&self.root, &json),
-                CatalogChannel::GitHub => std::fs::create_dir_all(&self.root)
-                    .map_err(|e| e.to_string())
-                    .and_then(|()| candidate.accept_catalog_and_cache(&json, &self.root.join(channel.filename()))),
-            };
+            let persistence = std::fs::create_dir_all(&self.root)
+                .map_err(|e| e.to_string())
+                .and_then(|()| candidate.accept_catalog_and_cache(&json, &self.root.join(channel.filename())))
+                .map_err(|e| format!("Could not save the verified catalog: {e}"));
             if let Err(error) = persistence {
                 self.persistence_failed = true;
                 return Err(error);
@@ -442,20 +457,7 @@ impl Backend {
         if self.channel != Some(channel) {
             return Err("Catalog channel changed; reopen App Hub before continuing.".into());
         }
-        let floors = VERIFIED_SEQUENCES
-            .get_or_init(|| Mutex::new(BTreeMap::new()))
-            .lock()
-            .unwrap_or_else(|p| p.into_inner());
-        if let Some(floor) = floors.get(&(self.root_key.clone(), self.anchor.clone())) {
-            if self
-                .store
-                .catalog()
-                .is_none_or(|catalog| catalog.sequence < *floor)
-            {
-                return Err(format!("Catalog {floor} was verified but is not available here. Installs and opens pause until it can be saved."));
-            }
-        }
-        Ok(())
+        check_verified_catalog_floor(&self.root, &self.anchor, self.store.catalog().map(|catalog| catalog.sequence))
     }
 }
 
@@ -556,21 +558,6 @@ fn asset_location(origin: &Origin, artifact: &str, asset: &str) -> Option<String
             Some(format!("{}/{encoded}", base.trim_end_matches('/')))
         }
     }
-}
-
-fn persist_catalog(root: &Path, json: &str) -> Result<(), String> {
-    std::fs::create_dir_all(root).map_err(|e| format!("Could not create the app library: {e}"))?;
-    let temporary = root.join(".catalog.json.tmp");
-    let result = (|| {
-        let mut file = std::fs::File::create(&temporary).map_err(|e| e.to_string())?;
-        file.write_all(json.as_bytes()).map_err(|e| e.to_string())?;
-        file.sync_all().map_err(|e| e.to_string())?;
-        std::fs::rename(&temporary, root.join("catalog.json")).map_err(|e| e.to_string())
-    })();
-    if result.is_err() {
-        let _ = std::fs::remove_file(temporary);
-    }
-    result.map_err(|e| format!("Could not save the verified catalog: {e}"))
 }
 
 fn publish_bundle(
@@ -885,7 +872,8 @@ mod tests {
         let original = f.publish_today(1, vec![f.entry()]);
         let mut backend = f.backend();
         backend.refresh();
-        std::fs::create_dir(f.root().join(".catalog.json.tmp")).unwrap();
+        std::fs::remove_file(f.root().join("catalog.lock")).unwrap();
+        std::fs::create_dir(f.root().join("catalog.lock")).unwrap();
         f.publish_today(2, vec![]);
         let snapshot = backend.refresh();
         assert_eq!(snapshot.entries.len(), 1);
@@ -906,11 +894,12 @@ mod tests {
         let consent = first.refresh().entries[0].consent.clone().unwrap();
         first.install(&consent).unwrap();
         let mut second = f.backend();
-        std::fs::create_dir(f.root().join(".catalog.json.tmp")).unwrap();
+        std::fs::remove_file(f.root().join("catalog.lock")).unwrap();
+        std::fs::create_dir(f.root().join("catalog.lock")).unwrap();
         entry.status = Status::Withdrawn("Withdrawn for review".into());
         f.publish_today(2, vec![entry]);
         assert!(!first.refresh().can_install);
-        std::fs::remove_dir(f.root().join(".catalog.json.tmp")).unwrap();
+        std::fs::remove_dir(f.root().join("catalog.lock")).unwrap();
         std::fs::write(f.path.join("hub/catalog.json"), original).unwrap();
         let mut third = f.backend();
 
@@ -1267,9 +1256,15 @@ mod tests {
         let mut backend = f.install_first_version();
         let mut withdrawn = f.entry();
         withdrawn.status = Status::Withdrawn("Withdrawn for review".into());
-        std::fs::create_dir(f.root().join(".catalog.json.tmp")).unwrap();
+        std::fs::remove_file(f.root().join("catalog.lock")).unwrap();
+        std::fs::create_dir(f.root().join("catalog.lock")).unwrap();
         f.publish_today(2, vec![withdrawn]);
         assert!(!backend.refresh().can_install);
+        let old_json = std::fs::read_to_string(f.root().join("catalog.json")).unwrap();
+        let mut direct = Store::new(&f.anchor.public_hex(), &f.root(), HostLimits::default());
+        direct.accept_catalog(&old_json).unwrap();
+        assert!(check_verified_catalog_floor(&f.root(), &f.anchor.public_hex(),
+            direct.catalog().map(|catalog| catalog.sequence)).is_err());
         let _guard = CATALOG_IO.lock().unwrap_or_else(|p| p.into_inner());
         let error = Backend::new_unlocked(
             f.root(),

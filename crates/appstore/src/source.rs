@@ -42,6 +42,13 @@ impl CatalogChannel {
         match self { Self::Legacy => "catalog.json", Self::GitHub => "catalog-v2.json" }
     }
 
+    pub fn require_current(self, root: &Path) -> Result<(), String> {
+        if Self::from_environment(root)? != self {
+            return Err("Catalog channel changed; reopen App Hub before continuing.".into());
+        }
+        Ok(())
+    }
+
     pub fn configure(self, store: octosense_app_hub::Store) -> octosense_app_hub::Store {
         match self { Self::Legacy => store, Self::GitHub => store.with_github_catalog() }
     }
@@ -141,6 +148,7 @@ mod channel_tests {
         assert!(CatalogChannel::select(Some("typo"), &root).is_err());
         std::fs::write(root.join("catalog-v2.json"), "even a corrupted v2 cache must not cause fallback").unwrap();
         assert_eq!(CatalogChannel::select(None, &root).unwrap(), CatalogChannel::GitHub);
+        assert!(CatalogChannel::Legacy.require_current(&root).is_err());
         assert!(CatalogChannel::select(Some("legacy"), &root).is_err());
         std::fs::remove_dir_all(root).unwrap();
     }
