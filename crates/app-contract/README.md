@@ -48,7 +48,7 @@ limits.
 
 ## Versions on crates.io
 
-crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0 and 1.7.0. Versions 1.3.0 and
+crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0 1.7.0 and 1.7.1. Versions 1.3.0 and
 1.4.0 exist only in this repository ([CHANGELOG.md](CHANGELOG.md)); 1.5.0
 includes their changes. A lock file that still holds 1.2.0 refuses every capability added
 since, such as `auth`:
@@ -57,17 +57,21 @@ since, such as `auth`:
 app org.example.connect requests unknown capability "auth"
 ```
 
-This tree prepares **1.7.1; publication is pending**. It reserves exactly four
-full app IDs, ignoring ASCII case: `catalog.json`, `catalog.lock`,
-`catalog-v2.json` and `catalog-v2.lock`. These names collide with host catalog or
-cache-lock files. `json` and `lock` are not reserved namespaces;
-`org.example.json` and `org.example.lock` remain valid. This security fix changes
-no manifest fields, capability grants or signature bytes. App Hub's policy crate
-requires at least 1.7.1; git consumers need the local contract patch below until
-that version is published.
+This tree prepares **1.8.0; publication is pending**. It adds optional
+`integrity.github`, the required `publisher-github-v1` marker and a
+`SignatureVerifier::verify_github` extension that refuses by default. Existing
+manifests and Ed25519 signing bytes remain unchanged. Hosts must supply a real
+provenance verifier; accepting the new marker alone does not authenticate an
+app. App Policy now requires 1.8.0; git consumers need the local contract patch
+below until it is published.
+
+Published 1.7.1 reserves exactly four full app IDs, ignoring ASCII case:
+`catalog.json`, `catalog.lock`, `catalog-v2.json` and `catalog-v2.lock`.
+`json` and `lock` are not reserved namespaces; `org.example.json` and
+`org.example.lock` remain valid.
 
 `cargo update -p octosense-app-contract` moves an unconstrained 1.x consumer
-to 1.7.0. Hosts using the new API declarations must select 1.6 or later, and
+to 1.7.1. Hosts using the new API declarations must select 1.6 or later, and
 hosts serving `wasm` 1.7 or later;
 older checked-in lock files remain on their existing version. OctoSense
 desktop 0.1.0-beta.2 patched the crate to an App Hub revision. To build

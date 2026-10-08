@@ -2,22 +2,28 @@
 
 English | [简体中文](SUBMITTING.zh-CN.md)
 
-You submit an app as a bundle at a tagged commit in your own public
-repository, then open an issue on this repository. Sign the bundle with your
-publisher key; only an app's first version may be unsigned. A reviewer, one
-of the App Hub maintainers, checks the exact bytes at your tag and runs the
-gate (`hub check`) on them again. If the app passes review, the reviewer
-publishes those bytes in the signed catalog that every OctoSense store reads.
+Open an [App Hub submission issue](#7-open-the-submission-issue) to request
+publication. You can open it before the release is ready: give the app id,
+planned version, public repository, requested capabilities and current test
+status, then add the remaining evidence in the same issue.
 
-The three reference apps in catalog sequence 10, the tenth signed version of
-the catalog, are the worked examples. Unless a step says otherwise, the
-example values come from GitHub Notes' first submission, version 0.1.0. The
-rules themselves (gate checks, capability names, manifest and listing fields,
-signing) are in [PUBLISHING.md](PUBLISHING.md).
+For both a first submission and routine updates, the app's GitHub workflow
+prepares, attests and packages the release. Developers need no separate
+publisher private key or repository signing secret. A maintainer reviews the
+exact release pack and its GitHub proof before an administrator publishes it
+in the authenticated catalog. A tag or GitHub Release alone is not Hub approval.
+A host supporting `publisher-github-v1` is required; a compatible released
+OctoSense host is still pending.
+
+The three reference apps from catalog sequence 10 are historical worked
+examples. Their Ed25519 keys and signed-source layout are optional legacy
+compatibility, not steps required for a GitHub publisher app. The gate,
+capability, manifest and signing rules are in [PUBLISHING.md](PUBLISHING.md).
 
 ```text
-1 repository → 2 manifest → 3 listing → 4 screenshots → 5 stamp, check, scan, sign
-→ 6 commit, tag, check a fresh clone → 7 issue → 8 review → 9 updates
+issue request (may come first) → repository, manifest, listing and screenshots
+→ test editable source → GitHub tag workflow → verify release pack
+→ add evidence to the issue → maintainer review → catalog admission
 ```
 
 ## Before you start
@@ -30,7 +36,7 @@ A host runs your bundle: `card-host` while you develop, and an OctoSense shell
 
 | Tool | Source | Use |
 | --- | --- | --- |
-| `hub` | App Hub `main` | Stamp the bundle (write its digest into the manifest), check, scan and sign it. Reviewers run the same code. |
+| `hub` | App Hub `main` | Stamp editable source, check and scan it, then prepare, verify and pack GitHub-attested releases. Reviewers run the same code. |
 | `card-host` | App Hub `main` | Run the unsigned bundle, drive it and capture screenshots. |
 | `tools/octo` | [Design Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) | Create, run and capture an app. It wraps `card-host` and `hub`. |
 | OctoSense desktop | The [0.1.0-beta.2](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-beta.2) release for macOS on Apple silicon | Run apps that use host services, including [connected accounts](PUBLISHING.md#connected-accounts). |
@@ -59,8 +65,9 @@ If the build fails with `no variant … TextInputStateQuery`, see
 
 An older or patched `hub` can pass a bundle that the reviewers' build refuses.
 Use an unpatched build of `main`, and leave that checkout as it is until you
-submit: `--catalog` reads its `catalog.json`, and the issue asks for its
-revision ([step 6](#6-freeze-and-verify-the-release)).
+submit. Record the exact tool revision and use its authenticated
+`catalog-v2.json` for publisher continuity checks; `catalog.json` is the
+explicit legacy channel ([step 6](#6-freeze-and-verify-the-release)).
 
 ### Know where your app runs
 
@@ -95,7 +102,8 @@ The rehearsal is verified only with a shell built from source.
 
 ### Check your platform
 
-- **macOS on Apple silicon** is verified: every command in this guide ran on it.
+- **macOS on Apple silicon** verified the historical reference-app commands.
+  The new GitHub publisher workflow has separate source and release status in step 5.
 - **Windows** is unverified on current `main`. Open issue
   [#41](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/41) records
   a native Windows 11 build and run at an earlier revision, verified by a
@@ -108,6 +116,14 @@ The rehearsal is verified only with a shell built from source.
   out under software rendering (llvmpipe, WSL).
 
 ### Protect your publisher key
+
+**Optional legacy compatibility only.** First submissions and updates using
+GitHub publishing skip this section; they create no developer signing key.
+
+This section applies only to historical Ed25519 publishing. New GitHub
+publisher apps require no developer signing key; follow the new route in
+[step 5](#5-produce-the-final-bytes). Contract 1.8.0 and a compatible host are
+still pending; existing release hosts cannot consume the new proof yet.
 
 Your publisher id names you in the catalog; your publisher key signs every
 version you publish. Once a version signed by the key is in the catalog, the
@@ -189,7 +205,9 @@ to reads and to writes the person approves.
 ## 1. Lay out the repository
 
 The Hub admits only `bundle/`. The gate reads nothing else in the repository,
-but reviewers load your privacy policy and support pages. The reference apps
+but reviewers load your privacy policy and support pages. For GitHub publishing,
+commit `.github/workflows/publish-app.yml` alongside editable `bundle/`;
+`publisher.json` is not required. The historical reference apps
 also carry the files below, which reviewers used. GitHub Notes at `v0.1.0`:
 
 ```text
@@ -198,7 +216,7 @@ octosense-github-notes/
   PRIVACY.md       the page privacy_policy_url points to
   SUPPORT.md       how to report problems
   README.md        what the app does and how to verify a release
-  publisher.json   publisher id, algorithm "Ed25519" and public key
+  publisher.json   legacy Ed25519 publisher id, algorithm and public key
   review/          gate output for the signed bundle (GATE.txt) and scan answers (ANSWERS.md)
   LICENSE, NOTICE
   .gitignore       keeps keys, build/ and .local-state/ out of Git
@@ -369,265 +387,117 @@ and in your issue.
 
 ## 5. Produce the final bytes
 
-Sign your bundle, as the reference apps did. The Hub also admits an unsigned
-first version, but every later version of the app must then be signed
-([Signing](PUBLISHING.md#signing)). To submit unsigned, skip substeps 4, 5
-and 7, and run each later `hub check` with `--allow-unsigned` in place of
-`--publisher-key`.
+For both first submissions and updates, use GitHub publisher provenance.
+Contract 1.8.0 adds `publisher-github-v1`. Two real tag-push releases and
+native Store install/update/launch checks passed ([evidence and
+limits](PUBLISHING.md#github-publisher-provenance)); a compatible released
+host is still pending.
 
-Sign last. A signed bundle no longer runs in `card-host`, and any edit after
-signing means stamping and signing again. Run these commands from your app
-repository:
+1. Open the submission issue if you have not already done so. Missing release
+   evidence can be added later; mark it pending rather than inventing a pass.
+2. Test the unsigned development copy and capture its real UI. Run the gate
+   and `hub scan bundle --allow-unsigned --packet build/review.json`, with
+   `build/` outside the bundle. Answer every question in that packet: seven,
+   or eight when the bundle ships `tools.json`, `AGENT.md` or skills. Include
+   the file supporting each answer and name untested behavior.
+3. Install and review `.github/workflows/publish-app.yml` using Design Flow's
+   `tools/octo publish-github <app-directory>` (also included by `tools/octo new`).
+   No `keygen`, `sign-manifest`, `--publisher-key` or repository signing secret
+   is part of this path. The native steps are documented in
+   [GitHub publisher provenance](PUBLISHING.md#github-publisher-provenance).
+4. Commit the tested editable source, screenshots, listing, privacy/support
+   pages, `.gitattributes` and workflow. Use a new semantic version for each
+   release and an exact `v<manifest.version>` tag. The workflow generates the
+   attested manifest and final release pack; do not commit those generated
+   bytes over your editable source.
 
-```sh
-cd ~/apps/my-app
-mkdir -p build review
-```
+Routine updates keep the same repository name, immutable repository/owner
+IDs and workflow identity, with a higher semantic version. They need no
+publisher private key. Historical Ed25519 app identities remain on their
+existing protocol; this is not an ownership-transfer procedure.
 
-1. Stamp the final unsigned bundle.
+### Optional historical Ed25519 route
 
-   ```sh
-   hub stamp bundle
-   ```
-
-   On an unsigned copy of GitHub Notes 0.1.0, this prints
-   `d5565438b78e01b98baf268661087b7efd0f5c01799f4841daa140955f82a13b`, the
-   digest in its published 0.1.0 manifest. Stamp again after any change to any
-   file in `bundle/`.
-
-2. Run the gate on the unsigned bundle.
-
-   ```sh
-   hub check bundle --allow-unsigned
-   ```
-
-   Success, for GitHub Notes 0.1.0:
-
-   ```text
-   org.octosense.samples.githubnotes 0.1.0 — PASSED
-     [warning] publisher-signature: unsigned: accountability rests on the hub alone
-     grants: capabilities {"auth", "github", "storage"}, hosts {}, storage 4194304 bytes, agent none
-   ```
-
-   The unsigned warning is expected here. `agent none` shows the 0.1.0 problem
-   in [Lessons from 0.1.0](#lessons-from-010): tools without an `agent` block.
-   GitHub Notes 0.1.1 prints `agent read-only`. If the `grants:` line lists more
-   than the app visibly needs, remove the extra capabilities or storage from
-   the manifest. On `REFUSED`, fix each
-   `[refused]` line ([Common refusals](#common-refusals-and-how-to-fix-them))
-   and start again at substep 1.
-
-3. Write the review packet and answer its questions.
-
-   ```sh
-   hub scan bundle --packet build/review.json
-   python3 -c 'import json; print("\n".join(json.load(open("build/review.json"))["questions"]))'
-   ```
-
-   `hub scan` prints two lines. The second command prints the packet's
-   questions, one per line. GitHub Notes 0.1.0, trimmed:
-
-   ```text
-   wrote the review packet to build/review.json
-   no --reviewer given; the packet holds 8 questions for one
-   Does the app do what its name, subtitle and description claim? Cite the text in its source.
-   Do the listing's platforms and category fit an app of this kind?
-   …
-   Route: pass, human-review, or reject. Give reasons a publisher can act on.
-   ```
-
-   The packet holds 7 questions, or 8 when the bundle ships `tools.json`,
-   `AGENT.md` or skills. All three reference apps got 8. Answer each one in
-   `review/ANSWERS.md` and cite the bundle file behind each answer; you paste
-   these answers into the issue. Keep `build/` out of the bundle and out of
-   Git.
-
-4. Create your publisher key, once.
-
-   ```sh
-   KEY=<key-file>                 # replace with a path outside every repository
-   mkdir -p "$(dirname "$KEY")"
-   hub keygen "$KEY"
-   PUB=$(hub pubkey "$KEY")
-   ```
-
-   `hub keygen` prints the public key, 64 hex characters, and on macOS and
-   Linux creates the key file readable only by you (`-rw-------`). If the file
-   already exists, `hub keygen` leaves it untouched and fails with
-   `hub: cannot create new signing key "<key-file>": File exists (os error 17)`:
-   keep using that key, or choose a new path. `hub pubkey` prints the public
-   key whenever you need it. Pick a publisher id that nobody else has on
-   record, such as your GitHub username. It becomes the key id of every
-   signature you make.
-
-5. Sign the manifest.
-
-   ```sh
-   hub sign-manifest bundle --key "$KEY" --key-id <publisher-id>
-   ```
-
-   Success prints `signed <app id> <version> with <publisher-id>`. Signing
-   rewrites `manifest.json` with every default filled in, which is why the
-   published manifests contain `null` fields their authors never wrote.
-
-6. Check the signed bytes against the published catalog, as reviewers do, and
-   keep the output.
-
-   ```sh
-   hub check bundle --publisher-key "<publisher-id>=$PUB" \
-     --catalog ~/octosense-ws/OctoSense-App-Hub/catalog.json | tee review/GATE.txt
-   ```
-
-   The unsigned warning is gone. GitHub Notes' `review/GATE.txt` for 0.1.0:
-
-   ```text
-   org.octosense.samples.githubnotes 0.1.0 — PASSED
-     grants: capabilities {"auth", "github", "storage"}, hosts {}, storage 4194304 bytes, agent none
-   ```
-
-   Without `--publisher-key`, the gate refuses a signed bundle, even with
-   `--allow-unsigned`: `[refused] publisher-signature: publisher key
-   "<publisher-id>" is not registered with this hub`. `--catalog` adds the
-   version and publisher-continuity checks against the catalog in your App
-   Hub checkout.
-
-7. Scan the signed bundle, as the reference apps did. A scan runs only on a
-   bundle the gate passes, so this confirms that your final signed bytes still
-   produce the questions you answered.
-
-   ```sh
-   hub scan bundle --publisher-key "<publisher-id>=$PUB" \
-     --catalog ~/octosense-ws/OctoSense-App-Hub/catalog.json --packet build/review-signed.json
-   ```
-
-   Its packet holds the same questions as substep 3. Without
-   `--publisher-key`, `hub scan` stops with
-   `hub: the gate refused this bundle; a scan is not offered`.
-
-If you change anything in `bundle/` after signing, even one word of the
-listing, `hub check` refuses with
-`digest: the bundle hashes to …, the manifest claims …`. Restamping fixes the digest but not the signature: the next
-`hub check` refuses with `publisher-signature: the signature from key
-"<publisher-id>" does not match the manifest`. Repeat substeps 1, 5, 6 and 7.
+Only choose this route deliberately for an existing legacy package or an
+older protocol. Its key handling and commands are in
+[Signing](PUBLISHING.md#signing). The dated [0.1.0 admission
+record](../reviews/connected-apps-0.1.0/admission.json) and
+[0.1.1 records](admissions/connected-apps-0.1.1/README.md) remain unchanged.
+They are historical evidence, not instructions requiring new developers to
+create keys. Do not restamp a sealed release; work from an unsigned
+development copy and publish a new version.
 
 ## 6. Freeze and verify the release
 
-Reviewers check out your tag and verify those bytes. The tag must point at the
-commit that holds the final signed bundle.
+The tag identifies the tested development source and workflow. The Release
+pack contains the final attested manifest; checking a source clone alone
+does not verify that pack.
 
-1. Commit and tag. The tag is `v` followed by the manifest's `version`.
-
-   ```sh
-   git add .gitattributes bundle review
-   git commit -m "Release 0.1.0"
-   git tag -a v0.1.0 -m "My App 0.1.0"
-   ```
-
-2. Before you push, check a clone of the tag. This catches files you forgot to
-   commit, a manifest stamped after the commit and converted line endings.
-
-   ```sh
-   CHECK="$(mktemp -d)/my-app"
-   git clone -c core.autocrlf=false --branch v0.1.0 ~/apps/my-app "$CHECK"
-   (cd "$CHECK" && hub check bundle --publisher-key "<publisher-id>=$PUB" \
-     --catalog ~/octosense-ws/OctoSense-App-Hub/catalog.json)
-   ```
-
-   Success is the same `PASSED` report as in step 5. `-c core.autocrlf=false`
-   gives you the bytes exactly as Git stores them, which is what reviewers
-   check out. If the check fails, fix the bundle, stamp and sign it again,
-   commit, run `git tag -d v0.1.0` and tag again. The tag exists only on your
-   machine so far.
-
-3. Push.
+1. After reviewing the tested commit, push its new `v<version>` tag. Record
+   `git rev-parse "v0.1.0^{commit}"` (substitute your version) and confirm it
+   with `git ls-remote origin 'refs/tags/v0.1.0*'`. For annotated tags the
+   `^{}` line identifies the commit. Never move, delete or recreate a pushed
+   tag; a correction needs a higher version and a new tag.
+2. Wait for the GitHub workflow to succeed. Keep the workflow run URL, exact
+   commit, release URL, `app.bundle.pack.json` and `release-receipt.json`.
+   The receipt's `pack_sha256` must match the downloaded pack, for example
+   with `shasum -a 256 app.bundle.pack.json` on macOS/Linux.
+3. Verify the downloaded final bytes without modifying them:
 
    ```sh
-   git push origin main v0.1.0
-   ```
-
-   > **Warning:** Never move, delete or recreate a tag after you push it.
-   > Reviewers check that the tag still resolves to the commit in your issue.
-   > To change anything, release a new version.
-
-4. Get the full commit SHA, and confirm the tag on the remote.
-
-   ```sh
-   git rev-parse "v0.1.0^{commit}"
-   git ls-remote origin 'refs/tags/v0.1.0*'
-   ```
-
-   For an annotated tag, plain `git rev-parse v0.1.0` prints the tag object
-   instead, and `ls-remote` prints the commit on its `^{}` line. GitHub Notes
-   0.1.0:
-
-   ```text
-   5f0c4c6b13bddae87a4945b2b76ca2a416793f14
-   0320a3aab446ad85a3e3abb75cd70fd7c089907a	refs/tags/v0.1.0
-   5f0c4c6b13bddae87a4945b2b76ca2a416793f14	refs/tags/v0.1.0^{}
-   ```
-
-   Success: `ls-remote` shows the same commit as `git rev-parse`, on its
-   `^{}` line for an annotated tag. If `ls-remote` prints nothing, the tag is
-   not on the remote yet: push it (substep 3). The issue needs this commit,
-   all 40 characters.
-
-5. Check a fresh clone of the pushed tag, as reviewers will, and record the
-   App Hub revision your `hub` was built from.
-
-   ```sh
-   CHECK="$(mktemp -d)/my-app"
-   git clone -c core.autocrlf=false --depth 1 --branch v0.1.0 https://github.com/<you>/my-app "$CHECK"
-   (cd "$CHECK" && hub check bundle --publisher-key "<publisher-id>=$PUB" \
-     --catalog ~/octosense-ws/OctoSense-App-Hub/catalog.json)
+   hub publisher-unpack app.bundle.pack.json --out review-bundle
+   hub publisher-verify review-bundle --catalog /path/to/catalog-v2.json
    git -C ~/octosense-ws/OctoSense-App-Hub rev-parse HEAD
    ```
 
-   Success is the same `PASSED` report, followed by the revision. The issue
-   asks for both. If the version is already in the catalog, the check refuses
-   it, as it now refuses GitHub Notes: `version: version 0.1.0 of
-   org.octosense.samples.githubnotes is already published; publish a new
-   version`. Raise `version` and release it under a new tag.
+   `review-bundle` must not exist beforehand. Use the current authenticated
+   catalog, before this proposed version has been admitted; that additionally
+   checks publisher continuity and version advancement. Record the complete
+   verification output and exact tool revision. A rejection is a finding to
+   fix, not a reason to strip the proof or use `--allow-unsigned`.
+4. Add these artifacts and the test evidence to your existing submission
+   issue. Reviewers verify both the source commit and the downloaded pack.
+   A successful release workflow does not install, submit or approve the app.
 
-6. Optional: publish a GitHub release for the tag with an archive of `bundle/`
-   and a `SHA256SUMS` file. The reference apps did, and reviewers compared the
-   downloads with their hashes.
+For optional legacy packages only, a fresh clone of the signed source tag
+is checked with its recorded public key, following
+[Signing](PUBLISHING.md#signing). This key-based check is not required for a
+GitHub-attested release.
 
 ## 7. Open the submission issue
 
-Open the
-[Submit an app form](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/new?template=submit-app.yml)
-in this repository, one issue per version, titled
-`Submit <app id> <version>`. The table gives each field, GitHub Notes' value
-from its 0.1.0 submission and where to find yours:
+Use the [Submit an app form](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/new?template=submit-app.yml),
+one issue per planned version, titled `Submit <app id> <version>`. **You can
+open this request before steps 1–6 are complete.** Add the release evidence
+to this same issue when ready; pending fields do not mean approval.
 
-| Form field | GitHub Notes 0.1.0 | Where to find it |
-| --- | --- | --- |
-| App id | `org.octosense.samples.githubnotes` | `id` in `bundle/manifest.json` |
-| Version | `0.1.0` | `version` in `bundle/manifest.json` |
-| Repository URL | `https://github.com/ymote/octosense-github-notes` | The public repository that holds the tag |
-| Tag | `v0.1.0` | Step 6 |
-| Full commit SHA | `5f0c4c6b13bddae87a4945b2b76ca2a416793f14` | `git rev-parse "v0.1.0^{commit}"` |
-| Bundle path | `bundle/` | The bundle directory |
-| Bundle BLAKE3 digest | `d5565438…5f82a13b` | `integrity.bundle_blake3` in the manifest |
-| Publisher id | `ymote` | Your `--key-id`; for an unsigned first version, the id you will sign updates with |
-| Publisher public key | `dbda2ca2…828761bc` | `hub pubkey "$KEY"`, or `unsigned` for an unsigned first version |
-| Privacy policy URL | `PRIVACY.md` at the commit | `publisher.privacy_policy_url` in the listing, or the same file at the commit |
-| Support contact | The Issues page | `publisher.support` in the listing |
-| Platforms tested | `macos`, on Apple silicon | Every platform the listing declares and the host you ran it on |
-| App Hub revision the gate ran on | `5c7a13f92fa25d36ba1fe7fb99dc9fb1b235f8d3` | The revision step 6 printed with the fresh-clone check |
-| Gate output | The complete `PASSED` report | The fresh-clone check in step 6, the same report as `review/GATE.txt` |
-| Scan answers | All 8, each after its question | `review/ANSWERS.md` |
-| Screenshots | Links to each PNG at the commit | `bundle/screenshots/` |
-| What is not verified | Live GitHub sign-in, remote commits, Windows and Linux | Everything you did not test |
-| Confirmations | — | No secrets in the bundle, a tag you will not move and the fresh-clone check in step 6 |
+| Form field | When and what to provide |
+| --- | --- |
+| Release status | Now: request with evidence pending, GitHub release ready, or optional legacy package |
+| App id / Version / Repository URL | Now: manifest id, planned version and public GitHub repository |
+| Requested capabilities and app behavior | Now: purpose and reason for each capability |
+| What is not verified | Now and after every update: incomplete checks, host/platform/provider limits |
+| Tag / Full commit SHA / Bundle path | Before admission: immutable source tag and commit, editable bundle path |
+| GitHub workflow run URL | Before admission: successful tag-push run for the exact release |
+| Release and pack URL / Release pack SHA256 | Before admission: final pack, receipt and matching downloaded hash |
+| Bundle BLAKE3 digest | Before admission: digest from the attested release manifest |
+| Privacy policy URL / Support contact | Before admission: working listing links or support email |
+| Platforms tested / App Hub revision the gate ran on | Before admission: exact host/tool revisions and exercised behavior |
+| Gate and publisher verification output | Before admission: complete development gate and downloaded-pack verification output |
+| Scan answers / Screenshots | Before admission: all packet answers with source evidence and real native captures |
+| Optional legacy authentication | Only for an intentionally chosen historical Ed25519 package; leave blank for GitHub releases and updates |
+| Confirmations | No secrets, immutable pushed tags, and honest pending evidence |
 
-Do not open a pull request that edits `catalog.json`, `index/` or
-`artifacts/`. Reviewers write them when they publish, and every store
-refuses a catalog that the Hub's own key did not sign.
+Do not open a PR editing `catalog.json`, `catalog-v2.json`, `index/` or
+`artifacts/`. Catalog publication is the administrator's separate
+[protected GitHub workflow](GITHUB-PUBLISHING.md), after review.
 
 ## 8. What reviewers check
 
-A reviewer verifies your submission first. The admission record for the
+A reviewer verifies the GitHub identity, exact source commit, complete release
+proof, pack digest, gate result, privacy and UI evidence before admission.
+The protected catalog workflow checks these bytes again; it does not run
+contributor code. The historical admission record for the
 reference apps' 0.1.0 submissions,
 [`reviews/connected-apps-0.1.0/admission.json`](../reviews/connected-apps-0.1.0/admission.json),
 lists what was confirmed for each one:
@@ -637,7 +507,7 @@ lists what was confirmed for each one:
 | The tag resolves to the stated commit | `tag_verified` | `git ls-remote` (step 6) |
 | The privacy and support URLs return HTTP 200 | `public_privacy_and_support_http` | The link check in step 3 |
 | Release downloads match their hashes | `release_download_hashes_match` | `shasum -a 256 -c SHA256SUMS`, if you publish a release |
-| The publisher signature verifies on the downloaded bundle | `downloaded_publisher_signature_verified` | The fresh-clone check (step 6) |
+| The publisher signature verifies on the downloaded bundle | `downloaded_publisher_signature_verified` | Historical Ed25519 fresh-clone check; GitHub releases use downloaded-pack verification in step 6 |
 | The gate passes on the downloaded bundle | `downloaded_gate_output` | The same check |
 | The bundle digest matches your issue | `bundle_digest` | `integrity.bundle_blake3` |
 
@@ -652,9 +522,10 @@ instructions to an AI agent, abusive wording and each tool's scope and risk.
 A first submission always waits for a human reviewer. Reviewers promise no
 review time.
 
-`hub publish` then runs the gate against the current catalog, copies the
-exact bytes into `artifacts/`, signs a new catalog and prints its sequence,
-for example `published org.octosense.samples.githubnotes 0.1.1 (catalog sequence 9)`.
+The historical reference releases used `hub publish` with an Ed25519 catalog.
+Current GitHub publication uses the [admin catalog workflow](GITHUB-PUBLISHING.md)
+to admit the exact reviewed bytes and advance the authenticated catalog.
+Developers do not receive a catalog signing key or modify catalog files.
 
 Admission does not prove that an app works with live providers. The 0.1.0
 record states `"live_provider_login_and_remote_effects_verified": false`, and
@@ -667,16 +538,19 @@ Say in your listing what you have not verified.
   in, or with findings to fix. Answer questions in the issue, and change
   nothing at your tag.
 - **An update is a new version and a new issue.** To fix a finding or ship a
-  change, raise `version`, repeat steps 4 to 6 (step 4 only if the UI
-  changed) and open a new issue that links the old one. Never post a new
+  change, raise `version` and open a new issue linking the old one; it can
+  precede the release. Repeat steps 4 to 6 (step 4 only if the UI changed)
+  and add that release evidence to the new issue. Never post a new
   version as a comment. The Hub never replaces a published version. The
   reference apps submitted 0.1.1 as new issues:
   [#130](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/130),
   [#131](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/131) and
   [#132](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/132).
-- Sign every later version with the same publisher id and key
-  ([Protect your publisher key](#protect-your-publisher-key)).
-- A reviewer can withdraw a version with a reason (`hub withdraw`). Stores
+- For GitHub updates, retain the recorded repository/owner/workflow identity,
+  raise the semantic version and run the same tag workflow. No separate
+  developer private key is required. Only historical Ed25519 packages keep
+  their recorded key ([optional legacy guidance](#protect-your-publisher-key)).
+- A reviewer can publish a catalog withdrawal with a reason. Stores
   stop running installed copies of that version at their next catalog fetch;
   other versions keep working. To ask for a withdrawal, open an issue with the
   app id, the version and the reason that people should see. A withdrawn
@@ -691,11 +565,11 @@ cannot read gets no report, only one `hub: …` line. The full rules are in
 
 | Check or message | Cause | Fix |
 | --- | --- | --- |
-| `digest: the bundle hashes to …, the manifest claims …` | The bytes changed after `hub stamp`: an edit, a stamp after the commit (`tools/octo check` restamps), CRLF line endings from a Git checkout or a Windows `hub` older than `main`, which hashed paths with `\`. | Build `hub` from `main`, add the `.gitattributes` from [step 1](#1-lay-out-the-repository), then stamp, sign, commit and check a fresh clone. |
-| `publisher-signature: publisher key "<id>" is not registered with this hub` | A signed bundle checked or scanned without its key, even with `--allow-unsigned` or through `tools/octo check`. | Pass `--publisher-key <publisher-id>=<hex public key>`. |
-| `publisher-signature: the signature from key "<id>" does not match the manifest` | The bundle was restamped after signing. | Sign again, then check. |
-| `continuity: not signed by the key on record for "<id>"`, or `continuity: … is already published by "<id>"; an update must carry that key` | The publisher id is on record with another key (someone else's id or your old key), or an update is unsigned. | Use an unused id for your first app. Sign every update with the key on record. |
-| `version: version … is already published; publish a new version` | That version is in the catalog. | Raise `version`, then sign, tag and check the new version (steps 5 and 6). |
+| `digest: the bundle hashes to …, the manifest claims …` | The bytes changed after `hub stamp`: an edit, a stamp after the commit (`tools/octo check` restamps), CRLF line endings from a Git checkout or a Windows `hub` older than `main`, which hashed paths with `\`. | Build `hub` from `main`, add the `.gitattributes` from [step 1](#1-lay-out-the-repository), then restamp editable source and create a new GitHub-attested version; verify the downloaded pack. Never restamp sealed releases. |
+| `publisher-signature: publisher key "<id>" is not registered with this hub` | Optional legacy Ed25519 only: a signed bundle checked or scanned without its key, even with `--allow-unsigned` or through `tools/octo check`. | Pass `--publisher-key <publisher-id>=<hex public key>`. |
+| `publisher-signature: the signature from key "<id>" does not match the manifest` | Optional legacy Ed25519 only: signed bytes changed. | Rebuild from unsigned development source and sign a new version with the recorded key. |
+| `continuity: not signed by the key on record for "<id>"`, or `continuity: … is already published by "<id>"; an update must carry that key` | Optional legacy Ed25519 only: the publisher id is on record with another key (someone else's id or your old key), or an update is unsigned. | Use an unused id for your first app. Sign every update with the key on record. |
+| `version: version … is already published; publish a new version` | That version is in the catalog. | Raise `version`, use a new tag and verify the workflow's new release pack (steps 5 and 6). |
 | `policy: app … requests unknown capability "<name>"` | The name is not in the contract (`contacts`, `model.image`, a prefix such as `octos.`), or `hub` is older than the capability. | Use exact names from [PUBLISHING.md](PUBLISHING.md#the-manifest), and rebuild `hub` from `main`. |
 | `hub: manifest is not valid: unknown field …`, with no report | `hub stamp` and `hub check` cannot parse the manifest. | Remove or rename the field. The message lists the valid ones. |
 | `contents: <file> has extension "…", which a bundle may not hold` | `.DS_Store`, `LICENSE` or another file without an allowed extension. | Delete it or move it out of `bundle/`. |

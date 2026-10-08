@@ -3,12 +3,24 @@
 `octosense-app-contract` follows the rules in [README.md](README.md#stability):
 within `1.x` it only grows.
 
-crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0 and 1.7.0; 1.3.0 and 1.4.0
+crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0 1.7.0 and 1.7.1; 1.3.0 and 1.4.0
 are unpublished, and 1.5.0 includes their changes.
 [README.md](README.md#versions-on-cratesio) shows how to update a lock file
 that holds 1.2.0.
 
-## 1.7.1 — publication pending
+## 1.8.0 — publication pending
+
+- Adds optional `Integrity::github` / `GithubPublisher`, the required
+  `publisher-github-v1` marker and the default-refusing
+  `SignatureVerifier::verify_github` extension. Full Sigstore verification
+  lives in App Hub, not this small contract crate.
+- GitHub identity is included in canonical manifest signing bytes; only the
+  attached proof is excluded, avoiding a manifest/bundle hash cycle.
+- Existing manifests retain their serialized bytes and Ed25519 behavior.
+  Older hosts refuse the new marker. New contract support alone grants no
+  runtime authority, capability or publisher continuity.
+
+## 1.7.1 — 2026-10-08
 
 - Reserve the exact full app IDs `catalog.json`, `catalog.lock`,
   `catalog-v2.json` and `catalog-v2.lock`, ignoring ASCII case, so an app's

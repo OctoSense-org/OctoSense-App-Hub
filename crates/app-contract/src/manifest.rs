@@ -28,7 +28,7 @@ pub const SCHEMA_MINOR: u32 = 0;
 /// build honours. Empty in `1.0.0`: every feature added in `1.x` that
 /// restricts or changes what an app gets is added here, with the field
 /// that carries it, in the same release.
-pub const KNOWN_FEATURES: &[&str] = &["palpo-admin-v1", "host-api-v1", "backend-api-v1", "script-tools-v1"];
+pub const KNOWN_FEATURES: &[&str] = &["palpo-admin-v1", "host-api-v1", "backend-api-v1", "script-tools-v1", "publisher-github-v1"];
 
 /// Parse a manifest: [`AppManifest::parse`].
 pub fn parse(json: &str) -> Result<AppManifest, String> {
@@ -304,7 +304,70 @@ pub struct Integrity {
     /// requires signing. Verified by a [`crate::verify::SignatureVerifier`].
     #[serde(default)]
     pub signature: Option<Signature>,
+    /// GitHub Actions provenance over the canonical manifest. Requires a
+    /// host that understands `publisher-github-v1`; never an unsigned fallback.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub github: Option<GithubPublisher>,
 }
+
+/// Immutable GitHub workflow identity for one release. The attestation is
+/// excluded from signing bytes; these identity fields are included.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+#[non_exhaustive]
+pub struct GithubPublisher {
+    /// Exact owner/repository spelling in the authenticated GitHub claims.
+    pub repository: String,
+    pub repository_id: String,
+    pub owner_id: String,
+    /// Repository-local workflow, such as `.github/workflows/publish-app.yml`.
+    pub workflow: String,
+    /// Exactly `v` followed by the manifest version.
+    pub tag: String,
+    /// Lowercase immutable Git commit SHA (40 hex characters).
+    pub commit: String,
+    /// Sigstore v0.3 bundle from actions/attest, attached after preparation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attestation: Option<serde_json::Value>,
+}
+
+impl GithubPublisher {
+    pub fn validate(&self, version: &str) -> Result<(), String> {
+        let parts: Vec<_> = self.repository.split('/').collect();
+        if parts.len() != 2 || parts.iter().any(|s| s.is_empty() || s.len() > 100
+            || *s == "." || *s == ".." || s.ends_with(".git")
+            || !s.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))) {
+            return Err("GitHub publisher repository must be owner/repo".into());
+        }
+        for id in [&self.repository_id, &self.owner_id] {
+            if id.is_empty() || id.len() > 20 || id.starts_with('0') || !id.bytes().all(|b| b.is_ascii_digit()) {
+                return Err("GitHub publisher requires nonzero numeric repository and owner IDs".into());
+            }
+        }
+        let name = self.workflow.strip_prefix(".github/workflows/").ok_or("publisher workflow must be repository-local")?;
+        if name.is_empty() || name.len() > 100 || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+            || !(name.ends_with(".yml") || name.ends_with(".yaml")) {
+            return Err("publisher workflow must name one YAML file in .github/workflows".into());
+        }
+        if self.tag != format!("v{version}") || self.tag.len() > 128
+            || !self.tag.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_.+".contains(&b)) {
+            return Err("publisher tag must be v followed by the exact manifest version".into());
+        }
+        if self.commit.len() != 40 || !self.commit.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+            return Err("publisher commit must be a lowercase 40-character Git SHA".into());
+        }
+        if let Some(proof) = &self.attestation {
+            if !proof.is_object() || serde_json::to_vec(proof).map_err(|e| e.to_string())?.len() > 48 * 1024 {
+                return Err("publisher attestation must be an object of at most 48 KiB".into());
+            }
+        }
+        Ok(())
+    }
+
+    pub fn repository_url(&self) -> String { format!("https://github.com/{}", self.repository) }
+    pub fn workflow_uri(&self) -> String { format!("{}/{}@refs/tags/{}", self.repository_url(), self.workflow, self.tag) }
+}
+
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -668,6 +731,14 @@ impl AppManifest {
     /// running it would give the app less containment, or something other,
     /// than its author declared.
     pub fn check_requires(&self) -> Result<(), String> {
+        let github_required = self.requires.iter().any(|f| f == "publisher-github-v1");
+        if github_required != self.integrity.github.is_some() {
+            return Err("GitHub publisher identity and publisher-github-v1 must be declared together".into());
+        }
+        if let Some(github) = &self.integrity.github {
+            if self.integrity.signature.is_some() {return Err("GitHub publisher identity cannot be combined with a legacy signature".into());}
+            github.validate(&self.version)?;
+        }
         if let Some(api) = &self.host_api {
             if !self.requires.iter().any(|f| f == "host-api-v1") {
                 return Err("host_api requires host-api-v1".into());
@@ -716,6 +787,7 @@ impl AppManifest {
     pub fn signing_bytes(&self) -> Result<Vec<u8>, String> {
         let mut bare = self.clone();
         bare.integrity.signature = None;
+        if let Some(github) = &mut bare.integrity.github { github.attestation = None; }
         let mut value = serde_json::to_value(&bare).map_err(|e| e.to_string())?;
         // A newer manifest was signed with the fields this build ignored.
         crate::lenient::restore(&mut value, &self.ignored);

@@ -240,6 +240,7 @@ impl Store {
             if catalog.sequence == held.sequence && catalog.signing_bytes()? != held.signing_bytes()? {
                 return Err("refusing different catalog contents at the same sequence".into());
             }
+            if self.github_catalog_required { verify_history_extension(held,&catalog)?; }
         }
         self.catalog = Some(catalog);
         Ok(())
@@ -513,9 +514,7 @@ impl Store {
         if !same_manifest(&entry.manifest, &prepared.manifest)? {
             return Err("the release changed while it was opening; try again".into());
         }
-        if let Some(signature) = &entry.manifest.integrity.signature {
-            self.publisher_keys().verify(&signature.key_id, &signature.value, &entry.manifest.signing_bytes()?)?;
-        }
+        octosense_app_policy::verify::verify_manifest(&entry.manifest, &self.publisher_keys())?;
         Ok(())
     }
 
@@ -542,6 +541,28 @@ impl Store {
         octosense_app_policy::admit_and_resolve_dir(&text, &digest, &self.limits, &self.publisher_keys())
             .map_err(|e| format!("{e}; reinstall this app"))
     }
+}
+
+/// A newer authenticated v2 catalog may withdraw history, never erase or
+/// rewrite it to reset a locally recorded publisher identity. Legacy remove
+/// behavior is deliberately unchanged.
+fn verify_history_extension(held:&Catalog,next:&Catalog)->Result<(),String>{
+    let mut cursor=0;
+    for previous in &held.entries {
+        let Some((offset,entry))=next.entries[cursor..].iter().enumerate()
+            .find(|(_,e)|e.app_id()==previous.app_id()&&e.version()==previous.version()) else {
+            return Err("v2 catalog removes or reorders recorded publisher history".into());
+        };
+        cursor+=offset+1;
+        let mut allowed=previous.clone();
+        if matches!((&previous.status,&entry.status),(crate::Status::Offered,crate::Status::Withdrawn(reason)) if !reason.trim().is_empty()&&reason.len()<=4096){
+            allowed.status=entry.status.clone();
+        }
+        if serde_json::to_value(&allowed).map_err(|e|e.to_string())?!=serde_json::to_value(entry).map_err(|e|e.to_string())? {
+            return Err("v2 catalog rewrites recorded publisher history".into());
+        }
+    }
+    Ok(())
 }
 
 /// The same manifest, field for field.
@@ -613,6 +634,37 @@ mod catalog_cache_tests {
         assert!(store.accept_authenticated_catalog(Catalog::new(4, "2026-10-08", vec![])).is_err());
         assert!(store.accept_authenticated_catalog(Catalog::new(5, "2026-10-09", vec![])).is_err());
         assert_eq!(store.catalog().unwrap().sequence, 5);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn v2_history_cannot_be_removed_rewritten_reordered_or_reoffered_after_refresh(){
+        let (root,anchor,_)=fixture();
+        // Tests the post-cryptographic admission boundary. It does not forge
+        // a v2 attestation or claim a successful public proof installation.
+        let base:Catalog=serde_json::from_str(include_str!("../../../catalog.json")).unwrap();
+        let mut store=Store::new(&anchor.public_hex(),&root,HostLimits::default()).with_github_catalog();
+        store.accept_authenticated_catalog(base.clone()).unwrap();
+        let mut next=base.clone();next.sequence+=1;
+        let mut changed=next.clone();changed.entries.remove(0);assert!(store.accept_authenticated_catalog(changed).is_err());
+        let mut changed=next.clone();changed.entries.swap(0,1);assert!(store.accept_authenticated_catalog(changed).is_err());
+        let mut changed=next.clone();changed.entries[0].publisher="attacker".into();assert!(store.accept_authenticated_catalog(changed).is_err());
+        let mut changed=next.clone();changed.entries[0].manifest.integrity.bundle_blake3="0".repeat(64);assert!(store.accept_authenticated_catalog(changed).is_err());
+        next.entries[0].status=crate::Status::Withdrawn("reviewed withdrawal".into());
+        store.accept_authenticated_catalog(next.clone()).unwrap();
+        // Recreate the state after the cache proof has independently verified:
+        // the invariant must survive a new Store instance, not just its address.
+        let encoded=serde_json::to_vec(&next).unwrap();
+        let mut restarted=Store::new(&anchor.public_hex(),&root,HostLimits::default()).with_github_catalog();
+        restarted.accept_authenticated_catalog(serde_json::from_slice(&encoded).unwrap()).unwrap();
+        let mut replay=next.clone();replay.sequence+=1;replay.entries[0].status=crate::Status::Offered;
+        assert!(restarted.accept_authenticated_catalog(replay).is_err());
+        let mut removed=next.clone();removed.sequence+=1;removed.entries.clear();
+        assert!(restarted.accept_authenticated_catalog(removed.clone()).is_err());
+        assert_eq!(restarted.catalog().unwrap().sequence,next.sequence);
+        let mut legacy=Store::new(&anchor.public_hex(),&root,HostLimits::default());
+        legacy.accept_authenticated_catalog(next).unwrap();
+        legacy.accept_authenticated_catalog(removed).unwrap();
         std::fs::remove_dir_all(root).unwrap();
     }
 

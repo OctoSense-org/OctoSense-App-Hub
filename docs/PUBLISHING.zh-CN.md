@@ -87,7 +87,7 @@ my-app/
 | 检查项 | 拒绝条件 | 警告条件 |
 | --- | --- | --- |
 | `digest` | `integrity.bundle_blake3` 与应用包不符。每次改动之后都要运行 `hub stamp`。 | |
-| `publisher-signature` | 用 `--publisher-key` 给出的密钥或签名目录中记录的密钥验证签名失败；清单已签名，却没有提供密钥（`publisher key "<id>" is not registered with this hub`）；清单未签名，且没有加 `--allow-unsigned`。 | 清单未签名，且加了 `--allow-unsigned`。 |
+| `publisher-signature` | 声明的 GitHub 证明验证失败（即使加了 `--allow-unsigned`）；或用 `--publisher-key` 给出的密钥或签名目录中记录的密钥验证历史签名失败；清单已签名，却没有提供密钥（`publisher key "<id>" is not registered with this hub`）；清单未签名，且没有加 `--allow-unsigned`。 | 清单未签名，且加了 `--allow-unsigned`。 |
 | `identity` | ID 以 `os.` 开头；ID 本身或其最后一段是保留名称（[ID 与保留名称](#id-与保留名称)）。 | |
 | `contents` | 文件的扩展名不是 `.card`、`.json`、`.l0`、`.octoscript`、`.splash`、`.svg`、`.png`、`.jpg`、`.jpeg`、`.webp`、`.ttf`、`.otf`、`.txt` 或 `.md` 之一，也不是函数模块（`.wasm`，见 `functions`）。准入检查同样拒绝没有扩展名的文件（例如 `.DS_Store` 和 `LICENSE`）。 | |
 | `functions` | 应用包带了 `.wasm` 模块却没有 `wasm` 能力，或带了 8 个以上的模块。不在 `fns/<name>.wasm`（名称为 `[a-z0-9_-]`，最多 64 个字符）或不是 WebAssembly 核心模块的文件，以 `contents-invalid` 拒绝。 | 应用声明了 `wasm`，却没有带 `fns/*.wasm`。 |
@@ -165,6 +165,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | `version` | 本次发布的版本。 | 不能为空。每次发布都使用新值；Hub 从不替换已发布的版本。 |
 | `name` | 用户看到的名称。 | |
 | `integrity.bundle_blake3` | 应用包摘要。 | 由 `hub stamp` 写入。不要手工修改。 |
+| `integrity.github` | GitHub 仓库/所有者 ID、工作流、标签、commit 和附加的 Sigstore 证明。 | 需要 `publisher-github-v1`，由 `publisher-prepare` 和 `publisher-attach` 生成。 |
 | `integrity.signature` | `{key_id, value}`，即发布者对清单的签名。 | 由 `hub sign-manifest` 写入（[签名](#签名)）。 |
 | `capabilities` | 应用可以使用的能力。 | 封闭列表中的名称（[能力](#能力)）。 |
 | `network.hosts` | 应用可以访问的主机。 | 纯主机名，且必须同时请求 `net`（[网络主机](#网络主机)）。 |
@@ -172,7 +173,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | `compute` | `instruction_budget`、`memory_bytes`。 | 会限制在宿主的上限以内。 |
 | `agent` | 应用自己的 Agent。 | 可选（[清单中的 `agent`](#清单中的-agent)）。 |
 | `research` | `research` 和 `crawl` 的范围。 | 请求了 `research` 或 `crawl` 时必需；两者都没请求时，出现此字段即拒绝（[research 范围](#research-范围)）。 |
-| `requires` | 应用需要的宿主特性。 | 每一项都必须是宿主已知的特性：`palpo-admin-v1`、`host-api-v1`、`backend-api-v1` 或 `script-tools-v1`。后三项还需要宿主实现它们对应的 API（[宿主 API 兼容性](HOST-API.zh-CN.md)）。 |
+| `requires` | 应用需要的宿主特性。 | 每一项都必须是宿主已知的特性：`palpo-admin-v1`、`host-api-v1`、`backend-api-v1`、`script-tools-v1` 或 `publisher-github-v1`。GitHub 发布需要真实来源证明验证器；三个 API 标记还需要宿主实现它们对应的 API（[宿主 API 兼容性](HOST-API.zh-CN.md)）。 |
 | `host_api` | 应用需要（`required`）或可以使用（`optional`）的宿主 API 方法，每个方法都写明 ABI 主版本。 | 可选；须在 `requires` 中声明 `host-api-v1`。商店在安装时和每次启动时检查 `required` 中的方法（[声明应用需要什么](HOST-API.zh-CN.md#声明应用需要什么)）。 |
 | `backend` | 应用自己的后端：公开的登录端点，以及应用可以调用的操作。 | 可选；须在 `requires` 中声明 `backend-api-v1`，并请求 `auth` 能力、设置 `storage.accounts: true`。不含任何凭据（[登录自己的后端](#登录自己的后端)）。 |
 | `schema_minor` | 清单用到了 schema 1 的哪些新增内容。 | 省略此字段。 |
@@ -754,6 +755,7 @@ OctoSense `main`（尚未进入任何发布版）可以让应用登录其开发�
 
 | 命令 | 作用 |
 | --- | --- |
+| `hub publisher-prepare/attach/verify/pack/unpack/entry` | 准备 GitHub 规范化主题、附加证明、验证、交付或生成审核候选；详见 [GitHub 发布者来源证明](#github-发布者来源证明)及 `hub --help` 的完整参数。均不会发布目录。 |
 | `hub stamp <bundle>` | 用准入检查的解析器解析 `manifest.json`，然后把应用包摘要写入 `integrity.bundle_blake3` 并输出。准入检查无法读取的清单，它会拒绝处理。 |
 | `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app]` | 准入检查本身。输出 `PASSED` 或 `REFUSED`、每个检查结果，以及应用将获得的授权。有拒绝时退出码为 1。`--json` 以 JSON 输出报告（`schema`、`stage`、`passed`、`app_id`、`version`、`digest`、`findings` 和 `resources`）。 |
 | `hub scan <bundle> [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--packet <out.json>] [--reviewer <cmd>] [--system-app]` | 先运行准入检查，再写出审核包，还可以把审核包交给一条审核命令。准入检查拒绝的应用包不会进入扫描。 |
@@ -762,7 +764,7 @@ OctoSense `main`（尚未进入任何发布版）可以让应用登录其开发�
 | `hub sign-manifest <bundle> --key <key-file> --key-id <publisher-id>` | 为清单签名，签名覆盖其中的摘要。 |
 | `hub verify <catalog> --anchor <hex>` | 用信任锚验证签名目录。 |
 
-`--catalog <file>` 会对照一份已发布的签名目录（例如本仓库的 `catalog.json`），增加 `version` 和 `continuity` 两项检查，并使用签名目录中记录的发布者密钥。如果该文件不存在，`hub check` 会跳过这两项检查，而且不给出警告。签名目录必须能用 Hub 的信任锚验证通过（[信任锚](../README.zh-CN.md#信任锚)）；开发用的 Hub 则用 `--anchor <hex>` 验证。否则 `hub check` 会停止，并输出 `hub: could not authenticate <file> against the hub anchor …`。
+`--catalog <file>` 会对照一份已发布的签名目录（例如本仓库的 `catalog.json`），增加 `version` 和 `continuity` 两项检查，并使用签名目录中记录的发布者密钥。文件不存在时会拒绝。v2 目录必须通过内置 GitHub 工作流策略验证；历史目录必须能用 Hub 的信任锚验证通过（[信任锚](../README.zh-CN.md#信任锚)）；开发用的 Hub 则用 `--anchor <hex>` 验证。否则 `hub check` 会停止，并输出 `hub: could not authenticate base catalog: …`。
 
 `hub publish`、`hub withdraw`、`hub remove` 和 `hub certify` 需要 Hub 自己的密钥，只有 Hub 的维护者会运行它们。
 
@@ -801,7 +803,43 @@ my-notes 0.1.0 — PASSED
 
 ## 签名
 
-目录管理员可使用 [GitHub 管理的目录签名](GITHUB-PUBLISHING.zh-CN.md)，无需额外的 Hub 私钥。该 v2 渠道需要兼容宿主；以下发布者连续性规则保持不变。
+新应用可以使用 GitHub 管理的发布者来源证明，无需开发者创建、保存或轮换发布者私钥。本源码实现准备契约 **1.8.0** 和 `publisher-github-v1`；兼容宿主发布版仍待完成。两个真实标签推送发布已通过下文记录的工作流与原生 Store 验收。下文保留历史包的 Ed25519 路径。
+
+### GitHub 发布者来源证明
+
+公开仓库的 GitHub 托管工作流在推送 `v<manifest.version>` 标签时运行。宿主使用内置 public-good 信任快照离线验证完整 Sigstore v0.3 证明：证书、签发者、签名、证书时间戳和透明日志证据，并要求仓库及所有者 ID、仓库 URL、本仓库工作流路径、标签、源码 commit、工作流 commit 和规范化清单主题完全一致。GitHub 身份代表对仓库工作流的控制，不是对某个人现实身份的证明。应用不会获得 GitHub 凭证。
+
+工作流调用以下原生命令：
+
+```sh
+hub publisher-prepare bundle --repository OWNER/REPO \
+  --repository-id REPOSITORY_ID --owner-id OWNER_ID \
+  --workflow .github/workflows/publish-app.yml \
+  --tag v0.1.0 --commit IMMUTABLE_GIT_SHA \
+  --out build/octosense-app-manifest.json
+# actions/attest 只为 build/octosense-app-manifest.json 生成证明。
+hub publisher-attach bundle --attestation build/publisher-attestation.sigstore.json
+hub publisher-verify bundle
+hub publisher-pack bundle --out build/app.bundle.pack.json
+```
+
+`build/` 必须预先存在且位于 `bundle/` 外。`publisher-prepare` 添加 `requires: ["publisher-github-v1"]`，在 `integrity.github` 中记录身份，并为最终应用包写入摘要。规范化签名字节包含身份和应用包摘要，但不包含 `integrity.github.attestation`。随后附加证明；应用包摘要不包含清单，因此不存在哈希循环。证明最多 48 KiB，完整清单最多 64 KiB。Prepare 拒绝已经封存的发布包；Attach 和 Pack 验证最终字节且不会重新写入摘要，修改后需要生成新的发布证明。此流程无需 `keygen`、`sign-manifest` 或 `--publisher-key`。
+
+验证使用公开的合成测试应用的 [v0.1.0 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736273522)与 [v0.1.1 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736765473)，没有使用仓库 Secrets。两个发布均生成并验证了真实 GitHub 证明。[原生验收示例](../crates/app-hub/examples/publisher_acceptance.rs)随后安装两个发布包，准备并验证启动、保留完整证明，并拒绝内容／证明／身份篡改、回滚、未签名的归属替换和已撤回版本。[验收记录](../reviews/github-publisher-v1/acceptance.json)绑定输入摘要与原生源码版本。Store 使用的是临时本地测试目录；该测试应用没有 App Hub 投稿 issue 或目录条目。这不代表已执行应用界面、在手机上安装 GitHub 发布者应用，或已发布兼容宿主。
+
+请下载含有生成后证明清单的 **Release pack**；单独检出源码并不包含这些最终字节。审核人员可运行 `hub publisher-unpack app.bundle.pack.json --out review-bundle`，再运行 `hub publisher-verify review-bundle --catalog <authenticated-catalog>`。Unpack 要求新目录，拒绝路径穿越，失败时仅清理自己创建的输出。`hub publisher-entry review-bundle --catalog <authenticated-catalog> --out build/index.json` 生成审核候选条目，不会发布。
+
+请创建 **App Hub submission issue** 发起发布请求，可以先开 issue、后生成 release；准备好后补充仓库、不可变标签/commit、发布 pack 链接和验证证据。创建标签或 GitHub Release 不等于提交、批准或上架。管理员目录审核仍走[独立的受保护发布流程](GITHUB-PUBLISHING.zh-CN.md)。
+
+目录发布者身份为 `github:<repository_id>`。更新须保持仓库、不可变仓库/所有者 ID 和工作流路径不变，并提高语义版本优先级。已撤回版本仍保留在所有权历史中。未签名更新、替换身份、重放版本或接管历史 Ed25519 应用 ID 都会被拒绝。本变更不提供迁移或恢复流程，也不修改任何已准入产物。
+
+旧宿主拒绝新标记；没有来源证明验证器的宿主即使开启未签名开发模式也会拒绝证明。独立 `card-host` 没有发布者验证器：预览时使用未签名开发副本，封存后的应用使用兼容 Store 宿主。准入不等于应用 UX 或设备验收；仅发布契约 1.8.0 不会交付兼容宿主。
+
+### 历史 Ed25519 发布者签名
+
+目录管理员可使用 [GitHub 管理的目录签名](GITHUB-PUBLISHING.zh-CN.md)，无需额外的 Hub 私钥。已有 Ed25519 发布者历史及其签名字节保持不变：
+
+`hub stamp` 和 `card-host --stamp` 遇到已有签名元数据时会拒绝，且不会改写清单。编辑已签名发布包前，先创建未签名的开发副本；保留原发布包，再为最终新版本写入摘要并签名。缺失或为 null 的 `integrity.signature` 仍表示未签名。
 
 发布者 ID 就是你签名所用的密钥 ID。已登记的密钥以已发布签名目录中的记录为准，提交时附带的密钥一律不算：
 
@@ -820,7 +858,7 @@ my-notes 0.1.0 — PASSED
 
 - **签名放在最后。** `card-host` 以及任何没有签名验证器的宿主，都会拒绝已签名的应用包：`no signature verifier is installed, so the signature from key "<id>" cannot be checked`。先在未签名的应用包上截图和测试，再写入摘要并签名。
 - **先写入摘要，再签名。** 为尚未写入摘要的清单签名，签下的是错误的摘要。
-- **任何改动之后，都要重新写入摘要并签名。** 改动 `manifest.json` 以外的任何文件，`hub check` 都会拒绝，报 `digest: the bundle hashes to …, the manifest claims …`。只重新运行 `hub stamp` 的话，`hub check` 仍会拒绝，这次报 `publisher-signature: the signature from key "<id>" does not match the manifest`。直接改动 `manifest.json` 本身，会立即得到第二种拒绝。请依次重新运行 `hub stamp`、`hub sign-manifest` 和 `hub check --publisher-key`。
+- **修改后准备新的未签名副本。** 修改应用包字节会使摘要失效，修改已签名清单字段会使签名失效。保留原发布包。在开发副本中移除旧的 `integrity.signature`，然后为最终新版本依次运行 `hub stamp`、`hub sign-manifest` 和 `hub check --publisher-key`。`hub stamp` 会拒绝旧签名，而不是静默使其失效。
 - **用密钥检查签名后的字节。** 除非 `--catalog` 指定的签名目录已经记录了你的密钥，否则不带 `--publisher-key <id>=<hex>` 时，`hub check` 会拒绝已签名的应用包，即使加了 `--allow-unsigned` 也一样。`hub scan` 没有 `--allow-unsigned` 参数：它直接接受未签名的应用包，而已签名的应用包同样需要提供密钥。
 - **保持字节原样。** 摘要覆盖除 `manifest.json` 以外的每个文件：文件的路径、长度和字节；在所有平台上，路径各段之间都用 `/` 分隔。换行符转换会改变摘要，所以不要让 Git 转换应用包（[安排仓库结构](SUBMITTING.zh-CN.md#1-安排仓库结构)）。
 

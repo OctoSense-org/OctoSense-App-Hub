@@ -91,6 +91,9 @@ pub fn verify_catalog(catalog: &Catalog, anchor_public_hex: &str) -> Result<(), 
     working
         .verify(&bytes, &signature(signature_hex)?)
         .map_err(|_| "the catalog's signature does not match its contents".to_string())?;
+    if catalog.entries.iter().any(|e|e.manifest.integrity.github.is_some()) {
+        crate::CatalogPublishers::from_catalog(catalog)?;
+    }
     Ok(())
 }
 
@@ -119,6 +122,10 @@ impl Default for PublisherKeys {
 }
 
 impl SignatureVerifier for PublisherKeys {
+    fn verify_github(&self, identity: &octosense_app_policy::manifest::GithubPublisher, signed_bytes: &[u8]) -> Result<(), String> {
+        crate::github_publisher::verify(identity, signed_bytes)
+    }
+
     fn verify(&self, key_id: &str, signature_hex: &str, signed_bytes: &[u8]) -> Result<(), String> {
         let (_, public) = self
             .keys
@@ -137,6 +144,7 @@ impl SignatureVerifier for PublisherKeys {
 
 /// Sign a manifest as a publisher would, for tests and for the signing tool.
 pub fn sign_manifest(key: &HubKey, manifest: &mut AppManifest, key_id: &str) -> Result<(), String> {
+    if manifest.integrity.github.is_some() { return Err("GitHub publisher manifests use an attestation, not a developer signing key".into()); }
     manifest.integrity.signature = None;
     let bytes = manifest.signing_bytes()?;
     manifest.integrity.signature = Some(octosense_app_policy::manifest::Signature::new(key_id, key.sign_hex(&bytes)));

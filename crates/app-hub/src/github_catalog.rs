@@ -150,7 +150,7 @@ fn authorize_claims(claims: &sigstore_verify::crypto::FulcioCiClaims) -> Result<
     Ok(())
 }
 
-fn verify_proof(
+pub(crate) fn verify_proof(
     payload: &[u8],
     bundle: &Bundle,
     root: &TrustedRoot,
@@ -262,7 +262,9 @@ pub fn verify_parts(payload: &[u8], proof: &[u8]) -> Result<VerifiedCatalog, Str
     )?;
     let digest = hex::encode(Sha256::digest(payload));
     verify_subject(&bundle, &digest)?;
-    Ok(VerifiedCatalog { catalog, digest })
+    let verified = VerifiedCatalog { catalog, digest };
+    CatalogPublishers::from_catalog(verified.catalog())?;
+    Ok(verified)
 }
 
 /// Read only the explicit v2 envelope. Invalid v2 never falls back to legacy.
@@ -351,6 +353,37 @@ pub fn authenticated_base(document: &[u8]) -> Result<Catalog, String> {
     Ok(catalog)
 }
 
+/// Authenticated publication history. Private fields prevent an unsigned
+/// candidate from being presented as reviewed ownership history.
+pub struct AuthenticatedCatalog {
+    catalog: Catalog,
+    publishers: CatalogPublishers,
+}
+impl AuthenticatedCatalog {
+    pub fn catalog(&self) -> &Catalog { &self.catalog }
+    pub fn publishers(&self) -> &CatalogPublishers { &self.publishers }
+}
+
+pub fn authenticated_publication_base(document: &[u8], legacy_anchor: &str) -> Result<AuthenticatedCatalog, String> {
+    if document.len() > MAX_DOCUMENT_BYTES { return Err("base catalog exceeds byte limit".into()); }
+    let value: serde_json::Value=serde_json::from_slice(document).map_err(|_| "invalid base catalog")?;
+    if value.get("schema").and_then(|v|v.as_u64())==Some(2) {
+        let verified=verify_document(document)?;
+        let publishers=CatalogPublishers::from_catalog(verified.catalog())?;
+        return Ok(AuthenticatedCatalog { catalog:verified.into_catalog(), publishers });
+    }
+    let catalog:Catalog=serde_json::from_value(value).map_err(|_|"invalid legacy base catalog")?;
+    crate::verify_catalog(&catalog,legacy_anchor).map_err(|e|format!("could not authenticate base catalog: {e}"))?;
+    let publishers=CatalogPublishers::from_catalog(&catalog)?;
+    Ok(AuthenticatedCatalog {catalog,publishers})
+}
+
+/// Candidate construction never authenticates its output. Only a subsequent
+/// protected workflow attestation can publish the proposed releases.
+pub fn prepare_authenticated(base: &AuthenticatedCatalog, candidate_bytes: &[u8], artifact_root: &Path) -> Result<Vec<u8>, String> {
+    prepare_with_registry(base.catalog(), base.publishers(), candidate_bytes, artifact_root)
+}
+
 /// Admit a reviewed candidate, without credentials or contributor execution.
 /// The caller authenticates its immutable candidate commit separately.
 pub fn prepare(
@@ -358,6 +391,11 @@ pub fn prepare(
     candidate_bytes: &[u8],
     artifact_root: &Path,
 ) -> Result<Vec<u8>, String> {
+    let registry=CatalogPublishers::from_catalog(base)?;
+    prepare_with_registry(base, &registry, candidate_bytes, artifact_root)
+}
+
+fn prepare_with_registry(base: &Catalog, registry: &CatalogPublishers, candidate_bytes: &[u8], artifact_root: &Path) -> Result<Vec<u8>, String> {
     let candidate = parse_catalog(candidate_bytes)?;
     if candidate.sequence
         != base
@@ -378,7 +416,11 @@ pub fn prepare(
     if old.len() != base.entries.len() {
         return Err("base catalog has duplicate versions".into());
     }
-    let registry = CatalogPublishers::from_catalog(base)?;
+    // Existing relative order is part of the append-only ownership history.
+    let retained: Vec<_> = candidate.entries.iter().filter(|e| old.contains_key(&(e.app_id(),e.version())))
+        .map(|e|(e.app_id(),e.version())).collect();
+    let previous_order:Vec<_>=base.entries.iter().map(|e|(e.app_id(),e.version())).collect();
+    if retained!=previous_order { return Err("candidate reorders or drops publisher history".into()); }
     let mut present = std::collections::BTreeSet::new();
     for entry in &candidate.entries {
         let key = (entry.app_id(), entry.version());
@@ -421,7 +463,7 @@ pub fn prepare(
         {
             return Err("candidate artifact path is not canonical".into());
         }
-        crate::verify_continuity(&entry.manifest, &registry)?;
+        crate::verify_continuity(&entry.manifest, registry)?;
         let bundle = artifact_root.join(&entry.artifact);
         for ancestor in bundle.ancestors().take_while(|p| *p != artifact_root) {
             if std::fs::symlink_metadata(ancestor)
@@ -434,11 +476,8 @@ pub fn prepare(
         }
         let keys = registry
             .trusted_keys(crate::PublisherKeys::new().with(&entry.publisher, &entry.publisher_key));
-        let report = crate::check_bundle(
-            &bundle,
-            &octosense_app_policy::HostLimits::default(),
-            &keys,
-            Some(base),
+        let report = crate::gate::check_bundle_with_registry(
+            &bundle, &octosense_app_policy::HostLimits::default(), &keys, base, registry,
         )?;
         let rebuilt = crate::entry_for(
             &bundle,

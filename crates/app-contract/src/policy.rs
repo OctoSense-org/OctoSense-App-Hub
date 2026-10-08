@@ -223,7 +223,7 @@ pub fn resolve(manifest: &AppManifest, limits: &HostLimits) -> Result<AppPolicy,
     if manifest.version.trim().is_empty() {
         return Err("manifest version is empty".into());
     }
-    if limits.require_signature && manifest.integrity.signature.is_none() {
+    if limits.require_signature && manifest.integrity.signature.is_none() && !manifest.integrity.github.as_ref().is_some_and(|g| g.attestation.is_some()) {
         return Err(format!("app {} is unsigned and this host requires a signature", manifest.id));
     }
 
