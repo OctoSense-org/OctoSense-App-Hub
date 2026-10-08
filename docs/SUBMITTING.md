@@ -455,9 +455,14 @@ and in your issue.
 
 ## 5. Produce the final bytes
 
-For both first submissions and updates, use GitHub publisher provenance.
-Contract 1.8.0 adds `publisher-github-v1`. Two real tag-push releases and
-native Store install/update/launch checks passed ([evidence and
+For a new app's first submission and all its updates, use GitHub publisher
+provenance from a public repository. OctoScript apps are open by default:
+each bundle already ships the app's source as readable text, so a public
+repository reveals little more
+([ADR 0002](adr/0002-github-attested-publisher-identity.md)). This route
+needs app contract 1.8.0 and a host that supports `publisher-github-v1`. Two
+tag-push releases of a test app passed native Store install, update and
+launch checks ([evidence and
 limits](PUBLISHING.md#github-publisher-provenance)). For the current public
 catalog, use the [RC1 release](../README.md#download-a-compatible-host).
 

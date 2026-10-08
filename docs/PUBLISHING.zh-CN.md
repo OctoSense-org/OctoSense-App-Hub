@@ -808,6 +808,8 @@ my-notes 0.1.0 — PASSED
 
 公开仓库的 GitHub 托管工作流在推送 `v<manifest.version>` 标签时运行。宿主使用内置 public-good 信任快照离线验证完整 Sigstore v0.3 证明：证书、签发者、签名、证书时间戳和透明日志证据，并要求仓库及所有者 ID、仓库 URL、本仓库工作流路径、标签、源码 commit、工作流 commit 和规范化清单主题完全一致。GitHub 身份代表对仓库工作流的控制，不是对某个人现实身份的证明。应用不会获得 GitHub 凭证。
 
+这条路径需要公开仓库：GitHub 用自己的 Sigstore 实例为私有仓库的证明签名，而宿主不信任该实例。OctoScript 应用默认开放：每个应用包本来就以可读文本的形式附带应用源码，所以公开仓库也不会多暴露多少内容（[ADR 0002](adr/0002-github-attested-publisher-identity.zh-CN.md)）。
+
 工作流调用以下原生命令：
 
 ```sh
