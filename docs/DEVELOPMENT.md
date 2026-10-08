@@ -125,7 +125,8 @@ desktop-v0.1.0-beta.2 or later.
 `backend-api-v1` or `script-tools-v1`, because it implements none of the APIs
 they need. The window shows "card-host refused this bundle" and
 `app <id> needs a host implementing <method>@1`. Test such an app in an
-OctoSense shell built from `main`.
+OctoSense shell built from the `feat/host-api-contract` implementation in
+[OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360), not an unmodified `main` while that PR is unmerged.
 
 ### Drive it over HTTP: `MAKEPAD_REMOTE`
 

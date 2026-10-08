@@ -11,7 +11,8 @@ run its own agent tools
 ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)).
 
 Contract 1.6.0 is on crates.io, but no released OctoSense build implements
-these APIs yet. Until one does, test in an OctoSense shell built from `main`.
+these APIs yet. Test the `feat/host-api-contract` implementation branch in
+[OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360). Building `main` alone does not provide these APIs while that PR is unmerged.
 An older host, such as OctoSense desktop 0.1.0-beta.2, serves none of these
 APIs and refuses an app that requires them.
 
@@ -91,7 +92,8 @@ registration.
   and a closed app answers `app_not_running`.
 - **Platforms.** The device-permission methods cover Android and macOS, and
   `location.get` covers Android only. It returns the last-known fix, of
-  unknown age. OctoSense `main`, not yet in any release, embeds `WebReader`
+  unknown age. The `feat/desktop-embedded-browser` implementation in
+  [OctoSense PR #361](https://github.com/OctoSense-org/OctoSense/pull/361), not yet released, embeds `WebReader`
   on Linux (X11 or XWayland, with WebKitGTK installed) and Windows (with the
   WebView2 Runtime installed), but not under native Wayland.
 - **Permission requests.** Only an app in the foreground can request a

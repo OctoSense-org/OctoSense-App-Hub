@@ -4,7 +4,7 @@
 
 契约 1.6 让应用可以声明自己需要的宿主 API，并查询宿主实现了哪些 API。它增加的是声明和发现机制，而不是访问权限：应用只能调用宿主中已编译的 Rust 服务，每次调用仍要经过应用自己的授权。同一版契约还让应用包可以声明自己的后端（[登录自己的后端](PUBLISHING.zh-CN.md#登录自己的后端)），并运行自己的 Agent 工具（[脚本工具执行](PUBLISHING.zh-CN.md#脚本工具执行script-tools-v1)）。
 
-契约 1.6.0 已发布到 crates.io，但目前还没有任何已发布的 OctoSense 版本实现这些 API。在此之前，请在基于 `main` 构建的 OctoSense Shell 中测试。旧宿主（例如 OctoSense 桌面版 0.1.0-beta.2）不提供这些 API，并会拒绝要求这些 API 的应用。
+契约 1.6.0 已发布到 crates.io，但目前还没有任何已发布的 OctoSense 版本实现这些 API。请在 [OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360) 的 `feat/host-api-contract` 实现分支上测试。该 PR 合并前，仅构建 `main` 无法获得这些 API。旧宿主（例如 OctoSense 桌面版 0.1.0-beta.2）不提供这些 API，并会拒绝要求这些 API 的应用。
 
 ## 声明应用需要什么
 
@@ -47,7 +47,7 @@ API 可用不等于已经配置，也不等于已经授权。`configured: null` 
 - **Agent 工具。** `host-service` 工具可以用 `host_method` 映射到 `auth.backend.me`、`auth.backend.request`、`runtime.list`、`runtime.describe`、三个 `*.permission.status` 方法或 `location.get`，最低风险为 `read`，并且需要该方法所属的能力和 `private_data: true`（[把工具映射到共享服务](PUBLISHING.zh-CN.md#把工具映射到共享服务host_method)）。Agent 的调用从不弹出提示，所以 `auth.backend.request` 只执行已声明的 `GET` 操作，宿主会在发出任何 HTTP 请求之前拒绝写操作；写操作仍须在前台应用中发起，并在宿主的原生审阅界面上确认。权限申请和撤销、账户管理和面板控制都没有 `host_method`。准入不能代替宿主对账户、授权和平台的检查。
 - **后端。** 宿主只从已准入的签名应用包读取 `backend` 块。它返回不透明的连接句柄，拒绝重定向和任何含有令牌的后端应答，并在原生审阅界面上让用户批准每一次写操作。后台调用和 Agent 调用都无法批准写操作。修改端点、更新应用或撤回应用，都会结束应用的后端会话。
 - **脚本工具。** 签名的 `app_tool(name, call_id)` 处理函数运行在已打开的完整应用中，使用该应用自己的 VM 和存储文件夹。它不加载任何原生库或 Wasm；应用关闭时返回 `app_not_running`。
-- **平台。** 设备权限方法支持 Android 和 macOS，`location.get` 只支持 Android，返回上次已知的位置，时效未知。OctoSense `main`（尚未进入任何发布版本）在 Linux（X11 或 XWayland，需安装 WebKitGTK）和 Windows（需安装 WebView2 Runtime）上内嵌 `WebReader`，但不支持原生 Wayland。
+- **平台。** 设备权限方法支持 Android 和 macOS，`location.get` 只支持 Android，返回上次已知的位置，时效未知。[OctoSense PR #361](https://github.com/OctoSense-org/OctoSense/pull/361) 的 `feat/desktop-embedded-browser` 实现（尚未发布）在 Linux（X11 或 XWayland，需安装 WebKitGTK）和 Windows（需安装 WebView2 Runtime）上内嵌 `WebReader`，但不支持原生 Wayland。
 - **权限申请。** 只有在前台的应用才能申请权限。来自 Agent 或后台的申请会返回 `authorization_required`。
 - **设备控件。** 在声明了 `host-api-v1` 的应用中，`CameraPreview`、`sys.request_location`、`sys.gps` 和地图的 GPS 读取同样需要该应用的设备授权。宿主每次启动后，这些功能都保持关闭，直到应用调用某个权限方法（例如 `camera.permission.status`）载入已保存的授权。请在应用打开时就调用它。
 - **`card-host`。** 三个标记所需的 API，它一个也没有实现，因此会拒绝要求这些标记的应用（[在本地运行应用包](DEVELOPMENT.zh-CN.md#在本地运行应用包card-host)）。
