@@ -46,6 +46,13 @@ Find the guide for your task:
 | Built-in native app | Source compiled into a shell release, built with the native workspace and the owning app's instructions. The shared icon conventions apply. | With the shell release. An icon declaration does not make it installable from the Hub. |
 | Agent-generated app type | Specifications and lint rules in OctoSense `apps/appcard` that teach AppCard's agents to compose a new kind of app. | Not a bundle. |
 
+Installed L0 cards keep their measured canvas inside the host app pane. The
+renderer positions descendants relative to that pane; a native two-axis scroll
+view keeps controls reachable when the canvas exceeds the available space.
+Validate at a nonzero pane position and in a viewport shorter or narrower than
+the authored canvas, including scrolling to and clicking its final control.
+Script apps continue to manage their own responsive layout and scrolling.
+
 A store bundle carries no native code. New Rust or JNI code, Python services
 and browser controllers do not install as a card app or a script app.
 
