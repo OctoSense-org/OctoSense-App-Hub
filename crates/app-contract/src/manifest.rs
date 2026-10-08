@@ -114,6 +114,11 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // inside its domain lists. More reach than `research`, which only reads
     // search results; neither implies the other.
     "crawl",
+    // Run the app's own WebAssembly functions (its bundle's `fns/*.wasm`)
+    // through the host's `wasm` service: computing only, in a sandbox with a
+    // deadline and a memory cap. A function reaches no file, network, clock
+    // or other app; it gets its input and returns its output.
+    "wasm",
     // Host services reached by exact name (App Hub's `services`). Each is
     // a separate consent: a host adapter checks the exact name, the person's
     // per-instance grant and its own ceilings on every request. A prefix is

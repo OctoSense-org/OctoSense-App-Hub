@@ -10,8 +10,12 @@ use std::path::Path;
 
 /// Everything a bundle may hold besides its manifest, by extension. A bundle
 /// is cards, data and artwork; anything else is a refusal, so a publisher
-/// cannot smuggle a payload the checks do not understand.
+/// cannot smuggle a payload the checks do not understand. The one exception
+/// is the app's own functions, `fns/*.wasm` (below).
 const ALLOWED_EXTENSIONS: &[&str] = &["card", "json", "l0", "octoscript", "splash", "svg", "png", "jpg", "jpeg", "webp", "ttf", "otf", "txt", "md"];
+
+/// The most WebAssembly modules (`fns/*.wasm`) a bundle may carry.
+pub const MAX_FUNCTION_MODULES: usize = 8;
 
 /// Ceiling for a whole bundle. Cards are text and artwork; a bundle bigger
 /// than this is either shipping something it should not, or should be split.
@@ -167,12 +171,15 @@ pub fn check_bundle(
 
     // ---- contents -------------------------------------------------------
     let mut total = 0u64;
+    let mut modules = 0usize;
     for file in list_files(bundle)? {
         let path = bundle.join(&file);
         let size = std::fs::metadata(&path).map_err(|e| e.to_string())?.len();
         total += size;
         let extension = file.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
-        if !ALLOWED_EXTENSIONS.contains(&extension.as_str()) {
+        if extension == "wasm" {
+            modules += 1;
+        } else if !ALLOWED_EXTENSIONS.contains(&extension.as_str()) {
             findings.push(Finding::refuse(
                 "contents",
                 format!("{} has extension {extension:?}, which a bundle may not hold", file.display()),
@@ -181,6 +188,28 @@ pub fn check_bundle(
     }
     if total > MAX_BUNDLE_BYTES {
         findings.push(Finding::refuse("size", format!("the bundle is {total} bytes, over the {MAX_BUNDLE_BYTES} ceiling")));
+    }
+
+    // ---- the app's own functions ----------------------------------------
+    // A WebAssembly module is the one executable a bundle may carry: the
+    // app's own functions in `fns/` (admission checks each name and header),
+    // run by the host's `wasm` service in a sandbox, under the `wasm`
+    // capability a store shows the person.
+    let declares_wasm = manifest.capabilities.iter().any(|c| c == "wasm");
+    if modules > 0 && !declares_wasm {
+        findings.push(Finding::refuse(
+            "functions",
+            format!("the bundle carries {modules} WebAssembly module(s) but does not declare the wasm capability"),
+        ));
+    }
+    if modules > MAX_FUNCTION_MODULES {
+        findings.push(Finding::refuse(
+            "functions",
+            format!("the bundle carries {modules} WebAssembly modules, over the {MAX_FUNCTION_MODULES} it may"),
+        ));
+    }
+    if declares_wasm && modules == 0 {
+        findings.push(Finding::warn("functions", "the bundle declares the wasm capability but carries no fns/*.wasm"));
     }
 
     // ---- assets are local ----------------------------------------------

@@ -143,6 +143,8 @@ each one today.
 - OctoSense serves `calendar`, `llm` and `news` only to its own system apps.
   For `photos` and `youtube` it serves only a `notify` method, to `os.photos`
   and `os.youtube`. Not yet: media services for store apps.
+- No release serves `wasm` (an app's own `fns/*.wasm` functions, contract
+  1.7.0). OctoSense runs them only in builds with its `wasm-lab` feature.
 - OctoSense runs an app agent's granted `implemented_by: "host-service"`
   tools, including tools mapped to a reviewed shared service with
   `host_method`, and loads `AGENT.md` and skills as guidance

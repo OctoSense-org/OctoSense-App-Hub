@@ -104,6 +104,7 @@ impl Entry {
                 "news" => "Read news the device collects from its feeds and topics".to_string(),
                 "photos" => "Read Photos's own library and publish collections".to_string(),
                 "youtube" => "Search YouTube and manage music recommendations".to_string(),
+                "wasm" => "Run its own sandboxed functions on this device".to_string(),
                 "glance" => "Show cards on your glance screen".to_string(),
                 "model" => "Send what you give it to the AI provider you configured, within a daily budget".to_string(),
                 "research" => format!("Search {}", octosense_app_policy::search_words(&self.manifest.shown_research_scope())),

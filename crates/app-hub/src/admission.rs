@@ -225,6 +225,7 @@ pub fn validate(root: &Path, files: &[BundleFile]) -> (Vec<Finding>, Vec<Resourc
             }),
             "png" | "jpg" | "jpeg" | "webp" => validate_bitmap(&path, &extension, is_icon),
             "svg" => validate_svg(&path, &name, &mut refs, is_icon),
+            "wasm" => validate_wasm(&path, &name),
             _ => Ok(()),
         };
         if let Err(error) = result {
@@ -420,6 +421,27 @@ fn check_svg_css(css: &str) -> Result<(), String> {
                 return Err("SVG resource URLs must be local fragment references".into());
             }
         }
+    }
+    Ok(())
+}
+
+/// An app's own function module, run by the host's `wasm` service under the
+/// `wasm` capability: a WebAssembly core module at `fns/<name>.wasm`. Its
+/// imports and exports are the host's to check when it loads the module.
+fn validate_wasm(path: &Path, name: &str) -> Result<(), String> {
+    let stem = name
+        .strip_prefix("fns/")
+        .and_then(|rest| rest.strip_suffix(".wasm"))
+        .ok_or("a WebAssembly module belongs in fns/, as fns/<name>.wasm")?;
+    if stem.is_empty()
+        || stem.len() > 64
+        || !stem.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-')
+    {
+        return Err("a function module is named fns/<name>.wasm, the name [a-z0-9_-] and at most 64 characters".into());
+    }
+    let header = read_bounded(path, MAX_BUNDLE_BYTES)?;
+    if !header.starts_with(b"\0asm\x01\0\0\0") {
+        return Err("not a WebAssembly core module (magic and version 1)".into());
     }
     Ok(())
 }
