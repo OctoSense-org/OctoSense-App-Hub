@@ -71,7 +71,7 @@ card-host --help
 | --- | --- |
 | `--bundle <dir>` | 要运行的应用包。默认：当前目录。 |
 | `--app-data <dir>` | 应用的存储隔离目录建在 `<dir>/<app id>/`；宿主服务把状态保存在 `<dir>/.host/`。默认：`$TMPDIR/octosense-card-apps`。 |
-| `--allow-unsigned` | 准入没有签名的清单。`card-host` 不验证任何发布者密钥，因此即使加了这个参数，它也会拒绝**已签名**的清单：`no signature verifier is installed, so the signature from key "<id>" cannot be checked`。请运行未签名的应用包并截图，最后再签名。 |
+| `--allow-unsigned` | 准入没有签名的清单。`card-host` 没有发布者验证器，因此即使加了这个参数，它也会拒绝**已封存**（带 GitHub 证明）的 Release：`this host has no GitHub publisher verifier`。请运行未签名的开发版应用包并截图。 |
 | `--stamp` | 在准入之前重写清单的 `integrity.bundle_blake3`，使其与目录一致。不加这个参数时，如果应用包的字节在上次 `hub stamp` 之后有变化，`card-host` 会拒绝它。 |
 | `--system` | 按系统应用的方式准入：只校验摘要，适用系统上限。空摘要会在内存中补齐。用于开发系统应用。 |
 | `--static <prefix>=<dir>` | 把 `<dir>` 中的文件读入内存，在 `<prefix>/...` 路径下提供，与 Shell 提供系统应用内置素材的方式相同。相册使用 `--static photos=<dir>`。可重复使用。 |
@@ -98,7 +98,7 @@ card-host --help
 
 `card-host` 不注册任何宿主服务，包括 `model`，以及连接 octos（OctoSense 运行的 Agent 内核）的 `octos.*` 服务。在 `card-host` 中，只有用于发现宿主 API 的 `runtime` 会响应。调用 `host.request("mail.list", …)` 的脚本应用会得到 `no service answers "mail" on this device`。依赖服务的应用，请在注册了该服务的 OctoSense Shell 中测试。[宿主服务](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md) 列出了哪个 Shell 提供哪个服务。已连接账户相关的服务需要 desktop-v0.1.0-beta.2 或更高版本。
 
-`card-host` 也会拒绝清单要求 `host-api-v1`、`backend-api-v1` 或 `script-tools-v1` 的应用，因为这些标记所需的 API 它一个也没有实现。窗口会显示“card-host refused this bundle”和 `app <id> needs a host implementing <method>@1`。这类应用请在基于 `main` 构建的 OctoSense Shell 中测试。
+`card-host` 也会拒绝清单要求 `host-api-v1`、`backend-api-v1` 或 `script-tools-v1` 的应用，因为这些标记所需的 API 它一个也没有实现。窗口会显示“card-host refused this bundle”和 `app <id> needs a host implementing <method>@1`。这类应用请在 [OctoSense 桌面版 0.1.0-rc.1](../README.zh-CN.md#下载兼容宿主) 中测试，它在自身的[平台限制](HOST-API.zh-CN.md#限制)内实现了这些 API。
 
 ### 通过 HTTP 驱动：`MAKEPAD_REMOTE`
 

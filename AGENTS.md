@@ -145,14 +145,22 @@ reviewer check one:
   before you build or check an app. Run `hub help` for the exact commands, and
   use only the commands it lists.
 - The submission issue is the developer's request to publish. Never treat a
-  tag or a GitHub release as a submission or an approval.
+  tag or a GitHub release as a submission or an approval. Until the app's
+  first publication, each new release arrives as a comment on that issue;
+  after publication, each new version gets a new issue.
 - Check the exact bytes at the submitted tag and in the release pack with
   `hub check`, `hub publisher-unpack` and `hub publisher-verify`, and post
   findings in the issue.
   No bot reviews submission issues; never claim that one did.
-- A GitHub publisher app needs no developer signing key: its workflow attests
-  each release. An app published with an Ed25519 key keeps that key for
-  every update. Never ask a developer for a private key.
+- App Hub accepts only GitHub-attested releases
+  ([ADR 0002](docs/adr/0002-github-attested-publisher-identity.md)): the
+  app's workflow attests each release, so a developer needs no signing key.
+  Never ask a developer for a private key.
+- Never approve or help with key-signed publishing. Do not approve a
+  key-signed release, even when the gate passes it: gate enforcement is
+  pending in [#168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168).
+  Do not help anyone create a publisher key, sign a manifest or pass
+  `--publisher-key` to publish an app.
 
 ## Catalog and publication
 

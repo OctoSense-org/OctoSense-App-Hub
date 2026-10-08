@@ -13,9 +13,9 @@
 
 推送标签或创建 GitHub Release 既不会提交应用，也不会批准应用。
 
-新应用的首个版本和每次更新，都由应用仓库的 GitHub 工作流准备 Release、生成证明并打包，因此你不需要发布者私钥，也不需要仓库签名 Secret。安装这类应用需要支持 `publisher-github-v1` 的宿主；请使用 [RC1 发行版及下载指南](../README.zh-CN.md#下载兼容宿主)。
+App Hub 只接受带 GitHub 证明的 Release（[ADR 0002](adr/0002-github-attested-publisher-identity.zh-CN.md)）。应用的首个版本和每次更新，都由应用仓库的 GitHub 工作流准备 Release、生成证明并打包，因此你不需要发布者密钥，也不需要仓库签名 Secret。安装这类应用需要支持 `publisher-github-v1` 的宿主；请使用 [RC1 发行版及下载指南](../README.zh-CN.md#下载兼容宿主)。
 
-公开签名目录第 13 版提供带 GitHub 证明的新 `io.github.ymote.*` 示例 ID（[当前应用](../README.zh-CN.md#应用)）。较早目录 10 的 Ed25519 身份和已签名源码布局只是历史兼容示例，不是 GitHub 发布者应用的必做步骤。准入、能力、清单和签名规则见[发布参考](PUBLISHING.zh-CN.md)。
+公开签名目录第 13 版提供带 GitHub 证明的 `io.github.ymote.*` 示例应用（[当前应用](../README.zh-CN.md#应用)）。App Hub 正在撤回较早那批用密钥签名的 `org.octosense.samples.*` 条目；后面的步骤仍以它们为例（见[三个参考应用](#三个参考应用)）。准入、能力、清单和签名规则见[发布参考](PUBLISHING.zh-CN.md)。
 
 ```text
 提交 issue（可以先开）→ 构建 hub 和 card-host → tools/octo doctor
@@ -78,25 +78,25 @@ tools/octo doctor
 | `hub publisher-verify` | 工作流、你和审核人员 | 6、8 | 验证 Release 的证明，并运行准入检查。 |
 | `hub publisher-entry` | 审核人员 | 8 | 生成候选签名目录条目；不发布任何内容。 |
 | `hub catalog-prepare`、`hub catalog-envelope`、`hub catalog-verify` | 管理员，通过受保护的签名目录工作流 | 9 | 准备、封装并验证签名的 `catalog-v2.json`（[GITHUB-PUBLISHING.zh-CN.md](GITHUB-PUBLISHING.zh-CN.md)）。 |
-| `hub keygen`、`hub pubkey`、`hub sign-manifest` | 你，仅限旧协议 Ed25519 应用 | 5 | 创建发布者密钥，并为清单签名（[签名](PUBLISHING.zh-CN.md#签名)）。 |
-| `hub publish`、`hub withdraw`、`hub remove`、`hub certify`、`hub verify` | 维护者，仅用于旧格式签名目录 | 9 | 在 `catalog.json` 中发布、撤回或删除版本，为它的工作密钥签发证书，或验证它。 |
+| `hub publish`、`hub withdraw`、`hub remove`、`hub certify`、`hub verify` | 维护者，用于旧格式签名目录；你只在演练签名目录时使用 | 9 | 在 `catalog.json` 中发布、撤回或删除版本，为它的工作密钥签发证书，或验证它。 |
+| `hub keygen`、`hub pubkey`、`hub sign-manifest` | 维护者，用于旧格式签名目录；你只在演练签名目录时使用 | — | 创建 Ed25519 密钥、输出公钥，或为旧格式清单签名。绝不要用它们为应用签名或发布应用：App Hub 只接受带 GitHub 证明的 Release。它们是否保留，由 [issue #168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168) 决定。 |
 
 App Flow 的 `tools/octo` 会替你运行其中几个命令，参数见其 [`tools/octo` 命令表](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/README.zh-CN.md#toolsocto)。
 
 | `tools/octo` 命令 | 运行的 `hub` 命令 |
 | --- | --- |
 | `new` | `hub stamp` |
-| `check` | 先 `hub stamp`，再 `hub check --allow-unsigned`，并把 `--catalog` 和 `--publisher-key` 原样传给 `hub check` |
+| `check` | 先 `hub stamp`，再 `hub check --allow-unsigned`，并把 `--catalog` 和其他 `hub check` 参数原样传给它 |
 | `doctor` | `hub help`，用来确认找到的正是这个 `hub` |
 | `publish-github` | 本身不运行：它安装 Release 工作流，推送标签时由该工作流运行 `hub publisher-prepare`、`hub publisher-attach`、`hub publisher-verify` 和 `hub publisher-pack` |
 
-在本地[商店演练](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)中，你还要用一次性密钥和旧格式测试签名目录，亲自运行 `hub keygen`、`hub certify`、`hub publish` 和 `hub verify`。
+在本地[商店演练](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)中，你还要对一个一次性的测试签名目录运行 `hub keygen`、`hub certify`、`hub publish` 和 `hub verify`。你在这里创建的密钥只为这个签名目录签名，从不为你的应用签名；演练也不会向 App Hub 发布任何内容。
 
 ### 应用能在哪里运行
 
 | 宿主 | 能运行 | 不能 |
 | --- | --- | --- |
-| `card-host` | 单个未签名的应用包，并提供远程控制接口，用于驱动和截图 | 提供用于发现宿主 API 的 `runtime` 以外的任何宿主服务：其他每个 `host.request` 都会失败，返回 `no service answers "<family>" on this device`。它也拒绝已签名的应用包，以及要求 `host-api-v1`、`backend-api-v1` 或 `script-tools-v1` 的应用。 |
+| `card-host` | 单个未签名的应用包，并提供远程控制接口，用于驱动和截图 | 提供用于发现宿主 API 的 `runtime` 以外的任何宿主服务：其他每个 `host.request` 都会失败，返回 `no service answers "<family>" on this device`。它也拒绝已封存的 Release，以及要求 `host-api-v1`、`backend-api-v1` 或 `script-tools-v1` 的应用。 |
 | RC1 发行版 `933abbcf` | 公开 v2 目录、`publisher-github-v1`、发现及已打开应用的 Splash 工具；宿主服务受平台限制 | 附带 OAuth 注册信息、默认启用 `wasm-lab`，或在其他系统上运行仅声明 macOS 的应用。Linux/Windows 的嵌入式后端登录及受保护写操作仍不支持；外部浏览器后端登录和读取另有实现。 |
 | 历史 desktop-v0.1.0-beta.2（macOS，Apple 芯片） | 已安装的应用，包括使用 `auth`、`github`、`gmail` 和 `gcalendar` 的应用 | 在宿主的 `oauth/clients.json` 中配好 OAuth 注册之前，登录 GitHub 或 Google（[配置方法](https://github.com/OctoSense-org/OctoSense/blob/desktop-v0.1.0-beta.2/crates/oauth-service/README.md)）；该发布版不附带任何注册信息。让应用登录它自己的后端。安装请求 `wasm` 的应用：它的商店会以 `unknown capability "wasm"` 拒绝。未在该发布版上验证：真实的提供商登录。 |
 | desktop-v0.1.0-beta.1 和 home-v0.1.0-beta.1（目前唯一发布的手机版本） | 所用能力都在旧版应用契约之内的商店应用 | 安装请求 `auth`、`github`、`gmail`、`gcalendar`、`calendar`、`photos`、`youtube`、`wasm` 或 `palpo.*` 的应用。它们的商店会拒绝这类应用，例如报 `unknown capability "auth"`。 |
@@ -110,41 +110,22 @@ RC1 发行版与历史 desktop beta.2 有以下不同。[下载发行文件并�
 - 应用 Agent 调用 `glance.publish` 时，宿主拒绝可执行的 Splash（`script`）和 L1 卡片源码。
 - 宿主只保留从 30 天前到 366 天后的 Google 日历日程，而不是日历的全部历史。
 
-想在提交前把应用装进 Shell 试用，可以先把它发布到本地签名目录（[演练步骤](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)）。演练只在从源码构建的 Shell 上验证过。
+想在 App Hub 发布之前试用应用的某个 Release，可以在从源码构建的 Shell 中，从本地测试签名目录安装它（[演练步骤](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)）。未验证：用带 GitHub 证明的 Release 进行演练。
 
 ### 确认你的平台
 
-- **macOS（Apple 芯片）**：当前公开示例使用兼容 RC1 发行版。安装、本地草稿和更新
-  与真实提供商效果是不同的验收范围，见[下载与账户限制](../README.zh-CN.md#下载兼容宿主)。
-- **Windows x64 / Linux x86_64**：RC1 安装包不会改变应用的
-  `listing.platforms`。当前四个示例只声明 macOS。原生浏览器和宿主测试不是你的
-  应用验收；每个声称支持的平台都要验证依赖和缺少服务时的状态。
-- Windows 使用 `python tools/octo`，它能找到 `.exe`。用[第 1 步的
-  `.gitattributes`](#1-安排仓库结构)保留应用包字节，再验证全新检出
-  （[第 6 步](#6-冻结并验证发布)）。
-- Linux WebReader 需要 GTK 3/WebKitGTK 和 X11/XWayland，不支持原生 Wayland。
-  Windows 使用 WebView2；这些引擎不随包附带。Linux/Windows 已实现外部浏览器
-  后端登录和清单声明的读取，这里未验收真实登录。嵌入式后端登录和受保护的
-  写操作仍不支持，会拒绝执行。见[浏览器要求](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/docs/desktop-embedded-browser.zh-CN.md)。
-
-### 保护发布者密钥
-
-**仅用于可选的旧协议兼容。** 使用 GitHub 发布的首次提交和更新均跳过本节，无需创建开发者签名密钥。
-
-本节只适用于历史 Ed25519 发布流程。新的 GitHub 发布者应用无需开发者签名密钥，请走[第 5 步](#5-生成最终字节)中的新路径。契约 1.8.0 已发布；[RC1 发行版](../README.zh-CN.md#下载兼容宿主)可以验证新证明，历史 beta 宿主不支持。
-
-发布者 ID 是你在签名目录中的名字；发布者密钥为你发布的每个版本签名。一旦有一个由这把密钥签名的版本进入签名目录，Hub 就只接受同一把密钥签名的后续版本。没有任何命令能替换丢失的密钥；万一丢失，请在 issue 中联系审核人员。
-
-> **警告：** 密钥文件是发布者密钥的唯一副本。把它放在所有仓库之外，做好备份，不要交给任何人。`hub keygen` 不会覆盖已有文件；在 macOS 和 Linux 上，它创建的密钥文件只有你自己能读取。在 Windows 上，请把密钥放在只有你的用户能读取的文件夹中。
+- **macOS（Apple 芯片）**：当前公开示例使用兼容 RC1 发行版。安装、本地草稿和更新与真实提供商效果是不同的验收范围，见[下载与账户限制](../README.zh-CN.md#下载兼容宿主)。
+- **Windows x64 / Linux x86_64**：RC1 安装包不会改变应用的 `listing.platforms`。当前四个示例只声明 macOS。原生浏览器和宿主测试不是你的应用验收；每个声称支持的平台都要验证依赖和缺少服务时的状态。
+- Windows 使用 `python tools/octo`，它能找到 `.exe`。用[第 1 步的 `.gitattributes`](#1-安排仓库结构) 保留应用包字节，再验证全新检出（[第 6 步](#6-冻结并验证发布)）。
+- Linux WebReader 需要 GTK 3/WebKitGTK 和 X11/XWayland，不支持原生 Wayland。Windows 使用 WebView2；这些引擎不随包附带。Linux/Windows 已实现外部浏览器后端登录和清单声明的读取，这里未验收真实登录。嵌入式后端登录和受保护的写操作仍不支持，会拒绝执行。见[浏览器要求](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/docs/desktop-embedded-browser.zh-CN.md)。
 
 ## 三个参考应用
 
-当前下载使用[公开目录表](../README.zh-CN.md#应用)中的 GitHub 证明 0.2.1 版本及新 ID。
-0.2.0 → 0.2.1 更新保持同一 GitHub 发布者身份，不需要开发者签名密钥。
+当前下载使用[公开签名目录表](../README.zh-CN.md#应用)中带 GitHub 证明的 0.2.1 版本及新 ID。0.2.0 → 0.2.1 更新保持同一 GitHub 发布者身份，不需要开发者签名密钥。
 
 ### 历史 0.1.x 示例
 
-签名目录第 10 版收录了发布者 `ymote` 的三个 macOS 开发者预览版，每个应用有两个版本：首个版本 0.1.0 和后续的 0.1.1，后者针对 [0.1.0 的教训](#010-的教训)中的三个问题做了改进。每个应用都有自己的公开仓库，标签为 `v0.1.0` 和 `v0.1.1`。下表描述的是 0.1.1：
+签名目录第 10 版收录了发布者 `ymote` 的三个 macOS 开发者预览版，每个应用有两个版本：首个版本 0.1.0 和后续的 0.1.1，后者针对 [0.1.0 的教训](#010-的教训)中的三个问题做了改进。这六个条目用发布者密钥签名；接替它们的是上文带 GitHub 证明的 0.2.x 版本。每个应用都有自己的公开仓库，标签为 `v0.1.0` 和 `v0.1.1`。下表描述的是 0.1.1：
 
 | | [GitHub Notes](https://github.com/ymote/octosense-github-notes) | [Inbox Assistant](https://github.com/ymote/octosense-inbox-assistant) | [Google Calendar](https://github.com/ymote/octosense-google-calendar) |
 | --- | --- | --- | --- |
@@ -171,23 +152,26 @@ App Flow 的[连接账户参考应用 README](https://github.com/OctoSense-org/O
 
 ## 1. 安排仓库结构
 
-Hub 只准入 `bundle/`。准入检查不读取仓库中的其他内容，但审核人员会打开你的隐私政策和支持页面。使用 GitHub 发布时，把 `.github/workflows/publish-app.yml` 与可编辑的 `bundle/` 一起 commit；无需 `publisher.json`。历史参考应用还附带了下面这些文件，审核人员都用到了。以 `v0.1.0` 的 GitHub Notes 为例：
+Hub 只准入 `bundle/`。准入检查不读取仓库中的其他内容，但审核人员会打开你的隐私政策和支持页面。把 Release 工作流 `.github/workflows/publish-app.yml` 与可编辑的 `bundle/` 一起 commit。应用仓库包含以下文件：
 
 ```text
-octosense-github-notes/
-  bundle/          提交的内容：清单、商店信息、代码、工具、素材、截图
-  PRIVACY.md       privacy_policy_url 指向的页面
-  SUPPORT.md       如何报告问题
-  README.md        应用做什么，以及如何验证 Release
-  publisher.json   历史 Ed25519 发布者 ID、算法和公钥
-  review/          签名后应用包的准入检查输出（GATE.txt）和扫描问题的回答（ANSWERS.md）
+my-app/
+  bundle/                             提交的内容：清单、商店信息、代码、工具、素材、截图
+  .github/workflows/publish-app.yml   Release 工作流
+  .gitattributes                      防止 Git 转换应用包的字节
+  PRIVACY.md                          privacy_policy_url 指向的页面
+  SUPPORT.md                          如何报告问题
+  README.md                           应用做什么，以及如何验证 Release
+  review/                             准入检查输出（GATE.txt）和扫描问题的回答（ANSWERS.md）
   LICENSE, NOTICE
-  .gitignore       把密钥、build/ 和 .local-state/ 挡在 Git 之外
+  .gitignore                          把 build/ 和 .local-state/ 挡在 Git 之外
 ```
+
+[GitHub Notes 0.2.1](https://github.com/ymote/octosense-github-notes/tree/v0.2.1) 采用的就是这种结构。其中的 `publisher.json` 是 0.1.x 留下的，你不需要这个文件。
 
 开发 README、密钥、审核包和 `.local-state/` 放在 `bundle/` 之外。素材要求保留的许可证和来源说明应以 `.txt` 或 `.md` 随包提供；这些文档中的链接不会授予网络权限。准入检查会按规则检查应用包中的每个文件，并计入 8 MiB 的大小上限。`tools/octo new` 生成的 `.gitignore` 已经排除了 `build/`、`.local-state/` 和 `*.key`。
 
-添加一个 `.gitattributes` 文件，让 Git 原样保存和检出应用包的字节。参考应用没有这个文件，所以检出时只要设置了 `core.autocrlf=true`（Windows 上很常见），Git 就会把它们的文本文件转换成 CRLF 换行，连摘要也对不上。
+添加一个 `.gitattributes` 文件，让 Git 原样保存和检出应用包的字节。参考应用的 0.1.x 标签没有这个文件，所以检出时只要设置了 `core.autocrlf=true`（Windows 上很常见），Git 就会把它们的文本文件转换成 CRLF 换行，连摘要也对不上。
 
 ```sh
 cd ~/apps/my-app
@@ -201,7 +185,7 @@ Git 从仓库根目录开始匹配这个模式，所以 `bundle/**` 只覆盖根
 
 ## 2. 写对清单
 
-编辑 `bundle/manifest.json`。下面是 GitHub Notes 0.1.0 在写入摘要和签名之前的清单：
+编辑 `bundle/manifest.json`。下面是 GitHub Notes 0.1.0 在写入摘要之前的清单：
 
 ```json
 {
@@ -230,7 +214,7 @@ hub stamp bundle
 
 ## 3. 撰写商店信息
 
-`bundle/listing.json` 是商店在安装前展示给用户的内容。发布者签名通过应用包摘要覆盖了它，所以以后哪怕改一个字，也要发布新版本。不要写任何会过时的内容。
+`bundle/listing.json` 是商店在安装前展示给用户的内容。Release 的 GitHub 证明通过应用包摘要覆盖了它，所以以后哪怕只改一个字，也需要新版本。不要写任何会过时的内容。
 
 | 字段 | 规则 | 参考应用 |
 | --- | --- | --- |
@@ -248,7 +232,7 @@ hub stamp bundle
 
 提交之前先写好隐私政策。说明哪些数据会离开设备、去往哪里：通过宿主服务访问的提供商 API、发给用户所选模型提供商的文本、速览卡片，以及应用是否带有应用 Agent。GitHub Notes 发布 0.1.0 之后修订过隐私政策，因为它的 `tools.json` 带来了一个政策中没有提到的应用 Agent。
 
-签名之前，先检查商店信息中的链接；标签推送之后再发现 URL 有误，就只能发布新版本来修正。先公开隐私政策页面，再逐个请求 `publisher` 字段中的 URL：
+推送标签之前，先检查商店信息中的链接；推送之后再发现 URL 有误，就只能用新版本来修正。先公开隐私政策页面，再逐个请求 `publisher` 字段中的 URL：
 
 ```sh
 python3 -c 'import json; p = json.load(open("bundle/listing.json"))["publisher"]; print(p["privacy_policy_url"]); print(p["support"])' \
@@ -292,18 +276,14 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 
 ## 5. 生成最终字节
 
-新应用的首次提交及其所有更新，都要使用公开仓库的 GitHub 发布者来源证明。OctoScript 应用默认开放：每个应用包本来就以可读文本的形式附带应用源码，所以公开仓库也不会多暴露多少内容（[ADR 0002](adr/0002-github-attested-publisher-identity.zh-CN.md)）。这条路径需要应用契约 1.8.0，以及支持 `publisher-github-v1` 的宿主。一个测试应用的两个 Release 均由标签推送生成，并通过了原生商店的安装、更新和启动检查（[证据与限制](PUBLISHING.zh-CN.md#github-发布者来源证明)）。如需当前的公开签名目录，请使用 [RC1 发行版](../README.zh-CN.md#下载兼容宿主)。
+应用的首个 Release 和每次更新，都要使用公开仓库的 GitHub 发布者来源证明；这是 App Hub 接受的唯一路径。OctoScript 应用默认开放：每个应用包本来就以可读文本的形式附带应用源码，所以公开仓库也不会多暴露多少内容（[ADR 0002](adr/0002-github-attested-publisher-identity.zh-CN.md)）。这条路径需要应用契约 1.8.0，以及支持 `publisher-github-v1` 的宿主。一个测试应用的两个 Release 均由标签推送生成，并通过了原生商店的安装、更新和启动检查（[证据与限制](PUBLISHING.zh-CN.md#github-发布者来源证明)）。如需当前的公开签名目录，请使用 [RC1 发行版](../README.zh-CN.md#下载兼容宿主)。
 
 1. 如果尚未开提交 issue，现在就可以开。Release 证据可以稍后补充；未完成的检查标为待完成，不要编造通过结果。
 2. 测试未签名的开发副本并截取真实界面。运行准入检查和 `hub scan bundle --packet build/review.json`，其中 `build/` 位于应用包外。逐题回答审核包中的问题：共七题，带 `tools.json`、`AGENT.md` 或技能时为八题。注明每个回答依据的文件及未测试的行为。
-3. 用 App Flow 的 `tools/octo publish-github <app-directory>` 安装并评审 `.github/workflows/publish-app.yml`（`tools/octo new` 也会提供）。此路径不需要 `keygen`、`sign-manifest`、`--publisher-key` 或仓库签名 Secret。原生命令见 [GitHub 发布者来源证明](PUBLISHING.zh-CN.md#github-发布者来源证明)。
+3. 用 App Flow 的 `tools/octo publish-github <app-directory>` 安装并评审 `.github/workflows/publish-app.yml`（`tools/octo new` 也会提供）。工作流不需要发布者密钥，也不需要仓库签名 Secret。原生命令见 [GitHub 发布者来源证明](PUBLISHING.zh-CN.md#github-发布者来源证明)。
 4. Commit 测试过的开发源码、截图、商店信息、隐私政策/支持页面、`.gitattributes` 和工作流。每个 Release 使用新的语义版本和精确的 `v<manifest.version>` 标签。工作流生成带证明的清单及最终 Release pack；不要把生成的字节覆盖提交到开发源码中。
 
-常规更新保留相同的仓库名、不可变仓库/所有者 ID 和工作流身份，并提高语义版本。更新同样无需发布者私钥。历史 Ed25519 应用身份继续使用原协议；这不是转移应用归属的流程。
-
-### 可选的历史 Ed25519 路径
-
-只有明确选择兼容已有旧协议包或旧协议时才走这条路径。密钥管理与命令见[签名](PUBLISHING.zh-CN.md#签名)。带日期的 [0.1.0 准入记录](../reviews/connected-apps-0.1.0/admission.json)和 [0.1.1 记录](admissions/connected-apps-0.1.1/README.zh-CN.md)保持原样。它们是历史证据，不是要求新开发者创建密钥的步骤。不要给已封存的 Release 重新写入摘要；从未签名开发副本开始，发布一个新版本。
+常规更新沿用相同的仓库名、工作流，以及不可变的仓库 ID 和所有者 ID，并提高语义版本。绝不要给已封存的 Release 重新写入摘要：修改可编辑源码，再用新版本生成 Release。
 
 ## 6. 冻结并验证发布
 
@@ -322,15 +302,15 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
    `review-bundle` 必须是尚不存在的目录。使用当前经过认证的目录，且拟提交版本尚未准入；这会同时核对发布者连续性和版本递增。保留完整验证输出及精确工具版本。拒绝结果是需要修复的问题，不能靠删除证明或添加 `--allow-unsigned` 绕过。
 4. 在已有的提交 issue 中补充这些产物及测试证据。审核人员会验证源码 commit 和下载的 pack。Release 工作流成功并不等于安装、提交或批准应用。
 
-只有可选的旧协议包才需要按[签名](PUBLISHING.zh-CN.md#签名)一节，用登记的公钥检查已签名源码标签的全新克隆。带 GitHub 证明的 Release 不需要这种密钥检查。
-
 ## 7. 开提交 issue
 
-使用 [Submit an app 表单](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/new?template=submit-app.yml)，每个计划版本开一个 issue，标题为 `Submit <app id> <version>`。开这个 issue，就是请求发布该版本。**第 1–6 步尚未完成时也可以先开。** 准备好后，在同一个 issue 中补充 Release 证据；待完成字段不代表获得批准。
+使用 [Submit an app 表单](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/new?template=submit-app.yml)，标题为 `Submit <app id> <version>`。开这个 issue，就是请求发布这个应用。**第 1–6 步尚未完成时也可以先开。** Release 证据准备好后，补充到同一个 issue 中；待完成字段不代表获得批准。
+
+在 App Hub 首次发布你的应用之前，始终使用这一个 issue：每个新 Release 都以评论的形式发在其中，写明它的标签、完整的 commit SHA 和工作流运行链接。首次发布之后，每个新版本都要开新 issue（见[第 9 步](#9-提交之后)）。
 
 | 表单字段 | 何时提供什么 |
 | --- | --- |
-| Release status（Release 状态） | 现在：证据待补充、GitHub Release 已准备好，或可选的旧协议包 |
+| Release status（Release 状态） | 现在：证据待补充，或 GitHub Release 已准备好 |
 | App id / Version / Repository URL（ID/版本/仓库） | 现在：清单 ID、计划版本及公开 GitHub 仓库 |
 | Requested capabilities and app behavior（能力与行为） | 现在：应用用途及每项能力的理由 |
 | What is not verified（未验证项） | 现在及每次更新后：未完成检查、宿主/平台/提供商限制 |
@@ -342,7 +322,6 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 | Platforms tested / App Hub revision the gate ran on（平台/工具版本） | 批准前：精确宿主/工具版本和已测试行为 |
 | Gate and publisher verification output（准入与证明验证） | 批准前：完整开发准入检查及下载 pack 的验证输出 |
 | Scan answers / Screenshots（扫描回答/截图） | 批准前：附源码依据的完整回答及真实原生截图 |
-| Optional legacy authentication（可选旧协议认证） | 只用于明确选择的历史 Ed25519 包；GitHub Release 及其更新均留空 |
 | Confirmations（确认项） | 无机密、推送后标签不可变、如实列出待完成证据 |
 
 不要开修改 `catalog.json`、`catalog-v2.json`、`index/` 或 `artifacts/` 的 PR。审核后的签名目录发布是 App Hub 管理员的独立[受保护 GitHub 工作流](GITHUB-PUBLISHING.zh-CN.md)。
@@ -356,7 +335,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 | 标签解析到所声明的 commit | `tag_verified` | `git ls-remote`（第 6 步） |
 | 隐私政策和支持地址返回 HTTP 200 | `public_privacy_and_support_http` | 第 3 步的链接检查 |
 | Release 下载文件与哈希值一致 | `release_download_hashes_match` | 创建了 Release 时：`shasum -a 256 -c SHA256SUMS` |
-| 下载的应用包上，发布者签名验证通过 | `downloaded_publisher_signature_verified` | 历史 Ed25519 全新克隆检查；GitHub Release 按第 6 步验证下载的 pack |
+| 下载的 Release 上，发布者的证明验证通过 | `downloaded_publisher_signature_verified` | 对下载的 pack 先运行 `hub publisher-unpack`，再运行 `hub publisher-verify`（第 6 步） |
 | 下载的应用包通过准入检查 | `downloaded_gate_output` | 同上 |
 | 应用包摘要与 issue 中的一致 | `bundle_digest` | `integrity.bundle_blake3` |
 
@@ -370,9 +349,9 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 
 检查通过后，由 App Hub 管理员审核这次提交并批准；未经批准，Hub 不会发布任何内容。随后，管理员运行受保护的[签名目录工作流](GITHUB-PUBLISHING.zh-CN.md)：工作流准入审核过的原样字节，让 GitHub Actions 用 Sigstore 为新的 `catalog-v2.json` 签名，再把它 commit 到 `main`。之后，用户就能在读取 `catalog-v2.json` 并支持 `publisher-github-v1` 的 OctoSense 构建中搜索、安装和运行这个应用。例如 [RC1 发行版](../README.zh-CN.md#下载兼容宿主)。历史 desktop-v0.1.0-beta.2 只读取 `hub publish` 生成的旧格式 `catalog.json`。
 
-- 审核人员关闭 issue 时，会注明应用所在的签名目录版本号，或者列出需要修复的问题。在 issue 中回答提问，但不要改动标签所指的内容。
-- **更新就是新版本加新 issue。** 要修复问题或推出改动：提高 `version` 并开一个链接旧 issue 的新 issue，可以先于 Release。重做第 4 到 6 步（界面有变化时才需要第 4 步），然后在新 issue 中补充这个 Release 的证据。不要在评论中提交新版本。Hub 从不替换已发布的版本。
-- GitHub 更新保留已登记的仓库/所有者/工作流身份，提高语义版本并运行同一标签工作流，无需单独的开发者私钥。只有历史 Ed25519 包继续使用登记的密钥（[可选旧协议说明](#保护发布者密钥)）。
+- 审核人员会在 issue 中列出需要修复的问题；应用进入签名目录后，审核人员关闭 issue，并注明应用所在的签名目录版本号。在 issue 中回答提问，但不要改动标签所指的内容。
+- **首次发布之前，每个新 Release 都发在同一个 issue 中。** 要修复问题，就提高 `version` 并重做第 4 到 6 步（界面有变化时才需要第 4 步），然后在提交 issue 中发评论，写明新的标签、完整的 commit SHA 和工作流运行链接。
+- **发布之后，每个新版本都要开新 issue。** 提高 `version`，开一个新 issue，链接前一个 issue（新 issue 可以先于 Release 开），重做第 4 到 6 步，然后在新 issue 中补充这个 Release 的证据。Hub 从不替换已发布的版本。
 - 维护者 commit 经过审核的撤回候选之后，App Hub 管理员可以通过同一个受保护的工作流，发布附带理由的签名目录撤回记录。各商店下次拉取签名目录时，会停止运行该版本已安装的副本；其他版本不受影响。如需撤回，请开一个 issue，写明应用 ID、版本和要向用户展示的理由。撤回的版本号不能再用，修复请以新版本发布。
 
 ## 常见拒绝原因及修复
@@ -382,9 +361,8 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 | 检查项或消息 | 原因 | 修复 |
 | --- | --- | --- |
 | `digest: the bundle hashes to …, the manifest claims …` | 写入摘要之后字节变了：有改动、在 commit 之后才写入摘要（`tools/octo check` 会重新写入）、Git 检出产生了 CRLF 换行，或者用了比 `main` 旧的 Windows 版 `hub`（它用 `\` 拼接路径来计算摘要）。 | 从 `main` 构建 `hub`，加上[第 1 步](#1-安排仓库结构)的 `.gitattributes`，然后为开发源码重新写入摘要并生成新的 GitHub 证明版本，验证下载的 pack；不要给已封存的 Release 重新写入摘要。 |
-| `publisher-signature: publisher key "<id>" is not registered with this hub` | 仅可选的旧 Ed25519 路径：检查或扫描已签名包时没有提供密钥；加 `--allow-unsigned` 或通过 `tools/octo check` 运行也一样。 | 传入 `--publisher-key <publisher-id>=<hex public key>`。 |
-| `publisher-signature: the signature from key "<id>" does not match the manifest` | 仅可选的旧 Ed25519 路径：签名字节发生变化。 | 从未签名开发源码重建，用登记的密钥签一个新版本。 |
-| `continuity: not signed by the key on record for "<id>"`，或 `continuity: … is already published by "<id>"; an update must carry that key` | 仅可选的旧 Ed25519 路径：该发布者 ID 已登记了另一把密钥（要么是别人的 ID，要么是你的旧密钥），或者更新没有签名。 | 首个应用换一个没人用过的 ID；每次更新都用已登记的密钥签名。 |
+| `continuity: existing legacy app ownership cannot be adopted by GitHub provenance` | 该 ID 已登记给未签名或用密钥签名的应用，例如照搬的 `org.octosense.samples.*` ID。 | 换一个新 ID。 |
+| `continuity: GitHub publisher repository, owner or workflow changed` | 更新来自另一个仓库、所有者或工作流文件，或者仓库已重命名或转移。 | 用已登记的仓库和工作流生成 Release。重命名或转移后的仓库不能再更新这个应用；请换用新 ID 发布。 |
 | `version: version … is already published; publish a new version` | 该版本已在签名目录中。 | 提高 `version`，使用新标签并验证工作流生成的新 Release pack（第 5、6 步）。 |
 | `policy: app … requests unknown capability "<name>"` | 名称不在契约中（`contacts`、`model.image`，或 `octos.` 这样的前缀），或者你的 `hub` 太旧，还不认识这个能力。 | 使用[发布参考](PUBLISHING.zh-CN.md#清单)中的确切名称，并从 `main` 重新构建 `hub`。 |
 | `hub: manifest is not valid: unknown field …`，没有报告 | `hub stamp` 和 `hub check` 无法解析清单。 | 删除该字段，或改用正确的字段名。消息中列出了合法字段。 |
@@ -399,7 +377,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 | `entry (main.splash): the bundle has no entry: …` | 应用包根目录下既没有 `main.splash`，也没有 `page.card`。 | 把入口文件放在 `bundle/` 的根目录。 |
 | `secrets: <file> declares is_password:true: …` | 声明了密码或一次性验证码字段。 | 删除它。登录由宿主服务负责。 |
 | `agent: AGENT.md is in the bundle but agent.instructions does not name it` | 有 Agent 文件，却没有对应的 `agent` 声明。 | 在 `agent` 中声明 `"instructions": "AGENT.md"`，或删除该文件。 |
-| `card-host: refused: no signature verifier is installed, so the signature from key "<id>" cannot be checked` | `card-host` 只运行未签名的应用包。 | 用未签名的副本运行和截图，最后再签名（[第 5 步](#5-生成最终字节)）。 |
+| `card-host: refused: this host has no GitHub publisher verifier` | `card-host` 只运行未签名的应用包，从不运行已封存的 Release。 | 用可编辑源码运行和截图；Release 由你的 Release 工作流封存（[第 5 步](#5-生成最终字节)）。 |
 
 ## Hub 目前做不到的事
 
