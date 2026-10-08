@@ -91,9 +91,8 @@ registration.
   and a closed app answers `app_not_running`.
 - **Platforms.** The device-permission methods cover Android and macOS, and
   `location.get` covers Android only. It returns the last-known fix, of
-  unknown age. OctoSense `main`, not yet in any release, embeds `WebReader`
-  on Linux (X11 or XWayland, with WebKitGTK installed) and Windows (with the
-  WebView2 Runtime installed), but not under native Wayland.
+  unknown age. `WebReader` opens embedded pages only on macOS, iOS and
+  Android; on other platforms, OctoSense answers `open` with `false`.
 - **Permission requests.** Only an app in the foreground can request a
   permission. A request from an agent or a background card fails with
   `<method> is unavailable to agents/background surfaces`. A request still

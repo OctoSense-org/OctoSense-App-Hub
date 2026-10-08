@@ -192,7 +192,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | `storage` | 应用自己的存储文件夹：`fs.*`、相机拍摄的内容，以及控件读取的本地文件。没有它，所有 `fs.*` 调用都会失败。 | Keep its own data on this device | 运行时，所有宿主都提供 |
 | `net` | 向 `network.hosts` 中的主机发出请求，不能访问其他主机。 | Reach only: *主机列表* | 运行时，所有宿主都提供 |
 | `images` | 显示任何公开 https 主机上的图片，不限于 `network.hosts`。 | Show pictures from any website | 运行时 |
-| `web` | 在系统网页视图中打开任何公开 https 页面；网页视图没有任何回到应用的通道。 | Open web pages in a browser view | 运行时，macOS、iOS 和 Android 构建都提供。桌面版 Linux 和 Windows 构建中，只有 OctoSense `main`（尚未进入任何发布版）提供：Linux 须在 X11 或 XWayland 下运行并安装 WebKitGTK，Windows 须安装 WebView2 Runtime。 |
+| `web` | 在系统网页视图中打开任何公开 https 页面；网页视图没有任何回到应用的通道。 | Open web pages in a browser view | 运行时，macOS、iOS 和 Android 构建都提供。OctoSense 的桌面版 Linux 和 Windows 构建没有网页视图：`open` 返回 `false`。 |
 | `location` | 设备的位置。仅在 OctoSense `main` 上：声明了 `host-api-v1` 的应用须先用 `location.permission.request` 请求权限，之后在 Android 上可以用 `location.get` 读取上次已知的位置（[宿主 API 兼容性](HOST-API.zh-CN.md)）。 | Use your location | 运行时，限具备该功能的设备 |
 | `camera` | 相机。拍摄的内容保存在应用的存储中，所以应用还需要 `storage`。仅在 OctoSense `main` 上：声明了 `host-api-v1` 的应用须先用 `camera.permission.request` 请求权限。 | Use the camera | 运行时，限具备该功能的设备 |
 | `microphone` | 相机录像时的声音。仅在 OctoSense `main` 上：声明了 `host-api-v1` 的应用须先用 `microphone.permission.request` 请求权限。 | Use the microphone | 运行时，限具备该功能的设备 |
