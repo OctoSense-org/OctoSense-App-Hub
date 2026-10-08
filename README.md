@@ -111,7 +111,7 @@ are in [AGENTS.md](AGENTS.md).
 
 ## What hosts serve today
 
-The gate admits 104 capability names, but a capability works only where a host
+The gate admits 105 capability names, but a capability works only where a host
 serves it. [Capabilities](docs/PUBLISHING.md#capabilities) lists who serves
 each one today.
 
