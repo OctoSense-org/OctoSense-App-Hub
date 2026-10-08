@@ -4,8 +4,8 @@ English | [简体中文](FIRST-APP.zh-CN.md)
 
 You start from a template and finish with an unsigned bundle that runs in
 `card-host` and passes the gate, the admission checks that `hub check` runs.
-[Submit an app to the App Hub](SUBMITTING.md) then takes it from signing to the
-submission issue.
+[Submit an app to the App Hub](SUBMITTING.md) then takes it through the four
+stages of a submission, from request to publication.
 
 A Hub app is one of two kinds, and both are submitted the same way:
 
@@ -342,26 +342,26 @@ hub: the bundle was refused
 `PASSED` means the bundle meets the admission rules. `hub check` does not run
 the app, catch placeholder text or check your privacy policy.
 
-## 6. Sign and submit
+## 6. Release and submit
 
-Continue with [Submit an app to the App Hub](SUBMITTING.md) from its step 5:
+Continue with steps 5 to 9 of [Submit an app to the App Hub](SUBMITTING.md):
 
 | Step | What you do |
 | --- | --- |
-| [5. Produce the final bytes](SUBMITTING.md#5-produce-the-final-bytes) | Scan the bundle, make your publisher key, sign last, and check the signed bytes. |
-| [6. Freeze and verify the release](SUBMITTING.md#6-freeze-and-verify-the-release) | Commit, tag, and check a fresh clone of the tag. |
-| [7. Open the submission issue](SUBMITTING.md#7-open-the-submission-issue) | Submit the repository, the tag, the full commit SHA and the gate output. |
-| [8. What reviewers check](SUBMITTING.md#8-what-reviewers-check) | See what a reviewer checks beyond the gate. |
-| [9. After you submit](SUBMITTING.md#9-after-you-submit) | Answer findings, and ship updates as new versions. |
+| [5. Produce the final bytes](SUBMITTING.md#5-produce-the-final-bytes) | Scan the bundle, answer the review questions and add the GitHub release workflow. |
+| [6. Freeze and verify the release](SUBMITTING.md#6-freeze-and-verify-the-release) | Commit, push a new tag and verify the release pack that the workflow builds. |
+| [7. Open the submission issue](SUBMITTING.md#7-open-the-submission-issue) | Request publication, then add the tag, the full commit SHA, the release pack and the verification output. |
+| [8. What reviewers check](SUBMITTING.md#8-what-reviewers-check) | See what a reviewer checks; the findings appear in your issue. |
+| [9. After you submit](SUBMITTING.md#9-after-you-submit) | See how an App Hub admin approves and the Hub publishes, and ship updates as new versions. |
 
 Two rules hold throughout:
 
-- **Sign last.** Any edit after signing means stamping and signing again
-  ([Signing](PUBLISHING.md#signing)).
-- **Make your publisher key once, outside every repository.**
-  `hub keygen <key-file>` creates the key and prints its public half, and
-  `hub pubkey <key-file>` prints that again later. `hub keygen` refuses to
-  overwrite an existing file, so running it again cannot replace your key.
+- **Test the editable source, and never edit a sealed release.** The workflow
+  seals the bytes it releases; any change needs a new version and tag
+  ([GitHub publisher provenance](PUBLISHING.md#github-publisher-provenance)).
+- **You need no publisher key.** Your app's GitHub workflow attests each
+  release. Only an app already published with an Ed25519 key keeps signing
+  with that key ([Signing](PUBLISHING.md#signing)).
 
 To try the app in OctoSense desktop before you submit, publish it to a local
 catalog with a throwaway anchor
