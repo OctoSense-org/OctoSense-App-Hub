@@ -701,6 +701,12 @@ The person is never asked twice for one call. A destructive tool may still say
 approval. `confirm: "app"` on a tool that is neither destructive nor outward
 confirms nothing, and the gate warns about it.
 
+Only a native app, such as Rinx, has a confirmation screen of its own today.
+In a store app, the gate refuses `confirm: "app"` on a `host-service` tool,
+and OctoSense refuses a destructive or outward call to a script tool that says
+it ([Script tool execution](#script-tool-execution-script-tools-v1)). Keep the
+default.
+
 ### `AGENT.md` and skills
 
 `AGENT.md` is the agent's role and instructions: what to do on each trigger,
