@@ -94,6 +94,8 @@ jobs:
         with:
           name: prepared-catalog-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/prepared/
+          # Admission hashes every bundle file, including reviewed dotfiles.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
 
