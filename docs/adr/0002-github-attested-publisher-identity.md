@@ -66,8 +66,8 @@ GitHub-attested releases, for new apps and for updates.
   or GitHub Release alone submits and approves nothing: an App Hub admin
   approves each version and publishes it through the protected catalog
   workflow of ADR 0001.
-- **Existing apps.** The six key-signed reference entries were withdrawn in
-  catalog sequence 14 in favor of their GitHub-attested successors
+- **Existing apps.** Catalog sequence 14 marked the six key-signed reference
+  entries withdrawn in favor of their GitHub-attested successors
   ([amendment](#amendment-2026-10-08)). GitHub provenance cannot take over an
   app on record as unsigned or key-signed, and an app published with GitHub
   provenance cannot fall back to a key or to unsigned releases.
@@ -133,9 +133,10 @@ App Hub closed the Ed25519 publisher-key route to new apps and to updates. No
 third-party app had been published with a key.
 
 - App Hub accepts only GitHub-attested releases (`publisher-github-v1`).
-- The six key-signed reference entries were withdrawn from `catalog-v2.json`
-  in catalog sequence 14, published on 2026-10-08
-  ([run 37852340163](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37852340163)):
+- Catalog sequence 14, published on 2026-10-08
+  ([run 37852340163](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37852340163)),
+  marked the six key-signed reference entries withdrawn in `catalog-v2.json`;
+  the entries stay in the catalog with `status.state` set to `withdrawn`:
   `org.octosense.samples.githubnotes`, `org.octosense.samples.inbox` and
   `org.octosense.samples.googlecalendar`, each at 0.1.0 and 0.1.1, from the
   publisher `ymote`. Their GitHub-attested successors are the
