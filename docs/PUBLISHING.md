@@ -1182,8 +1182,12 @@ the full proofs, and refused content/proof/identity tampering, rollback,
 unsigned ownership replacement and withdrawn releases. The [receipt](../reviews/github-publisher-v1/acceptance.json)
 binds the input hashes and native source. Its Store catalog was an ephemeral
 local test catalog; the fixture has no App Hub submission or catalog entry.
-This does not establish app UI execution, phone publisher installation or a
-compatible host release.
+This does not establish app UI execution or phone publisher installation.
+[OctoSense desktop RC1](../README.md#download-a-compatible-host) is a
+compatible host release: on macOS, it installs the GitHub-attested sample apps
+in catalog sequence 13 and checks their attestations and publisher continuity
+at install and update. Store installs on iOS, Windows and Linux remain
+unverified, and no released phone build supports `publisher-github-v1`.
 
 Download the **release pack**, which contains the generated attested manifest;
 a source checkout alone does not contain those final bytes. A reviewer can

@@ -7,10 +7,7 @@ App Hub 仓库管理员批准目录的确切摘要。GitHub Actions 使用短期
 保存额外的 Hub 私钥。这是 GitHub 管理的制品签名，不是 SSH 签名，
 也不是 commit 上的绿色 Verified 标记。
 
-**交付状态：** [生产工作流 37736098082](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37736098082)
-已在 commit `27eeec5b3abc3f9c2aa06a3894bab2f15228f116` 发布序号 11 的目录。
-本源码让新兼容宿主默认选择 GitHub 渠道；更新后的 OctoSense 二进制版本仍待发布。
-旧已安装宿主及参考应用的包字节保持原样。确切证明和消费者证据见“验证”。
+**交付状态**：[生产工作流 37736098082](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37736098082) 已在 commit `27eeec5b3abc3f9c2aa06a3894bab2f15228f116` 发布序号 11 的签名目录。此后的运行又发布了序号 12 和 13，其中序号 13 由[工作流 37755718288](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37755718288) 在 commit `3842c5ec503a8e9124cbbe99655556ffe24c41e1` 发布。本源码让新兼容宿主默认选择 GitHub 渠道；2026-10-08 推出的 [OctoSense 桌面版 0.1.0-rc.1](../README.zh-CN.md#下载兼容宿主) 是兼容的宿主发行版，默认读取 `catalog-v2.json`。已安装的旧宿主及参考应用的包字节保持原样。序号 11 的确切证明和消费者证据见“验证”。
 
 ## 谁能批准发布
 
