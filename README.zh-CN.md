@@ -82,12 +82,12 @@ OCTOSENSE_PREVIEW_SIZE=1200x860 OCTOSENSE_APP_DATA="$(mktemp -d)" target/release
 - 除了用于发现宿主 API 的 `runtime`，`card-host` 不提供任何宿主服务，也不运行 Agent。
 - OctoSense 向每个获得授权的应用提供 `mail`、`model` 和 `glance`。
 - 宿主配置好 OAuth 客户端注册信息后，OctoSense 桌面版 0.1.0-beta.2 提供已连接账户相关的能力（`auth`、`github`、`gcalendar`、`gmail`）。令牌留在宿主中，应用只拿到连接句柄。
-- [OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360) 的实现（`feat/host-api-contract`，尚未发布）能在 macOS 和 Android 上通过 `auth` 让应用登录清单声明的后端，并执行清单列出的后端操作。每次写操作都要等用户确认（[登录应用自己的后端](docs/PUBLISHING.zh-CN.md#登录自己的后端)）。
-- 该 PR 还在 macOS 和 Android 上向声明了 `host-api-v1` 和相应能力的应用提供设备权限方法：`camera.permission.*`、`microphone.permission.*` 和 `location.permission.*`，各含 `status`、`request` 和 `revoke`。在 Android 上，它还提供 `location.get`。只有在前台的应用才能请求权限，并由用户在宿主面板上批准，如果操作系统要求，还要在系统提示中确认（[宿主 API 兼容性](docs/HOST-API.zh-CN.md)）。
+- OctoSense `main`（尚未进入任何发布版本）还能在 macOS 和 Android 上通过 `auth` 让应用登录清单声明的后端，并执行清单列出的后端操作。每次写操作都要等用户确认（[登录应用自己的后端](docs/PUBLISHING.zh-CN.md#登录自己的后端)）。
+- OctoSense `main` 还在 macOS 和 Android 上向声明了 `host-api-v1` 和相应能力的应用提供设备权限方法：`camera.permission.*`、`microphone.permission.*` 和 `location.permission.*`，各含 `status`、`request` 和 `revoke`。在 Android 上，它还提供 `location.get`。只有在前台的应用才能请求权限，并由用户在宿主面板上批准，如果操作系统要求，还要在系统提示中确认（[宿主 API 兼容性](docs/HOST-API.zh-CN.md)）。
 - OctoSense `main` 还要求亲手点按才能批准 GitHub 或 Google 日历的保存，拒绝应用 Agent 发布可执行 Splash（`script`）卡片，并且只保留从 30 天前到 366 天后的 Google 日历日程（尚未进入任何发布版本）。OctoSense 桌面版 0.1.0-beta.2 不具备其中任何一项。
 - OctoSense 只向自己的系统应用提供 `calendar`、`llm` 和 `news`。对于 `photos` 和 `youtube`，它只向 `os.photos` 和 `os.youtube` 提供一个 `notify` 方法。尚未提供：面向商店应用的媒体服务。
 - OctoSense 运行应用 Agent 已获授权的 `implemented_by: "host-service"` 工具，包括用 `host_method` 映射到已审核共享服务的工具，并把 `AGENT.md` 和技能作为指引加载（[应用的 Agent 与工具](docs/PUBLISHING.zh-CN.md#应用的-agent-与工具)）。
-- 目前还没有任何 OctoSense 发布版本运行 `implemented_by: "app"` 的工具：桌面版 0.1.0-beta.2 会拒绝它们，返回 `app_tool_unavailable`。PR #360 的实现提供 `app_tools.dispatch@1`，会在已打开的应用中运行这类工具，前提是应用声明了 `requires: ["script-tools-v1"]`；应用关闭时返回 `app_not_running`（[脚本工具执行](docs/PUBLISHING.zh-CN.md#脚本工具执行script-tools-v1)）。
+- 目前还没有任何 OctoSense 发布版本运行 `implemented_by: "app"` 的工具：桌面版 0.1.0-beta.2 会拒绝它们，返回 `app_tool_unavailable`。OctoSense `main` 提供 `app_tools.dispatch@1`，会在已打开的应用中运行这类工具，前提是应用声明了 `requires: ["script-tools-v1"]`；应用关闭时返回 `app_not_running`（[脚本工具执行](docs/PUBLISHING.zh-CN.md#脚本工具执行script-tools-v1)）。
 
 ## 信任锚
 

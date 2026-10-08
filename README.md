@@ -121,13 +121,12 @@ each one today.
 - OctoSense desktop 0.1.0-beta.2 serves the connected-account capabilities
   (`auth`, `github`, `gcalendar`, `gmail`) once the host has OAuth client
   registrations. Tokens stay with the host; apps get connection handles.
-- The implementation in [OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360)
-  (`feat/host-api-contract`, not yet released) signs an app in through
+- OctoSense `main`, not yet in any release, also signs an app in through
   `auth` to the backend that its manifest declares, on macOS and Android. It
   then runs the backend operations that the manifest names, and each write
   waits for the person's review
   ([Sign in to your own backend](docs/PUBLISHING.md#sign-in-to-your-own-backend)).
-- That PR also serves the device-permission methods on macOS and
+- OctoSense `main` also serves the device-permission methods on macOS and
   Android to an app that declares `host-api-v1` and the matching capability:
   `camera.permission.*`, `microphone.permission.*` and
   `location.permission.*`, each with `status`, `request` and `revoke`. On
@@ -148,8 +147,8 @@ each one today.
   `host_method`, and loads `AGENT.md` and skills as guidance
   ([The app's agent and tools](docs/PUBLISHING.md#the-apps-agent-and-tools)).
 - No OctoSense release runs `implemented_by: "app"` tools yet: desktop
-  0.1.0-beta.2 refuses them with `app_tool_unavailable`. The PR #360
-  implementation advertises `app_tools.dispatch@1` and runs them in the open app, for an app
+  0.1.0-beta.2 refuses them with `app_tool_unavailable`. OctoSense `main`
+  advertises `app_tools.dispatch@1` and runs them in the open app, for an app
   that declares `requires: ["script-tools-v1"]`; a closed app answers
   `app_not_running`
   ([Script tool execution](docs/PUBLISHING.md#script-tool-execution-script-tools-v1)).

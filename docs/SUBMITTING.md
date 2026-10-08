@@ -69,18 +69,17 @@ revision ([step 6](#6-freeze-and-verify-the-release)).
 | desktop-v0.1.0-beta.2 (macOS, Apple silicon) | Installed apps, including apps that use `auth`, `github`, `gmail` and `gcalendar` | Sign in to GitHub or Google until the host has an OAuth registration in `oauth/clients.json` ([setup](https://github.com/OctoSense-org/OctoSense/blob/desktop-v0.1.0-beta.2/crates/oauth-service/README.md)); the release ships none. Sign an app in to its own backend. Unverified on this release: live provider sign-in. |
 | desktop-v0.1.0-beta.1 and home-v0.1.0-beta.1 (the only released phone build) | Store apps that use only capabilities their older app contract knows | Install an app that requests `auth`, `github`, `gmail`, `gcalendar`, `calendar`, `photos`, `youtube` or `palpo.*`. Their stores refuse it, for example with `unknown capability "auth"`. |
 
-OctoSense `main` and the separately identified PR #360 implementation differ
-from desktop-v0.1.0-beta.2 in these ways; no release has these changes yet.
+OctoSense `main` differs from desktop-v0.1.0-beta.2 in these ways, and no
+release has them yet.
 
 - A distributor can compile GitHub and Google registrations into its build. A
   build you make from source has no registrations until you add them, for
   example in `oauth/clients.json`
   ([Connected accounts](PUBLISHING.md#connected-accounts)).
-- In [OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360)
-  (`feat/host-api-contract`) on macOS and Android, an app can sign in to the backend that its manifest
+- On macOS and Android, an app can sign in to the backend that its manifest
   declares and call the backend operations the manifest names
   ([Sign in to your own backend](PUBLISHING.md#sign-in-to-your-own-backend)).
-- In the same PR, an app that declares `host-api-v1` gets the device-permission methods on
+- An app that declares `host-api-v1` gets the device-permission methods on
   macOS and Android ([Host API compatibility](HOST-API.md)).
 - Approving a GitHub or Google Calendar save takes a physical press on the
   host's confirmation sheet, as approving a Gmail send does on both builds.
@@ -714,11 +713,11 @@ cannot read gets no report, only one `hub: …` line. The full rules are in
 
 | You want | Status | Instead |
 | --- | --- | --- |
-| Sign in to your own backend | In [OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360), not yet released, on macOS and Android. Declare the backend in the manifest; the app then calls only the backend operations it declares, and each write waits for the person's review on the host ([Sign in to your own backend](PUBLISHING.md#sign-in-to-your-own-backend)). | On a released build, identify the person with identity-only sign-in: `auth` with GitHub's `read:user`, or Google's `openid`, `email` and `profile`. For provider data, add `github`, `gmail` or `gcalendar`. |
+| Sign in to your own backend | Only on OctoSense `main`, not yet in any release, on macOS and Android. Declare the backend in the manifest; the app then calls only the backend operations it declares, and each write waits for the person's review on the host ([Sign in to your own backend](PUBLISHING.md#sign-in-to-your-own-backend)). | On a released build, identify the person with identity-only sign-in: `auth` with GitHub's `read:user`, or Google's `openid`, `email` and `profile`. For provider data, add `github`, `gmail` or `gcalendar`. |
 | Keep an API key or token in the app | Not supported. The gate refuses only password and one-time-code fields, so it does not catch a key typed into a plain field or kept in storage. | Ship no keys. For text generation, use `model`, which calls the person's own AI provider. |
 | Generate images, audio, video or embeddings | Not yet. `model` serves only `model.complete` and `model.budget`. `model.image`, `model.audio`, `model.video` and `model.embeddings` are unknown capabilities ([#85](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/85)–[#88](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/88)). | Use `model.complete` for text. |
 | Use `llm`, `news`, `calendar`, `prompt`, `ledger.read`, `clipboard` or `palpo.*` | The gate admits them, but no host serves them to a store app. `llm` and `news` answer only `os.*` apps, and `calendar` only `os.calendar`. Nothing acts on the others. | Do not request them. For Google Calendar, use `gcalendar`. |
-| Run your app's own logic in agent tools | Not in any release. The PR #360 implementation runs `implemented_by: "app"` tools while the full app is open; a closed app answers `app_not_running`. OctoSense desktop 0.1.0-beta.2 refuses these tools with `app_tool_unavailable`. A `host-service` tool without `host_method` calls the service named by your app's namespace, which is not a capability, so the call fails with `not_granted`. | To reach a shared service, map the tool with `host_method` to a method of `github`, `gcalendar`, `gmail` or `glance` ([Map a tool to a shared service](PUBLISHING.md#map-a-tool-to-a-shared-service-host_method)). For your own logic, declare `requires: ["script-tools-v1"]` and implement the `app_tool` hook ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)). Test it in the `feat/host-api-contract` implementation linked above. |
+| Run your app's own logic in agent tools | Not in any release. OctoSense `main` runs `implemented_by: "app"` tools while the full app is open; a closed app answers `app_not_running`. OctoSense desktop 0.1.0-beta.2 refuses these tools with `app_tool_unavailable`. A `host-service` tool without `host_method` calls the service named by your app's namespace, which is not a capability, so the call fails with `not_granted`. | To reach a shared service, map the tool with `host_method` to a method of `github`, `gcalendar`, `gmail` or `glance` ([Map a tool to a shared service](PUBLISHING.md#map-a-tool-to-a-shared-service-host_method)). For your own logic, declare `requires: ["script-tools-v1"]` and implement the `app_tool` hook ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)). Test it in an OctoSense shell built from `main`. |
 | Submit a system app (`os.*`) or a native app | No route here. System apps ship with the shells, and native code needs a shell release ([delivery paths](DEVELOPMENT.md#choose-a-delivery-path)). | Build a store app with an id of your own. |
 | Install an `auth` app on a phone | No released phone build can. | Test on desktop-v0.1.0-beta.2. |
 | Name Makepad's built-in CJK font in a card kit | Not yet ([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). | Bundle a `.ttf` or `.otf` and name it with a bundle-relative `font_src` ([Fonts](PUBLISHING.md#fonts)). A host built with Makepad's International font set, such as `card-host`, also draws Chinese with a built-in CJK fallback. OctoSense desktop 0.1.0-beta.2 loads no bundled font; on that release, build the card from the role kit and set no `font_src`. Unverified: how the OctoSense shells draw Chinese. |
