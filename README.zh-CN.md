@@ -134,7 +134,8 @@ OCTOSENSE_PREVIEW_SIZE=1200x860 OCTOSENSE_APP_DATA="$(mktemp -d)" target/release
 
 `card-host` 仅提供 `runtime` 发现，不运行 Agent，并拒绝封存的 Release 和仅宿主
 支持的要求标记。`calendar`、`llm`、`news` 仍为系统应用服务；`photos`/`youtube`
-通知仅供各自的系统应用使用。Wasm 仍需选择 `wasm-lab`，**标准桌面安装包默认不启用**。
+通知仅供各自的系统应用使用。Wasm **在 RC1 及其他所有发行版中均未启用**；OctoSense
+`main` 在 macOS、Linux 和 Android 上的标准桌面版和 Home 构建中运行它，属于有限支持。
 声明能力不能添加原生代码或开启构建特性。见[宿主 API 兼容性](docs/HOST-API.zh-CN.md)。
 
 ## 信任锚
