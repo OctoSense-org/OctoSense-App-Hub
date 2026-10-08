@@ -6,9 +6,9 @@ English | [简体中文](PUBLISHING.zh-CN.md)
 | --- | --- |
 | Submit an app, step by step | [Submit an app to the App Hub](SUBMITTING.md) |
 | Build and check a first app | [Build your first Hub app](FIRST-APP.md) |
-| Set up the workspace, build `hub` and `card-host`, run and capture an app | [Quickstart](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md) in Design Flow (OctoScript-App-Design-Flow), the app-development harness |
-| Call a capability or a host service from a script | Design Flow [Capabilities](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.md) and [Script API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md) |
-| See which shell serves which host service | Design Flow [Host services](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md) |
+| Set up the workspace, build `hub` and `card-host`, run and capture an app | [Quickstart](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.md) in OctoSense App Flow (formerly Design Flow), the app-development harness |
+| Call a capability or a host service from a script | App Flow [Capabilities](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.md) and [Script API](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/SCRIPT-API.md) |
+| See which shell serves which host service | App Flow [Host services](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.md) |
 | Prepare the icon | [App icons and bundled artwork](ICONS.md) |
 
 The gate is the Hub's admission check. Run it yourself with `hub check`: it
@@ -46,10 +46,10 @@ my-app/
   screenshots/       at least one PNG or SVG the listing names (required)
 ```
 
-Build a script app with Design Flow's
-[script-app flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/script-app/FLOW.md)
-and [Script API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md), starting from its
-[`templates/script-app/`](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/templates/script-app).
+Build a script app with App Flow's
+[script-app flow](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/script-app/FLOW.md)
+and [Script API](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/SCRIPT-API.md), starting from its
+[`templates/script-app/`](https://github.com/OctoSense-org/OctoSense-App-Flow/tree/main/templates/script-app).
 
 Name the bundle's own artwork through the `{{assets}}` placeholder, for example
 `http_resource("{{assets}}/assets/logo.png")`. The host replaces the
@@ -72,8 +72,8 @@ my-app/
   screenshots/       at least one PNG or SVG the listing names (required)
 ```
 
-Produce the card, its data and its kit with Design Flow's
-[image-to-card flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md).
+Produce the card, its data and its kit with App Flow's
+[image-to-card flow](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/image-to-card/FLOW.md).
 The [L0 specification](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md)
 defines the card language.
 
@@ -289,11 +289,11 @@ platform and provider limits; historical beta differences are explicit.
 | `research` | Searching through the system toolbox, within the manifest's research scope ([The research scope](#the-research-scope)). The host runs every search. | Search *what the scope allows* | System apps only, in phone builds |
 | `crawl` | Crawling sites through the system toolbox, up to the scope's `max_depth` and `max_pages`, inside its domain lists. More reach than `research`. | Crawl websites, *within the scope*, which reaches more than searching | As `research` |
 | `runtime` | Asking which APIs the host implements, with `runtime.list` and `runtime.describe` ([Host API compatibility](HOST-API.md)). It grants none of the APIs it lists. | Inspect available host APIs without gaining access to their data or permissions | Not on OctoSense desktop 0.1.0-beta.2, whose store refuses the name. App Hub's request dispatcher answers it in every host built from App Hub `main`, `card-host` included. |
-| `wasm` | The app's own functions: WebAssembly modules in the bundle's `fns/` (at most 8), run by the host's `wasm` service in a sandbox with a deadline and a memory cap. A function gets only its input and reaches no file, network, clock or other app. An agent tool can run one with `host_method: "wasm.<function>"`. To write, build and call a function, see Design Flow's [Run your own Rust code](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/RUST.md). | Run its own sandboxed functions on this device | Only builds with `wasm-lab`; standard desktop RC1 packages leave it disabled |
+| `wasm` | The app's own functions: WebAssembly modules in the bundle's `fns/` (at most 8), run by the host's `wasm` service in a sandbox with a deadline and a memory cap. A function gets only its input and reaches no file, network, clock or other app. An agent tool can run one with `host_method: "wasm.<function>"`. To write, build and call a function, see App Flow's [Run your own Rust code](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.md). | Run its own sandboxed functions on this device | Only builds with `wasm-lab`; standard desktop RC1 packages leave it disabled |
 
 No capability implies another. Not yet: `photos` and `youtube` services for
-store apps. For how a script calls each capability, see Design Flow's
-[Capabilities](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.md).
+store apps. For how a script calls each capability, see App Flow's
+[Capabilities](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.md).
 
 Source: `KNOWN_CAPABILITIES` in `crates/app-contract/src/manifest.rs`.
 
@@ -868,8 +868,8 @@ no service answers fails at once with `no service answers "<family>" on this dev
 `card-host` registers no service; only App Hub's `runtime` discovery
 answers there.
 To see which shell serves which family, read
-Design Flow's
-[Host services](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md).
+App Flow's
+[Host services](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.md).
 
 `card-host` also implements none of the APIs that `host-api-v1`,
 `backend-api-v1` and `script-tools-v1` require, so it refuses an app whose
@@ -890,8 +890,8 @@ go only to the sheet; timers and service replies still reach the app. A host
 built from App Hub `main` keeps its own reference to the sheet, so an app
 widget named `sheet` cannot hide or replace it.
 
-See Design Flow's
-[Mail, the worked example](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md#mail-the-worked-example).
+See App Flow's
+[Mail, the worked example](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.md#mail-the-worked-example).
 
 ### Connected accounts
 
@@ -900,8 +900,8 @@ capability it uses: `github`, `gcalendar` or `gmail`. The person signs in on a
 host sheet, and the app gets a connection handle, never a token. Writes go
 through a host review. Set `storage.accounts: true`, so that each account keeps
 its own data. For the hosts that serve these apps, see
-[Before you start](SUBMITTING.md#before-you-start); for the calls, see Design
-Flow's [Use a connected account](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.md#use-a-connected-account).
+[Before you start](SUBMITTING.md#before-you-start); for the calls, see
+App Flow's [Use a connected account](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.md#use-a-connected-account).
 
 What the host enforces depends on its build and platform. Protected writes
 remain unsupported and fail closed on Windows/Linux; see
@@ -1043,8 +1043,8 @@ capability does not change this.
 ## Commands
 
 `hub` runs the gate's own code, so its report is the one the Hub acts on.
-Build it as in Design Flow's
-[Quickstart](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md).
+Build it as in App Flow's
+[Quickstart](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.md).
 Run `hub`, `hub help` or any command with `--help` or `-h` for the usage;
 none of them reads a bundle or writes a file. An unknown command fails with
 ``hub: unknown command "<name>"; run `hub help` for usage``.
@@ -1182,8 +1182,13 @@ the full proofs, and refused content/proof/identity tampering, rollback,
 unsigned ownership replacement and withdrawn releases. The [receipt](../reviews/github-publisher-v1/acceptance.json)
 binds the input hashes and native source. Its Store catalog was an ephemeral
 local test catalog; the fixture has no App Hub submission or catalog entry.
-This does not establish app UI execution, phone publisher installation or a
-compatible host release.
+This does not establish app UI execution or phone publisher installation.
+
+On macOS, [OctoSense desktop RC1](../README.md#download-a-compatible-host)
+installs the GitHub-attested sample apps in catalog sequence 13 and checks
+their attestations and publisher continuity at install and update. Store
+installs on iOS, Windows and Linux remain unverified, and no released phone
+build supports `publisher-github-v1`.
 
 Download the **release pack**, which contains the generated attested manifest;
 a source checkout alone does not contain those final bytes. A reviewer can

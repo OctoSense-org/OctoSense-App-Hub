@@ -1,7 +1,7 @@
 name: Native authoring tools
 
 # Exercise the same unmodified sibling runtime and package selection as
-# Design Flow's doctor / docs/CODE-WALKTHROUGH.md, not an OctoSense overlay.
+# OctoSense App Flow's doctor / docs/CODE-WALKTHROUGH.md, not an OctoSense overlay.
 on:
   push:
     branches: [main]

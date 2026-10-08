@@ -20,14 +20,14 @@ A native app ships inside a shell release instead
 ## 1. Prepare the tools and an app repository
 
 1. Set up the workspace `~/octosense-ws` as
-   [Quickstart §1](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md#1-prerequisites)
-   describes: clone App Hub and Design Flow (OctoScript-App-Design-Flow) side by
-   side, then run Design Flow's `tools/setup-native.py`. It adds the `makepad`,
+   [Quickstart §1](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.md#1-prerequisites)
+   describes: clone App Hub and OctoSense App Flow (formerly Design Flow) side
+   by side, then run App Flow's `tools/setup-native.py`. It adds the `makepad`,
    `octoscript-makepad` and `octoscript` checkouts that App Hub's `Cargo.toml`
    patches in.
 
    ```sh
-   cd ~/octosense-ws/OctoScript-App-Design-Flow
+   cd ~/octosense-ws/OctoSense-App-Flow
    python3 tools/setup-native.py
    python3 tools/setup-native.py --check
    ```
@@ -70,12 +70,12 @@ A native app ships inside a shell release instead
    ([section 3](#3-choose-the-id-capabilities-and-artwork) has the details).
    Then create the app repository from a template, in a new directory:
 
-   - **Script app.** Run Design Flow's `tools/octo new`. Name each platform
+   - **Script app.** Run App Flow's `tools/octo new`. Name each platform
      you will test the app on with `--platform`; repeat the flag for more
      than one.
 
      ```sh
-     cd ~/octosense-ws/OctoScript-App-Design-Flow
+     cd ~/octosense-ws/OctoSense-App-Flow
      tools/octo new ~/apps/my-app --platform macos --id com.example.mynotes --name "My Notes"
      ```
 
@@ -85,8 +85,8 @@ A native app ships inside a shell release instead
        target platforms: macos; verify each before publishing
      ```
 
-     It copies the `bundle/` of Design Flow's
-     [`templates/script-app/`](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/templates/script-app),
+     It copies the `bundle/` of App Flow's
+     [`templates/script-app/`](https://github.com/OctoSense-org/OctoSense-App-Flow/tree/main/templates/script-app),
      a small notes app with a manifest, a listing and an icon, and adds
      `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` and a `.gitignore`. It writes your
      `--platform` values into the listing's `platforms`. Then it stamps the
@@ -125,10 +125,10 @@ stored state, and error and empty states.
 
 ### A script app
 
-Follow Design Flow's
-[script-app flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/script-app/FLOW.md).
+Follow App Flow's
+[script-app flow](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/script-app/FLOW.md).
 The calls a program may make (`fs`, `net`, `host.request`, widget handles) are
-in the [script API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md).
+in the [script API](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/SCRIPT-API.md).
 The [system apps](https://github.com/OctoSense-org/OctoSense/tree/main/apps)
 are complete examples of the same format.
 
@@ -163,8 +163,8 @@ my-app/
 
 ### A card app
 
-Use Design Flow's
-[image-to-card flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md)
+Use App Flow's
+[image-to-card flow](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/image-to-card/FLOW.md)
 to create and review the card. You still implement the app's data binding: a
 screenshot, or the flow's atlas of screens, is not a running app. The
 [L0 reference](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md)
@@ -277,7 +277,7 @@ verifies no publisher keys, so it refuses a signed manifest even with
    Success is one line of JSON, starting
    `{"s":[{"i":"main_window","ty":"Window","r":[0,0,412,892],…`. Read the log
    for errors after the `admitted` line. For scripted input, see the
-   [native instrument guide](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md).
+   [native instrument guide](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md).
 
 4. Capture a frame:
 
@@ -365,7 +365,7 @@ Two rules hold throughout:
 
 To try the app in OctoSense desktop before you submit, publish it to a local
 catalog with a throwaway anchor
-([Rehearse the store path locally](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally)).
+([Rehearse the store path locally](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally)).
 
 ## Troubleshooting
 

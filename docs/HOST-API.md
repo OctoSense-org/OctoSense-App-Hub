@@ -117,5 +117,6 @@ registration.
 - **Unverified:** a physical permission approval, camera capture, live
   providers, real models, and host API acceptance on Linux, Windows and phones.
 
-For the calls, see Design Flow's
-[Discover and use host APIs](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-API-V1.md).
+For the calls, see
+[Discover and use host APIs](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-V1.md)
+in OctoSense App Flow (formerly Design Flow).

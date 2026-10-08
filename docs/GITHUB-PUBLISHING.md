@@ -8,12 +8,18 @@ the signature in a public transparency log. No admin stores a separate Hub
 private key. This is GitHub-managed artifact signing, not an SSH signature or
 the green Verified badge on a commit.
 
-**Delivery status:** [production workflow 37736098082](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37736098082)
+**Delivery status:** [production run 37736098082](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37736098082)
 published catalog sequence 11 at commit
-`27eeec5b3abc3f9c2aa06a3894bab2f15228f116`. This source selects the GitHub
-channel by default for new compatible hosts; an updated OctoSense binary
-release remains pending. Old installed hosts and reference-app bundle bytes
-are unchanged. See Validation for the exact proof/consumer evidence.
+`27eeec5b3abc3f9c2aa06a3894bab2f15228f116`. Later runs published sequences
+12 and 13;
+[run 37755718288](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37755718288)
+published sequence 13 at commit `3842c5ec503a8e9124cbbe99655556ffe24c41e1`.
+This source selects the GitHub channel by default for new compatible hosts.
+[OctoSense desktop 0.1.0-rc.1](../README.md#download-a-compatible-host),
+released on 2026-10-08, is a compatible host release and reads
+`catalog-v2.json` by default. Old installed hosts and reference-app bundle
+bytes are unchanged. [Validation](#validation) records the sequence 11 proof
+and its native consumer checks.
 
 ## Who authorizes publication
 

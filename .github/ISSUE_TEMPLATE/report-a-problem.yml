@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Use this form for problems with App Hub itself: `hub`, `card-host`, the gate, the store or the catalog.
-        To submit an app, use the **Submit an app** form instead. To ask how to build an app, use [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/issues).
+        To submit an app, use the **Submit an app** form instead. To ask how to build an app, use [OctoSense App Flow](https://github.com/OctoSense-org/OctoSense-App-Flow/issues) (formerly Design Flow).
         可以用中文填写。
 
   - type: textarea

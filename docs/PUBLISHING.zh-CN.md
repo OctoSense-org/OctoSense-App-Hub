@@ -6,9 +6,9 @@
 | --- | --- |
 | 分步提交应用 | [向 App Hub 提交应用](SUBMITTING.zh-CN.md) |
 | 开发并检查第一个应用 | [开发你的第一个 Hub 应用](FIRST-APP.zh-CN.md) |
-| 搭建工作区，构建 `hub` 和 `card-host`，运行应用并截图 | 应用开发工具集 Design Flow（OctoScript-App-Design-Flow）的[快速上手](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.zh-CN.md) |
-| 在脚本中调用能力或宿主服务 | Design Flow 的[能力](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.zh-CN.md)和[脚本 API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md) |
-| 查询哪个 Shell 提供哪个宿主服务 | Design Flow 的[宿主服务](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md) |
+| 搭建工作区，构建 `hub` 和 `card-host`，运行应用并截图 | 应用开发工具集 OctoSense App Flow（原 Design Flow）的[快速上手](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.zh-CN.md) |
+| 在脚本中调用能力或宿主服务 | App Flow 的[能力](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.zh-CN.md)和[脚本 API](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/SCRIPT-API.md) |
+| 查询哪个 Shell 提供哪个宿主服务 | App Flow 的[宿主服务](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md) |
 | 准备图标 | [应用图标与随包素材](ICONS.zh-CN.md) |
 
 准入检查决定应用包能否进入 Hub。用 `hub check` 自行运行准入检查：每违反一条规则，它都会报告一条拒绝或警告。通过准入检查，并不能说明应用能正常渲染、图标在小尺寸下依然清晰，或商店信息属实。这些由审核人员检查（[审核检查什么](SUBMITTING.zh-CN.md#8-审核检查什么)）。
@@ -37,7 +37,7 @@ my-app/
   screenshots/       商店信息引用的截图，至少一个 PNG 或 SVG 文件（必需）
 ```
 
-以 Design Flow 的 [`templates/script-app/`](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/templates/script-app) 为起点，按照它的[脚本应用流程](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/script-app/FLOW.md)和[脚本 API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md) 开发脚本应用。
+以 App Flow 的 [`templates/script-app/`](https://github.com/OctoSense-org/OctoSense-App-Flow/tree/main/templates/script-app) 为起点，按照它的[脚本应用流程](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/script-app/FLOW.md)和[脚本 API](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/SCRIPT-API.md) 开发脚本应用。
 
 引用应用包自带的素材时，使用 `{{assets}}` 占位符，例如 `http_resource("{{assets}}/assets/logo.png")`。宿主会把占位符替换为一个本地回环地址，该地址只提供这个应用包的内容。
 
@@ -56,7 +56,7 @@ my-app/
   screenshots/       商店信息引用的截图，至少一个 PNG 或 SVG 文件（必需）
 ```
 
-用 Design Flow 的[图像到卡片流程](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md)生成卡片、卡片数据和 kit。[L0 规范](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md)定义了这门卡片语言。
+用 App Flow 的[图像到卡片流程](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/image-to-card/FLOW.md)生成卡片、卡片数据和 kit。[L0 规范](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md)定义了这门卡片语言。
 
 两类应用都可以在 `manifest.json` 旁附带自己的 Agent：`tools.json`、`AGENT.md` 和 `skills/<name>/`（[应用的 Agent 与工具](#应用的-agent-与工具)）。
 
@@ -220,9 +220,9 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | `research` | 通过系统工具箱搜索，不超出清单的 research 范围（[research 范围](#research-范围)）。每次搜索都由宿主执行。 | Search *范围允许的内容* | 仅系统应用，且只在手机版构建中 |
 | `crawl` | 通过系统工具箱抓取网站，深度和页数不超过范围中的 `max_depth` 和 `max_pages`，并遵守其中的域名列表。覆盖面比 `research` 更广。 | Crawl websites, *范围的限制*, which reaches more than searching | 同 `research` |
 | `runtime` | 用 `runtime.list` 和 `runtime.describe` 查询宿主实现了哪些 API（[宿主 API 兼容性](HOST-API.zh-CN.md)）。它不授予所列的任何 API。 | Inspect available host APIs without gaining access to their data or permissions | OctoSense 桌面版 0.1.0-beta.2 不提供，它的商店会拒绝这个名称。在基于 App Hub `main` 构建的每个宿主中（包括 `card-host`），由 App Hub 的请求分派器响应。 |
-| `wasm` | 应用自带的函数：应用包 `fns/` 中的 WebAssembly 模块（最多 8 个），由宿主的 `wasm` 服务在沙盒中运行，有截止时间和内存上限。函数只拿到自己的输入，接触不到文件、网络、时钟或其他应用。Agent 工具可以用 `host_method: "wasm.<function>"` 运行它。函数的编写、构建和调用方法见 Design Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/RUST.zh-CN.md)。 | Run its own sandboxed functions on this device | 仅启用 `wasm-lab` 的构建提供；标准桌面 RC1 包默认关闭 |
+| `wasm` | 应用自带的函数：应用包 `fns/` 中的 WebAssembly 模块（最多 8 个），由宿主的 `wasm` 服务在沙盒中运行，有截止时间和内存上限。函数只拿到自己的输入，接触不到文件、网络、时钟或其他应用。Agent 工具可以用 `host_method: "wasm.<function>"` 运行它。函数的编写、构建和调用方法见 App Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.zh-CN.md)。 | Run its own sandboxed functions on this device | 仅启用 `wasm-lab` 的构建提供；标准桌面 RC1 包默认关闭 |
 
-任何能力都不隐含其他能力。尚不支持：面向商店应用的 `photos` 和 `youtube` 服务。脚本如何调用各项能力，见 Design Flow 的[能力](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.zh-CN.md)文档。
+任何能力都不隐含其他能力。尚不支持：面向商店应用的 `photos` 和 `youtube` 服务。脚本如何调用各项能力，见 App Flow 的[能力](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.zh-CN.md)文档。
 
 源码：`crates/app-contract/src/manifest.rs` 中的 `KNOWN_CAPABILITIES`。
 
@@ -641,7 +641,7 @@ OctoSense 桌面 RC1 改变了四点：
 host.request("mail.list", {…}, fn(r){ … })
 ```
 
-除非应用的策略授予了相应的服务族（`mail.*` 对应 `mail`）或确切的服务名，否则隔离环境会拒绝调用。获准的调用会交给宿主为该服务族注册的服务。服务完成工作后返回数据，绝不返回凭据；它返回的连接句柄不透明，并与该应用绑定。如果某个服务族没有任何服务响应，对它的调用会立即失败，返回 `no service answers "<family>" on this device`；`card-host` 不注册任何服务，在那里只有 App Hub 用于发现宿主 API 的 `runtime` 会响应。哪个 Shell 提供哪个服务族，见 Design Flow 的[宿主服务](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。
+除非应用的策略授予了相应的服务族（`mail.*` 对应 `mail`）或确切的服务名，否则隔离环境会拒绝调用。获准的调用会交给宿主为该服务族注册的服务。服务完成工作后返回数据，绝不返回凭据；它返回的连接句柄不透明，并与该应用绑定。如果某个服务族没有任何服务响应，对它的调用会立即失败，返回 `no service answers "<family>" on this device`；`card-host` 不注册任何服务，在那里只有 App Hub 用于发现宿主 API 的 `runtime` 会响应。哪个 Shell 提供哪个服务族，见 App Flow 的[宿主服务](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。
 
 `card-host` 也没有实现 `host-api-v1`、`backend-api-v1` 和 `script-tools-v1` 所需的任何 API，因此会拒绝清单要求其中任何一项的应用：这类应用请在基于 `main` 构建的 OctoSense Shell 中测试。
 
@@ -651,11 +651,11 @@ host.request("mail.list", {…}, fn(r){ … })
 
 面板显示期间，文本、按键、输入法输入、剪贴板和指针释放事件只发给面板；计时器和服务回复仍会送达应用。基于 App Hub `main` 构建的宿主会自己保存对面板的引用，因此应用中名为 `sheet` 的控件无法隐藏或替换面板。
 
-参见 Design Flow 的 [Mail 完整示例](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md#完整示例mail)。
+参见 App Flow 的 [Mail 完整示例](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md#完整示例mail)。
 
 ### 已连接账户
 
-使用 GitHub 或 Google 的应用要声明 `auth`，再加上它用到的提供商能力：`github`、`gcalendar` 或 `gmail`。用户在宿主面板上登录，应用拿到的是连接句柄，绝不是令牌。写操作要经过宿主确认。请设置 `storage.accounts: true`，让每个账户各自保存数据。哪些宿主支持这类应用，见[开始之前](SUBMITTING.zh-CN.md#开始之前)；具体如何调用，见 Design Flow 的[使用已连接账户](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.zh-CN.md#使用已连接账户)。
+使用 GitHub 或 Google 的应用要声明 `auth`，再加上它用到的提供商能力：`github`、`gcalendar` 或 `gmail`。用户在宿主面板上登录，应用拿到的是连接句柄，绝不是令牌。写操作要经过宿主确认。请设置 `storage.accounts: true`，让每个账户各自保存数据。哪些宿主支持这类应用，见[开始之前](SUBMITTING.zh-CN.md#开始之前)；具体如何调用，见 App Flow 的[使用已连接账户](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.zh-CN.md#使用已连接账户)。
 
 宿主强制执行哪些规则，取决于构建版本和平台。Windows/Linux 的受保护写操作仍不支持，会拒绝执行，见[平台限制](../README.zh-CN.md#下载兼容宿主)：
 
@@ -750,7 +750,7 @@ OctoSense 桌面 RC1 可以在[平台限制](../README.zh-CN.md#下载兼容宿�
 
 ## 命令
 
-`hub` 运行的就是准入检查本身的代码，Hub 依据的也正是它的报告。按 Design Flow 的[快速上手](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.zh-CN.md)构建它。运行 `hub`、`hub help`，或在任何命令后加上 `--help` 或 `-h`，都会输出用法；这些命令都不会读取应用包，也不会写入文件。未知命令会失败，并输出 ``hub: unknown command "<name>"; run `hub help` for usage``。
+`hub` 运行的就是准入检查本身的代码，Hub 依据的也正是它的报告。按 App Flow 的[快速上手](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.zh-CN.md)构建它。运行 `hub`、`hub help`，或在任何命令后加上 `--help` 或 `-h`，都会输出用法；这些命令都不会读取应用包，也不会写入文件。未知命令会失败，并输出 ``hub: unknown command "<name>"; run `hub help` for usage``。
 
 | 命令 | 作用 |
 | --- | --- |
@@ -826,7 +826,9 @@ hub publisher-pack bundle --out build/app.bundle.pack.json
 
 `build/` 必须预先存在且位于 `bundle/` 外。`publisher-prepare` 添加 `requires: ["publisher-github-v1"]`，在 `integrity.github` 中记录身份，并为最终应用包写入摘要。规范化签名字节包含身份和应用包摘要，但不包含 `integrity.github.attestation`。随后附加证明；应用包摘要不包含清单，因此不存在哈希循环。证明最多 48 KiB，完整清单最多 64 KiB。Prepare 拒绝已经封存的发布包；Attach 和 Pack 验证最终字节且不会重新写入摘要，修改后需要生成新的发布证明。此流程无需 `keygen`、`sign-manifest` 或 `--publisher-key`。
 
-验证使用公开的合成测试应用的 [v0.1.0 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736273522)与 [v0.1.1 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736765473)，没有使用仓库 Secrets。两个发布均生成并验证了真实 GitHub 证明。[原生验收示例](../crates/app-hub/examples/publisher_acceptance.rs)随后安装两个发布包，准备并验证启动、保留完整证明，并拒绝内容／证明／身份篡改、回滚、未签名的归属替换和已撤回版本。[验收记录](../reviews/github-publisher-v1/acceptance.json)绑定输入摘要与原生源码版本。Store 使用的是临时本地测试目录；该测试应用没有 App Hub 投稿 issue 或目录条目。这不代表已执行应用界面、在手机上安装 GitHub 发布者应用，或已发布兼容宿主。
+验证使用公开的合成测试应用的 [v0.1.0 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736273522)与 [v0.1.1 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736765473)，没有使用仓库 Secrets。两个工作流均生成并验证了真实 GitHub 证明。[原生验收示例](../crates/app-hub/examples/publisher_acceptance.rs)随后安装两个发布包，准备并验证启动、保留完整证明，并拒绝内容/证明/身份篡改、回滚、未签名的归属替换和已撤回版本。[验收记录](../reviews/github-publisher-v1/acceptance.json)绑定输入摘要与原生源码版本。Store 使用的是临时的本地测试签名目录；该测试应用没有 App Hub 提交 issue，也没有签名目录条目。这既不能证明应用界面可以运行，也不能证明手机可以安装 GitHub 发布者应用。
+
+在 macOS 上，[OctoSense 桌面 RC1](../README.zh-CN.md#下载兼容宿主) 可以安装签名目录第 13 版中带 GitHub 证明的示例应用，并在安装和更新时检查这些应用的证明和发布者连续性。iOS、Windows 和 Linux 上的商店安装仍未验证，目前也没有任何已发行的手机版本支持 `publisher-github-v1`。
 
 请下载含有生成后证明清单的 **Release pack**；单独检出源码并不包含这些最终字节。审核人员可运行 `hub publisher-unpack app.bundle.pack.json --out review-bundle`，再运行 `hub publisher-verify review-bundle --catalog <authenticated-catalog>`。Unpack 要求新目录，拒绝路径穿越，失败时仅清理自己创建的输出。`hub publisher-entry review-bundle --catalog <authenticated-catalog> --out build/index.json` 生成审核候选条目，不会发布。
 

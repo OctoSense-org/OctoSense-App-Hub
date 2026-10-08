@@ -2,7 +2,7 @@
 
 [English](README.md) | 简体中文
 
-按照 [开发你的第一个 Hub 应用](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/FIRST-APP.zh-CN.md)，把这个目录复制到新的应用仓库中。这是一个卡片应用的**元数据脚手架**，不是可运行或可发布的演示。要开发脚本应用（`main.splash`），请改用 [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) 的 `tools/octo new`，不要复制这个目录。
+按照 [开发你的第一个 Hub 应用](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/FIRST-APP.zh-CN.md)，把这个目录复制到新的应用仓库中。这是一个卡片应用的**元数据脚手架**，不是可运行或可发布的演示。要开发脚本应用（`main.splash`），请改用 [OctoSense App Flow](https://github.com/OctoSense-org/OctoSense-App-Flow)（原 Design Flow）的 `tools/octo new`，不要复制这个目录。
 
 模板中的文件分为两组：
 
@@ -17,7 +17,7 @@
 2. 把 `listing.json` 中的 `platforms` 设为你实际测试过的平台。模板声明的是 `["macos"]`；只有在 macOS 上测试过，才保留它。
 3. 把 `listing.json` 中的 `license` 设为应用实际使用的许可证。模板中的 `Apache-2.0` 只是示例。
 4. 用你的应用图标替换 `bundle/assets/icon.svg`。
-5. 使用 [图像到卡片流程](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md)，生成并评审 `bundle/page.card`、可选的 `page.data.json`、卡片的 `kit/` 目录和本地素材。
+5. 使用 [图像到卡片流程](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/image-to-card/FLOW.md)，生成并评审 `bundle/page.card`、可选的 `page.data.json`、卡片的 `kit/` 目录和本地素材。
 6. 在 [`card-host`](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/DEVELOPMENT.zh-CN.md#在本地运行应用包card-host) 中运行未签名的应用包，并截取 `bundle/screenshots/01-main.png`。
 7. 按照 [向 App Hub 提交应用](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/SUBMITTING.zh-CN.md) 的说明，为完成后的 `bundle/` 目录写入摘要，再检查、审核、签名并提交。
 

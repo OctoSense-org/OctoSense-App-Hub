@@ -35,10 +35,10 @@
 | --- | --- | --- |
 | `hub` | App Hub `main` | 为开发源码写入摘要并检查、扫描，再准备、验证和打包带 GitHub 证明的 Release。审核人员运行的是同一份代码。 |
 | `card-host` | App Hub `main` | 运行未签名的应用包，驱动它并截图。 |
-| `tools/octo` | [Design Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) | 创建、运行应用并截图。它封装了 `card-host` 和 `hub`。 |
+| `tools/octo` | [OctoSense App Flow](https://github.com/OctoSense-org/OctoSense-App-Flow)（原 Design Flow） | 创建、运行应用并截图。它封装了 `card-host` 和 `hub`。 |
 | OctoSense 桌面版 | [RC1 发行版，源码 `933abbcf`](../README.zh-CN.md#下载兼容宿主)；各平台下载及运行条件见该指南 | 安装带 GitHub 证明的 Release 并运行兼容宿主服务。连接账户示例使用 macOS；不附带 OAuth 注册信息。 |
 
-按 [QUICKSTART §1](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.zh-CN.md#1-前置条件) 准备好工作区，然后从最新的 `main` 构建 `hub` 和 `card-host`：
+按 [QUICKSTART §1](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.zh-CN.md#1-前置条件) 准备好工作区，然后从最新的 `main` 构建 `hub` 和 `card-host`：
 
 ```sh
 cd ~/octosense-ws/OctoSense-App-Hub
@@ -53,10 +53,10 @@ hub
 
 如果构建失败并报 `no variant … TextInputStateQuery`，请看 [`card-host` 构建失败](DEVELOPMENT.zh-CN.md#card-host-构建失败)。
 
-然后在 Design Flow 检出目录中运行 `tools/octo doctor`，之后再构建或检查应用：
+然后在 App Flow 检出目录中运行 `tools/octo doctor`，之后再构建或检查应用：
 
 ```sh
-cd ~/octosense-ws/OctoScript-App-Design-Flow
+cd ~/octosense-ws/OctoSense-App-Flow
 tools/octo doctor
 ```
 
@@ -81,7 +81,7 @@ tools/octo doctor
 | `hub keygen`、`hub pubkey`、`hub sign-manifest` | 你，仅限旧协议 Ed25519 应用 | 5 | 创建发布者密钥，并为清单签名（[签名](PUBLISHING.zh-CN.md#签名)）。 |
 | `hub publish`、`hub withdraw`、`hub remove`、`hub certify`、`hub verify` | 维护者，仅用于旧格式签名目录 | 9 | 在 `catalog.json` 中发布、撤回或删除版本，为它的工作密钥签发证书，或验证它。 |
 
-Design Flow 的 `tools/octo` 会替你运行其中几个命令，参数见 Design Flow 的 [`tools/octo` 命令表](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/README.zh-CN.md#toolsocto)。
+App Flow 的 `tools/octo` 会替你运行其中几个命令，参数见其 [`tools/octo` 命令表](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/README.zh-CN.md#toolsocto)。
 
 | `tools/octo` 命令 | 运行的 `hub` 命令 |
 | --- | --- |
@@ -90,7 +90,7 @@ Design Flow 的 `tools/octo` 会替你运行其中几个命令，参数见 Desig
 | `doctor` | `hub help`，用来确认找到的正是这个 `hub` |
 | `publish-github` | 本身不运行：它安装 Release 工作流，推送标签时由该工作流运行 `hub publisher-prepare`、`hub publisher-attach`、`hub publisher-verify` 和 `hub publisher-pack` |
 
-在本地[商店演练](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)中，你还要用一次性密钥和旧格式测试签名目录，亲自运行 `hub keygen`、`hub certify`、`hub publish` 和 `hub verify`。
+在本地[商店演练](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)中，你还要用一次性密钥和旧格式测试签名目录，亲自运行 `hub keygen`、`hub certify`、`hub publish` 和 `hub verify`。
 
 ### 应用能在哪里运行
 
@@ -110,7 +110,7 @@ RC1 发行版与历史 desktop beta.2 有以下不同。[下载发行文件并�
 - 应用 Agent 调用 `glance.publish` 时，宿主拒绝可执行的 Splash（`script`）和 L1 卡片源码。
 - 宿主只保留从 30 天前到 366 天后的 Google 日历日程，而不是日历的全部历史。
 
-想在提交前把应用装进 Shell 试用，可以先把它发布到本地签名目录（[演练步骤](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)）。演练只在从源码构建的 Shell 上验证过。
+想在提交前把应用装进 Shell 试用，可以先把它发布到本地签名目录（[演练步骤](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)）。演练只在从源码构建的 Shell 上验证过。
 
 ### 确认你的平台
 
@@ -157,7 +157,7 @@ RC1 发行版与历史 desktop beta.2 有以下不同。[下载发行文件并�
 
 应用 Agent 是 OctoSense 为单个应用运行的 AI Agent，使用该应用的工具。`read-only` 是 Agent 自身会话的权限配置：Agent 每次写入工作区（即应用的存储）之前都要先征得同意。它不约束 `tools.json` 中的工具：这些工具的调用是否要等用户确认，由各自的 `risk` 级别决定。Inbox 的 5 个 `act` 工具会直接修改回复草稿、记录分拣结果、发布速览卡片，无需询问。
 
-Design Flow 的[连接账户参考应用 README](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/examples/connected-apps/README.zh-CN.md) 介绍了每个应用的工作方式。其中 GitHub Notes 和 Inbox 的副本包含与 0.1.1 相同的修复；Google Calendar 的副本不显示日期范围。
+App Flow 的[连接账户参考应用 README](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/examples/connected-apps/README.zh-CN.md) 介绍了每个应用的工作方式。其中 GitHub Notes 和 Inbox 的副本包含与 0.1.1 相同的修复；Google Calendar 的副本不显示日期范围。
 
 ### 0.1.0 的教训
 
@@ -267,7 +267,7 @@ python3 -c 'import json; p = json.load(open("bundle/listing.json"))["publisher"]
 
 ## 4. 截图
 
-商店信息里，只有截图能让审核人员对照运行中的应用核实。在 `card-host` 中运行未签名的应用包，通过远程控制接口把应用驱动到要展示的每个状态（路由见 [QUICKSTART](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.zh-CN.md)），逐一截图。在 Design Flow 的检出目录中运行：
+商店信息里，只有截图能让审核人员对照运行中的应用核实。在 `card-host` 中运行未签名的应用包，通过远程控制接口把应用驱动到要展示的每个状态（路由见 [QUICKSTART](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.zh-CN.md)），逐一截图。在 App Flow 的检出目录中运行：
 
 ```sh
 tools/octo run ~/apps/my-app/bundle --port 8141 --detach
@@ -282,7 +282,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 {"ok":1}
 ```
 
-使用前逐张打开 PNG 查看。不要发布错误画面、空白的首帧或效果图。如果应用一直在播放动画，`shot` 仍会保存最后一帧，并在输出中注明 `(still changing after 2s, e.g. an animation; this is the last frame)`；请检查这一帧。其他截图问题见 [QUICKSTART 的故障排查](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.zh-CN.md#故障排查)。
+使用前逐张打开 PNG 查看。不要发布错误画面、空白的首帧或效果图。如果应用一直在播放动画，`shot` 仍会保存最后一帧，并在输出中注明 `(still changing after 2s, e.g. an animation; this is the last frame)`；请检查这一帧。其他截图问题见 [QUICKSTART 的故障排查](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.zh-CN.md#故障排查)。
 
 未验证，仅限 Linux：如果在软件渲染（llvmpipe、WSL）下 `shot` 超时，请在启动 `tools/octo run` 或 `card-host` 之前设置 `MAKEPAD_WRITE_FRAMEBUFFER_PNG=<file>`，Makepad 的 OpenGL 后端每次绘制窗口时都会把窗口画面保存到这个 PNG 文件；在 macOS 上，`shot` 仍是经过验证的截图方式。
 
@@ -296,7 +296,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 
 1. 如果尚未开提交 issue，现在就可以开。Release 证据可以稍后补充；未完成的检查标为待完成，不要编造通过结果。
 2. 测试未签名的开发副本并截取真实界面。运行准入检查和 `hub scan bundle --packet build/review.json`，其中 `build/` 位于应用包外。逐题回答审核包中的问题：共七题，带 `tools.json`、`AGENT.md` 或技能时为八题。注明每个回答依据的文件及未测试的行为。
-3. 用 Design Flow 的 `tools/octo publish-github <app-directory>` 安装并评审 `.github/workflows/publish-app.yml`（`tools/octo new` 也会提供）。此路径不需要 `keygen`、`sign-manifest`、`--publisher-key` 或仓库签名 Secret。原生命令见 [GitHub 发布者来源证明](PUBLISHING.zh-CN.md#github-发布者来源证明)。
+3. 用 App Flow 的 `tools/octo publish-github <app-directory>` 安装并评审 `.github/workflows/publish-app.yml`（`tools/octo new` 也会提供）。此路径不需要 `keygen`、`sign-manifest`、`--publisher-key` 或仓库签名 Secret。原生命令见 [GitHub 发布者来源证明](PUBLISHING.zh-CN.md#github-发布者来源证明)。
 4. Commit 测试过的开发源码、截图、商店信息、隐私政策/支持页面、`.gitattributes` 和工作流。每个 Release 使用新的语义版本和精确的 `v<manifest.version>` 标签。工作流生成带证明的清单及最终 Release pack；不要把生成的字节覆盖提交到开发源码中。
 
 常规更新保留相同的仓库名、不可变仓库/所有者 ID 和工作流身份，并提高语义版本。更新同样无需发布者私钥。历史 Ed25519 应用身份继续使用原协议；这不是转移应用归属的流程。
@@ -407,12 +407,12 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 | --- | --- | --- |
 | 登录你自己的后端 | RC 在[平台限制](#确认你的平台)内提供宿主运行的后端登录和清单声明的读取；兼容 Android 源码构建另有嵌入式流程。每次写操作都需要受支持的原生审阅流程（见发布参考的[登录自己的后端](PUBLISHING.zh-CN.md#登录自己的后端)一节）。 | 只需提供商身份时，用仅验证身份的登录来识别用户：`auth` 搭配 GitHub 的 `read:user`，或 Google 的 `openid`、`email` 和 `profile`。需要提供商数据时，再加上 `github`、`gmail` 或 `gcalendar`。 |
 | 在应用中保存 API 密钥或令牌 | 不支持。准入检查只拒绝密码和一次性验证码字段，因此发现不了输入到普通字段或存放在存储中的密钥。 | 不要附带任何密钥。生成文本请用 `model`，它调用的是用户自己的 AI 提供商。 |
-| 生成图片、音频、视频或向量嵌入 | RC 在 `model` 能力下提供相应方法；媒体方法名不是独立能力。仍受提供商配置、权益和平台限制约束。 | 运行时发现方法，并处理提供商不可用的状态；见[媒体指南](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/AI-SERVICES.zh-CN.md#媒体与嵌入向量model)。 |
+| 生成图片、音频、视频或向量嵌入 | RC 在 `model` 能力下提供相应方法；媒体方法名不是独立能力。仍受提供商配置、权益和平台限制约束。 | 运行时发现方法，并处理提供商不可用的状态；见[媒体指南](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/AI-SERVICES.zh-CN.md#媒体与嵌入向量model)。 |
 | 使用 `llm`、`news`、`calendar`、`prompt`、`ledger.read`、`clipboard` 或 `palpo.*` | 准入检查接受它们，但没有宿主向商店应用提供这些服务。`llm` 和 `news` 只响应 `os.*` 应用，`calendar` 只响应 `os.calendar`，其余的没有任何宿主处理。 | 不要请求它们。访问 Google 日历请用 `gcalendar`。 |
 | 用 Agent 工具运行应用自身的逻辑 | RC1 发行版会在完整应用打开期间运行 `implemented_by: "app"` 的工具；应用关闭时返回 `app_not_running`。OctoSense 桌面版 0.1.0-beta.2 拒绝这类工具，返回 `app_tool_unavailable`。没有 `host_method` 的 `host-service` 工具会调用以应用的命名空间命名的服务，而命名空间不是能力，所以调用失败，返回 `not_granted`。 | 要调用共享服务，用 `host_method` 把工具映射到 `github`、`gcalendar`、`gmail` 或 `glance` 的某个方法（见发布参考的[把工具映射到共享服务](PUBLISHING.zh-CN.md#把工具映射到共享服务host_method)一节）。要运行应用自身的逻辑，在清单中声明 `requires: ["script-tools-v1"]`，并实现 `app_tool` 钩子（见发布参考的[脚本工具执行](PUBLISHING.zh-CN.md#脚本工具执行script-tools-v1)一节）。请在[兼容 RC1 发行版](../README.zh-CN.md#下载兼容宿主)中测试。 |
-| 在应用中附带原生 Rust 代码 | 商店应用包不能携带原生代码。准入检查会拒绝原生库，原生代码需要随 Shell 新版本发布（[交付路径](DEVELOPMENT.zh-CN.md#选择合适的交付路径)）。 | 要做纯计算，把 Rust 代码编译成 `fns/` 中的 WebAssembly 模块，并请求 `wasm` 能力（见发布参考的[能力](PUBLISHING.zh-CN.md#能力)一节）。只有启用 `wasm-lab` 特性的 OctoSense 构建会运行它，目前还没有任何发布版启用这项特性。具体做法，以及设备 API、网络和文件各走哪条路，见 Design Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/RUST.zh-CN.md)。 |
+| 在应用中附带原生 Rust 代码 | 商店应用包不能携带原生代码。准入检查会拒绝原生库，原生代码需要随 Shell 新版本发布（[交付路径](DEVELOPMENT.zh-CN.md#选择合适的交付路径)）。 | 要做纯计算，把 Rust 代码编译成 `fns/` 中的 WebAssembly 模块，并请求 `wasm` 能力（见发布参考的[能力](PUBLISHING.zh-CN.md#能力)一节）。只有启用 `wasm-lab` 特性的 OctoSense 构建会运行它，目前还没有任何发布版启用这项特性。具体做法，以及设备 API、网络和文件各走哪条路，见 App Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.zh-CN.md)。 |
 | 提交系统应用（`os.*`）或原生应用 | 这里没有提交途径。系统应用随 Shell 一起发布，原生代码需要随 Shell 新版本发布（[交付路径](DEVELOPMENT.zh-CN.md#选择合适的交付路径)）。 | 用自己的 ID 做一个商店应用。 |
 | 在手机上安装 `auth` 应用 | 目前没有任何已发布的手机版本能做到。 | 这些只声明 macOS 的示例使用 Mac 上的兼容 RC；Android Google 授权不可用。 |
 | 在卡片 kit 中引用 Makepad 内置的 CJK 字体 | 当前 Hub 和锁定运行时支持 Regular 与 Bold 的准确资源名。 | 名称、打包字体及旧版宿主限制见[字体](PUBLISHING.zh-CN.md#字体)。Mac 上已验证 `card-host` 原生显示；尚未在每种 Shell 和平台上验证。 |
 
-哪个 Shell 提供哪项宿主服务，见 Design Flow 的 [HOST-SERVICES.zh-CN.md](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。
+哪个 Shell 提供哪项宿主服务，见 App Flow 的 [HOST-SERVICES.zh-CN.md](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。

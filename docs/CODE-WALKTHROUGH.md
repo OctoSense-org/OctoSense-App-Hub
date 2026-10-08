@@ -27,7 +27,8 @@ covers the threads and queues that carry their work.
 App Hub supplies package admission, distribution and hosting. OctoSense
 supplies the desktop and phone shells, app-agent peers and the octos runtime.
 The shell starts model work after it prepares an allowed app peer. The Python
-`tools/octo` in Design Flow is a development command, unrelated to octos.
+`tools/octo` in OctoSense App Flow (formerly Design Flow) is a development
+command, unrelated to octos.
 
 Splash is the Makepad Script runtime that contains an app and draws its UI.
 
@@ -48,7 +49,7 @@ sign-in form; it runs in an isolate of its own, under no app's policy.
 
 ```mermaid
 flowchart LR
-    Author[Design Flow tools/octo] --> Gate[hub: stamp/check/scan]
+    Author[App Flow tools/octo] --> Gate[hub: stamp/check/scan]
     Gate --> Catalog[Signed catalog and bundles]
     Catalog --> Store[Store: verify and install]
     Store --> Runner[Shell CardModule]
@@ -67,8 +68,8 @@ registers no host services; only App Hub's `runtime` discovery answers there.
 
 ## 2. Run the right host
 
-First prepare the sibling sources with Design Flow's
-[native workspace instructions](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/NATIVE-WORKSPACE.md).
+First prepare the sibling sources with App Flow's
+[native workspace instructions](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/NATIVE-WORKSPACE.md).
 This workspace's [`Cargo.toml`](../Cargo.toml) patches paths to `../makepad`,
 `../octoscript-makepad` and `../octoscript`. Without those siblings, even
 `cargo metadata` and policy-only tests fail to resolve. Each workspace that
