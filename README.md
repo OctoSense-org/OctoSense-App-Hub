@@ -239,10 +239,12 @@ they do not publish a v2 update.
 
 ## Apps
 
-The authenticated public **catalog sequence 13** offers these fresh GitHub
-publisher identities. Search by exact ID to distinguish them from historical
-`org.octosense.samples.*` entries. The new IDs do not migrate old installations
-or their data.
+The authenticated public **catalog sequence 14** offers the GitHub publisher
+identities below. The three historical `org.octosense.samples.*` apps are
+withdrawn, including their 0.1.0 and 0.1.1 releases. Their installed data is
+retained; the new IDs do not migrate it. RC1 still displays withdrawn apps as
+unavailable. The discovery fix in [App Hub #170](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/170)
+hides them from browsing and search when included in a newer host.
 
 | App | Exact app ID | Latest version | Runs on |
 | --- | --- | --- | --- |
@@ -258,7 +260,8 @@ and does not book events. No app needs an OctoSense cloud account.
 
 The public [first-admission candidate](catalog-candidates/ymote-github-samples-first/admission-review.json)
 and [update candidate](catalog-candidates/ymote-github-samples-updates/independent-review.json)
-record the reviewed releases. Catalog 13 preserves the preceding entries,
+record the reviewed releases. The [retirement review](catalog-candidates/retire-legacy-connected-samples/review.json)
+records the six withdrawals. Catalog 14 preserves the preceding entries,
 including these IDs' 0.2.0/1.1.0 versions. Historical
 [0.1.1 admission](docs/admissions/connected-apps-0.1.1/README.md) and
 [0.1.0 evidence](reviews/connected-apps-0.1.0/README.md) remain unchanged;
