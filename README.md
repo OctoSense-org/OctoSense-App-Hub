@@ -27,14 +27,19 @@ follow [Build your first Hub app](docs/FIRST-APP.md) and
 your Design Flow checkout to build `hub` and `card-host`. Do not edit
 `catalog.json`, `index/` or `artifacts/`.
 
-**Submitting an app?** Follow [Submit an app to the App Hub](docs/SUBMITTING.md):
-open an issue here with the repository, version/commit, screenshots and
-permissions. You may open it before the release is ready, then add its verified
-release pack. A GitHub release alone is not App Hub approval. The catalog's
-[three reference apps](docs/SUBMITTING.md#the-three-reference-apps) (GitHub
-Notes, Inbox Assistant and Google Calendar) passed admission end to end; their
-repositories show a complete submission. Look up rules, capabilities and
-fields in the [publishing reference](docs/PUBLISHING.md).
+**Submitting an app?** To request publication, open an issue here with the
+repository, version and requested capabilities, as
+[Submit an app to the App Hub](docs/SUBMITTING.md) describes. You can open it
+before the release is ready and add the tag, commit, screenshots and verified
+release pack later; a tag or GitHub release alone submits nothing. That
+guide's four stages cover review, approval and publication, and its
+[`hub` command table](docs/SUBMITTING.md#the-hub-command) lists who runs each
+command and when.
+
+The catalog's [three reference apps](docs/SUBMITTING.md#the-three-reference-apps)
+(GitHub Notes, Inbox Assistant and Google Calendar) passed admission end to
+end; their repositories show a complete submission. Look up rules,
+capabilities and fields in the [publishing reference](docs/PUBLISHING.md).
 
 **Using host APIs?** [Host API compatibility](docs/HOST-API.md) shows how an
 app declares the host APIs it needs and checks which ones a host implements.
@@ -49,14 +54,14 @@ app declares the host APIs it needs and checks which ones a host implements.
 | `artifacts/<app>-<version>.bundle/` | App Hub's copy of the bundle, exactly the bytes that were reviewed. `hub publish` creates it. |
 | `artifacts/<app>-<version>.bundle.pack.json` | The same bundle as one file, which stores download. |
 | `docs/FIRST-APP.md` | A first-app walkthrough for a card app or a script app: create, run, capture and check. |
-| `docs/SUBMITTING.md` | The submission, step by step: repository, manifest, listing, screenshots, signing, release, issue and review. |
+| `docs/SUBMITTING.md` | The submission's four stages, who runs each `hub` command, and every step from repository layout to publication. |
 | `docs/PUBLISHING.md` | The reference: gate rules; capabilities and who serves them; manifest, listing and tool fields; host services; `hub` commands; signing. |
 | `docs/GITHUB-PUBLISHING.md` | Admin-authorized GitHub signing, exact candidate review and v2 migration. |
 | `docs/HOST-API.md` | Declaring the host APIs an app needs, `runtime` discovery and what today's hosts implement. |
 | `docs/ICONS.md` | Canonical icon ownership, export constraints and visual review. |
 | `docs/DEVELOPMENT.md` | The guide map, delivery paths, `card-host` and its remote-control routes, and `card-studio`. |
 | `templates/app/` | A card app repository scaffold with metadata, an example icon and linked agent instructions. |
-| `crates/app-contract` | The app contract, `octosense-app-contract` ([OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)): the manifest, the policy an app gets, bundle integrity and running a bundle. Within `1.x` it only grows ([README](crates/app-contract/README.md)). This tree prepares 1.8.0; crates.io currently provides 1.7.1 ([Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)). |
+| `crates/app-contract` | The app contract, `octosense-app-contract` ([OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)): the manifest, the policy an app gets, bundle integrity and running a bundle. Within `1.x` it only grows ([README](crates/app-contract/README.md)). Contract 1.8.0 is published on crates.io ([Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)). |
 | `crates/app-policy` | The signed manifest and listing, admission, and resolution into an isolate's settings and an agent session profile ([OctoSense Home ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0002-agentic-app-security-model.md)); an app's own agent (`tools.json`, `AGENT.md`, skills) loaded as an `AgentBundle`; the `tools.json` parser and checks that native modules' tool manifests share (`ToolManifest::load`). It also re-exports the app contract. |
 | `crates/app-hub` | The index, the signed catalog, the gate, the agent scan, the device client and the `hub` command ([OctoSense Home ADR 0003](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0003-app-hub-and-store.md)). |
 | `crates/appstore` | The store as an OctoSense module, the `card` module that runs an installed app as its own client, system apps (`os.` ids) and host services with their sheets. |
@@ -192,15 +197,18 @@ access (or an explicitly supplied mirror containing a verified v2 envelope).
 Fetch/proof failure never falls back to legacy. Older released hosts continue
 to use `catalog.json`; a compatible OctoSense release is still pending.
 
-## How a maintainer publishes an app
+## How the Hub publishes an app
 
-After you submit ([Submit an app to the App Hub](docs/SUBMITTING.md)), a
-maintainer reviews the exact bytes of your tagged commit.
-[GitHub admin publication](docs/GITHUB-PUBLISHING.md) signs a new v2 catalog
-without a separate Hub private key. See its delivery-status receipt for
-production publication and consumer acceptance; a compatible host release
-remains pending. The existing `hub publish` path still produces
-the legacy anchor-signed catalog.
+After you open a submission issue
+([Submit an app to the App Hub](docs/SUBMITTING.md)), a reviewer runs the gate
+on the exact bytes of your release and posts findings in the issue. An App
+Hub admin then approves the submission; the Hub publishes nothing without
+that approval. The admin publishes the approved entry with
+[GitHub admin publication](docs/GITHUB-PUBLISHING.md): GitHub Actions signs
+the new `catalog-v2.json` with Sigstore, so no admin keeps a separate Hub
+private key. No OctoSense release reads `catalog-v2.json` yet: OctoSense
+desktop 0.1.0-beta.2 reads only the legacy anchor-signed `catalog.json`,
+which `hub publish` produces.
 
 For v2, publish a reviewed withdrawal candidate through the same protected
 workflow, retaining history and a reason. Stores honor it after accepting the

@@ -20,7 +20,9 @@ App Hub 为 OctoSense 发布应用。本仓库包含：
 
 **要开发应用？** 请从 [OctoSense-org 主页](https://github.com/OctoSense-org)上的“先读这些”列表开始：先读 OctoScript-App-Design-Flow（下称 Design Flow）的 `AGENTS.md`，再读其 `docs/QUICKSTART.md`。接着按照[开发你的第一个 Hub 应用](docs/FIRST-APP.zh-CN.md)和[应用图标与随包素材](docs/ICONS.zh-CN.md)操作。把本仓库克隆到 Design Flow 检出目录旁边，用来构建 `hub` 和 `card-host`。不要修改 `catalog.json`、`index/` 或 `artifacts/`。
 
-**要提交应用？** 请按照[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)操作：在本仓库开 issue，提供仓库、版本/commit、截图和权限。可以先开 issue，再补充经过验证的 release pack；GitHub release 本身不代表 App Hub 批准。目录中的[三个参考应用](docs/SUBMITTING.zh-CN.md#三个参考应用)（GitHub Notes、Inbox Assistant 和 Google Calendar）完整通过了准入，它们的仓库展示了一次完整的提交。规则、能力和字段请查阅[发布参考](docs/PUBLISHING.zh-CN.md)。
+**要提交应用？** 按照[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)，在本仓库开 issue 请求发布，填写仓库、版本和所需能力。Release 还没准备好时也可以先开，之后再补充 tag、commit、截图和经过验证的 Release pack；只打 tag 或只创建 GitHub Release 都不算提交。该指南的四个阶段涵盖审核、批准和发布；每个命令由谁运行、何时运行，见其中的 [`hub` 命令](docs/SUBMITTING.zh-CN.md#hub-命令)一节。
+
+签名目录中的[三个参考应用](docs/SUBMITTING.zh-CN.md#三个参考应用)（GitHub Notes、Inbox Assistant 和 Google Calendar）完整通过了准入，它们的仓库展示了一次完整的提交。规则、能力和字段请查阅[发布参考](docs/PUBLISHING.zh-CN.md)。
 
 **要使用宿主 API？** [宿主 API 兼容性](docs/HOST-API.zh-CN.md)说明应用如何声明所需的宿主 API，以及如何查询宿主实现了哪些 API。
 
@@ -34,14 +36,14 @@ App Hub 为 OctoSense 发布应用。本仓库包含：
 | `artifacts/<app>-<version>.bundle/` | App Hub 保存的应用包副本，与审核时的字节完全一致。由 `hub publish` 生成。 |
 | `artifacts/<app>-<version>.bundle.pack.json` | 打成单个文件的同一应用包，商店下载的就是它。 |
 | `docs/FIRST-APP.md` | 第一个应用（卡片应用或脚本应用）的分步教程：创建、运行、截图与检查。 |
-| `docs/SUBMITTING.md` | 提交流程的分步说明：仓库、清单、商店信息、截图、签名、发布、issue 与审核。 |
+| `docs/SUBMITTING.md` | 提交流程的四个阶段、每个 `hub` 命令由谁运行，以及从仓库结构到发布的每一步。 |
 | `docs/PUBLISHING.md` | 参考文档：准入规则；能力及其提供方；清单、商店信息和工具的字段；宿主服务；`hub` 命令；签名。 |
 | `docs/GITHUB-PUBLISHING.md` | 管理员授权的 GitHub 签名、确切候选审核及 v2 迁移。 |
 | `docs/HOST-API.md` | 声明应用需要的宿主 API、用 `runtime` 发现宿主 API，以及目前各宿主实现了哪些 API。 |
 | `docs/ICONS.md` | 规范图标的归属、导出约束与视觉评审。 |
 | `docs/DEVELOPMENT.md` | 指南导航、交付路径、`card-host` 及其远程控制路由，以及 `card-studio`。 |
 | `templates/app/` | 卡片应用仓库脚手架，包含元数据、示例图标和链接好的 Agent 指引。 |
-| `crates/app-contract` | 应用契约 `octosense-app-contract`（[OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)）：清单、应用获得的策略、应用包完整性校验与运行应用包所需的内容。在 `1.x` 内只做增量变更（[README](crates/app-contract/README.md)）。本分支正在准备 1.8.0；crates.io 当前提供 1.7.1（[crates.io 上的版本](crates/app-contract/README.md#versions-on-cratesio)，英文）。 |
+| `crates/app-contract` | 应用契约 `octosense-app-contract`（[OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)）：清单、应用获得的策略、应用包完整性校验与运行应用包所需的内容。在 `1.x` 内只做增量变更（[README](crates/app-contract/README.md)）。契约 1.8.0 已发布到 crates.io（[crates.io 上的版本](crates/app-contract/README.md#versions-on-cratesio)，英文）。 |
 | `crates/app-policy` | 签名清单与商店信息、准入，以及解析为隔离环境设置和 Agent 会话配置（[OctoSense Home ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0002-agentic-app-security-model.md)）；应用自带的 Agent（`tools.json`、`AGENT.md`、技能）加载为 `AgentBundle`；原生模块的工具清单共用同一套 `tools.json` 解析与检查（`ToolManifest::load`）。它还重新导出应用契约。 |
 | `crates/app-hub` | 索引、签名目录、准入检查、Agent 扫描、设备端客户端和 `hub` 命令（[OctoSense Home ADR 0003](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0003-app-hub-and-store.md)）。 |
 | `crates/appstore` | 作为 OctoSense 模块的商店；把已安装应用作为独立客户端运行的 `card` 模块；系统应用（`os.` 前缀 id）；以及宿主服务及其面板。 |
@@ -102,9 +104,7 @@ OCTOSENSE_PREVIEW_SIZE=1200x860 OCTOSENSE_APP_DATA="$(mktemp -d)" target/release
 
 ## 让商店读取其他 Hub
 
-新兼容宿主默认选择 `github-v2`，从本 Hub 获取 `catalog-v2.json`。
-`OCTOSENSE_HUB` 可指定另一个目录或基础 URL，但更换来源不会更换可信 GitHub
-身份或渠道。镜像必须提供同一份可验证的 v2 信封和产物。
+新兼容宿主默认选择 `github-v2`，从本 Hub 获取 `catalog-v2.json`。`OCTOSENSE_HUB` 可指定另一个目录或基础 URL，但更换来源不会更换可信 GitHub 身份或渠道。镜像必须提供同一份可验证的 v2 信封和产物。
 
 使用**旧格式本地测试 Hub** 时，显式选择 `legacy`、提供测试信任锚，并使用新的应用数据目录：
 
@@ -114,14 +114,11 @@ OCTOSENSE_HUB_ANCHOR="<test-anchor-hex>" OCTOSENSE_APP_DATA="<fresh-test-directo
 appstore
 ```
 
-此示例仅按源码核对；运行前替换占位符。应用库只要已有 v2 缓存，即使损坏，也会
-拒绝降级到旧格式。旧缓存不会离线转换：第一次获取 v2 需要网络，或显式提供含
-有效 v2 信封的镜像。拉取或证明失败不会回退。旧发布宿主继续读取 `catalog.json`，
-兼容的 OctoSense 版本仍待发布。
+此示例仅按源码核对；运行前替换占位符。应用库只要已有 v2 缓存，即使损坏，也会拒绝降级到旧格式。旧缓存不会离线转换：第一次获取 v2 需要网络，或显式提供含有效 v2 信封的镜像。拉取或证明失败不会回退。较旧的宿主发布版继续读取 `catalog.json`；兼容的 OctoSense 发布版仍待推出。
 
-## 维护者如何发布应用
+## Hub 如何发布应用
 
-你提交应用（[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)）之后，维护者审核你打了 tag 的 commit 中的原样字节。[GitHub 管理员发布](docs/GITHUB-PUBLISHING.zh-CN.md)为新的 v2 目录签名，无需额外的 Hub 私钥。生产发布和消费者验收见该文档的交付状态回执；兼容宿主版本仍待发布。现有 `hub publish` 路径继续生成旧的信任锚签名目录。
+你开了提交 issue（[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)）之后，审核人员会对 Release 中的原样字节运行准入检查，并在 issue 中反馈发现的问题。随后由 App Hub 管理员批准这次提交；未经批准，Hub 不会发布任何内容。管理员通过 [GitHub 管理员发布](docs/GITHUB-PUBLISHING.zh-CN.md)发布已批准的条目：GitHub Actions 用 Sigstore 为新的 `catalog-v2.json` 签名，因此管理员无需另外保管 Hub 私钥。目前还没有任何 OctoSense 发布版读取 `catalog-v2.json`：OctoSense 桌面版 0.1.0-beta.2 只读取 `hub publish` 生成、由信任锚签名的旧格式 `catalog.json`。
 
 v2 的撤回通过相同的受保护工作流发布带理由的新候选，保留历史。商店在获取并验证新目录后执行撤回。`hub withdraw` / `hub remove` 仅修改旧格式目录，不能代替 v2 发布。
 
