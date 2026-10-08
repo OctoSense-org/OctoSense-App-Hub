@@ -10,8 +10,10 @@ the app's grants. The same contract lets a bundle declare its own backend
 run its own agent tools
 ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)).
 
-Contract 1.6.0 is on crates.io, but no released OctoSense build implements
-these APIs yet. Until one does, test in an OctoSense shell built from `main`.
+These declarations are included in contract 1.8.0. The
+[RC1 release](../README.md#download-a-compatible-host), source `933abbcf`,
+implements them within the platform limits below; its download status is
+tracked in that guide.
 An older host, such as OctoSense desktop 0.1.0-beta.2, serves none of these
 APIs and refuses an app that requires them.
 
@@ -91,8 +93,11 @@ registration.
   and a closed app answers `app_not_running`.
 - **Platforms.** The device-permission methods cover Android and macOS, and
   `location.get` covers Android only. It returns the last-known fix, of
-  unknown age. `WebReader` opens embedded pages only on macOS, iOS and
-  Android; on other platforms, OctoSense answers `open` with `false`.
+  unknown age. The RC also embeds ordinary `WebReader` pages on Windows
+  (WebView2) and Linux X11/XWayland (WebKitGTK); native Wayland is unsupported.
+  Linux/Windows advertise `auth.backend.request@1` for declared reads and
+  implement external-browser backend login; live sign-in is not validated here.
+  Embedded backend login and protected writes remain unsupported and fail closed.
 - **Permission requests.** Only an app in the foreground can request a
   permission. A request from an agent or a background card fails with
   `<method> is unavailable to agents/background surfaces`. A request still

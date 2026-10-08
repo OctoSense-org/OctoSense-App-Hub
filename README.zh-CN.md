@@ -26,6 +26,40 @@ App Hub 为 OctoSense 发布应用。本仓库包含：
 
 **要使用宿主 API？** [宿主 API 兼容性](docs/HOST-API.zh-CN.md)说明应用如何声明所需的宿主 API，以及如何查询宿主实现了哪些 API。
 
+## 下载兼容宿主
+
+[**桌面版 0.1.0-rc.1 已发布**](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.1)，源码为 `933abbcf`，
+支持带 GitHub 证明的应用、公开 v2 目录和 Host API v1。
+
+| 平台 | 下载 |
+| --- | --- |
+| macOS Apple 芯片 | [DMG](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/OctoSense_0.1.0-rc.1_aarch64.dmg) 或 [应用 ZIP](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/OctoSense_0.1.0-rc.1_macos_aarch64.app.zip) |
+| Windows x64 | [安装程序](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_x64-setup.exe) |
+| Linux x86_64 | [Debian 包](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_amd64.deb) 或 [AppImage](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_x86_64.AppImage) |
+
+请用 [SHA256SUMS](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/SHA256SUMS) 核对下载，并阅读发行说明中的平台要求。
+这些预发行包**没有 Apple Developer ID 签名、公证或 Windows 发布者签名**。
+macOS 包在本机构建并验收，Windows/Linux 包来自标签 CI 打包任务。
+[发行来源记录](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/RELEASE-PROVENANCE.json)记载确切文件及签名状态。
+自行构建请按[固定源码的环境准备指南](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/README.zh-CN.md#环境准备)操作。
+
+下面四个示例请在 **Apple 芯片 Mac** 上运行。打开 **App Hub → Search**，
+输入确切应用 ID，选择 **Get**，审阅权限后选择 **Install**，再点 **Open**。
+**Library** 可重新打开已安装应用，并在有兼容新版本时提供 **Update**。
+保留默认公开目录，不需要自定义来源、信任锚、开发者密钥或 OctoSense 云端账户。
+旧 beta.2 宿主无法读取新的发布者证明或公开 v2 目录：请换用兼容宿主，
+不要修改应用证明或目录设置。
+
+RC **没有附带公开的 GitHub/Google OAuth 客户端注册信息**。本地草稿和未连接
+账户时的界面可用；提供商登录需要宿主发行方或运维人员提供注册信息
+（[配置](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/crates/oauth-service/README.zh-CN.md)）。普通用户不应被要求注册
+Google 开发者项目。安装成功不代表登录、邮件投递、GitHub commit 或日历写入已验证。
+连接账户示例只声明 macOS。Linux/Windows 已实现外部浏览器后端登录和清单声明的后端读取，
+但这里未验证这些平台的真实登录。嵌入式后端登录及受保护的写操作仍不支持，会拒绝执行。
+Android Google 授权仍不可用。普通 WebReader 与登录是不同的流程；Linux 需要
+GTK 3/WebKitGTK 和 X11/XWayland，Windows 需要 WebView2。这些引擎不随包附带，
+见[浏览器要求](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/docs/desktop-embedded-browser.zh-CN.md)。
+
 ## 仓库结构
 
 | 路径 | 说明 |
@@ -81,18 +115,26 @@ OCTOSENSE_PREVIEW_SIZE=1200x860 OCTOSENSE_APP_DATA="$(mktemp -d)" target/release
 
 ## 宿主目前提供什么
 
-准入检查接受 105 个能力名称，但只有宿主提供了对应的服务，能力才会生效。[能力](docs/PUBLISHING.zh-CN.md#能力)一节列出了每项能力目前由谁提供。
+准入检查接受能力名称；每次调用仍需要宿主实现并授权。
+完整参考见[能力](docs/PUBLISHING.zh-CN.md#能力)。[RC1 发行版](#下载兼容宿主)包含：
 
-- 除了用于发现宿主 API 的 `runtime`，`card-host` 不提供任何宿主服务，也不运行 Agent。
-- OctoSense 向每个获得授权的应用提供 `mail`、`model` 和 `glance`。
-- 宿主配置好 OAuth 客户端注册信息后，OctoSense 桌面版 0.1.0-beta.2 提供已连接账户相关的能力（`auth`、`github`、`gcalendar`、`gmail`）。令牌留在宿主中，应用只拿到连接句柄。
-- OctoSense `main`（尚未进入任何发布版本）还能在 macOS 和 Android 上通过 `auth` 让应用登录清单声明的后端，并执行清单列出的后端操作。每次写操作都要等用户确认（[登录应用自己的后端](docs/PUBLISHING.zh-CN.md#登录自己的后端)）。
-- OctoSense `main` 还在 macOS 和 Android 上向声明了 `host-api-v1` 和相应能力的应用提供设备权限方法：`camera.permission.*`、`microphone.permission.*` 和 `location.permission.*`，各含 `status`、`request` 和 `revoke`。在 Android 上，它还提供 `location.get`。只有在前台的应用才能请求权限，并由用户在宿主面板上批准，如果操作系统要求，还要在系统提示中确认（[宿主 API 兼容性](docs/HOST-API.zh-CN.md)）。
-- OctoSense `main` 还要求亲手点按才能批准 GitHub 或 Google 日历的保存，拒绝应用 Agent 发布可执行 Splash（`script`）卡片，并且只保留从 30 天前到 366 天后的 Google 日历日程（尚未进入任何发布版本）。OctoSense 桌面版 0.1.0-beta.2 不具备其中任何一项。
-- OctoSense 只向自己的系统应用提供 `calendar`、`llm` 和 `news`。对于 `photos` 和 `youtube`，它只向 `os.photos` 和 `os.youtube` 提供一个 `notify` 方法。尚未提供：面向商店应用的媒体服务。
-- 目前没有任何发布版本提供 `wasm`（应用 `fns/*.wasm` 中自带的函数，契约 1.7.0）。OctoSense 只在启用 `wasm-lab` 特性的构建中运行它们。
-- OctoSense 运行应用 Agent 已获授权的 `implemented_by: "host-service"` 工具，包括用 `host_method` 映射到已审核共享服务的工具，并把 `AGENT.md` 和技能作为指引加载（[应用的 Agent 与工具](docs/PUBLISHING.zh-CN.md#应用的-agent-与工具)）。
-- 目前还没有任何 OctoSense 发布版本运行 `implemented_by: "app"` 的工具：桌面版 0.1.0-beta.2 会拒绝它们，返回 `app_tool_unavailable`。OctoSense `main` 提供 `app_tools.dispatch@1`，会在已打开的应用中运行这类工具，前提是应用声明了 `requires: ["script-tools-v1"]`；应用关闭时返回 `app_not_running`（[脚本工具执行](docs/PUBLISHING.zh-CN.md#脚本工具执行script-tools-v1)）。
+- 公开 GitHub v2 目录及 `publisher-github-v1` 验证，使用契约 1.8.0。
+- `runtime` 发现和 `script-tools-v1`：已准入的 `implemented_by: "app"` 工具
+  调用已打开的完整应用中的 Splash 处理函数；应用关闭时返回 `app_not_running`。
+- 已连接账户服务（`auth`、`github`、`gmail`、`gcalendar`），受提供商注册和平台
+  限制约束。令牌保留在宿主中。
+- macOS、Android、Linux 和 Windows 上由清单声明的后端读取；受保护的写操作需要
+  受支持的原生批准流程。相机、麦克风和位置的逐应用授权支持 macOS/Android；
+  `location.get` 仅在 Android 上提供。
+- 支持平台上的 GitHub/Calendar 保存和 Gmail 发送需要亲手确认；Agent 发布速览
+  卡片时拒绝可执行 Splash `script`；Calendar 同步限定日期范围。
+- `model` 的媒体及文本方法，仍需已配置且有相应权益的提供商。方法已注册不代表
+  已通过真实提供商执行验证。
+
+`card-host` 仅提供 `runtime` 发现，不运行 Agent，并拒绝封存的 Release 和仅宿主
+支持的要求标记。`calendar`、`llm`、`news` 仍为系统应用服务；`photos`/`youtube`
+通知仅供各自的系统应用使用。Wasm 仍需选择 `wasm-lab`，**标准桌面安装包默认不启用**。
+声明能力不能添加原生代码或开启构建特性。见[宿主 API 兼容性](docs/HOST-API.zh-CN.md)。
 
 ## 信任锚
 
@@ -114,26 +156,34 @@ OCTOSENSE_HUB_ANCHOR="<test-anchor-hex>" OCTOSENSE_APP_DATA="<fresh-test-directo
 appstore
 ```
 
-此示例仅按源码核对；运行前替换占位符。应用库只要已有 v2 缓存，即使损坏，也会拒绝降级到旧格式。旧缓存不会离线转换：第一次获取 v2 需要网络，或显式提供含有效 v2 信封的镜像。拉取或证明失败不会回退。较旧的宿主发布版继续读取 `catalog.json`；兼容的 OctoSense 发布版仍待推出。
+此示例仅按源码核对；运行前替换占位符。应用库只要已有 v2 缓存，即使损坏，也会拒绝降级到旧格式。旧缓存不会离线转换：第一次获取 v2 需要网络，或显式提供含有效 v2 信封的镜像。拉取或证明失败不会回退。较旧的宿主发布版继续读取 `catalog.json`；公开 v2 目录需要[兼容的 RC1 发行版](#下载兼容宿主)。
 
 ## Hub 如何发布应用
 
-你开了提交 issue（[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)）之后，审核人员会对 Release 中的原样字节运行准入检查，并在 issue 中反馈发现的问题。随后由 App Hub 管理员批准这次提交；未经批准，Hub 不会发布任何内容。管理员通过 [GitHub 管理员发布](docs/GITHUB-PUBLISHING.zh-CN.md)发布已批准的条目：GitHub Actions 用 Sigstore 为新的 `catalog-v2.json` 签名，因此管理员无需另外保管 Hub 私钥。目前还没有任何 OctoSense 发布版读取 `catalog-v2.json`：OctoSense 桌面版 0.1.0-beta.2 只读取 `hub publish` 生成、由信任锚签名的旧格式 `catalog.json`。
+你开了提交 issue（[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)）之后，审核人员会对 Release 中的原样字节运行准入检查，并在 issue 中反馈发现的问题。随后由 App Hub 管理员批准这次提交；未经批准，Hub 不会发布任何内容。管理员通过 [GitHub 管理员发布](docs/GITHUB-PUBLISHING.zh-CN.md)发布已批准的条目：GitHub Actions 用 Sigstore 为新的 `catalog-v2.json` 签名，因此管理员无需另外保管 Hub 私钥。RC1 发行版读取 `catalog-v2.json`；OctoSense 桌面版 0.1.0-beta.2 只读取 `hub publish` 生成、由信任锚签名的旧格式 `catalog.json`。
 
 v2 的撤回通过相同的受保护工作流发布带理由的新候选，保留历史。商店在获取并验证新目录后执行撤回。`hub withdraw` / `hub remove` 仅修改旧格式目录，不能代替 v2 发布。
 
 ## 应用
 
-| 应用 | 版本 | 分类 | 运行平台 | 发布者 | 用到的功能 | 状态 |
-| --- | --- | --- | --- | --- | --- | --- |
-| [GitHub Notes](https://github.com/ymote/octosense-github-notes) | 0.1.1 | 效率 | macOS | ymote | 本地草稿、通过宿主登录 GitHub、经你确认的 commit，以及 Shell 的 Ask 对话栏中可选的应用 Agent | 预览 |
-| [Inbox Assistant](https://github.com/ymote/octosense-inbox-assistant) | 0.1.1 | 效率 | macOS | ymote | Gmail、本地草稿、已配置的模型，以及经你同意的速览卡片与 Agent 处理 | 预览 |
-| [Google Calendar](https://github.com/ymote/octosense-google-calendar) | 0.1.1 | 效率 | macOS | ymote | Google Calendar、本地草稿，以及经你同意的应用 Agent 聊天与速览卡片 | 预览 |
+已认证的公开**签名目录第 13 版**提供以下新的 GitHub 发布者身份。请搜索确切 ID，
+与历史 `org.octosense.samples.*` 条目区分。新 ID 不会迁移旧安装或旧数据。
 
-以上为 **macOS 开发者预览**。第 10 版目录提供每个应用的 0.1.1 版，并保留其 0.1.0 条目。请在搭载 Apple 芯片的 Mac 上通过 [OctoSense 桌面版 0.1.0-beta.2](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-beta.2) 的商店安装。OctoSense 桌面版 0.1.0-beta.1 和 Home 0.1.0-beta.1 会列出这些应用，但无法安装：它们的商店把 `auth` 当作未知能力拒绝。目前还没有任何手机版本能安装它们。[0.1.1 准入记录](docs/admissions/connected-apps-0.1.1/README.zh-CN.md)列出了发布者的 commit 和已验证的内容。[0.1.0 记录](reviews/connected-apps-0.1.0/README.zh-CN.md)还包括在桌面版 0.1.0-beta.2 发布版中进行的商店测试。
+| 应用 | 确切应用 ID | 最新版本 | 运行平台 |
+| --- | --- | --- | --- |
+| [GitHub Notes](https://github.com/ymote/octosense-github-notes/releases/tag/v0.2.1) | `io.github.ymote.githubnotes` | 0.2.1 | macOS |
+| [Inbox Assistant](https://github.com/ymote/octosense-inbox-assistant/releases/tag/v0.2.1) | `io.github.ymote.inboxassistant` | 0.2.1 | macOS |
+| [Google Calendar](https://github.com/ymote/octosense-google-calendar/releases/tag/v0.2.1) | `io.github.ymote.googlecalendar` | 0.2.1 | macOS |
+| [Camera Card Demo](https://github.com/ymote/camera-card/releases/tag/v1.1.1) | `io.github.ymote.cameracard` | 1.1.1 | macOS |
 
-登录 GitHub 或 Google 需要宿主上有 OAuth 客户端注册信息。OctoSense 桌面版 0.1.0-beta.2 只从宿主的 `oauth/clients.json` 读取注册信息，而该版本没有附带任何注册信息（[已连接账户与 App Hub 示例](https://github.com/OctoSense-org/OctoSense/blob/desktop-v0.1.0-beta.2/crates/oauth-service/README.zh-CN.md)）。OctoSense `main` 会在构建时编入发行方提供的注册信息，可选的 `oauth/clients.json` 会整体替换它们；这项改动尚未进入任何发布版本。
+四个应用都是开发者预览。Camera Card Demo 是**静态 L0 界面**，不是拍照应用。
+三个连接账户的应用保留本地草稿，访问提供商时需要宿主配置 OAuth；Calendar 的
+Agent 提供建议，不会创建日程。所有应用都不需要 OctoSense 云端账户。
 
-尚未在发布版本上验证：真实登录和远程写入。在开发构建上，仅验证身份的登录已在 macOS 上通过，Google Calendar 也完成了一次连接并保存了一个日程；GitHub commit 和 Gmail 发送仍未验证（[当前交付边界](https://github.com/OctoSense-org/OctoSense/blob/main/crates/oauth-service/README.zh-CN.md#当前交付边界)）。
-
-Calendar 应用 Agent 只提供建议，不会创建日程。这三个应用都不需要 OctoSense 云端账户。
+公开的[首次准入候选](catalog-candidates/ymote-github-samples-first/admission-review.json)及
+[更新候选](catalog-candidates/ymote-github-samples-updates/independent-review.json)记录了经审核
+的 Release。目录 13 保留之前的条目，包括这些 ID 的 0.2.0/1.1.0 版本。
+历史 [0.1.1 准入](docs/admissions/connected-apps-0.1.1/README.zh-CN.md)及
+[0.1.0 证据](reviews/connected-apps-0.1.0/README.zh-CN.md)保持原样，描述的是旧
+Ed25519 身份，而不是新的发布路径。安装方法及当前账户/平台限制见
+[下载兼容宿主](#下载兼容宿主)。

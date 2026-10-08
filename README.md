@@ -44,6 +44,47 @@ capabilities and fields in the [publishing reference](docs/PUBLISHING.md).
 **Using host APIs?** [Host API compatibility](docs/HOST-API.md) shows how an
 app declares the host APIs it needs and checks which ones a host implements.
 
+## Download a compatible host
+
+[**Desktop 0.1.0-rc.1 is available**](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.1), built from source
+`933abbcf`, for GitHub-proven apps, the public v2 catalog and Host API v1.
+
+| Platform | Download |
+| --- | --- |
+| macOS Apple silicon | [DMG](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/OctoSense_0.1.0-rc.1_aarch64.dmg) or [app ZIP](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/OctoSense_0.1.0-rc.1_macos_aarch64.app.zip) |
+| Windows x64 | [Installer](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_x64-setup.exe) |
+| Linux x86_64 | [Debian package](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_amd64.deb) or [AppImage](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_x86_64.AppImage) |
+
+Check downloads against [SHA256SUMS](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/SHA256SUMS) and read the release's
+platform instructions. These prerelease packages have **no Apple Developer ID
+signature or notarization, and no Windows publisher signature**. The macOS
+package was built and validated locally; Windows/Linux packages came from the
+tagged CI package jobs. [Release provenance](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/RELEASE-PROVENANCE.json)
+records the exact files and signing status. To build yourself, follow the
+[pinned setup guide](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/README.md#set-up).
+
+For the four samples below, use **macOS on Apple silicon**. Open **App Hub →
+Search**, enter the exact app ID, choose **Get**, review its permissions and
+choose **Install**, then **Open**. **Library** reopens an installed app and
+offers **Update** when a compatible newer version is available. Keep the
+default public catalog; no custom origin, anchor, developer key or OctoSense
+cloud account is needed. An older beta.2 host cannot read the new publisher
+proof or public v2 channel: install a compatible host instead of changing the
+app's proof or catalog settings.
+
+The RC does **not** ship public GitHub/Google OAuth client registrations.
+Local drafts and no-account screens work; provider sign-in needs registration
+supplied by the host distributor/operator ([configuration](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/crates/oauth-service/README.md#configure-a-release-maintainers)).
+Ordinary users should not need to register a Google developer project.
+Installing an app does not prove login, email delivery, a GitHub commit or a
+Calendar write. The connected samples declare macOS only. Linux/Windows
+implement external-browser backend login and declared backend reads, but live
+sign-in on those platforms is not validated here. Embedded backend login and
+protected writes remain unsupported and fail closed. Android Google
+authorization remains unavailable. Ordinary WebReader is separate from login;
+Linux needs GTK 3/WebKitGTK and X11/XWayland, and Windows needs WebView2. Those
+engines are not bundled; see the [browser requirements](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/docs/desktop-embedded-browser.md).
+
 ## Repository layout
 
 | Path | What it is |
@@ -121,49 +162,30 @@ are in [AGENTS.md](AGENTS.md).
 
 ## What hosts serve today
 
-The gate admits 105 capability names, but a capability works only where a host
-serves it. [Capabilities](docs/PUBLISHING.md#capabilities) lists who serves
-each one today.
+The gate admits capability names; the host must implement and grant each call.
+[Capabilities](docs/PUBLISHING.md#capabilities) is the reference. The
+[RC1 release](#download-a-compatible-host) includes:
 
-- `card-host` serves no host service except `runtime` discovery, and runs no
-  agent.
-- OctoSense serves `mail`, `model` and `glance` to any app granted them.
-- OctoSense desktop 0.1.0-beta.2 serves the connected-account capabilities
-  (`auth`, `github`, `gcalendar`, `gmail`) once the host has OAuth client
-  registrations. Tokens stay with the host; apps get connection handles.
-- OctoSense `main`, not yet in any release, also signs an app in through
-  `auth` to the backend that its manifest declares, on macOS and Android. It
-  then runs the backend operations that the manifest names, and each write
-  waits for the person's review
-  ([Sign in to your own backend](docs/PUBLISHING.md#sign-in-to-your-own-backend)).
-- OctoSense `main` also serves the device-permission methods on macOS and
-  Android to an app that declares `host-api-v1` and the matching capability:
-  `camera.permission.*`, `microphone.permission.*` and
-  `location.permission.*`, each with `status`, `request` and `revoke`. On
-  Android it also serves `location.get`. Only an app in the foreground can
-  request a permission, and the person approves it on a host sheet, then in
-  the system prompt if the OS asks
-  ([Host API compatibility](docs/HOST-API.md)).
-- OctoSense `main` also requires a physical press to approve a GitHub or
-  Google Calendar save, refuses executable Splash (`script`) cards from app agents,
-  and keeps Google Calendar events from 30 days back to 366 days ahead
-  (in no
-  release yet). OctoSense desktop 0.1.0-beta.2 does none of these.
-- OctoSense serves `calendar`, `llm` and `news` only to its own system apps.
-  For `photos` and `youtube` it serves only a `notify` method, to `os.photos`
-  and `os.youtube`. Not yet: media services for store apps.
-- No release serves `wasm` (an app's own `fns/*.wasm` functions, contract
-  1.7.0). OctoSense runs them only in builds with its `wasm-lab` feature.
-- OctoSense runs an app agent's granted `implemented_by: "host-service"`
-  tools, including tools mapped to a reviewed shared service with
-  `host_method`, and loads `AGENT.md` and skills as guidance
-  ([The app's agent and tools](docs/PUBLISHING.md#the-apps-agent-and-tools)).
-- No OctoSense release runs `implemented_by: "app"` tools yet: desktop
-  0.1.0-beta.2 refuses them with `app_tool_unavailable`. OctoSense `main`
-  advertises `app_tools.dispatch@1` and runs them in the open app, for an app
-  that declares `requires: ["script-tools-v1"]`; a closed app answers
-  `app_not_running`
-  ([Script tool execution](docs/PUBLISHING.md#script-tool-execution-script-tools-v1)).
+- Public GitHub v2 catalog and `publisher-github-v1` verification, with contract 1.8.0.
+- `runtime` discovery and `script-tools-v1`: an admitted `implemented_by: "app"`
+  tool calls the open full app's Splash handler; a closed app returns `app_not_running`.
+- Connected-account services (`auth`, `github`, `gmail`, `gcalendar`), subject
+  to provider registration and platform limits. Tokens remain with the host.
+- Declared backend reads on macOS, Android, Linux and Windows; protected
+  writes require a supported native approval path. Per-app camera, microphone
+  and location consent covers macOS/Android; `location.get` is Android-only.
+- Physical confirmation for protected GitHub/Calendar saves and Gmail sends
+  on supported platforms; agent Glance publication refuses executable Splash
+  `script`; Calendar synchronization uses a bounded date window.
+- `model` media methods as well as text, only with a configured, entitled
+  provider. A registered method does not prove live provider execution.
+
+`card-host` serves only `runtime` discovery, runs no agent, and refuses sealed
+releases or the host-only requirement markers. `calendar`, `llm` and `news`
+remain system-app services; `photos`/`youtube` notifications serve only their
+system apps. Wasm remains opt-in via `wasm-lab`, **off in standard desktop
+packages**. Declaring a capability cannot add native code or enable a build
+feature. See [Host API compatibility](docs/HOST-API.md).
 
 ## Trust anchor
 
@@ -194,8 +216,8 @@ Replace the placeholders before running this source-reviewed example. A library
 with any v2 cache refuses a legacy downgrade, even if that cache is malformed.
 An old legacy cache is not converted offline: the first v2 fetch needs network
 access (or an explicitly supplied mirror containing a verified v2 envelope).
-Fetch/proof failure never falls back to legacy. Older released hosts continue
-to use `catalog.json`; a compatible OctoSense release is still pending.
+Fetch/proof failure never falls back to legacy. Older beta hosts continue to use `catalog.json`; use the
+[RC1 release](#download-a-compatible-host) for the public v2 catalog.
 
 ## How the Hub publishes an app
 
@@ -206,9 +228,8 @@ Hub admin then approves the submission; the Hub publishes nothing without
 that approval. The admin publishes the approved entry with
 [GitHub admin publication](docs/GITHUB-PUBLISHING.md): GitHub Actions signs
 the new `catalog-v2.json` with Sigstore, so no admin keeps a separate Hub
-private key. No OctoSense release reads `catalog-v2.json` yet: OctoSense
-desktop 0.1.0-beta.2 reads only the legacy anchor-signed `catalog.json`,
-which `hub publish` produces.
+private key. The RC1 release reads `catalog-v2.json`; desktop beta.2 reads only the
+legacy anchor-signed `catalog.json`, which `hub publish` produces.
 
 For v2, publish a reviewed withdrawal candidate through the same protected
 workflow, retaining history and a reason. Stores honor it after accepting the
@@ -217,35 +238,29 @@ they do not publish a v2 update.
 
 ## Apps
 
-| App | Version | Category | Runs on | Publisher | Uses | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| [GitHub Notes](https://github.com/ymote/octosense-github-notes) | 0.1.1 | Productivity | macOS | ymote | Local drafts, GitHub sign-in through the host, commits you review, and an optional app agent in the shell's Ask panel | Preview |
-| [Inbox Assistant](https://github.com/ymote/octosense-inbox-assistant) | 0.1.1 | Productivity | macOS | ymote | Gmail, local drafts, the configured model, and, with your consent, Glance cards and agent work | Preview |
-| [Google Calendar](https://github.com/ymote/octosense-google-calendar) | 0.1.1 | Productivity | macOS | ymote | Google Calendar, local drafts, and, with your consent, an app-agent chat and Glance cards | Preview |
+The authenticated public **catalog sequence 13** offers these fresh GitHub
+publisher identities. Search by exact ID to distinguish them from historical
+`org.octosense.samples.*` entries. The new IDs do not migrate old installations
+or their data.
 
-These are **macOS developer previews**. Catalog sequence 10 offers version
-0.1.1 of each and keeps its 0.1.0 entry. Install them from the store in
-[OctoSense desktop 0.1.0-beta.2](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-beta.2)
-on an Apple silicon Mac. OctoSense desktop 0.1.0-beta.1 and Home 0.1.0-beta.1
-list them but cannot install them: their stores refuse `auth` as an unknown
-capability. No phone release can install them yet. The
-[0.1.1 admission record](docs/admissions/connected-apps-0.1.1/README.md)
-names the publisher commits and what was verified. The
-[0.1.0 record](reviews/connected-apps-0.1.0/README.md) also covers a store
-test in the desktop 0.1.0-beta.2 release.
+| App | Exact app ID | Latest version | Runs on |
+| --- | --- | --- | --- |
+| [GitHub Notes](https://github.com/ymote/octosense-github-notes/releases/tag/v0.2.1) | `io.github.ymote.githubnotes` | 0.2.1 | macOS |
+| [Inbox Assistant](https://github.com/ymote/octosense-inbox-assistant/releases/tag/v0.2.1) | `io.github.ymote.inboxassistant` | 0.2.1 | macOS |
+| [Google Calendar](https://github.com/ymote/octosense-google-calendar/releases/tag/v0.2.1) | `io.github.ymote.googlecalendar` | 0.2.1 | macOS |
+| [Camera Card Demo](https://github.com/ymote/camera-card/releases/tag/v1.1.1) | `io.github.ymote.cameracard` | 1.1.1 | macOS |
 
-Signing in to GitHub or Google needs OAuth client registrations on the host.
-OctoSense desktop 0.1.0-beta.2 reads them only from the host's
-`oauth/clients.json`, and the release ships none
-([Connected accounts and App Hub samples](https://github.com/OctoSense-org/OctoSense/blob/desktop-v0.1.0-beta.2/crates/oauth-service/README.md)).
-OctoSense `main` compiles in the registrations its distributor supplies, and
-an optional `oauth/clients.json` replaces all of them; no release includes that
-change yet.
+All four are developer previews. Camera Card Demo is a **static L0 screen**,
+not a camera capture app. The three connected apps retain local drafts and
+require configured host OAuth for provider access; Calendar's agent advises
+and does not book events. No app needs an OctoSense cloud account.
 
-Unverified on a release: live sign-in and remote writes. On development
-builds, identity-only sign-in passed on macOS, and Google Calendar connected
-and saved one event; GitHub commits and Gmail sends remain unverified
-([current delivery boundary](https://github.com/OctoSense-org/OctoSense/blob/main/crates/oauth-service/README.md#current-delivery-boundary)).
-
-The Calendar app agent only advises; it does not book events. None of the
-three apps needs an OctoSense cloud account.
+The public [first-admission candidate](catalog-candidates/ymote-github-samples-first/admission-review.json)
+and [update candidate](catalog-candidates/ymote-github-samples-updates/independent-review.json)
+record the reviewed releases. Catalog 13 preserves the preceding entries,
+including these IDs' 0.2.0/1.1.0 versions. Historical
+[0.1.1 admission](docs/admissions/connected-apps-0.1.1/README.md) and
+[0.1.0 evidence](reviews/connected-apps-0.1.0/README.md) remain unchanged;
+they describe earlier Ed25519 identities, not the new publishing path.
+Follow [Download a compatible host](#download-a-compatible-host) for installation
+and the current account/platform limits.
