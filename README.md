@@ -46,14 +46,22 @@ app declares the host APIs it needs and checks which ones a host implements.
 
 ## Download a compatible host
 
-Use the **desktop-v0.1.0-rc.1 candidate**, source `933abbcf`, for the current
-GitHub-proven apps and Host API v1. **Release assets are awaiting publication**
-at the [RC download page](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.1); a tag alone is not a downloadable release.
-Until assets appear, use the pinned source's [build guide](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/README.md#set-up).
-The intended packages are macOS Apple silicon (`.dmg`/`.app` zip), Windows x64
-(installer), and Linux x86_64 (`.deb`/`.AppImage`). Check the release's actual
-asset list, SHA256SUMS, signing status and installation instructions before use.
-This is a prerelease; do not assume a package is signed or notarized.
+[**Desktop 0.1.0-rc.1 is available**](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.1), built from source
+`933abbcf`, for GitHub-proven apps, the public v2 catalog and Host API v1.
+
+| Platform | Download |
+| --- | --- |
+| macOS Apple silicon | [DMG](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/OctoSense_0.1.0-rc.1_aarch64.dmg) or [app ZIP](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/OctoSense_0.1.0-rc.1_macos_aarch64.app.zip) |
+| Windows x64 | [Installer](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_x64-setup.exe) |
+| Linux x86_64 | [Debian package](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_amd64.deb) or [AppImage](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_x86_64.AppImage) |
+
+Check downloads against [SHA256SUMS](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/SHA256SUMS) and read the release's
+platform instructions. These prerelease packages have **no Apple Developer ID
+signature or notarization, and no Windows publisher signature**. The macOS
+package was built and validated locally; Windows/Linux packages came from the
+tagged CI package jobs. [Release provenance](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/RELEASE-PROVENANCE.json)
+records the exact files and signing status. To build yourself, follow the
+[pinned setup guide](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/README.md#set-up).
 
 For the four samples below, use **macOS on Apple silicon**. Open **App Hub →
 Search**, enter the exact app ID, choose **Get**, review its permissions and
@@ -156,7 +164,7 @@ are in [AGENTS.md](AGENTS.md).
 
 The gate admits capability names; the host must implement and grant each call.
 [Capabilities](docs/PUBLISHING.md#capabilities) is the reference. The
-[RC candidate](#download-a-compatible-host) includes:
+[RC1 release](#download-a-compatible-host) includes:
 
 - Public GitHub v2 catalog and `publisher-github-v1` verification, with contract 1.8.0.
 - `runtime` discovery and `script-tools-v1`: an admitted `implemented_by: "app"`
@@ -209,7 +217,7 @@ with any v2 cache refuses a legacy downgrade, even if that cache is malformed.
 An old legacy cache is not converted offline: the first v2 fetch needs network
 access (or an explicitly supplied mirror containing a verified v2 envelope).
 Fetch/proof failure never falls back to legacy. Older beta hosts continue to use `catalog.json`; use the
-[RC candidate](#download-a-compatible-host) for the public v2 catalog.
+[RC1 release](#download-a-compatible-host) for the public v2 catalog.
 
 ## How the Hub publishes an app
 
@@ -220,7 +228,7 @@ Hub admin then approves the submission; the Hub publishes nothing without
 that approval. The admin publishes the approved entry with
 [GitHub admin publication](docs/GITHUB-PUBLISHING.md): GitHub Actions signs
 the new `catalog-v2.json` with Sigstore, so no admin keeps a separate Hub
-private key. The RC candidate reads `catalog-v2.json`; desktop beta.2 reads only the
+private key. The RC1 release reads `catalog-v2.json`; desktop beta.2 reads only the
 legacy anchor-signed `catalog.json`, which `hub publish` produces.
 
 For v2, publish a reviewed withdrawal candidate through the same protected

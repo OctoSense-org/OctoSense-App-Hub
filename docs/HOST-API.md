@@ -11,7 +11,7 @@ run its own agent tools
 ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)).
 
 These declarations are included in contract 1.8.0. The
-[RC candidate](../README.md#download-a-compatible-host), source `933abbcf`,
+[RC1 release](../README.md#download-a-compatible-host), source `933abbcf`,
 implements them within the platform limits below; its download status is
 tracked in that guide.
 An older host, such as OctoSense desktop 0.1.0-beta.2, serves none of these

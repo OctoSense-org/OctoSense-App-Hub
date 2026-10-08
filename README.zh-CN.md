@@ -28,12 +28,20 @@ App Hub 为 OctoSense 发布应用。本仓库包含：
 
 ## 下载兼容宿主
 
-当前带 GitHub 证明的应用和 Host API v1 使用 **desktop-v0.1.0-rc.1 候选版**，
-源码为 `933abbcf`。[RC 下载页](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.1)的**发行文件仍待发布**；标签本身不等于可下载的发行版。
-文件出现之前，可按固定源码的[构建指南](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/README.zh-CN.md#环境准备)构建。
-计划提供 macOS Apple 芯片（`.dmg`/`.app` zip）、Windows x64（安装程序）及
-Linux x86_64（`.deb`/`.AppImage`）包。使用前请核对实际文件列表、SHA256SUMS、
-签名状态和安装说明。这是预发行版本，不要假定安装包已经签名或公证。
+[**桌面版 0.1.0-rc.1 已发布**](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.1)，源码为 `933abbcf`，
+支持带 GitHub 证明的应用、公开 v2 目录和 Host API v1。
+
+| 平台 | 下载 |
+| --- | --- |
+| macOS Apple 芯片 | [DMG](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/OctoSense_0.1.0-rc.1_aarch64.dmg) 或 [应用 ZIP](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/OctoSense_0.1.0-rc.1_macos_aarch64.app.zip) |
+| Windows x64 | [安装程序](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_x64-setup.exe) |
+| Linux x86_64 | [Debian 包](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_amd64.deb) 或 [AppImage](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_x86_64.AppImage) |
+
+请用 [SHA256SUMS](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/SHA256SUMS) 核对下载，并阅读发行说明中的平台要求。
+这些预发行包**没有 Apple Developer ID 签名、公证或 Windows 发布者签名**。
+macOS 包在本机构建并验收，Windows/Linux 包来自标签 CI 打包任务。
+[发行来源记录](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/RELEASE-PROVENANCE.json)记载确切文件及签名状态。
+自行构建请按[固定源码的环境准备指南](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/README.zh-CN.md#环境准备)操作。
 
 下面四个示例请在 **Apple 芯片 Mac** 上运行。打开 **App Hub → Search**，
 输入确切应用 ID，选择 **Get**，审阅权限后选择 **Install**，再点 **Open**。
@@ -108,7 +116,7 @@ OCTOSENSE_PREVIEW_SIZE=1200x860 OCTOSENSE_APP_DATA="$(mktemp -d)" target/release
 ## 宿主目前提供什么
 
 准入检查接受能力名称；每次调用仍需要宿主实现并授权。
-完整参考见[能力](docs/PUBLISHING.zh-CN.md#能力)。[RC 候选版](#下载兼容宿主)包含：
+完整参考见[能力](docs/PUBLISHING.zh-CN.md#能力)。[RC1 发行版](#下载兼容宿主)包含：
 
 - 公开 GitHub v2 目录及 `publisher-github-v1` 验证，使用契约 1.8.0。
 - `runtime` 发现和 `script-tools-v1`：已准入的 `implemented_by: "app"` 工具
@@ -148,11 +156,11 @@ OCTOSENSE_HUB_ANCHOR="<test-anchor-hex>" OCTOSENSE_APP_DATA="<fresh-test-directo
 appstore
 ```
 
-此示例仅按源码核对；运行前替换占位符。应用库只要已有 v2 缓存，即使损坏，也会拒绝降级到旧格式。旧缓存不会离线转换：第一次获取 v2 需要网络，或显式提供含有效 v2 信封的镜像。拉取或证明失败不会回退。较旧的宿主发布版继续读取 `catalog.json`；公开 v2 目录需要[兼容的 RC 候选版](#下载兼容宿主)。
+此示例仅按源码核对；运行前替换占位符。应用库只要已有 v2 缓存，即使损坏，也会拒绝降级到旧格式。旧缓存不会离线转换：第一次获取 v2 需要网络，或显式提供含有效 v2 信封的镜像。拉取或证明失败不会回退。较旧的宿主发布版继续读取 `catalog.json`；公开 v2 目录需要[兼容的 RC1 发行版](#下载兼容宿主)。
 
 ## Hub 如何发布应用
 
-你开了提交 issue（[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)）之后，审核人员会对 Release 中的原样字节运行准入检查，并在 issue 中反馈发现的问题。随后由 App Hub 管理员批准这次提交；未经批准，Hub 不会发布任何内容。管理员通过 [GitHub 管理员发布](docs/GITHUB-PUBLISHING.zh-CN.md)发布已批准的条目：GitHub Actions 用 Sigstore 为新的 `catalog-v2.json` 签名，因此管理员无需另外保管 Hub 私钥。RC 候选版读取 `catalog-v2.json`；OctoSense 桌面版 0.1.0-beta.2 只读取 `hub publish` 生成、由信任锚签名的旧格式 `catalog.json`。
+你开了提交 issue（[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)）之后，审核人员会对 Release 中的原样字节运行准入检查，并在 issue 中反馈发现的问题。随后由 App Hub 管理员批准这次提交；未经批准，Hub 不会发布任何内容。管理员通过 [GitHub 管理员发布](docs/GITHUB-PUBLISHING.zh-CN.md)发布已批准的条目：GitHub Actions 用 Sigstore 为新的 `catalog-v2.json` 签名，因此管理员无需另外保管 Hub 私钥。RC1 发行版读取 `catalog-v2.json`；OctoSense 桌面版 0.1.0-beta.2 只读取 `hub publish` 生成、由信任锚签名的旧格式 `catalog.json`。
 
 v2 的撤回通过相同的受保护工作流发布带理由的新候选，保留历史。商店在获取并验证新目录后执行撤回。`hub withdraw` / `hub remove` 仅修改旧格式目录，不能代替 v2 发布。
 

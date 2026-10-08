@@ -190,23 +190,23 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 [refused] policy: app com.example.forecast requests unknown capability "model.image"
 ```
 
-能力让应用可以发出请求，但并不提供响应这些请求的服务。响应请求的是**宿主服务**：OctoSense Shell 中的代码，负责完成应用自己无权做的事。**目前由谁提供**一列说明 OctoSense 桌面版 0.1.0-beta.2 上由谁响应。
+能力让应用可以发出请求，但并不提供响应这些请求的服务。响应请求的是**宿主服务**：OctoSense Shell 中的代码，负责完成应用自己无权做的事。**目前由谁提供**一列说明[桌面 RC1](../README.zh-CN.md#下载兼容宿主)在其平台和提供商限制内由谁响应；历史 beta 的区别会明确注明。
 
 | 能力 | 授予的权限 | 商店显示的文字 | 目前由谁提供 |
 | --- | --- | --- | --- |
 | `storage` | 应用自己的存储文件夹：`fs.*`、相机拍摄的内容，以及控件读取的本地文件。没有它，所有 `fs.*` 调用都会失败。 | Keep its own data on this device | 运行时，所有宿主都提供 |
 | `net` | 向 `network.hosts` 中的主机发出请求，不能访问其他主机。 | Reach only: *主机列表* | 运行时，所有宿主都提供 |
 | `images` | 显示任何公开 https 主机上的图片，不限于 `network.hosts`。 | Show pictures from any website | 运行时 |
-| `web` | 在系统网页视图中打开任何公开 https 页面；网页视图没有任何回到应用的通道。 | Open web pages in a browser view | 运行时，macOS、iOS 和 Android 构建都提供。OctoSense 的桌面版 Linux 和 Windows 构建没有网页视图：`open` 返回 `false`。 |
-| `location` | 设备的位置。仅在 OctoSense `main` 上：声明了 `host-api-v1` 的应用须先用 `location.permission.request` 请求权限，之后在 Android 上可以用 `location.get` 读取上次已知的位置（[宿主 API 兼容性](HOST-API.zh-CN.md)）。 | Use your location | 运行时，限具备该功能的设备 |
-| `camera` | 相机。拍摄的内容保存在应用的存储中，所以应用还需要 `storage`。仅在 OctoSense `main` 上：声明了 `host-api-v1` 的应用须先用 `camera.permission.request` 请求权限。 | Use the camera | 运行时，限具备该功能的设备 |
-| `microphone` | 相机录像时的声音。仅在 OctoSense `main` 上：声明了 `host-api-v1` 的应用须先用 `microphone.permission.request` 请求权限。 | Use the microphone | 运行时，限具备该功能的设备 |
+| `web` | 在系统网页视图中打开任何公开 https 页面；网页视图没有任何回到应用的通道。 | Open web pages in a browser view | 运行时在支持的平台上提供，包括 RC1 Windows/WebView2 和 Linux X11/XWayland/WebKitGTK；原生 Wayland 内嵌仍不支持（[运行条件](../README.zh-CN.md#下载兼容宿主)）。 |
+| `location` | 设备的位置。在桌面 RC1 的 macOS 构建及兼容 Android 源码构建中：声明了 `host-api-v1` 的应用须先用 `location.permission.request` 请求权限，之后仅在 Android 上可以用 `location.get` 读取上次已知的位置（[宿主 API 兼容性](HOST-API.zh-CN.md)）。 | Use your location | 运行时，限具备该功能的设备 |
+| `camera` | 相机。拍摄的内容保存在应用的存储中，所以应用还需要 `storage`。在桌面 RC1 的 macOS 构建及兼容 Android 源码构建中：声明了 `host-api-v1` 的应用须先用 `camera.permission.request` 请求权限。 | Use the camera | 运行时，限具备该功能的设备 |
+| `microphone` | 相机录像时的声音。在桌面 RC1 的 macOS 构建及兼容 Android 源码构建中：声明了 `host-api-v1` 的应用须先用 `microphone.permission.request` 请求权限。 | Use the microphone | 运行时，限具备该功能的设备 |
 | `library` | 把拍摄的内容提供给系统相册，其他应用也能看到。 | Save to your photo library, where other apps can see it | 运行时，限具备该功能的设备 |
 | `clipboard` | 剪贴板。 | Use the clipboard | 尚不支持：没有 API 使用它 |
 | `prompt` | 应用向用户提出的问题。 | Ask you questions | 尚不支持：没有宿主读取它。应用 Agent 用 `ask_user_question` 提问。 |
 | `ledger.read` | 读取共享账本。 | Read your shared data | 尚不支持：没有 `ledger` 服务 |
 | `mail` | 通过宿主的 `mail` 服务收发邮件，使用用户在宿主[面板](#面板应用从不收集机密信息)上登录的账户。 | Read and send mail from accounts you sign in to on the device | OctoSense |
-| `auth` | 连接应用自己的 GitHub 或 Google 账户。仅在 OctoSense `main` 上，还能登录应用自己的后端，并调用清单声明的操作（[登录自己的后端](#登录自己的后端)）。 | Connect its own GitHub or Google accounts, or sign in to its developer’s backend, through the host | OctoSense，需要宿主上有 OAuth 客户端注册信息（[已连接账户](#已连接账户)） |
+| `auth` | 连接应用自己的 GitHub 或 Google 账户。在 OctoSense 桌面 RC1 中，还能登录应用自己的后端，并调用清单声明的操作（[登录自己的后端](#登录自己的后端)）。 | Connect its own GitHub or Google accounts, or sign in to its developer’s backend, through the host | OctoSense，需要宿主上有 OAuth 客户端注册信息（[已连接账户](#已连接账户)） |
 | `github` | 读取仓库；每次 Markdown commit 都要等用户确认。 | Read authorized repositories and ask you to review Markdown commits | 同 `auth` |
 | `gcalendar` | 读取 Google 日历；每次修改日程都要等用户确认。 | Read authorized Google calendars and ask you to review event changes | 同 `auth` |
 | `gmail` | 读取 Gmail 并保存回复草稿；每次发送都要等用户确认。与 `mail` 相互独立。 | Read authorized Gmail messages, keep reply drafts and request native send review | 同 `auth` |
@@ -216,11 +216,11 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | `photos` | 相册应用自己的图库和合集。 | Read Photos's own library and publish collections | 仅系统应用：OctoSense 只向 `os.photos` 提供 `photos.notify` |
 | `youtube` | YouTube 搜索和音乐推荐。 | Search YouTube and manage music recommendations | 仅系统应用：OctoSense 只向 `os.youtube` 提供 `youtube.notify` |
 | `glance` | 向速览栏发布速览卡片（`glance.publish`、`glance.withdraw`、`glance.list`）。宿主会检查卡片，为卡片设置上限和有效期；卡片只能打开它自己的应用。 | Show cards on your glance screen | OctoSense |
-| `model` | `model.complete` 和 `model.budget`，受每个应用的每日预算限制。`model.complete` 接受一个模型类别（`fast` 或 `strong`）和一个 JSON Schema。图片、音频、视频和向量方法在 [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368) 中实现，尚未进入发布版宿主。 | Send what you give it to the AI provider you configured, within a daily budget | OctoSense；媒体方法需要新实现及已配置的兼容供应商 |
+| `model` | `model.complete` 和 `model.budget`，受每个应用的每日预算限制。`model.complete` 接受一个模型类别（`fast` 或 `strong`）和一个 JSON Schema。图片、音频、视频和向量方法在 [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368) 中实现，已包含在桌面 RC1 中。 | Send what you give it to the AI provider you configured, within a daily budget | OctoSense；媒体方法需要新实现及已配置的兼容供应商 |
 | `research` | 通过系统工具箱搜索，不超出清单的 research 范围（[research 范围](#research-范围)）。每次搜索都由宿主执行。 | Search *范围允许的内容* | 仅系统应用，且只在手机版构建中 |
 | `crawl` | 通过系统工具箱抓取网站，深度和页数不超过范围中的 `max_depth` 和 `max_pages`，并遵守其中的域名列表。覆盖面比 `research` 更广。 | Crawl websites, *范围的限制*, which reaches more than searching | 同 `research` |
 | `runtime` | 用 `runtime.list` 和 `runtime.describe` 查询宿主实现了哪些 API（[宿主 API 兼容性](HOST-API.zh-CN.md)）。它不授予所列的任何 API。 | Inspect available host APIs without gaining access to their data or permissions | OctoSense 桌面版 0.1.0-beta.2 不提供，它的商店会拒绝这个名称。在基于 App Hub `main` 构建的每个宿主中（包括 `card-host`），由 App Hub 的请求分派器响应。 |
-| `wasm` | 应用自带的函数：应用包 `fns/` 中的 WebAssembly 模块（最多 8 个），由宿主的 `wasm` 服务在沙盒中运行，有截止时间和内存上限。函数只拿到自己的输入，接触不到文件、网络、时钟或其他应用。Agent 工具可以用 `host_method: "wasm.<function>"` 运行它。函数的编写、构建和调用方法见 Design Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/RUST.zh-CN.md)。 | Run its own sandboxed functions on this device | 尚未进入发布版本：OctoSense 只在启用 `wasm-lab` 特性的构建中提供 |
+| `wasm` | 应用自带的函数：应用包 `fns/` 中的 WebAssembly 模块（最多 8 个），由宿主的 `wasm` 服务在沙盒中运行，有截止时间和内存上限。函数只拿到自己的输入，接触不到文件、网络、时钟或其他应用。Agent 工具可以用 `host_method: "wasm.<function>"` 运行它。函数的编写、构建和调用方法见 Design Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/RUST.zh-CN.md)。 | Run its own sandboxed functions on this device | 仅启用 `wasm-lab` 的构建提供；标准桌面 RC1 包默认关闭 |
 
 任何能力都不隐含其他能力。尚不支持：面向商店应用的 `photos` 和 `youtube` 服务。脚本如何调用各项能力，见 Design Flow 的[能力](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.zh-CN.md)文档。
 
@@ -473,10 +473,10 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | `microphone` | `microphone.permission.status` | |
 | `location` | `location.permission.status`、`location.get` | |
 
-`wasm.<function>` 运行应用自带的函数之一（`fns/*.wasm`，`wasm` 能力）。目前还没有任何 OctoSense 发布版提供它，也没有提供上表中的 `auth`、`runtime`、`camera`、`microphone` 和 `location` 方法（[宿主 API 兼容性](HOST-API.zh-CN.md)）。上面的规则同样适用于这些方法，`runtime.list` 和 `runtime.describe` 也不例外。通过准入不等于已经配置账户、取得权限或补上缺少的 API：请用 `runtime.describe` 查询宿主实现了什么。映射到 `auth.backend.request` 的工具只能执行后端声明的 `GET` 操作；写操作仍须应用在前台，并由用户在宿主的原生审阅界面上批准。权限的 `request` 和 `revoke`、账户管理，以及 `app_tools.dispatch@1` 等运行时 ABI，都没有 `host_method`。
+`wasm.<function>` 运行应用自带的函数之一（`fns/*.wasm`，`wasm` 能力）。它只在启用 `wasm-lab` 的构建中可用，标准桌面 RC1 包默认关闭。RC1 在[平台限制](HOST-API.zh-CN.md#限制)内实现上表中的 `auth`、`runtime`、`camera`、`microphone` 和 `location` 方法。上面的规则同样适用于这些方法，`runtime.list` 和 `runtime.describe` 也不例外。通过准入不等于已经配置账户、取得权限或补上缺少的 API：请用 `runtime.describe` 查询宿主实现了什么。映射到 `auth.backend.request` 的工具只能执行后端声明的 `GET` 操作；写操作仍须应用在前台，并由用户在宿主的原生审阅界面上批准。权限的 `request` 和 `revoke`、账户管理，以及 `app_tools.dispatch@1` 等运行时 ABI，都没有 `host_method`。
 
 上述七个媒体别名需要 [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368)，
-尚无发布版宿主实现它们。它们仍要求 `model` 能力和 `private_data: true`。
+桌面 RC1 已包含这些方法。它们仍要求 `model` 能力和 `private_data: true`。
 生成与向量请求可能计费，因此它们和视频取消至少需要 `act` 风险，并使用有资源上限的
 模型服务。发现 API 不代表供应商账户已有权益；远端视频任务已运行时，取消可能失败。
 额度和进程内任务生命周期见双语[媒体契约](https://github.com/OctoSense-org/OctoSense/blob/main/apps/ai-providers/host-service/MEDIA.zh-CN.md)。
@@ -485,13 +485,13 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 账户/业务写入、登录、确认和批准都没有 `host_method`：这些操作由用户在应用自己的
 界面上发起。上述有上限的模型任务是模型供应商提交的明确例外。
 
-对于映射到 `glance.publish` 的工具，让 `input_schema` 只接受 `template` 加 `initial`，或 L0 `source` 加 `data`。绝不要接受 `script`。OctoSense 桌面版 0.1.0-beta.2 按应用自身的策略发布 Agent 提交的脚本卡片，因此模型写出的 `script` 会作为你的应用运行。OctoSense `main`（尚未进入任何发布版）会拒绝这类卡片，报错 `Agents cannot publish executable Splash; choose an admitted template with initial data, or L0 source`；它也拒绝 L1 的 `source`。
+对于映射到 `glance.publish` 的工具，让 `input_schema` 只接受 `template` 加 `initial`，或 L0 `source` 加 `data`。绝不要接受 `script`。OctoSense 桌面版 0.1.0-beta.2 按应用自身的策略发布 Agent 提交的脚本卡片，因此模型写出的 `script` 会作为你的应用运行。OctoSense 桌面 RC1 会拒绝这类卡片，报错 `Agents cannot publish executable Splash; choose an admitted template with initial data, or L0 source`；它也拒绝 L1 的 `source`。
 
 源码：`crates/app-policy/src/agent.rs` 中的 `SHARED_HOST_METHODS`。
 
 ### 脚本工具执行（`script-tools-v1`）
 
-脚本工具是 `"implemented_by": "app"` 的工具：由应用自己的 Splash 代码在已打开的应用中运行。它需要提供 `app_tools.dispatch@1` 的宿主，例如基于 `main` 构建的 OctoSense Shell；OctoSense `main` 尚未进入任何发布版。OctoSense 桌面版 0.1.0-beta.2 拒绝这类工具，返回 `app_tool_unavailable`。
+脚本工具是 `"implemented_by": "app"` 的工具：由应用自己的 Splash 代码在已打开的应用中运行。它需要提供 `app_tools.dispatch@1` 的宿主，例如[桌面 RC1](../README.zh-CN.md#下载兼容宿主)。OctoSense 桌面版 0.1.0-beta.2 拒绝这类工具，返回 `app_tool_unavailable`。
 
 添加脚本工具：
 
@@ -601,7 +601,7 @@ OctoSense 桌面版 0.1.0-beta.2 的商店用一行说明代替前三行：“Ru
 | `agent.model` | 尚不支持：OctoSense 会忽略它。 |
 | Agent 发布的速览卡片 | 应用可以发布的任何卡片，包括 `script` 卡片。 |
 
-OctoSense `main`（尚未进入任何发布版）改变了四点：
+OctoSense 桌面 RC1 改变了四点：
 
 - `implemented_by: "app"` 的工具在已打开的应用中运行（[脚本工具执行](#脚本工具执行script-tools-v1)）。
 - 发布速览卡片的工具调用（直接调用 `glance.publish`，或经由 `host_method`）只接受带 `initial` 对象的模板，或 L0 `source`。它拒绝 `script` 和 L1 源码，返回的错误类型为 `unsafe_card_source`。
@@ -657,9 +657,9 @@ host.request("mail.list", {…}, fn(r){ … })
 
 使用 GitHub 或 Google 的应用要声明 `auth`，再加上它用到的提供商能力：`github`、`gcalendar` 或 `gmail`。用户在宿主面板上登录，应用拿到的是连接句柄，绝不是令牌。写操作要经过宿主确认。请设置 `storage.accounts: true`，让每个账户各自保存数据。哪些宿主支持这类应用，见[开始之前](SUBMITTING.zh-CN.md#开始之前)；具体如何调用，见 Design Flow 的[使用已连接账户](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.zh-CN.md#使用已连接账户)。
 
-宿主执行哪些规则，取决于它的构建：
+宿主强制执行哪些规则，取决于构建版本和平台。Windows/Linux 的受保护写操作仍不支持，会拒绝执行，见[平台限制](../README.zh-CN.md#下载兼容宿主)：
 
-| | OctoSense 桌面版 0.1.0-beta.2 | OctoSense `main`（尚未进入任何发布版） |
+| | OctoSense 桌面版 0.1.0-beta.2 | OctoSense 桌面 RC1 |
 | --- | --- | --- |
 | 批准 Gmail 发送 | 在原生的 Approve & Send 控件上亲手点按 | 相同 |
 | 批准 GitHub 或 Google 日历的保存 | 在宿主的确认面板上批准，不检查是否为亲手点按 | 在原生的 Approve & Save 控件上亲手点按；脚本和 Agent 的请求无法批准 |
@@ -672,11 +672,11 @@ host.request("mail.list", {…}, fn(r){ … })
 | 宿主 | 注册信息来源 | 没有注册信息时 `auth.connect` 的报错 |
 | --- | --- | --- |
 | OctoSense 桌面版 0.1.0-beta.2 | 宿主的 `oauth/clients.json`，该发布版不附带这个文件 | `OAuth is not configured. Add provider registrations in the host's oauth/clients.json` |
-| OctoSense `main`（尚未进入任何发布版） | 发行方在构建时编入；宿主上的 `oauth/clients.json` 会替换它们 | `GitHub sign-in is unavailable in this build. Check for an OctoSense update or contact its distributor.`，或 Google 的同类消息 |
+| OctoSense 桌面 RC1 | 发行方构建设置，或宿主 `oauth/clients.json` 覆盖配置；公开 RC1 包不附带注册信息 | `GitHub sign-in is unavailable in this build. Check for an OctoSense update or contact its distributor.`，或 Google 的同类消息 |
 
 ### 登录自己的后端
 
-OctoSense `main`（尚未进入任何发布版）可以让应用登录其开发者的后端，并调用应用声明的后端操作。在清单中声明这个后端。声明是公开的，不含任何凭据：
+OctoSense 桌面 RC1 可以在[平台限制](../README.zh-CN.md#下载兼容宿主)内让应用登录其开发者的后端，并调用应用声明的后端操作。在清单中声明这个后端。声明是公开的，不含任何凭据：
 
 ```json
 {
@@ -719,7 +719,7 @@ OctoSense `main`（尚未进入任何发布版）可以让应用登录其开发�
 
 适用范围：
 
-- 只有实现了 `auth.backend.request@1` 的宿主才会安装这个应用，即 macOS 和 Android 上的 OctoSense `main`。其他商店会拒绝安装；基于 App Hub `main` 构建的商店会报 `app <id> needs a host implementing auth.backend.request@1`。iOS 不支持后端登录。
+- 只有实现了 `auth.backend.request@1` 的宿主才会安装这个应用：桌面 RC1 在 macOS、Windows 和 Linux 上声明该方法；兼容 Android 源码构建也实现它。Windows/Linux 使用外部浏览器登录及清单声明的读取，嵌入式登录和受保护的写操作不支持。缺少该方法的宿主会报 `app <id> needs a host implementing auth.backend.request@1`。iOS 不支持后端登录。
 - 没有 `backend` 块的应用，只能在运维人员已把其后端登记到宿主 `oauth/backends.json` 的设备上登录。Windows 和 Linux 上的这类登录使用浏览器（未经验证）。
 - 未验证：在设备上实际登录，以及实际批准一次写操作。
 
@@ -802,7 +802,7 @@ my-notes 0.1.0 — PASSED
 
 ## 签名
 
-新应用可以使用 GitHub 管理的发布者来源证明，无需开发者创建、保存或轮换发布者私钥。本源码实现使用已发布的契约 **1.8.0** 和 `publisher-github-v1`；兼容宿主发布版仍待完成。两个真实标签推送发布已通过下文记录的工作流与原生 Store 验收。下文保留历史包的 Ed25519 路径。
+新应用可以使用 GitHub 管理的发布者来源证明，无需开发者创建、保存或轮换发布者私钥。本源码实现使用已发布的契约 **1.8.0** 和 `publisher-github-v1`；[桌面 RC1](../README.zh-CN.md#下载兼容宿主)是兼容的宿主发行版。两个真实标签推送发布已通过下文记录的工作流与原生 Store 验收。下文保留历史包的 Ed25519 路径。
 
 ### GitHub 发布者来源证明
 

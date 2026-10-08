@@ -258,23 +258,24 @@ other name:
 A capability lets the app make requests; it does not provide a service to
 answer them. A **host service**, code in the OctoSense shell that does what the
 app may not do itself, answers them. **Served today** says what answers on
-OctoSense desktop 0.1.0-beta.2.
+[desktop RC1](../README.md#download-a-compatible-host), within its stated
+platform and provider limits; historical beta differences are explicit.
 
 | Capability | Grants | The store says | Served today |
 | --- | --- | --- | --- |
 | `storage` | The app's own storage folder: `fs.*`, camera captures and local files a widget reads. Without it every `fs.*` call fails. | Keep its own data on this device | The runtime, in every host |
 | `net` | Requests to the hosts in `network.hosts`, and no others. | Reach only: *hosts* | The runtime, in every host |
 | `images` | Pictures from any public https host, not only `network.hosts`. | Show pictures from any website | The runtime |
-| `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime, in macOS, iOS and Android builds. OctoSense's desktop Linux and Windows builds have none: `open` returns `false`. |
-| `location` | The device's location. On OctoSense `main` only, an app that declares `host-api-v1` must first ask with `location.permission.request`; on Android it can then read the last-known fix with `location.get` ([Host API compatibility](HOST-API.md)). | Use your location | The runtime, where the device has it |
-| `camera` | The camera. A capture is saved in the app's storage, so the app also needs `storage`. On OctoSense `main` only, an app that declares `host-api-v1` must first ask with `camera.permission.request`. | Use the camera | The runtime, where the device has it |
-| `microphone` | Sound with a camera video. On OctoSense `main` only, an app that declares `host-api-v1` must first ask with `microphone.permission.request`. | Use the microphone | The runtime, where the device has it |
+| `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime on supported platforms, including RC1 Windows/WebView2 and Linux X11/XWayland/WebKitGTK; native Wayland embedding is unsupported ([requirements](../README.md#download-a-compatible-host)). |
+| `location` | The device's location. On macOS in desktop RC1 and in compatible Android source builds, an app that declares `host-api-v1` must first ask with `location.permission.request`; on Android only, it can then read the last-known fix with `location.get` ([Host API compatibility](HOST-API.md)). | Use your location | The runtime, where the device has it |
+| `camera` | The camera. A capture is saved in the app's storage, so the app also needs `storage`. On macOS in desktop RC1 and in compatible Android source builds, an app that declares `host-api-v1` must first ask with `camera.permission.request`. | Use the camera | The runtime, where the device has it |
+| `microphone` | Sound with a camera video. On macOS in desktop RC1 and in compatible Android source builds, an app that declares `host-api-v1` must first ask with `microphone.permission.request`. | Use the microphone | The runtime, where the device has it |
 | `library` | Offering captures to the system photo library, where other apps can see them. | Save to your photo library, where other apps can see it | The runtime, where the device has it |
 | `clipboard` | The clipboard. | Use the clipboard | Not yet: no API uses it |
 | `prompt` | Questions the app asks the person. | Ask you questions | Not yet: no host reads it. An app agent asks with `ask_user_question`. |
 | `ledger.read` | Reading the shared ledger. | Read your shared data | Not yet: no `ledger` service |
 | `mail` | Mail through the host's `mail` service, from accounts the person signs in to on a host [sheet](#sheets-apps-never-collect-secrets). | Read and send mail from accounts you sign in to on the device | OctoSense |
-| `auth` | Connecting the app's own GitHub or Google accounts. On OctoSense `main` only, also signing in to the app's own backend and calling the operations the manifest declares ([Sign in to your own backend](#sign-in-to-your-own-backend)). | Connect its own GitHub or Google accounts, or sign in to its developer’s backend, through the host | OctoSense, with OAuth client registrations on the host ([Connected accounts](#connected-accounts)) |
+| `auth` | Connecting the app's own GitHub or Google accounts. In OctoSense desktop RC1, also signing in to the app's own backend and calling the operations the manifest declares ([Sign in to your own backend](#sign-in-to-your-own-backend)). | Connect its own GitHub or Google accounts, or sign in to its developer’s backend, through the host | OctoSense, with OAuth client registrations on the host ([Connected accounts](#connected-accounts)) |
 | `github` | Reading repositories; each Markdown commit waits for the person's review. | Read authorized repositories and ask you to review Markdown commits | As `auth` |
 | `gcalendar` | Reading Google calendars; each event change waits for the person's review. | Read authorized Google calendars and ask you to review event changes | As `auth` |
 | `gmail` | Reading Gmail and keeping reply drafts; each send waits for the person's review. Separate from `mail`. | Read authorized Gmail messages, keep reply drafts and request native send review | As `auth` |
@@ -284,11 +285,11 @@ OctoSense desktop 0.1.0-beta.2.
 | `photos` | Photos' own library and collections. | Read Photos's own library and publish collections | System apps only: OctoSense serves just `photos.notify`, to `os.photos` |
 | `youtube` | YouTube search and music recommendations. | Search YouTube and manage music recommendations | System apps only: OctoSense serves just `youtube.notify`, to `os.youtube` |
 | `glance` | Publishing Glance cards to the Glance screen (`glance.publish`, `glance.withdraw`, `glance.list`). The host checks, caps and expires the cards; a card opens only its own app. | Show cards on your glance screen | OctoSense |
-| `model` | `model.complete` and `model.budget`, within a daily budget per app. `model.complete` takes a model class (`fast` or `strong`) and a JSON Schema. Image, audio, video and embedding methods are implemented in [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368), not in a released host. | Send what you give it to the AI provider you configured, within a daily budget | OctoSense; media methods require the new implementation and a compatible configured provider |
+| `model` | `model.complete` and `model.budget`, within a daily budget per app. `model.complete` takes a model class (`fast` or `strong`) and a JSON Schema. Image, audio, video and embedding methods are implemented in [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368), included in desktop RC1. | Send what you give it to the AI provider you configured, within a daily budget | OctoSense; media methods require the new implementation and a compatible configured provider |
 | `research` | Searching through the system toolbox, within the manifest's research scope ([The research scope](#the-research-scope)). The host runs every search. | Search *what the scope allows* | System apps only, in phone builds |
 | `crawl` | Crawling sites through the system toolbox, up to the scope's `max_depth` and `max_pages`, inside its domain lists. More reach than `research`. | Crawl websites, *within the scope*, which reaches more than searching | As `research` |
 | `runtime` | Asking which APIs the host implements, with `runtime.list` and `runtime.describe` ([Host API compatibility](HOST-API.md)). It grants none of the APIs it lists. | Inspect available host APIs without gaining access to their data or permissions | Not on OctoSense desktop 0.1.0-beta.2, whose store refuses the name. App Hub's request dispatcher answers it in every host built from App Hub `main`, `card-host` included. |
-| `wasm` | The app's own functions: WebAssembly modules in the bundle's `fns/` (at most 8), run by the host's `wasm` service in a sandbox with a deadline and a memory cap. A function gets only its input and reaches no file, network, clock or other app. An agent tool can run one with `host_method: "wasm.<function>"`. To write, build and call a function, see Design Flow's [Run your own Rust code](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/RUST.md). | Run its own sandboxed functions on this device | Not in a release: OctoSense serves it only in builds with its `wasm-lab` feature |
+| `wasm` | The app's own functions: WebAssembly modules in the bundle's `fns/` (at most 8), run by the host's `wasm` service in a sandbox with a deadline and a memory cap. A function gets only its input and reaches no file, network, clock or other app. An agent tool can run one with `host_method: "wasm.<function>"`. To write, build and call a function, see Design Flow's [Run your own Rust code](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/RUST.md). | Run its own sandboxed functions on this device | Only builds with `wasm-lab`; standard desktop RC1 packages leave it disabled |
 
 No capability implies another. Not yet: `photos` and `youtube` services for
 store apps. For how a script calls each capability, see Design Flow's
@@ -597,9 +598,10 @@ The gate refuses a `host_method` unless every rule holds:
 | `location` | `location.permission.status`, `location.get` | |
 
 `wasm.<function>` runs one of the app's own functions (`fns/*.wasm`, the
-`wasm` capability). No OctoSense release serves it, or the `auth`,
-`runtime`, `camera`, `microphone` and `location` methods above yet
-([Host API compatibility](HOST-API.md)).
+`wasm` capability), only in builds with `wasm-lab`; standard desktop RC1
+packages leave it disabled. RC1 implements the `auth`, `runtime`, `camera`,
+`microphone` and `location` methods above within the
+[platform limits](HOST-API.md#limits).
 The rules above apply to them too, `runtime.list` and `runtime.describe`
 included. Admission does not configure an account, grant a permission or
 add a missing API: check what the host implements with `runtime.describe`.
@@ -610,7 +612,7 @@ person's approval on the host's native review screen. Permission `request` and
 have no `host_method`.
 
 The seven media aliases above require [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368);
-no released host implements them. They keep the `model` capability and
+desktop RC1 includes them. They keep the `model` capability and
 `private_data: true` requirements. Generation and embeddings may be billable,
 so they and video cancellation require `act` risk and use the bounded model
 service. Discovery does not prove provider entitlement; video cancellation
@@ -627,7 +629,7 @@ For a tool mapped to `glance.publish`, let `input_schema` accept only
 `template` with `initial`, or an L0 `source` with `data`. Never accept
 `script`. OctoSense desktop 0.1.0-beta.2 publishes an agent's script card
 under the app's own policy, so a model-written `script` runs as your app.
-OctoSense `main` (in no release yet) refuses it with
+OctoSense desktop RC1 refuses it with
 `Agents cannot publish executable Splash; choose an admitted template with initial data, or L0 source`,
 and refuses an L1 `source` too.
 
@@ -637,8 +639,7 @@ Source: `SHARED_HOST_METHODS` in `crates/app-policy/src/agent.rs`.
 
 A script tool is a tool with `"implemented_by": "app"`: the app's own Splash
 code runs it, inside the open app. It needs a host that advertises
-`app_tools.dispatch@1`, such as an OctoSense shell built from `main` (in no
-release yet). OctoSense desktop 0.1.0-beta.2 refuses these tools with
+`app_tools.dispatch@1`, such as [desktop RC1](../README.md#download-a-compatible-host). OctoSense desktop 0.1.0-beta.2 refuses these tools with
 `app_tool_unavailable`.
 
 To add one:
@@ -801,7 +802,7 @@ On OctoSense desktop 0.1.0-beta.2, each part works as follows:
 | `agent.model` | Not yet: OctoSense ignores it. |
 | Glance cards from the agent | Any card the app may publish, a `script` card included. |
 
-OctoSense `main` (in no release yet) changes four things:
+OctoSense desktop RC1 changes four things:
 
 - Tools with `implemented_by: "app"` run in the open app
   ([Script tool execution](#script-tool-execution-script-tools-v1)).
@@ -902,9 +903,11 @@ its own data. For the hosts that serve these apps, see
 [Before you start](SUBMITTING.md#before-you-start); for the calls, see Design
 Flow's [Use a connected account](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.md#use-a-connected-account).
 
-What the host enforces depends on its build:
+What the host enforces depends on its build and platform. Protected writes
+remain unsupported and fail closed on Windows/Linux; see
+[platform limits](../README.md#download-a-compatible-host):
 
-| | OctoSense desktop 0.1.0-beta.2 | OctoSense `main` (in no release yet) |
+| | OctoSense desktop 0.1.0-beta.2 | OctoSense desktop RC1 |
 | --- | --- | --- |
 | Approving a Gmail send | A physical press on the native Approve & Send control | The same |
 | Approving a GitHub or Google Calendar save | The host's review sheet, which does not check that the press is physical | A physical press on the native Approve & Save control; script and agent requests cannot approve |
@@ -921,12 +924,13 @@ Sign-in needs the provider's OAuth registration in the host:
 | Host | Registrations come from | Without one, `auth.connect` fails with |
 | --- | --- | --- |
 | OctoSense desktop 0.1.0-beta.2 | The host's `oauth/clients.json`, which the release does not ship | `OAuth is not configured. Add provider registrations in the host's oauth/clients.json` |
-| OctoSense `main`, not yet in any release | The distributor, at build time; an `oauth/clients.json` on the host replaces them | `GitHub sign-in is unavailable in this build. Check for an OctoSense update or contact its distributor.`, or the same for Google |
+| OctoSense desktop RC1 | Distributor build settings or a host `oauth/clients.json` override; the public RC1 packages include no registrations | `GitHub sign-in is unavailable in this build. Check for an OctoSense update or contact its distributor.`, or the same for Google |
 
 ### Sign in to your own backend
 
-OctoSense `main` (in no release yet) can sign an app in to its developer's
-backend and call the backend operations that the app declares. Declare the
+OctoSense desktop RC1 can sign an app in to its developer's
+backend and call the backend operations that the app declares, within the
+[platform limits](../README.md#download-a-compatible-host). Declare the
 backend in the manifest. The declaration is public and holds no credential:
 
 ```json
@@ -991,9 +995,11 @@ sessions, and the person signs in again.
 Where it works:
 
 - Only a host that implements `auth.backend.request@1` installs the app:
-  OctoSense `main` on macOS and Android. Other stores refuse it; one built from
-  App Hub `main` says `app <id> needs a host implementing auth.backend.request@1`.
-  iOS has no backend sign-in.
+  desktop RC1 advertises it on macOS, Windows and Linux; compatible Android
+  source builds also implement it. Windows/Linux use external-browser login
+  and declared reads; embedded login and protected writes are unsupported.
+  A host missing the method refuses it with
+  `app <id> needs a host implementing auth.backend.request@1`. iOS has no backend sign-in.
 - An app without a `backend` block signs in only on devices whose operator
   registered its backend in the host's `oauth/backends.json`. Windows and Linux
   use the browser for that sign-in (unverified).
@@ -1121,8 +1127,8 @@ packet on stdin. Its failure or invalid output still requires human review.
 
 New apps can use GitHub-managed publisher provenance: developers do not
 create, store or rotate a publisher private key. This source implementation
-uses published contract **1.8.0** and `publisher-github-v1`; a compatible released
-host is still pending. Two real tag-push releases passed the workflow and
+uses published contract **1.8.0** and `publisher-github-v1`;
+[desktop RC1](../README.md#download-a-compatible-host) is a compatible released host. Two real tag-push releases passed the workflow and
 native Store acceptance described below. The historical Ed25519 route
 remains below for existing packages.
 
