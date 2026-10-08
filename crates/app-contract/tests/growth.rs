@@ -85,6 +85,21 @@ fn media_services_require_exact_separate_grants() {
 }
 
 #[test]
+fn an_apps_own_functions_are_a_grant_of_their_own() {
+    let limits = HostLimits::system();
+    let manifest = parse(&manifest_with(r#""capabilities":["wasm"]"#)).unwrap();
+    let policy = resolve(&manifest, &limits).unwrap();
+    assert!(policy.allows("wasm"));
+    for other in ["net", "storage", "model", "glance", "mail", "runtime"] {
+        assert!(!policy.allows(other), "wasm must not imply {other}");
+    }
+    for near in ["wasm.*", "wasm.find_slots", "WASM"] {
+        let manifest = parse(&manifest_with(&format!(r#""capabilities":["{near}"]"#))).unwrap();
+        assert!(resolve(&manifest, &limits).is_err(), "{near} must be unknown");
+    }
+}
+
+#[test]
 fn an_unknown_required_feature_needs_a_newer_host() {
     let err = parse(&manifest_with(r#""requires":["storage.encrypted"]"#)).unwrap_err();
     assert_eq!(err, "app forecast needs a newer host: storage.encrypted");

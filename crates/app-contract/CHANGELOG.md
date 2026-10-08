@@ -4,9 +4,18 @@
 within `1.x` it only grows.
 
 crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0 and 1.6.0; 1.3.0 and 1.4.0 are
-unpublished, and 1.5.0 includes their changes.
+unpublished, and 1.5.0 includes their changes. 1.7.0 is not published yet.
 [README.md](README.md#versions-on-cratesio) shows how to update a lock file
 that holds 1.2.0.
+
+## 1.7.0
+
+- `KNOWN_CAPABILITIES` gains `wasm`: the app's own functions, WebAssembly
+  modules in its bundle's `fns/`, run by the host's `wasm` service in a
+  sandbox with a deadline and a memory cap. A function gets its input and
+  returns its output; it reaches no file, network, clock or other app. The
+  grant implies no other capability. When 1.7.0 was cut, OctoSense served
+  `wasm` only in builds with its `wasm-lab` feature, and no release had it.
 
 ## 1.6.0
 

@@ -50,7 +50,8 @@ limits.
 
 crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0 and 1.6.0. Versions 1.3.0 and 1.4.0 exist
 only in this repository ([CHANGELOG.md](CHANGELOG.md)); 1.5.0 includes their
-changes. A lock file that still holds 1.2.0 refuses every capability added
+changes. 1.7.0, which adds `wasm`, is in this repository and not yet on
+crates.io. A lock file that still holds 1.2.0 refuses every capability added
 since, such as `auth`:
 
 ```text
