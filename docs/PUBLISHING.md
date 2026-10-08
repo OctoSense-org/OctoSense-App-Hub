@@ -257,7 +257,7 @@ OctoSense desktop 0.1.0-beta.2.
 | `storage` | The app's own storage folder: `fs.*`, camera captures and local files a widget reads. Without it every `fs.*` call fails. | Keep its own data on this device | The runtime, in every host |
 | `net` | Requests to the hosts in `network.hosts`, and no others. | Reach only: *hosts* | The runtime, in every host |
 | `images` | Pictures from any public https host, not only `network.hosts`. | Show pictures from any website | The runtime |
-| `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime, only in macOS, iOS and Android builds. Desktop Linux and Windows builds have no system web view. On OctoSense `main` only, Linux (X11 or XWayland) and Windows builds embed one, if the person has installed WebKitGTK or the WebView2 Runtime. |
+| `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime, in macOS, iOS and Android builds. Among desktop Linux and Windows builds, only OctoSense `main` (in no release yet) has one: on Linux under X11 or XWayland with WebKitGTK installed, and on Windows with the WebView2 Runtime installed. |
 | `location` | The device's location. On OctoSense `main` only, an app that declares `host-api-v1` must first ask with `location.permission.request`; on Android it can then read the last-known fix with `location.get` ([Host API compatibility](HOST-API.md)). | Use your location | The runtime, where the device has it |
 | `camera` | The camera. A capture is saved in the app's storage, so the app also needs `storage`. On OctoSense `main` only, an app that declares `host-api-v1` must first ask with `camera.permission.request`. | Use the camera | The runtime, where the device has it |
 | `microphone` | Sound with a camera video. On OctoSense `main` only, an app that declares `host-api-v1` must first ask with `microphone.permission.request`. | Use the microphone | The runtime, where the device has it |
@@ -541,7 +541,7 @@ The gate admits these tools, but in a store app each call fails with
 | `host_method` | A reviewed shared-service method the tool runs on ([Map a tool to a shared service](#map-a-tool-to-a-shared-service-host_method)). Optional. |
 | `outward` | Set it on an `act` tool whose call reaches outside the device (sends, posts, shares). Each call then waits for the person, as a destructive call does. Default `false`; refused on a `read` tool. |
 | `auto_approvable` | A standing rule ("allow for an hour") may approve a call. Default `true`. Say `false` for deletion, payments, account or security changes and sharing outside the device, so the person approves each call as it happens. |
-| `confirm` | Who asks the person before a destructive or outward call: `host` (the default, the host's approval path) or `app` (the app's own confirmation screen). The gate allows `app` only for a tool the app implements itself, and the host refuses such a tool's destructive or outward calls ([Script tool execution](#script-tool-execution-script-tools-v1)). |
+| `confirm` | Who asks the person before a destructive or outward call: `host` (the default, the host's approval path) or `app` (the app's own confirmation screen). `app` passes the gate only on a tool the app implements itself, and OctoSense refuses every destructive or outward call to a script tool that says `app` ([Who confirms a call](#who-confirms-a-call)). |
 
 ### Map a tool to a shared service: `host_method`
 
@@ -593,7 +593,7 @@ included. Admission does not configure an account, grant a permission or
 add a missing API: check what the host implements with `runtime.describe`.
 A tool mapped to `auth.backend.request` runs only the backend's declared
 `GET` operations; a write still needs the app in the foreground and the
-person's approval on the host's native review. Permission `request` and
+person's approval on the host's native review screen. Permission `request` and
 `revoke`, account management and runtime ABIs such as `app_tools.dispatch@1`
 have no `host_method`.
 
@@ -614,9 +614,9 @@ Source: `SHARED_HOST_METHODS` in `crates/app-policy/src/agent.rs`.
 
 A script tool is a tool with `"implemented_by": "app"`: the app's own Splash
 code runs it, inside the open app. It needs a host that advertises
-`app_tools.dispatch@1`, such as an OctoSense shell built from `main`, which is
-not yet in any release. OctoSense desktop 0.1.0-beta.2 refuses these tools
-with `app_tool_unavailable`.
+`app_tools.dispatch@1`, such as an OctoSense shell built from `main` (in no
+release yet). OctoSense desktop 0.1.0-beta.2 refuses these tools with
+`app_tool_unavailable`.
 
 To add one:
 
@@ -644,8 +644,8 @@ has checked them against `input_schema`, and `context`, which holds `app`,
 `account`, `caller` and `call_id`. The host fills in `context`; the script
 cannot choose its values. Finish the call with `mod.app_tools.complete` or
 `mod.app_tools.fail`. A result that does not match `output_schema` reaches the
-caller as `invalid_result`. The caller gets `app_error` for a `fail`, a script
-error in the hook or a hook that exceeds the VM's instruction limit. The host
+caller as `invalid_result`. The caller gets `app_error` when the hook calls
+`fail`, raises a script error or exceeds the VM's instruction limit. The host
 does not enforce `pattern` or `format`.
 
 The hook runs on the UI thread, in the same Splash VM and storage folder as
@@ -704,8 +704,8 @@ confirms nothing, and the gate warns about it.
 Only a native app, such as Rinx, has a confirmation screen of its own today.
 In a store app, the gate refuses `confirm: "app"` on a `host-service` tool,
 and OctoSense refuses a destructive or outward call to a script tool that says
-it ([Script tool execution](#script-tool-execution-script-tools-v1)). Keep the
-default.
+`confirm: "app"` ([Script tool execution](#script-tool-execution-script-tools-v1)).
+Keep the default.
 
 ### `AGENT.md` and skills
 

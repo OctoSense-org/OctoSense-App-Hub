@@ -51,6 +51,6 @@ API 可用不等于已经配置，也不等于已经授权。`configured: null` 
 - **权限申请。** 只有在前台的应用才能申请权限。来自 Agent 或后台的申请会返回 `authorization_required`。
 - **设备控件。** 在声明了 `host-api-v1` 的应用中，`CameraPreview`、`sys.request_location`、`sys.gps` 和地图的 GPS 读取同样需要该应用的设备授权。宿主每次启动后，这些功能都保持关闭，直到应用调用某个权限方法（例如 `camera.permission.status`）载入已保存的授权。请在应用打开时就调用它。
 - **`card-host`。** 三个标记所需的 API，它一个也没有实现，因此会拒绝要求这些标记的应用（[在本地运行应用包](DEVELOPMENT.zh-CN.md#在本地运行应用包card-host)）。
-- **未验证：** 亲手点按批准权限、相机拍摄，以及 Linux、Windows、手机、真实提供商和真实模型的验收。
+- **未验证：** 亲手点按批准权限、相机拍摄、真实提供商、真实模型，以及宿主 API 在 Linux、Windows 和手机上的验收。
 
 具体调用方法见 Design Flow 的[发现并使用宿主 API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-API-V1.zh-CN.md)。

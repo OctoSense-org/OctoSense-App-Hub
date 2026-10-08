@@ -105,8 +105,8 @@ registration.
 - **`card-host`.** It implements none of the APIs that the three markers need,
   so it refuses apps that require them
   ([Run a bundle locally](DEVELOPMENT.md#run-a-bundle-locally-card-host)).
-- **Unverified:** a physical permission approval, camera capture, and Linux,
-  Windows, phone, live-provider and real-model acceptance.
+- **Unverified:** a physical permission approval, camera capture, live
+  providers, real models, and host API acceptance on Linux, Windows and phones.
 
 For the calls, see Design Flow's
 [Discover and use host APIs](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-API-V1.md).

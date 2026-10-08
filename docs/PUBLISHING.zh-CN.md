@@ -191,7 +191,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | `storage` | 应用自己的存储文件夹：`fs.*`、相机拍摄的内容，以及控件读取的本地文件。没有它，所有 `fs.*` 调用都会失败。 | Keep its own data on this device | 运行时，所有宿主都提供 |
 | `net` | 向 `network.hosts` 中的主机发出请求，不能访问其他主机。 | Reach only: *主机列表* | 运行时，所有宿主都提供 |
 | `images` | 显示任何公开 https 主机上的图片，不限于 `network.hosts`。 | Show pictures from any website | 运行时 |
-| `web` | 在系统网页视图中打开任何公开 https 页面；网页视图没有任何回到应用的通道。 | Open web pages in a browser view | 运行时，仅限 macOS、iOS 和 Android 构建。桌面版 Linux 和 Windows 构建没有系统网页视图。仅在 OctoSense `main` 上：Linux（X11 或 XWayland）和 Windows 构建会内嵌系统网页视图，前提是用户已安装 WebKitGTK 或 WebView2 Runtime。 |
+| `web` | 在系统网页视图中打开任何公开 https 页面；网页视图没有任何回到应用的通道。 | Open web pages in a browser view | 运行时，macOS、iOS 和 Android 构建都提供。桌面版 Linux 和 Windows 构建中，只有 OctoSense `main`（尚未进入任何发布版）提供：Linux 须在 X11 或 XWayland 下运行并安装 WebKitGTK，Windows 须安装 WebView2 Runtime。 |
 | `location` | 设备的位置。仅在 OctoSense `main` 上：声明了 `host-api-v1` 的应用须先用 `location.permission.request` 请求权限，之后在 Android 上可以用 `location.get` 读取上次已知的位置（[宿主 API 兼容性](HOST-API.zh-CN.md)）。 | Use your location | 运行时，限具备该功能的设备 |
 | `camera` | 相机。拍摄的内容保存在应用的存储中，所以应用还需要 `storage`。仅在 OctoSense `main` 上：声明了 `host-api-v1` 的应用须先用 `camera.permission.request` 请求权限。 | Use the camera | 运行时，限具备该功能的设备 |
 | `microphone` | 相机录像时的声音。仅在 OctoSense `main` 上：声明了 `host-api-v1` 的应用须先用 `microphone.permission.request` 请求权限。 | Use the microphone | 运行时，限具备该功能的设备 |
@@ -424,7 +424,7 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | `host_method` | 工具映射到的已审核共享服务方法（[把工具映射到共享服务](#把工具映射到共享服务host_method)）。可选。 |
 | `outward` | 如果 `act` 工具的调用会触及设备之外（发送、发帖、分享），就设置此项。这样每次调用都会像破坏性（`destructive`）调用一样，等待用户批准。默认 `false`；准入检查拒绝在 `read` 工具上设置它。 |
 | `auto_approvable` | 常设规则（例如“一小时内允许”）可以批准调用。默认 `true`。对于删除、付款、账户或安全设置的变更，以及向设备之外分享，请设为 `false`，让用户逐次当场批准。 |
-| `confirm` | 执行破坏性或对外的调用之前，由谁询问用户：`host`（默认，即宿主的批准流程）或 `app`（应用自己的确认界面）。准入检查只允许应用自己实现的工具使用 `app`，而宿主会拒绝这类工具的破坏性或对外调用（[脚本工具执行](#脚本工具执行script-tools-v1)）。 |
+| `confirm` | 执行破坏性或对外的调用之前，由谁询问用户：`host`（默认，即宿主的批准流程）或 `app`（应用自己的确认界面）。准入检查只允许应用自己实现的工具使用 `app`；如果脚本工具写了 `app`，OctoSense 会拒绝它的每一次破坏性或对外调用（[由谁确认调用](#由谁确认调用)）。 |
 
 ### 把工具映射到共享服务：`host_method`
 
@@ -494,7 +494,7 @@ fn app_tool(name, call_id) {
 }
 ```
 
-`mod.app_tools.request(call_id)` 返回 `args` 和 `context`：`args` 是宿主按 `input_schema` 检查过的参数，`context` 包含 `app`、`account`、`caller` 和 `call_id`。`context` 由宿主填写，脚本无法选择其中的值。用 `mod.app_tools.complete` 或 `mod.app_tools.fail` 结束调用。结果不符合 `output_schema` 时，调用方收到 `invalid_result`。调用 `fail`、钩子出现脚本错误或超出 VM 的指令限制时，调用方收到 `app_error`。宿主不强制检查 `pattern` 和 `format`。
+`mod.app_tools.request(call_id)` 返回 `args` 和 `context`：`args` 是宿主按 `input_schema` 检查过的参数，`context` 包含 `app`、`account`、`caller` 和 `call_id`。`context` 由宿主填写，脚本无法选择其中的值。用 `mod.app_tools.complete` 或 `mod.app_tools.fail` 结束调用。结果不符合 `output_schema` 时，调用方收到 `invalid_result`。钩子调用 `fail`、出现脚本错误或超出 VM 的指令限制时，调用方收到 `app_error`。宿主不强制检查 `pattern` 和 `format`。
 
 钩子在 UI 线程上运行，与应用界面共用同一个 Splash VM 和存储文件夹，并受 VM 的指令和内存限制约束。钩子也可以稍后再完成调用，例如在 `host.request` 回调中完成：`mod.app_tools.active(call_id)` 会告诉它这次调用是否仍未结束。其他应用或宿主面板无法凭 `call_id` 读取参数或完成调用。
 
