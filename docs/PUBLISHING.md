@@ -615,7 +615,7 @@ no released host implements them. They keep the `model` capability and
 so they and video cancellation require `act` risk and use the bounded model
 service. Discovery does not prove provider entitlement; video cancellation
 can fail when the remote job is already running. See the bilingual
-[media contract](https://github.com/OctoSense-org/OctoSense/blob/feat/model-media-services/apps/ai-providers/host-service/MEDIA.md)
+[media contract](https://github.com/OctoSense-org/OctoSense/blob/main/apps/ai-providers/host-service/MEDIA.md)
 for quotas and process-local job lifetime. Live provider/device validation is
 not claimed by these policy aliases.
 

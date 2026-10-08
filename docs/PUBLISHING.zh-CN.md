@@ -479,7 +479,7 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 尚无发布版宿主实现它们。它们仍要求 `model` 能力和 `private_data: true`。
 生成与向量请求可能计费，因此它们和视频取消至少需要 `act` 风险，并使用有资源上限的
 模型服务。发现 API 不代表供应商账户已有权益；远端视频任务已运行时，取消可能失败。
-额度和进程内任务生命周期见双语[媒体契约](https://github.com/OctoSense-org/OctoSense/blob/feat/model-media-services/apps/ai-providers/host-service/MEDIA.zh-CN.md)。
+额度和进程内任务生命周期见双语[媒体契约](https://github.com/OctoSense-org/OctoSense/blob/main/apps/ai-providers/host-service/MEDIA.zh-CN.md)。
 这些策略别名不构成真实供应商或设备验证。
 
 账户/业务写入、登录、确认和批准都没有 `host_method`：这些操作由用户在应用自己的
