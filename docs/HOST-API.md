@@ -101,9 +101,11 @@ registration.
   the app location access.
 - **Device widgets.** With `host-api-v1`, `CameraPreview`,
   `sys.request_location`, `sys.gps` and map GPS reads need the app's device
-  consent too. After the host starts, they stay closed until the app calls a
-  permission method, such as `camera.permission.status`, which loads the
-  saved consent. Call it when the app opens.
+  consent too. After the host starts, each stays closed until the app calls
+  its capability's permission method, which loads that saved consent:
+  `camera.permission.status` before `CameraPreview`, and
+  `location.permission.status` before a GPS read. Call these when the app
+  opens.
 - **`card-host`.** It implements none of the APIs that the three markers need,
   so it refuses apps that require them
   ([Run a bundle locally](DEVELOPMENT.md#run-a-bundle-locally-card-host)).

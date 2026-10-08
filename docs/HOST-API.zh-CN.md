@@ -49,7 +49,7 @@ API 可用不等于已经配置，也不等于已经授权。`configured: null` 
 - **脚本工具。** 签名的 `app_tool(name, call_id)` 处理函数运行在已打开的完整应用中，使用该应用自己的 VM 和存储文件夹。它不加载任何原生库或 Wasm；应用关闭时返回 `app_not_running`。
 - **平台。** 设备权限方法支持 Android 和 macOS，`location.get` 只支持 Android，返回上次已知的位置，时效未知。`WebReader` 只在 macOS、iOS 和 Android 上打开内嵌网页；在其他平台上，OctoSense 的 `open` 返回 `false`。
 - **权限申请。** 只有在前台的应用才能申请权限。来自 Agent 或后台卡片的申请会失败，返回 `<method> is unavailable to agents/background surfaces`。宿主转入后台时仍在等待的申请会失败，返回 `authorization_required`；在用户授予应用位置权限之前，`location.get` 也返回 `authorization_required`。
-- **设备控件。** 在声明了 `host-api-v1` 的应用中，`CameraPreview`、`sys.request_location`、`sys.gps` 和地图的 GPS 读取同样需要该应用的设备授权。宿主每次启动后，这些功能都保持关闭，直到应用调用某个权限方法（例如 `camera.permission.status`）载入已保存的授权。请在应用打开时就调用它。
+- **设备控件。** 在声明了 `host-api-v1` 的应用中，`CameraPreview`、`sys.request_location`、`sys.gps` 和地图的 GPS 读取同样需要该应用的设备授权。宿主每次启动后，这些功能都保持关闭，直到应用调用对应能力的权限方法，载入为该能力保存的授权：启动 `CameraPreview` 之前调用 `camera.permission.status`，读取 GPS 之前调用 `location.permission.status`。请在应用打开时调用这些方法。
 - **`card-host`。** 三个标记所需的 API，它一个也没有实现，因此会拒绝要求这些标记的应用（[在本地运行应用包](DEVELOPMENT.zh-CN.md#在本地运行应用包card-host)）。
 - **未验证：** 亲手点按批准权限、相机拍摄、真实提供商、真实模型，以及宿主 API 在 Linux、Windows 和手机上的验收。
 
