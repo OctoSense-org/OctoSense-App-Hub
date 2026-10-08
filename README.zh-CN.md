@@ -28,13 +28,14 @@ App Hub 为 OctoSense 发布应用。本仓库包含：
 
 | 路径 | 说明 |
 | --- | --- |
-| `catalog.json` | 签名目录。商店在展示任何内容之前，先用下方的信任锚验证它。 |
+| `catalog.json` | 旧格式签名目录。商店在展示任何内容之前，先用下方的信任锚验证它。 |
 | `index/<app>-<version>.json` | 每个应用版本对应一条已准入条目：清单、发布者、源码位置与状态。维护者在 `hub publish` 之后从目录导出。 |
 | `artifacts/<app>-<version>.bundle/` | App Hub 保存的应用包副本，与审核时的字节完全一致。由 `hub publish` 生成。 |
 | `artifacts/<app>-<version>.bundle.pack.json` | 打成单个文件的同一应用包，商店下载的就是它。 |
 | `docs/FIRST-APP.md` | 第一个应用（卡片应用或脚本应用）的分步教程：创建、运行、截图与检查。 |
 | `docs/SUBMITTING.md` | 提交流程的分步说明：仓库、清单、商店信息、截图、签名、发布、issue 与审核。 |
 | `docs/PUBLISHING.md` | 参考文档：准入规则；能力及其提供方；清单、商店信息和工具的字段；宿主服务；`hub` 命令；签名。 |
+| `docs/GITHUB-PUBLISHING.md` | 管理员授权的 GitHub 签名、确切候选审核及 v2 迁移。 |
 | `docs/HOST-API.md` | 声明应用需要的宿主 API、用 `runtime` 发现宿主 API，以及目前各宿主实现了哪些 API。 |
 | `docs/ICONS.md` | 规范图标的归属、导出约束与视觉评审。 |
 | `docs/DEVELOPMENT.md` | 指南导航、交付路径、`card-host` 及其远程控制路由，以及 `card-studio`。 |
@@ -92,7 +93,7 @@ OCTOSENSE_PREVIEW_SIZE=1200x860 OCTOSENSE_APP_DATA="$(mktemp -d)" target/release
 
 ## 信任锚
 
-商店信任这个锚，并沿着它的证书找到为目录签名的工作密钥。轮换工作密钥不需要发布新版商店。
+旧版商店信任这个锚，并沿着它的证书找到为 `catalog.json` 签名的工作密钥。轮换工作密钥不需要发布新版商店。
 
 ```text
 6000284a069ba7cada2925094074e8e0baae07e25d1b7fc31f396c993f363e11
@@ -110,7 +111,7 @@ appstore
 
 ## 维护者如何发布应用
 
-你提交应用（[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)）之后，维护者对你打了 tag 的 commit 原样运行 `hub publish`，再把签名后的目录 commit 到本仓库。尚未提供：发布用的 Action，以及独立的索引仓库。
+你提交应用（[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)）之后，维护者审核你打了 tag 的 commit 中的原样字节。[GitHub 管理员发布](docs/GITHUB-PUBLISHING.zh-CN.md)为新的 v2 目录签名，无需额外的 Hub 私钥；正式启用和兼容宿主发布仍待完成。现有 `hub publish` 路径继续生成旧的信任锚签名目录。
 
 维护者用 `hub withdraw` 撤回某个版本，每个商店下次拉取目录时都会撤下该版本。`hub remove` 用于删除本不该发布的条目。
 

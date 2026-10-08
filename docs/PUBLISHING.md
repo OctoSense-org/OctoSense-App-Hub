@@ -1116,6 +1116,10 @@ packet on stdin. Its failure or invalid output still requires human review.
 
 ## Signing
 
+Catalog administrators can use [GitHub-managed catalog signing](GITHUB-PUBLISHING.md)
+without a separate Hub private key. That v2 channel requires a compatible
+host; the publisher continuity rules below remain unchanged.
+
 Your publisher id is your signature's key id. The key on record is the one in
 the published catalog, never one a submission supplies:
 
