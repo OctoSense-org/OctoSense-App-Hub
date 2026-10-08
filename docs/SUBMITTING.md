@@ -47,11 +47,11 @@ A host runs your bundle: `card-host` while you develop, and an OctoSense shell
 | --- | --- | --- |
 | `hub` | App Hub `main` | Stamp editable source, check and scan it, then prepare, verify and pack GitHub-attested releases. Reviewers run the same code. |
 | `card-host` | App Hub `main` | Run the unsigned bundle, drive it and capture screenshots. |
-| `tools/octo` | [Design Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) | Create, run and capture an app. It wraps `card-host` and `hub`. |
+| `tools/octo` | [OctoSense App Flow](https://github.com/OctoSense-org/OctoSense-App-Flow) (formerly Design Flow) | Create, run and capture an app. It wraps `card-host` and `hub`. |
 | OctoSense desktop | [RC1 release, source `933abbcf`](../README.md#download-a-compatible-host); platform downloads and prerequisites in that guide | Install GitHub-proven releases and run compatible host services. Use macOS for the connected samples; OAuth registrations are not included. |
 
 Set up the workspace as described in
-[QUICKSTART §1](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md#1-prerequisites),
+[QUICKSTART §1](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.md#1-prerequisites),
 then build `hub` and `card-host` from current `main`:
 
 ```sh
@@ -72,11 +72,11 @@ than `main`: pull and build it again.
 If the build fails with `no variant … TextInputStateQuery`, see
 [`card-host` fails to build](DEVELOPMENT.md#card-host-fails-to-build).
 
-Then run `tools/octo doctor` from your Design Flow checkout, before you build
+Then run `tools/octo doctor` from your App Flow checkout, before you build
 or check an app:
 
 ```sh
-cd ~/octosense-ws/OctoScript-App-Design-Flow
+cd ~/octosense-ws/OctoSense-App-Flow
 tools/octo doctor
 ```
 
@@ -111,8 +111,8 @@ lists. The table shows who runs each command and in which step.
 | `hub keygen`, `hub pubkey`, `hub sign-manifest` | You, for a legacy Ed25519 app only | 5 | Create a publisher key and sign the manifest ([Signing](PUBLISHING.md#signing)). |
 | `hub publish`, `hub withdraw`, `hub remove`, `hub certify`, `hub verify` | A maintainer, for the legacy catalog | 9 | Publish, withdraw or remove versions in `catalog.json`, certify its working key, or verify it. |
 
-Design Flow's `tools/octo` runs some of these for you; its
-[`tools/octo` table](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/README.md#toolsocto)
+App Flow's `tools/octo` runs some of these for you; its
+[`tools/octo` table](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/README.md#toolsocto)
 lists the flags.
 
 | `tools/octo` command | Runs |
@@ -123,7 +123,7 @@ lists the flags.
 | `publish-github` | Nothing itself: it installs the release workflow, which runs `hub publisher-prepare`, `hub publisher-attach`, `hub publisher-verify` and `hub publisher-pack` on the tag push |
 
 In a local
-[store rehearsal](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally),
+[store rehearsal](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally),
 you also run `hub keygen`, `hub certify`, `hub publish` and `hub verify`
 yourself, with throwaway keys and a legacy test catalog.
 
@@ -156,7 +156,7 @@ The RC1 release differs from historical desktop beta.2 in these ways.
   not the calendar's whole history.
 
 To try your app in a shell before you submit, publish it to a local catalog
-([rehearsal](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally)).
+([rehearsal](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally)).
 The rehearsal is verified only with a shell built from source.
 
 ### Check your platform
@@ -229,8 +229,8 @@ not cover the tools in `tools.json`, whose `risk` levels decide when a call
 waits for the person using the app. Inbox's 5 `act` tools edit reply drafts,
 record triage decisions and publish Glance cards without asking.
 
-Design Flow's
-[connected-apps README](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/examples/connected-apps/README.md)
+App Flow's
+[connected-apps README](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/examples/connected-apps/README.md)
 explains how each app works. Its copies of GitHub Notes and Inbox have the
 same fixes as 0.1.1; its copy of Google Calendar does not show the date range.
 
@@ -416,8 +416,8 @@ that is not public yet, a private repository or a typo.
 A screenshot is the one listing claim that a reviewer can check against the
 running app. Run the unsigned bundle in `card-host`, drive the app to each
 state over the remote bridge
-([QUICKSTART](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md)
-lists the routes), and capture each state. From your Design Flow checkout:
+([QUICKSTART](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.md)
+lists the routes), and capture each state. From your App Flow checkout:
 
 ```sh
 tools/octo run ~/apps/my-app/bundle --port 8141 --detach
@@ -437,7 +437,7 @@ frame or a mock-up. If the app keeps animating, `shot` saves the last frame
 anyway and adds
 `(still changing after 2s, e.g. an animation; this is the last frame)` to its
 output; look at that frame. For other capture problems, see
-[QUICKSTART's troubleshooting](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md#troubleshooting).
+[QUICKSTART's troubleshooting](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.md#troubleshooting).
 
 Unverified, Linux only: if `shot` times out under software rendering
 (llvmpipe, WSL), set `MAKEPAD_WRITE_FRAMEBUFFER_PNG=<file>` before you start
@@ -473,7 +473,7 @@ catalog, use the [RC1 release](../README.md#download-a-compatible-host).
    `build/` outside the bundle. Answer every question in that packet: seven,
    or eight when the bundle ships `tools.json`, `AGENT.md` or skills. Include
    the file supporting each answer and name untested behavior.
-3. Install and review `.github/workflows/publish-app.yml` using Design Flow's
+3. Install and review `.github/workflows/publish-app.yml` using App Flow's
    `tools/octo publish-github <app-directory>` (also included by `tools/octo new`).
    No `keygen`, `sign-manifest`, `--publisher-key` or repository signing secret
    is part of this path. The native steps are documented in
@@ -670,14 +670,14 @@ cannot read gets no report, only one `hub: …` line. The full rules are in
 | --- | --- | --- |
 | Sign in to your own backend | The RC implements host-run backend sign-in and declared reads, within the [platform limits](#check-your-platform); compatible Android source builds have a separate embedded route. Each write requires a supported native review path ([Sign in to your own backend](PUBLISHING.md#sign-in-to-your-own-backend)). | For provider identity only, identify the person with identity-only sign-in: `auth` with GitHub's `read:user`, or Google's `openid`, `email` and `profile`. For provider data, add `github`, `gmail` or `gcalendar`. |
 | Keep an API key or token in the app | Not supported. The gate refuses only password and one-time-code fields, so it does not catch a key typed into a plain field or kept in storage. | Ship no keys. For text generation, use `model`, which calls the person's own AI provider. |
-| Generate images, audio, video or embeddings | The RC has methods under the `model` capability; media method names are not separate capabilities. Provider configuration, entitlement and platform limits still apply. | Discover methods at runtime and handle unavailable providers; see the [media guide](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/AI-SERVICES.md#media-and-embeddings-model). |
+| Generate images, audio, video or embeddings | The RC has methods under the `model` capability; media method names are not separate capabilities. Provider configuration, entitlement and platform limits still apply. | Discover methods at runtime and handle unavailable providers; see the [media guide](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/AI-SERVICES.md#media-and-embeddings-model). |
 | Use `llm`, `news`, `calendar`, `prompt`, `ledger.read`, `clipboard` or `palpo.*` | The gate admits them, but no host serves them to a store app. `llm` and `news` answer only `os.*` apps, and `calendar` only `os.calendar`. Nothing acts on the others. | Do not request them. For Google Calendar, use `gcalendar`. |
 | Run your app's own logic in agent tools | The RC1 release runs `implemented_by: "app"` tools while the full app is open; a closed app answers `app_not_running`. OctoSense desktop 0.1.0-beta.2 refuses these tools with `app_tool_unavailable`. A `host-service` tool without `host_method` calls the service named by your app's namespace, which is not a capability, so the call fails with `not_granted`. | To reach a shared service, map the tool with `host_method` to a method of `github`, `gcalendar`, `gmail` or `glance` ([Map a tool to a shared service](PUBLISHING.md#map-a-tool-to-a-shared-service-host_method)). For your own logic, declare `requires: ["script-tools-v1"]` and implement the `app_tool` hook ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)). Test it in the [compatible RC1 release](../README.md#download-a-compatible-host). |
-| Ship native Rust code | A store bundle cannot carry it. The gate refuses native libraries, and native code needs a shell release ([delivery paths](DEVELOPMENT.md#choose-a-delivery-path)). | For pure computation, compile your Rust code to a WebAssembly module in `fns/` and request `wasm` ([Capabilities](PUBLISHING.md#capabilities)). Only OctoSense builds with the `wasm-lab` feature run it, and no release enables that feature yet. Design Flow's [Run your own Rust code](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/RUST.md) shows how to build it, and which route to take for device APIs, the network and files. |
+| Ship native Rust code | A store bundle cannot carry it. The gate refuses native libraries, and native code needs a shell release ([delivery paths](DEVELOPMENT.md#choose-a-delivery-path)). | For pure computation, compile your Rust code to a WebAssembly module in `fns/` and request `wasm` ([Capabilities](PUBLISHING.md#capabilities)). Only OctoSense builds with the `wasm-lab` feature run it, and no release enables that feature yet. App Flow's [Run your own Rust code](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.md) shows how to build it, and which route to take for device APIs, the network and files. |
 | Submit a system app (`os.*`) or a native app | No route here. System apps ship with the shells, and native code needs a shell release ([delivery paths](DEVELOPMENT.md#choose-a-delivery-path)). | Build a store app with an id of your own. |
 | Install an `auth` app on a phone | No released phone build can. | Use the compatible RC on macOS for these macOS-only samples; Android Google authorization is unavailable. |
 | Name Makepad's built-in CJK font in a card kit | Supported by the current Hub and pinned runtime for the exact Regular/Bold resources. | See [Fonts](PUBLISHING.md#fonts) for names, bundled fonts and older-host limits. Native `card-host` rendering is verified on Mac; every shell/platform is not yet verified. |
 
-Design Flow's
-[HOST-SERVICES.md](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md)
+App Flow's
+[HOST-SERVICES.md](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.md)
 lists which shell serves which host service.

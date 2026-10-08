@@ -13,7 +13,7 @@ Each app's source stays in its publisher's own repository.
 
 | Looking for | Repository |
 | --- | --- |
-| How to build an app: quickstart, script API, script-app template, design flows, examples | [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) |
+| How to build an app: quickstart, script API, script-app template, design flows, examples | [OctoSense App Flow](https://github.com/OctoSense-org/OctoSense-App-Flow) (formerly Design Flow) |
 | The AppCard assistant runtime (opt-in in the shells, `--features app-appcard`) | [OctoSense `apps/appcard`](https://github.com/OctoSense-org/OctoSense/tree/main/apps/appcard) |
 | The first-party system apps (AI providers, Calendar, Camera, Mail, Maps, News, Photos, YouTube) and their host services (`llm`, `model`, `calendar`, `mail`, `news`) | [OctoSense `apps/`](https://github.com/OctoSense-org/OctoSense/tree/main/apps) |
 | The L0 parser and checker, and the Makepad lowering and renderer | [OctoScript](https://github.com/OctoSense-org/OctoScript) and [OctoScript-Makepad](https://github.com/OctoSense-org/OctoScript-Makepad) |
@@ -21,10 +21,10 @@ Each app's source stays in its publisher's own repository.
 
 **Building an app?** Start with the "read these first" list on the
 [OctoSense-org profile](https://github.com/OctoSense-org): the `AGENTS.md` of
-OctoScript-App-Design-Flow (Design Flow), then its `docs/QUICKSTART.md`. Next,
+App Flow, then its `docs/QUICKSTART.md`. Next,
 follow [Build your first Hub app](docs/FIRST-APP.md) and
 [App icons and bundled artwork](docs/ICONS.md). Clone this repository beside
-your Design Flow checkout to build `hub` and `card-host`. Do not edit
+your App Flow checkout to build `hub` and `card-host`. Do not edit
 `catalog.json`, `index/` or `artifacts/`.
 
 **Submitting an app?** To request publication, open an issue here with the

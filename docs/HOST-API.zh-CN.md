@@ -53,4 +53,4 @@ API 可用不等于已经配置，也不等于已经授权。`configured: null` 
 - **`card-host`。** 三个标记所需的 API，它一个也没有实现，因此会拒绝要求这些标记的应用（[在本地运行应用包](DEVELOPMENT.zh-CN.md#在本地运行应用包card-host)）。
 - **未验证：** 亲手点按批准权限、相机拍摄、真实提供商、真实模型，以及宿主 API 在 Linux、Windows 和手机上的验收。
 
-具体调用方法见 Design Flow 的[发现并使用宿主 API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-API-V1.zh-CN.md)。
+具体调用方法见 OctoSense App Flow（原 Design Flow）的[发现并使用宿主 API](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-V1.zh-CN.md)。

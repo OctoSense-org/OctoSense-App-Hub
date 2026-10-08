@@ -6,8 +6,8 @@ Copy this directory into a new app repository, following
 [Build your first Hub app](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/FIRST-APP.md).
 It is a **metadata scaffold** for a card app, not a runnable or publishable
 demo. For a script app (`main.splash`), use `tools/octo new` from
-[OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow)
-instead of this directory.
+[OctoSense App Flow](https://github.com/OctoSense-org/OctoSense-App-Flow)
+(formerly Design Flow) instead of this directory.
 
 The starter holds two groups of files:
 
@@ -28,7 +28,7 @@ Before you submit:
 4. Replace `bundle/assets/icon.svg` with your app's artwork.
 5. Generate and review `bundle/page.card`, the optional `page.data.json`, the
    card's `kit/` directory and local assets with the
-   [image-to-card flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md).
+   [image-to-card flow](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/image-to-card/FLOW.md).
 6. Run the unsigned bundle in
    [`card-host`](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/DEVELOPMENT.md#run-a-bundle-locally-card-host)
    and capture `bundle/screenshots/01-main.png`.

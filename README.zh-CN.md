@@ -12,13 +12,13 @@ App Hub 为 OctoSense 发布应用。本仓库包含：
 
 | 想找 | 仓库 |
 | --- | --- |
-| 如何开发应用：快速上手、脚本 API、脚本应用模板、设计流程、示例 | [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) |
+| 如何开发应用：快速上手、脚本 API、脚本应用模板、设计流程、示例 | [OctoSense App Flow](https://github.com/OctoSense-org/OctoSense-App-Flow)（原 Design Flow） |
 | AppCard 助手运行时（Shell 中需 `--features app-appcard` 才启用） | [OctoSense `apps/appcard`](https://github.com/OctoSense-org/OctoSense/tree/main/apps/appcard) |
 | 第一方系统应用（AI 提供方、日历、相机、邮件、地图、新闻、相册、YouTube）及其宿主服务（`llm`、`model`、`calendar`、`mail`、`news`） | [OctoSense `apps/`](https://github.com/OctoSense-org/OctoSense/tree/main/apps) |
 | L0 解析器和检查器，以及 Makepad 转换层和渲染层 | [OctoScript](https://github.com/OctoSense-org/OctoScript) 与 [OctoScript-Makepad](https://github.com/OctoSense-org/OctoScript-Makepad) |
 | 应用包格式、准入检查、签名、提交与商店 | 本仓库 |
 
-**要开发应用？** 请从 [OctoSense-org 主页](https://github.com/OctoSense-org)上的“先读这些”列表开始：先读 OctoScript-App-Design-Flow（下称 Design Flow）的 `AGENTS.md`，再读其 `docs/QUICKSTART.md`。接着按照[开发你的第一个 Hub 应用](docs/FIRST-APP.zh-CN.md)和[应用图标与随包素材](docs/ICONS.zh-CN.md)操作。把本仓库克隆到 Design Flow 检出目录旁边，用来构建 `hub` 和 `card-host`。不要修改 `catalog.json`、`index/` 或 `artifacts/`。
+**要开发应用？** 请从 [OctoSense-org 主页](https://github.com/OctoSense-org)上的“先读这些”列表开始：先读 App Flow 的 `AGENTS.md`，再读其 `docs/QUICKSTART.md`。接着按照[开发你的第一个 Hub 应用](docs/FIRST-APP.zh-CN.md)和[应用图标与随包素材](docs/ICONS.zh-CN.md)操作。把本仓库克隆到 App Flow 检出目录旁边，用来构建 `hub` 和 `card-host`。不要修改 `catalog.json`、`index/` 或 `artifacts/`。
 
 **要提交应用？** 按照[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)，在本仓库开 issue 请求发布，填写仓库、版本和所需能力。Release 还没准备好时也可以先开，之后再补充 tag、commit、截图和经过验证的 Release pack；只打 tag 或只创建 GitHub Release 都不算提交。该指南的四个阶段涵盖审核、批准和发布；每个命令由谁运行、何时运行，见其中的 [`hub` 命令](docs/SUBMITTING.zh-CN.md#hub-命令)一节。
 

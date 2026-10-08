@@ -10,7 +10,7 @@ repositories:
 
 | Repository | What it owns |
 | --- | --- |
-| [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) | The app-development harness: quickstart, script API, the script-app template, the `tools/octo` command, the design flows (`flows/`) and the example apps (`examples/`). |
+| [OctoSense App Flow](https://github.com/OctoSense-org/OctoSense-App-Flow) (formerly Design Flow) | The app-development harness: quickstart, script API, the script-app template, the `tools/octo` command, the design flows (`flows/`) and the example apps (`examples/`). |
 | [OctoSense `apps/appcard`](https://github.com/OctoSense-org/OctoSense/tree/main/apps/appcard) | AppCard, an opt-in "Ask anything" agent the shells can link, and the L0 card language (`a2app-l0/framework/l0.md`). |
 | [OctoSense `apps/`](https://github.com/OctoSense-org/OctoSense/tree/main/apps) | The system apps (News, Photos, Maps, Camera, Mail, Calendar, AI providers, YouTube), each a script app bundle in `apps/<name>/bundle/`, and the host services of Mail, Calendar, News and AI providers in `apps/<name>/host-service/`. |
 | [OctoSense `crates/oauth-service`](https://github.com/OctoSense-org/OctoSense/tree/main/crates/oauth-service) | The connected-account host services: `auth`, `github`, `gmail` and `gcalendar`. |
@@ -19,20 +19,20 @@ Find the guide for your task:
 
 | Task | Guide |
 | --- | --- |
-| Set up the workspace and build `hub` and `card-host` | [Quickstart](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md) |
-| Prepare shared Makepad/Octoscript dependencies | [Native workspace](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/NATIVE-WORKSPACE.md) |
-| Start a script app from a runnable template | [Quickstart](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md) and [`templates/script-app/`](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/templates/script-app) |
+| Set up the workspace and build `hub` and `card-host` | [Quickstart](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.md) |
+| Prepare shared Makepad/Octoscript dependencies | [Native workspace](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/NATIVE-WORKSPACE.md) |
+| Start a script app from a runnable template | [Quickstart](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.md) and [`templates/script-app/`](https://github.com/OctoSense-org/OctoSense-App-Flow/tree/main/templates/script-app) |
 | Start a card app repository with metadata and agent instructions | [App starter](../templates/app/README.md) |
-| Write a script app: state, handlers, storage, requests, host services | [Script-app flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/script-app/FLOW.md) and [Script API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md) |
-| Find which shell serves a host service | [Host services](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md) |
-| Turn UI designs into native cards | [Image-to-card flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md) |
-| Understand card data, state, events, copy, themes and views | [L0 language](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md) and the [L0 notes](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/docs/l0) |
+| Write a script app: state, handlers, storage, requests, host services | [Script-app flow](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/script-app/FLOW.md) and [Script API](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/SCRIPT-API.md) |
+| Find which shell serves a host service | [Host services](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.md) |
+| Turn UI designs into native cards | [Image-to-card flow](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/image-to-card/FLOW.md) |
+| Understand card data, state, events, copy, themes and views | [L0 language](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md) and the [L0 notes](https://github.com/OctoSense-org/OctoSense-App-Flow/tree/main/docs/l0) |
 | Run a bundle and drive it over HTTP | [`card-host`](#run-a-bundle-locally-card-host), below |
-| Test real native input, capture frames and clean up test instances | [Native instrument](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md) |
+| Test real native input, capture frames and clean up test instances | [Native instrument](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md) |
 | Set up an app-owned icon and bundled artwork | [Icons](ICONS.md) |
 | Package, validate and sign a bundle | [Publishing](PUBLISHING.md) |
 | Submit a bundle for review | [Submitting](SUBMITTING.md) |
-| Read worked examples | [Examples](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/examples) and the [system apps](https://github.com/OctoSense-org/OctoSense/tree/main/apps) |
+| Read worked examples | [Examples](https://github.com/OctoSense-org/OctoSense-App-Flow/tree/main/examples) and the [system apps](https://github.com/OctoSense-org/OctoSense/tree/main/apps) |
 
 <a id="choose-the-appropriate-delivery-path"></a>
 
@@ -59,10 +59,10 @@ services and browser controllers do not install as a card app or a script app.
 Rust code compiled to a WebAssembly module can ship in a store app under the
 `wasm` capability, in a sandbox with no files, network or clock. Only
 OctoSense builds with the `wasm-lab` feature run it, and no release enables
-that feature yet (Design Flow's
-[Run your own Rust code](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/RUST.md)).
+that feature yet (App Flow's
+[Run your own Rust code](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.md)).
 
-Some Design Flow examples include a native service or a website integration.
+Some App Flow examples include a native service or a website integration.
 Before you base a Hub app on one, check that every behavior runs inside the
 app's isolate. Copying a service project's source directory does not make it
 installable.
@@ -76,7 +76,7 @@ under exactly the policy its manifest resolves to. It follows the order a
 device uses: admit, resolve, apply, evaluate.
 
 Build it from this repository, in the prepared
-[native workspace](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/NATIVE-WORKSPACE.md):
+[native workspace](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/NATIVE-WORKSPACE.md):
 
 ```sh
 cargo build --release -p octosense-card-host --bin card-host
@@ -130,7 +130,7 @@ discovery answers there. A script app that
 calls `host.request("mail.list", …)` gets
 `no service answers "mail" on this device`. Test a service-backed app in an
 OctoSense shell that registers the service.
-[Host services](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md)
+[Host services](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.md)
 lists which shell serves which. The connected-account services need
 desktop-v0.1.0-beta.2 or later.
 
@@ -276,7 +276,7 @@ a skill for octos.
   untracked copy that drifts.
 - A passing build or gate does not prove that the visuals are right, that
   input works or that the app runs on a given platform. Test those with the
-  [native-instrument guide](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md).
+  [native-instrument guide](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md).
 
 ## Troubleshooting
 

@@ -5,7 +5,7 @@ Read [README.md](README.md), the
 editing. This repository owns the app contract, admission, the catalog and its
 signing, the store, the contained runner and the shared host-service
 transport. OctoSense owns the shells, first-party services and live agent
-integration; Design Flow (OctoScript-App-Design-Flow) owns authoring
+integration; OctoSense App Flow (formerly Design Flow) owns authoring
 workflows.
 
 Do not confuse this file with a bundle's `AGENT.md` (singular), which
@@ -30,11 +30,11 @@ change, with the same sections, in the same order and with the same content.
 | Icons | [docs/ICONS.md](docs/ICONS.md) and its `.zh-CN.md` twin |
 | Delivery paths, `card-host` flags and remote routes, `card-studio`, the `card-host` build failure | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and its `.zh-CN.md` twin |
 | Code paths and the crate inventory | [docs/CODE-WALKTHROUGH.md](docs/CODE-WALKTHROUGH.md) |
-| Workspace setup, building `hub` and `card-host`, `tools/octo`, running and capturing, the script API, how to use each capability | Design Flow [docs/QUICKSTART.md](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md), [docs/SCRIPT-API.md](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md), [docs/CAPABILITIES.md](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/CAPABILITIES.md) |
-| Which shell serves which host service | Design Flow [docs/HOST-SERVICES.md](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md) |
-| The three reference apps in detail | Design Flow [examples/connected-apps/README.md](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/examples/connected-apps/README.md); [docs/SUBMITTING.md](docs/SUBMITTING.md) summarizes them |
+| Workspace setup, building `hub` and `card-host`, `tools/octo`, running and capturing, the script API, how to use each capability | App Flow [docs/QUICKSTART.md](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.md), [docs/SCRIPT-API.md](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/SCRIPT-API.md), [docs/CAPABILITIES.md](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.md) |
+| Which shell serves which host service | App Flow [docs/HOST-SERVICES.md](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.md) |
+| The three reference apps in detail | App Flow [examples/connected-apps/README.md](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/examples/connected-apps/README.md); [docs/SUBMITTING.md](docs/SUBMITTING.md) summarizes them |
 
-`docs/FIRST-APP.md` repeats Design Flow's setup, build, run and capture
+`docs/FIRST-APP.md` repeats App Flow's setup, build, run and capture
 commands. When those change, update it too.
 
 The publisher-facing documents are `docs/FIRST-APP.md` (the first app),
@@ -49,7 +49,7 @@ owns those.
   `AgentBundle::load` alone starts no peer. OctoSense loads `AGENT.md` and
   skills as per-turn guidance, not as kernel skills.
 - Keep native `AppModule`, Splash script bundles and OctoScript L0 cards
-  distinct. `tools/octo` is Design Flow's Python CLI; octos is the agent
+  distinct. `tools/octo` is App Flow's Python CLI; octos is the agent
   kernel. `card-host` serves no host service except `runtime` discovery,
   and runs no agent.
 - For agent or storage changes, also inspect OctoSense `crates/shell/src/host_tools`,
@@ -130,9 +130,9 @@ owns those.
 - Label source-reviewed commands separately from commands you ran. Mark a
   command nobody ran "(not run)" or **unverified**.
 - Never edit evidence records such as `reviews/**/*.json`.
-- Before you rename or remove a heading, search App Hub, Design Flow,
+- Before you rename or remove a heading, search App Hub, App Flow,
   OctoSense and the three reference apps' repositories for links to it, and
-  keep linked heading text. Design Flow and `docs/SUBMITTING.md` link
+  keep linked heading text. App Flow and `docs/SUBMITTING.md` link
   `docs/PUBLISHING.md` headings such as `#submitting`, `#the-manifest` and
   `#rules-the-gate-enforces`.
 
@@ -141,7 +141,7 @@ owns those.
 Apply these rules when you help a developer submit an app, or help a
 reviewer check one:
 
-- After you build `hub` and `card-host`, run Design Flow's `tools/octo doctor`
+- After you build `hub` and `card-host`, run App Flow's `tools/octo doctor`
   before you build or check an app. Run `hub help` for the exact commands, and
   use only the commands it lists.
 - The submission issue is the developer's request to publish. Never treat a

@@ -15,10 +15,10 @@ Hub 应用分为两类，提交方式相同：
 
 ## 1. 准备工具和应用仓库
 
-1. 按[快速上手第 1 节](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.zh-CN.md#1-前置条件)的说明搭建工作区 `~/octosense-ws`：把 App Hub 和 Design Flow（OctoScript-App-Design-Flow）都克隆到这个目录下，然后运行 Design Flow 的 `tools/setup-native.py`。这个脚本会添加 `makepad`、`octoscript-makepad` 和 `octoscript` 三个检出目录，App Hub 的 `Cargo.toml` 以补丁方式引入它们。
+1. 按[快速上手第 1 节](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.zh-CN.md#1-前置条件)的说明搭建工作区 `~/octosense-ws`：把 App Hub 和 OctoSense App Flow（原 Design Flow）都克隆到这个目录下，然后运行 App Flow 的 `tools/setup-native.py`。这个脚本会添加 `makepad`、`octoscript-makepad` 和 `octoscript` 三个检出目录，App Hub 的 `Cargo.toml` 以补丁方式引入它们。
 
    ```sh
-   cd ~/octosense-ws/OctoScript-App-Design-Flow
+   cd ~/octosense-ws/OctoSense-App-Flow
    python3 tools/setup-native.py
    python3 tools/setup-native.py --check
    ```
@@ -45,10 +45,10 @@ Hub 应用分为两类，提交方式相同：
 
 4. 现在就确定应用 ID，以后不能再改。ID 由 1 到 64 个 `[a-z0-9.-]` 字符组成，不能以 `os.` 开头，最后一段不能是[保留名称](PUBLISHING.zh-CN.md#id-与保留名称)。详见[第 3 节](#3-选择-id能力和素材)。然后在一个新目录中，从模板创建应用仓库：
 
-   - **脚本应用**：运行 Design Flow 的 `tools/octo new`。用 `--platform` 指定每个要测试的平台；有多个平台时，重复这个参数。
+   - **脚本应用**：运行 App Flow 的 `tools/octo new`。用 `--platform` 指定每个要测试的平台；有多个平台时，重复这个参数。
 
      ```sh
-     cd ~/octosense-ws/OctoScript-App-Design-Flow
+     cd ~/octosense-ws/OctoSense-App-Flow
      tools/octo new ~/apps/my-app --platform macos --id com.example.mynotes --name "My Notes"
      ```
 
@@ -58,7 +58,7 @@ Hub 应用分为两类，提交方式相同：
        target platforms: macos; verify each before publishing
      ```
 
-     Design Flow 的 [`templates/script-app/`](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/templates/script-app) 是一个小型笔记应用，带有清单、商店信息和图标。`tools/octo new` 复制它的 `bundle/`，添加 `AGENTS.md`、`CLAUDE.md`、`GEMINI.md` 和 `.gitignore`，并把 `--platform` 的值写入商店信息的 `platforms`。然后为应用包写入摘要，即把摘要记录到 `manifest.json` 中。在创建任何文件之前，它就会拒绝以 `os.` 开头的 ID（除非传入 `--system`），也会拒绝最后一段是保留名称的 ID：`octo: id 'com.example.notes' uses reserved native/host namespace 'notes'; choose an app-specific name`。
+     App Flow 的 [`templates/script-app/`](https://github.com/OctoSense-org/OctoSense-App-Flow/tree/main/templates/script-app) 是一个小型笔记应用，带有清单、商店信息和图标。`tools/octo new` 复制它的 `bundle/`，添加 `AGENTS.md`、`CLAUDE.md`、`GEMINI.md` 和 `.gitignore`，并把 `--platform` 的值写入商店信息的 `platforms`。然后为应用包写入摘要，即把摘要记录到 `manifest.json` 中。在创建任何文件之前，它就会拒绝以 `os.` 开头的 ID（除非传入 `--system`），也会拒绝最后一段是保留名称的 ID：`octo: id 'com.example.notes' uses reserved native/host namespace 'notes'; choose an app-specific name`。
 
    - **卡片应用**：复制 App Hub 的[应用起步模板](../templates/app/README.zh-CN.md)：
 
@@ -84,7 +84,7 @@ Hub 应用分为两类，提交方式相同：
 
 ### 脚本应用
 
-按照 Design Flow 的[脚本应用流程](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/script-app/FLOW.md)（英文）开发。程序可以调用的接口（`fs`、`net`、`host.request`、控件句柄）见[脚本 API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md)（英文）。[系统应用](https://github.com/OctoSense-org/OctoSense/tree/main/apps)是同一格式的完整示例。
+按照 App Flow 的[脚本应用流程](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/script-app/FLOW.md)（英文）开发。程序可以调用的接口（`fs`、`net`、`host.request`、控件句柄）见[脚本 API](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/SCRIPT-API.md)（英文）。[系统应用](https://github.com/OctoSense-org/OctoSense/tree/main/apps)是同一格式的完整示例。
 
 ```text
 my-app/
@@ -106,7 +106,7 @@ my-app/
 
 ### 卡片应用
 
-用 Design Flow 的[图像到卡片流程](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md)（英文）创建并评审卡片。应用的数据绑定仍需你自己实现：截图或流程产出的界面图集，都不是能运行的应用。[L0 参考文档](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md)（英文）定义了数据、状态和事件。
+用 App Flow 的[图像到卡片流程](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/image-to-card/FLOW.md)（英文）创建并评审卡片。应用的数据绑定仍需你自己实现：截图或流程产出的界面图集，都不是能运行的应用。[L0 参考文档](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md)（英文）定义了数据、状态和事件。
 
 ```text
 my-app/
@@ -178,7 +178,7 @@ my-app/
    curl --silent 127.0.0.1:8151/snap
    ```
 
-   成功时输出一行 JSON，开头是 `{"s":[{"i":"main_window","ty":"Window","r":[0,0,412,892],…`。查看日志中 `admitted` 行之后有没有错误。要用脚本发送输入，见[原生测试工具指南](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md)（英文）。
+   成功时输出一行 JSON，开头是 `{"s":[{"i":"main_window","ty":"Window","r":[0,0,412,892],…`。查看日志中 `admitted` 行之后有没有错误。要用脚本发送输入，见[原生测试工具指南](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md)（英文）。
 
 4. 截取一帧画面：
 
@@ -249,7 +249,7 @@ hub: the bundle was refused
 - **测试开发源码，绝不修改已封存的 Release。** 工作流会封存它放进 Release 的字节；任何改动都需要新版本和新标签（[GitHub 发布者来源证明](PUBLISHING.zh-CN.md#github-发布者来源证明)）。
 - **你不需要发布者密钥。** 应用的 GitHub 工作流为每个 Release 生成证明。只有已经用 Ed25519 密钥发布过的应用，才继续用那把密钥签名（[签名](PUBLISHING.zh-CN.md#签名)）。
 
-要在提交前用 OctoSense 桌面版试用应用，请用一个临时信任锚把它发布到本地签名目录（[在本地演练商店流程](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)）。
+要在提交前用 OctoSense 桌面版试用应用，请用一个临时信任锚把它发布到本地签名目录（[在本地演练商店流程](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)）。
 
 ## 故障排查
 

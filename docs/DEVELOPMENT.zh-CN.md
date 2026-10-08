@@ -6,7 +6,7 @@
 
 | 仓库 | 负责内容 |
 | --- | --- |
-| [OctoScript-App-Design-Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) | 应用开发工具集：快速上手、脚本 API、脚本应用模板、`tools/octo` 命令、设计流程（`flows/`）和示例应用（`examples/`）。 |
+| [OctoSense App Flow](https://github.com/OctoSense-org/OctoSense-App-Flow)（原 Design Flow） | 应用开发工具集：快速上手、脚本 API、脚本应用模板、`tools/octo` 命令、设计流程（`flows/`）和示例应用（`examples/`）。 |
 | [OctoSense `apps/appcard`](https://github.com/OctoSense-org/OctoSense/tree/main/apps/appcard) | AppCard（Shell 可选链接的“Ask anything” Agent）和 L0 卡片语言（`a2app-l0/framework/l0.md`）。 |
 | [OctoSense `apps/`](https://github.com/OctoSense-org/OctoSense/tree/main/apps) | 系统应用（新闻、相册、地图、相机、邮件、日历、AI providers、YouTube），每个都是 `apps/<name>/bundle/` 下的脚本应用包；邮件、日历、新闻和 AI providers 的宿主服务位于 `apps/<name>/host-service/`。 |
 | [OctoSense `crates/oauth-service`](https://github.com/OctoSense-org/OctoSense/tree/main/crates/oauth-service) | 已连接账户的宿主服务：`auth`、`github`、`gmail` 和 `gcalendar`。 |
@@ -15,20 +15,20 @@
 
 | 任务 | 指南 |
 | --- | --- |
-| 搭建工作区，构建 `hub` 和 `card-host` | [快速上手](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.zh-CN.md) |
-| 准备共享的 Makepad/Octoscript 依赖 | [原生工作区](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/NATIVE-WORKSPACE.md) |
-| 从可运行模板开始一个脚本应用 | [快速上手](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.zh-CN.md) 和 [`templates/script-app/`](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/templates/script-app) |
+| 搭建工作区，构建 `hub` 和 `card-host` | [快速上手](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.zh-CN.md) |
+| 准备共享的 Makepad/Octoscript 依赖 | [原生工作区](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/NATIVE-WORKSPACE.md) |
+| 从可运行模板开始一个脚本应用 | [快速上手](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.zh-CN.md) 和 [`templates/script-app/`](https://github.com/OctoSense-org/OctoSense-App-Flow/tree/main/templates/script-app) |
 | 用元数据和 Agent 指引搭建卡片应用仓库 | [应用起步模板](../templates/app/README.zh-CN.md) |
-| 编写脚本应用：状态、处理函数、存储、请求、宿主服务 | [脚本应用流程](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/script-app/FLOW.md) 和 [脚本 API](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/SCRIPT-API.md) |
-| 查询哪个 Shell 提供哪个宿主服务 | [宿主服务](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md) |
-| 把 UI 设计转成原生卡片 | [图像到卡片流程](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/image-to-card/FLOW.md) |
-| 理解卡片的数据、状态、事件、文案、主题和视图 | [L0 语言](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md) 和 [L0 笔记](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/docs/l0) |
+| 编写脚本应用：状态、处理函数、存储、请求、宿主服务 | [脚本应用流程](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/script-app/FLOW.md) 和 [脚本 API](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/SCRIPT-API.md) |
+| 查询哪个 Shell 提供哪个宿主服务 | [宿主服务](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md) |
+| 把 UI 设计转成原生卡片 | [图像到卡片流程](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/image-to-card/FLOW.md) |
+| 理解卡片的数据、状态、事件、文案、主题和视图 | [L0 语言](https://github.com/OctoSense-org/OctoSense/blob/main/apps/appcard/a2app-l0/framework/l0.md) 和 [L0 笔记](https://github.com/OctoSense-org/OctoSense-App-Flow/tree/main/docs/l0) |
 | 运行应用包，并通过 HTTP 驱动它 | 下文的 [`card-host`](#在本地运行应用包card-host) |
-| 测试真实的原生输入、截取画面并清理测试实例 | [原生测试工具](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md) |
+| 测试真实的原生输入、截取画面并清理测试实例 | [原生测试工具](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md) |
 | 设置应用自有的图标和随包素材 | [图标](ICONS.zh-CN.md) |
 | 打包、验证并签名应用包 | [发布](PUBLISHING.zh-CN.md) |
 | 提交应用包供审核 | [提交](SUBMITTING.zh-CN.md) |
-| 阅读完整示例 | [示例](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/tree/main/examples) 和 [系统应用](https://github.com/OctoSense-org/OctoSense/tree/main/apps) |
+| 阅读完整示例 | [示例](https://github.com/OctoSense-org/OctoSense-App-Flow/tree/main/examples) 和 [系统应用](https://github.com/OctoSense-org/OctoSense/tree/main/apps) |
 
 ## 选择合适的交付路径
 
@@ -42,15 +42,15 @@
 
 已安装的 L0 卡片在宿主应用面板内保留其测量画布。渲染器按面板的相对坐标放置子控件；当画布超过可用空间时，原生双轴滚动视图让底部和右侧控件仍可操作。验收时应测试非零面板位置，以及小于原画布的高度和宽度，并滚动到最后一个控件后点击。不带测量位置的语义角色 L0 使用与 `card-host` 相同的流式布局转换。脚本应用继续自行管理响应式布局与滚动。
 
-商店应用包不含原生代码。新的原生 Rust 或 JNI 代码、Python 服务和浏览器控制器，都无法作为卡片应用或脚本应用安装。编译成 WebAssembly 模块的 Rust 代码可以借助 `wasm` 能力随商店应用发布，在没有文件、网络和时钟的沙盒中运行。只有启用 `wasm-lab` 特性的 OctoSense 构建会运行它，目前还没有任何发布版启用这项特性（见 Design Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/RUST.zh-CN.md)）。
+商店应用包不含原生代码。新的原生 Rust 或 JNI 代码、Python 服务和浏览器控制器，都无法作为卡片应用或脚本应用安装。编译成 WebAssembly 模块的 Rust 代码可以借助 `wasm` 能力随商店应用发布，在没有文件、网络和时钟的沙盒中运行。只有启用 `wasm-lab` 特性的 OctoSense 构建会运行它，目前还没有任何发布版启用这项特性（见 App Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.zh-CN.md)）。
 
-有些 Design Flow 示例包含原生服务或网站集成。以这类示例为基础开发 Hub 应用之前，先确认每一项行为都能在应用的隔离环境中运行。复制某个服务项目的源码目录，并不能让它变得可安装。
+有些 App Flow 示例包含原生服务或网站集成。以这类示例为基础开发 Hub 应用之前，先确认每一项行为都能在应用的隔离环境中运行。复制某个服务项目的源码目录，并不能让它变得可安装。
 
 ## 在本地运行应用包：`card-host`
 
 `card-host`（`crates/card-host`）运行单个应用包，可以是卡片应用，也可以是脚本应用。它严格执行清单解析出的策略，处理顺序与设备相同：准入、解析、应用、执行。
 
-在准备好的 [原生工作区](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/NATIVE-WORKSPACE.md) 中，从本仓库构建：
+在准备好的 [原生工作区](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/NATIVE-WORKSPACE.md) 中，从本仓库构建：
 
 ```sh
 cargo build --release -p octosense-card-host --bin card-host
@@ -96,7 +96,7 @@ card-host --help
 | `sources` | 每个已声明数据源的 `$state`：取数据中的 `$status` 条目；没有该条目时，有值为 `ready`，无值为 `pending`。 |
 | `lowering` 或 `lower_error` | 原生 kit 包为 `design`；由角色 kit 组合的卡片为 `l0-kit`，其节点带有可检查的 id `beauty_0_1_…`。 |
 
-`card-host` 不注册任何宿主服务，包括 `model`，以及连接 octos（OctoSense 运行的 Agent 内核）的 `octos.*` 服务。在 `card-host` 中，只有用于发现宿主 API 的 `runtime` 会响应。调用 `host.request("mail.list", …)` 的脚本应用会得到 `no service answers "mail" on this device`。依赖服务的应用，请在注册了该服务的 OctoSense Shell 中测试。[宿主服务](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md) 列出了哪个 Shell 提供哪个服务。已连接账户相关的服务需要 desktop-v0.1.0-beta.2 或更高版本。
+`card-host` 不注册任何宿主服务，包括 `model`，以及连接 octos（OctoSense 运行的 Agent 内核）的 `octos.*` 服务。在 `card-host` 中，只有用于发现宿主 API 的 `runtime` 会响应。调用 `host.request("mail.list", …)` 的脚本应用会得到 `no service answers "mail" on this device`。依赖服务的应用，请在注册了该服务的 OctoSense Shell 中测试。[宿主服务](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md) 列出了哪个 Shell 提供哪个服务。已连接账户相关的服务需要 desktop-v0.1.0-beta.2 或更高版本。
 
 `card-host` 也会拒绝清单要求 `host-api-v1`、`backend-api-v1` 或 `script-tools-v1` 的应用，因为这些标记所需的 API 它一个也没有实现。窗口会显示“card-host refused this bundle”和 `app <id> needs a host implementing <method>@1`。这类应用请在基于 `main` 构建的 OctoSense Shell 中测试。
 
@@ -203,7 +203,7 @@ curl -s 127.0.0.1:8151/quit
 - 应用特有的行为、数据来源和测试，保留在应用自己的仓库中。
 - 记录每次发布构建和测试时所用的 Hub 与运行时版本。
 - 离线工作时，保留一份固定到已知 Hub 版本的指南副本，不要使用会悄悄过时的未跟踪副本。
-- 构建或准入检查通过，并不能证明视觉正确、输入可用，或应用能在某个平台上运行。请按 [原生测试工具指南](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md) 测试这些方面。
+- 构建或准入检查通过，并不能证明视觉正确、输入可用，或应用能在某个平台上运行。请按 [原生测试工具指南](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/core/NATIVE-INSTRUMENT.md) 测试这些方面。
 
 ## 故障排查
 
