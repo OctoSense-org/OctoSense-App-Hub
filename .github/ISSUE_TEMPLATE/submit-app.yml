@@ -1,176 +1,194 @@
 name: Submit an app
-description: Submit one app version for admission to the App Hub catalog.
+description: Request app admission; add release evidence when it is ready.
 title: "Submit <app id> <version>"
 body:
   - type: markdown
     attributes:
       value: |
-        Follow [the submission guide](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/SUBMITTING.md) ([简体中文](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/SUBMITTING.zh-CN.md)) before you open this issue.
-        Replace `<app id>` and `<version>` in the title, for example `Submit org.example.tipjar 0.1.0`.
-
-        Open one issue per version. To submit an update, open a new issue that links the old one; do not post the update as a comment on the old one.
-        Do not open a pull request that edits `catalog.json`, `index/` or `artifacts/`.
-
+        Open this issue to request publication. The release can come later; fill in what is ready and list pending checks.
+        First submissions and updates use the app's GitHub publishing workflow: no separate developer signing key or signing secret.
+        Read [the guide](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/SUBMITTING.md) ([简体中文](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/SUBMITTING.zh-CN.md)).
+        Use one issue per planned version; link the prior issue for an update. Add that version's evidence here when ready.
+        A maintainer reviews the exact release pack before catalog admission. A tag or release is not approval.
+        Do not submit a PR editing catalog.json, catalog-v2.json, index/ or artifacts/.
+  - type: dropdown
+    id: release-status
+    attributes:
+      label: Release status
+      options:
+        - Request opened; release evidence pending
+        - GitHub release ready for review
+        - Optional legacy package ready for review
+    validations:
+      required: true
   - type: input
     id: app-id
     attributes:
-      label: App id
-      description: "The `id` in `bundle/manifest.json`."
-      placeholder: org.example.tipjar
+      label: "App id"
+      description: "The id in bundle/manifest.json."
+      placeholder: "org.example.tipjar"
     validations:
       required: true
-
   - type: input
     id: version
     attributes:
-      label: Version
-      description: "The `version` in `bundle/manifest.json`. Use a version the catalog does not list yet; a published version is never replaced."
-      placeholder: 0.1.0
+      label: "Version"
+      description: "Planned manifest version; each released update needs a higher semantic version."
+      placeholder: "0.1.0"
     validations:
       required: true
-
   - type: input
     id: repository
     attributes:
-      label: Repository URL
-      description: The public repository that holds the tag.
-      placeholder: https://github.com/<you>/<app>
+      label: "Repository URL"
+      description: "Public GitHub app repository; a tag or release does not need to exist yet."
+      placeholder: "https://github.com/<you>/<app>"
     validations:
       required: true
-
+  - type: textarea
+    id: capabilities
+    attributes:
+      label: "Requested capabilities and app behavior"
+      description: "Explain what the app does and why it needs each capability; mark undecided requests pending."
+      placeholder: "storage: save app-owned drafts"
+    validations:
+      required: true
   - type: input
     id: tag
     attributes:
-      label: Tag
-      description: "`v` followed by the version. Never move, delete or recreate it after you push it."
-      placeholder: v0.1.0
+      label: "Tag"
+      description: "Add when ready: v followed by the exact manifest version. Never move a pushed tag."
+      placeholder: "v0.1.0"
     validations:
-      required: true
-
+      required: false
   - type: input
     id: commit
     attributes:
-      label: Full commit SHA
-      description: "The output of `git rev-parse \"<tag>^{commit}\"`, all 40 characters. For an annotated tag, `git rev-parse <tag>` alone prints the tag object."
-      placeholder: 40-character commit SHA
+      label: "Full commit SHA"
+      description: "Add when ready: all 40 characters from git rev-parse \"<tag>^{commit}\"."
+      placeholder: "40-character source commit SHA"
     validations:
-      required: true
-
+      required: false
   - type: input
     id: bundle-path
     attributes:
-      label: Bundle path
-      description: The bundle directory at the submitted commit.
-      value: bundle/
+      label: "Bundle path"
+      description: "Editable source location; the generated release pack holds the final attested manifest."
+      placeholder: "bundle/"
     validations:
-      required: true
-
+      required: false
+  - type: input
+    id: workflow-run
+    attributes:
+      label: "GitHub workflow run URL"
+      description: "Add the successful tag-push publishing run before admission. No developer private key is required."
+      placeholder: "https://github.com/<you>/<app>/actions/runs/<run>"
+    validations:
+      required: false
+  - type: input
+    id: release-pack
+    attributes:
+      label: "Release and pack URL"
+      description: "Add the Release containing app.bundle.pack.json and release-receipt.json before admission."
+      placeholder: "https://github.com/<you>/<app>/releases/tag/v0.1.0"
+    validations:
+      required: false
+  - type: input
+    id: pack-sha256
+    attributes:
+      label: "Release pack SHA256"
+      description: "Add the downloaded pack hash and confirm it matches release-receipt.json."
+      placeholder: "64 hex characters"
+    validations:
+      required: false
   - type: input
     id: bundle-digest
     attributes:
-      label: Bundle BLAKE3 digest
-      description: "`integrity.bundle_blake3` in `bundle/manifest.json`, the value `hub stamp` printed."
-      placeholder: 64 hex characters
+      label: "Bundle BLAKE3 digest"
+      description: "Add integrity.bundle_blake3 from the final manifest in the verified release pack."
+      placeholder: "64 hex characters"
     validations:
-      required: true
-
-  - type: input
-    id: publisher-id
-    attributes:
-      label: Publisher id
-      description: "Your publisher id: the `--key-id` you signed with, or, for an unsigned first version, the id you will sign updates with."
-      placeholder: your-publisher-id
-    validations:
-      required: true
-
-  - type: input
-    id: publisher-key
-    attributes:
-      label: Publisher public key
-      description: "The output of `hub pubkey <key-file>`. For an unsigned first version, write `unsigned`; every later version must be signed. Never paste the private key."
-      placeholder: 64 hex characters
-    validations:
-      required: true
-
+      required: false
   - type: input
     id: privacy-url
     attributes:
-      label: Privacy policy URL
-      description: "The listing's `publisher.privacy_policy_url`, or the same file at the submitted commit. It must return HTTP 200."
-      placeholder: https://github.com/<you>/<app>/blob/<commit>/PRIVACY.md
+      label: "Privacy policy URL"
+      description: "Before admission: publisher.privacy_policy_url from the listing, or its immutable repository file; must return HTTP 200."
+      placeholder: "https://github.com/<you>/<app>/blob/<commit>/PRIVACY.md"
     validations:
-      required: true
-
+      required: false
   - type: input
     id: support
     attributes:
-      label: Support contact
-      description: "The listing's `publisher.support`: a URL that returns HTTP 200, or an email address."
-      placeholder: https://github.com/<you>/<app>/issues
+      label: "Support contact"
+      description: "Before admission: listing publisher.support, a working URL or email address."
+      placeholder: "https://github.com/<you>/<app>/issues"
     validations:
-      required: true
-
+      required: false
   - type: textarea
     id: platforms
     attributes:
-      label: Platforms tested
-      description: Each platform the listing declares, with the host you ran the app on and what you tested there.
-      placeholder: |
-        macos: macOS on Apple silicon, card-host from App Hub <revision>, every screen driven by hand
-        macos: OctoSense desktop 0.1.0-beta.2, installed from a local catalog
+      label: "Platforms tested"
+      description: "List tested hosts and exact revisions. Pending is allowed at request time; only claim tested platforms in the final listing."
+      placeholder: "macos: compatible source-built OctoSense at <commit>; describe tests"
     validations:
-      required: true
-
+      required: false
   - type: input
     id: hub-revision
     attributes:
-      label: App Hub revision the gate ran on
-      description: "The output of `git rev-parse HEAD` in the App Hub checkout your `hub` was built from. Use an unpatched build of `main`."
-      placeholder: 40-character commit SHA
+      label: "App Hub revision the gate ran on"
+      description: "Add the immutable Hub tool revision from the workflow and local verification before admission."
+      placeholder: "40-character commit SHA"
     validations:
-      required: true
-
+      required: false
   - type: textarea
     id: gate-output
     attributes:
-      label: Gate output
-      description: "The complete output of the `hub check` you ran on a fresh clone of the pushed tag ([step 6 of the submission guide](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/SUBMITTING.md#6-freeze-and-verify-the-release))."
-      render: text
+      label: "Gate and publisher verification output"
+      description: "Before admission: complete publisher-unpack/publisher-verify output for the downloaded pack, plus development gate output. A source clone alone does not verify a release pack."
+      placeholder: "Pending release verification"
     validations:
-      required: true
-
+      required: false
   - type: textarea
     id: scan-answers
     attributes:
-      label: Scan answers
-      description: "Every question in the review packet that `hub scan --packet` wrote, each followed by your answer and the bundle file behind it. The packet holds 7 questions, or 8 when the bundle ships `tools.json`, `AGENT.md` or skills; `hub scan` does not print them."
+      label: "Scan answers"
+      description: "Before admission: answer every hub scan packet question, with the supporting bundle file. Seven questions, or eight for an app agent."
+      placeholder: "Pending review packet"
     validations:
-      required: true
-
+      required: false
   - type: textarea
     id: screenshots
     attributes:
-      label: Screenshots
-      description: Links to each screenshot at the submitted commit. Say which ones show fictional data.
+      label: "Screenshots"
+      description: "Before admission: real native captures linked at an immutable commit. Identify fictional data."
+      placeholder: "Pending native captures"
     validations:
-      required: true
-
+      required: false
   - type: textarea
     id: not-verified
     attributes:
-      label: What is not verified
-      description: Everything you did not test, such as platforms, host services, live provider sign-in or remote writes.
+      label: "What is not verified"
+      description: "Name incomplete release steps, platforms, host services, live sign-in and writes. Update this as checks finish."
+      placeholder: "Release workflow and compatible-host installation are pending."
     validations:
       required: true
-
+  - type: textarea
+    id: legacy-authentication
+    attributes:
+      label: "Optional legacy authentication"
+      description: "Only for a deliberately chosen existing Ed25519 package: publisher id and public key. Leave blank for GitHub publishing, including updates. Never send a private key."
+      placeholder: "Not applicable: GitHub publishing"
+    validations:
+      required: false
   - type: checkboxes
     id: confirmations
     attributes:
       label: Confirmations
       options:
-        - label: My bundle contains no passwords, API keys, tokens or other secrets.
+        - label: My bundle and this issue contain no passwords, private keys, API keys or tokens.
           required: true
-        - label: I will not move, delete or recreate the tag.
+        - label: I will not move, delete or recreate a pushed release tag.
           required: true
-        - label: I took the gate output above from a fresh clone of the pushed tag.
+        - label: I have identified pending checks and understand that a release is not Hub approval.
           required: true
