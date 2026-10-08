@@ -11,9 +11,12 @@ the green Verified badge on a commit.
 **Delivery status:** [production run 37736098082](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37736098082)
 published catalog sequence 11 at commit
 `27eeec5b3abc3f9c2aa06a3894bab2f15228f116`. Later runs published sequences
-12 and 13;
+12, 13 and 14;
 [run 37755718288](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37755718288)
-published sequence 13 at commit `3842c5ec503a8e9124cbbe99655556ffe24c41e1`.
+published sequence 13 at commit `3842c5ec503a8e9124cbbe99655556ffe24c41e1`, and
+[run 37852340163](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37852340163)
+published sequence 14 at commit `14135444bb2ded83cee3458553287aa60387f795`,
+withdrawing the six key-signed `org.octosense.samples.*` entries.
 This source selects the GitHub channel by default for new compatible hosts.
 [OctoSense desktop 0.1.0-rc.1](../README.md#download-a-compatible-host),
 released on 2026-10-08, is a compatible host release and reads
