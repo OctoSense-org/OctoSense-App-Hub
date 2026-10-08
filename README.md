@@ -78,8 +78,9 @@ cargo build --release -p octosense-card-host -p octosense-app-hub
 To run `hub` from source without a release build, use
 `cargo run -p octosense-app-hub --bin hub`. [Run the right host](docs/CODE-WALKTHROUGH.md#2-run-the-right-host) lists the
 package tests. The [native tools CI](.github/workflows/native-tools.yml) runs
-the release build above and those tests on macOS, against sibling checkouts without
-OctoSense's runtime patches.
+the release build above and those tests on macOS, Windows and Linux, against
+sibling checkouts without OctoSense's runtime patches. Native font rendering
+is checked in a graphical macOS session; the other jobs cover builds and tests.
 
 Build only the packages you need. A build that includes the store packages
 with their default features, such as `cargo test --workspace`, also needs

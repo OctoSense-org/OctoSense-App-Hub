@@ -320,6 +320,11 @@ fn kit_font_objects_and_tokens_cannot_bypass_asset_checks() {
         (json!({"$token":"face"}), Some(json!("missing.ttf")), false),
         (json!({"$token":"face"}), Some(json!({"$token":"nested"})), false),
         (json!({"$token":"face"}), Some(json!("makepad_widgets:resources/Inter.ttf")), true),
+        (json!("makepad_widgets:resources/LXGWWenKaiRegular.ttf"), None, true),
+        (json!({"$token":"face"}), Some(json!("makepad_widgets:resources/LXGWWenKaiBold.ttf")), true),
+        (json!("makepad_widgets:resources/../private.ttf"), None, false),
+        (json!("makepad_widgets:resources/Unshipped.ttf"), None, false),
+        (json!("other_crate:resources/LXGWWenKaiRegular.ttf"), None, false),
         (json!({"$token":"face"}), Some(json!("assets/body.ttf")), true),
         (json!(["assets/body.ttf"]), None, false),
     ] {

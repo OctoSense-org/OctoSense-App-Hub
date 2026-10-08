@@ -30,8 +30,15 @@ env:
 
 jobs:
   standalone:
-    runs-on: macos-latest
-    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v6
         with:
@@ -58,6 +65,17 @@ jobs:
           ref: ${{ steps.runtime.outputs.revision }}
           path: octoscript-makepad
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Linux native build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pkg-config libssl-dev libx11-dev libxcursor-dev \
+            libxrandr-dev libxi-dev libxinerama-dev libgl1-mesa-dev libegl1-mesa-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libgles2-mesa-dev \
+            libasound2-dev libpulse-dev libdbus-1-dev libudev-dev libdrm-dev libgbm-dev libva-dev
       - name: Prepare and verify the pinned sibling sources
         run: |
           python3 octoscript-makepad/tools/runtime.py prepare --root "$GITHUB_WORKSPACE"
@@ -83,5 +101,9 @@ jobs:
           cargo test --locked --release -p octosense-app-hub-app --no-default-features --lib
           cargo test --locked --release -p octosense-card-host --bin card-host
       - name: Native bundled-font path with system fallback disabled
+        if: runner.os == 'macOS'
         working-directory: app-hub
-        run: python3 crates/card-host/tests/native_fonts.py
+        run: |
+          python3 crates/card-host/tests/native_fonts.py
+          python3 crates/card-host/tests/native_fonts.py --font cjk-regular
+          python3 crates/card-host/tests/native_fonts.py --font cjk-bold

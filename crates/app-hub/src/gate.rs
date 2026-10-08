@@ -129,6 +129,26 @@ pub fn check_bundle(
     verifier: &dyn SignatureVerifier,
     previous: Option<&Catalog>,
 ) -> Result<GateReport, String> {
+    check_bundle_for(bundle, limits, verifier, previous, false)
+}
+
+/// Check a shipped system app during development, using the same resource
+/// ceilings as the system runner. This report cannot become a store entry.
+/// Store admission always uses [`check_bundle`], including with system limits.
+pub fn check_system_bundle(
+    bundle: &Path,
+    verifier: &dyn SignatureVerifier,
+) -> Result<GateReport, String> {
+    check_bundle_for(bundle, &HostLimits::system(), verifier, None, true)
+}
+
+fn check_bundle_for(
+    bundle: &Path,
+    limits: &HostLimits,
+    verifier: &dyn SignatureVerifier,
+    previous: Option<&Catalog>,
+    system_development: bool,
+) -> Result<GateReport, String> {
     // Metadata first: nothing is read or hashed beyond the limits.
     let files = crate::admission::inventory(bundle)?;
     let manifest_path = bundle.join(octosense_app_policy::MANIFEST_FILE);
@@ -159,10 +179,16 @@ pub fn check_bundle(
     // ---- identity ------------------------------------------------------
     // Ids under `os.` are the system apps' (appstore::system): every device
     // refuses to install one from a store, so the hub refuses to offer one.
-    if manifest.id.starts_with("os.") {
+    if manifest.id.starts_with("os.") && !system_development {
         findings.push(Finding::refuse(
             "identity",
             format!("{} is under os., which is reserved for system apps that ship with the device", manifest.id),
+        ));
+    }
+    if system_development && !manifest.id.starts_with("os.") {
+        findings.push(Finding::refuse(
+            "identity",
+            "--system-app checks only shipped os.* apps; use ordinary check/scan for store apps",
         ));
     }
     // Native apps' ids and the host's own names (app-policy's
@@ -493,6 +519,9 @@ pub fn entry_for(
     }
     let manifest_json = std::fs::read_to_string(bundle.join(octosense_app_policy::MANIFEST_FILE)).map_err(|e| e.to_string())?;
     let manifest = AppManifest::parse(&manifest_json)?;
+    if manifest.id.starts_with("os.") {
+        return Err("system development reports cannot become store entries".into());
+    }
     // The entry is what the gate checked, byte for byte, or nothing.
     if serde_json::to_vec(&manifest).map_err(|e| e.to_string())? != report.admitted_manifest
         || manifest.id != report.app_id

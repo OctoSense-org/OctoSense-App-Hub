@@ -137,11 +137,12 @@ admission. A warning does not.
 
 A card names a font with `font_src`, in the `page.data.json` placements or in
 a native kit's component styles. The gate accepts a font file in the bundle,
-or the one built-in font it allows, `makepad_widgets:resources/Inter.ttf`. Any
-other built-in font is refused:
+or one of these exact built-in resource names from the pinned runtime:
 
 ```text
-[refused] resource-invalid (kit/native/light/kit.json/components/detail/style/font_src): not a portable bundle path: "makepad_widgets:resources/LXGWWenKaiRegular.ttf"
+makepad_widgets:resources/Inter.ttf
+makepad_widgets:resources/LXGWWenKaiRegular.ttf
+makepad_widgets:resources/LXGWWenKaiBold.ttf
 ```
 
 Use a bundle-relative path such as `"font_src": "assets/Body.ttf"` for a
@@ -156,8 +157,8 @@ gate checks the path that the token resolves to. Any other object, or an
 array, is refused with
 `font_src must be a bundled font path, a supported built-in font, or one token resolving to a string`.
 
-Not yet: other built-in fonts
-([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)).
+Other built-in names and crate paths are refused. Bundle a licensed font
+subset when it is not one of these shipped resources.
 
 A bundled font counts toward the 8 MiB limit, so bundle a subset of a large
 CJK font. The gate checks the font's path but does not decode the file, so
@@ -1027,8 +1028,8 @@ none of them reads a bundle or writes a file. An unknown command fails with
 | Command | What it does |
 | --- | --- |
 | `hub stamp <bundle>` | Parses `manifest.json` with the gate's parser, then writes the bundle's digest into `integrity.bundle_blake3` and prints it. Refuses a manifest the gate cannot read. |
-| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json]` | The gate. Prints `PASSED` or `REFUSED`, every finding and what the app will be granted. Exits 1 on a refusal. `--json` prints the report as JSON (`schema`, `stage`, `passed`, `app_id`, `version`, `digest`, `findings` and `resources`). |
-| `hub scan <bundle> [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--packet <out.json>] [--reviewer <cmd>]` | Runs the gate, then writes the review packet and optionally hands it to a reviewer command. A bundle the gate refuses gets no scan. |
+| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app]` | The gate. Prints `PASSED` or `REFUSED`, every finding and what the app will be granted. Exits 1 on a refusal. `--json` prints the report as JSON (`schema`, `stage`, `passed`, `app_id`, `version`, `digest`, `findings` and `resources`). |
+| `hub scan <bundle> [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--packet <out.json>] [--reviewer <cmd>] [--system-app]` | Runs the gate, then writes the review packet and optionally hands it to a reviewer command. A bundle the gate refuses gets no scan. |
 | `hub keygen <key-file>` | Creates a new key file, writes a signing key into it as hex and prints the public half. Refuses a path that already exists, including a symlink. On macOS and Linux the file is readable only by you (mode `0600`). |
 | `hub pubkey <key-file>` | Prints a key's public half. |
 | `hub sign-manifest <bundle> --key <key-file> --key-id <publisher-id>` | Signs the manifest, which covers the digest. |
@@ -1080,6 +1081,21 @@ The questions, abridged from `crates/app-hub/src/scan.rs`:
 8. Route: pass, human-review or reject, with reasons a publisher can act on.
 
 Reviewers ask the same questions.
+
+### Developing a shipped system app
+
+Use `hub check <bundle> --system-app` or `hub scan <bundle> --system-app`
+for a local `os.*` bundle. This mode uses the same resource ceilings as
+`card-host --system`, accepts an unsigned development bundle, and still
+checks its digest, contents, tools and any supplied signature. Supply
+`--publisher-key` when the bundle is signed. Store-app IDs are refused in
+this mode, and `publish` refuses both `--system-app` and `os.*` bundles.
+The mode does not install host services or add the shell's extra tool offers.
+A passing system-development report cannot become a catalog entry.
+
+The optional reviewer command runs in `sh -c` on Unix and `cmd.exe /D /S /C`
+on Windows. Configure a command for the host platform; it receives the review
+packet on stdin. Its failure or invalid output still requires human review.
 
 ## Signing
 

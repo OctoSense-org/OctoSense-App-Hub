@@ -5,7 +5,7 @@ hub — the OctoSense app hub command (ADR 0003)
   hub certify --anchor <f> --working <f>   anchor certifies a working key
   hub stamp <bundle>                    write the bundle's digest into its manifest
   hub sign-manifest <bundle> --key <f> --key-id <id>
-  hub check <bundle> [--catalog <f> [--anchor <hex>]] [--allow-unsigned] [--publisher-key id=hex] [--json]
+  hub check <bundle> [--catalog <f> [--anchor <hex>]] [--allow-unsigned] [--publisher-key id=hex] [--json] [--system-app]
   hub publish <bundle> --catalog <f> --key <f> --anchor-cert <hex>
               --publisher <id> [--repo <url>] [--commit <sha>] [--out <dir>]
   hub withdraw <app> --version <v> --reason <text> --catalog <f> --key <f> --anchor-cert <hex>
@@ -13,7 +13,7 @@ hub — the OctoSense app hub command (ADR 0003)
               (drops the entry, its index file and its artifacts; for a
               publish that should never have been offered — withdraw otherwise)
   hub scan <bundle> [--reviewer <cmd>] [--packet <out.json>]
-             [--publisher-key id=hex] [--catalog <f> [--anchor <hex>]]
+             [--publisher-key id=hex] [--catalog <f> [--anchor <hex>]] [--system-app]
   hub verify <catalog> --anchor <hex>
 
 Use hub help or --help / -h with any command for this usage (no files changed).
@@ -21,6 +21,9 @@ keygen refuses existing files and symlinks. New keys are owner-only (0600)
 on Unix; on other platforms protect the containing directory with its ACL.
 scan permits unsigned development bundles, but signed bundles still need a
 trusted publisher key (explicitly or from a verified catalog).
+check/scan --system-app check a shipped os.* bundle with the system runner's
+limits, allowing an unsigned development bundle. Other ids are refused in
+this mode. publish never accepts --system-app or an os.* bundle.
 
 publish also accepts --reviewer <cmd> (the agent scan; a reject stops the
 publish, human-review stops it until --reviewed) and writes

@@ -42,6 +42,9 @@ fn run() -> Result<(), String> {
     let flag = |name: &str| argv.windows(2).find(|w| w[0] == format!("--{name}")).map(|w| w[1].clone());
     let has = |name: &str| argv.iter().any(|a| a == &format!("--{name}"));
     let positional = argv.get(2).filter(|arg| !arg.starts_with('-')).cloned();
+    if has("system-app") && !matches!(command, "check" | "scan") {
+        return Err("--system-app is only supported by check and scan; system apps cannot be published".into());
+    }
 
     match command {
         "keygen" => {
@@ -314,7 +317,11 @@ fn gate_for(bundle: &Path, argv: &[String], allow_unsigned: bool, catalog: Optio
     if let Some(Ok(registry)) = previous.as_ref().map(CatalogPublishers::from_catalog) {
         keys = registry.trusted_keys(keys);
     }
-    check_bundle(bundle, &limits, &keys, previous.as_ref())
+    if argv.iter().any(|arg| arg == "--system-app") {
+        octosense_app_hub::gate::check_system_bundle(bundle, &keys)
+    } else {
+        check_bundle(bundle, &limits, &keys, previous.as_ref())
+    }
 }
 
 /// The catalog at `path`, once it verifies against the trusted anchor.
