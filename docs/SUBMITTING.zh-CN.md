@@ -281,7 +281,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 1. 如果尚未开提交 issue，现在就可以开。Release 证据可以稍后补充；未完成的检查标为待完成，不要编造通过结果。
 2. 测试可编辑源码并截取真实界面。运行准入检查和 `hub scan bundle --packet build/review.json`，其中 `build/` 位于应用包外。逐题回答审核包中的问题：共七题，带 `tools.json`、`AGENT.md` 或技能时为八题。注明每个回答依据的文件及未测试的行为。
 3. 用 App Flow 的 `tools/octo publish-github <app-directory>` 安装并评审 `.github/workflows/publish-app.yml`（`tools/octo new` 也会提供）。工作流不需要发布者密钥，也不需要仓库签名 Secret。原生命令见 [GitHub 发布者来源证明](PUBLISHING.zh-CN.md#github-发布者来源证明)。
-4. Commit 测试过的可编辑源码、截图、商店信息、隐私政策/支持页面、`.gitattributes` 和工作流。每个 Release 使用新的语义版本和精确的 `v<manifest.version>` 标签。工作流生成带证明的清单及最终 Release pack；不要把生成的字节覆盖提交到可编辑源码中。
+4. Commit 测试过的可编辑源码、截图、商店信息、隐私政策/支持页面、`.gitattributes` 和工作流。每个 Release 使用新的语义版本和精确的 `v<manifest.version>` 标签。工作流生成带证明的清单及最终 Release pack；不要用这些生成的字节覆盖可编辑源码并 commit。
 
 常规更新沿用相同的仓库名、工作流，以及不可变的仓库 ID 和所有者 ID，并提高语义版本。绝不要给已封存的 Release 重新写入摘要：修改可编辑源码，再用新版本生成 Release。
 
@@ -304,7 +304,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 
 ## 7. 开提交 issue
 
-用 [Submit an app 表单](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/new?template=submit-app.yml) 开一个 issue，标题写作 `Submit <app id> <version>`。开这个 issue，就是请求发布这个应用。**第 1–6 步尚未完成时也可以先开。** Release 证据准备好后，补充到同一个 issue 中；待完成字段不代表获得批准。
+用 [Submit an app 表单](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/new?template=submit-app.yml)开一个 issue，标题写作 `Submit <app id> <version>`。开这个 issue，就是请求发布这个应用。**第 1–6 步尚未完成时也可以先开。** Release 证据准备好后，补充到同一个 issue 中；待完成字段不代表获得批准。
 
 在 App Hub 首次发布你的应用之前，始终使用这一个 issue：每个新 Release 都以评论的形式发在其中，写明它的标签、完整的 commit SHA 和工作流运行链接，并把 issue 标题和正文中的 Version 字段改成新版本。首次发布之后，每个新版本都要开新 issue（见[第 9 步](#9-提交之后)）。
 
@@ -360,7 +360,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 
 | 检查项或消息 | 原因 | 修复 |
 | --- | --- | --- |
-| `digest: the bundle hashes to …, the manifest claims …` | 写入摘要之后字节变了：有改动、在 commit 之后才写入摘要（`tools/octo check` 会重新写入）、Git 检出产生了 CRLF 换行，或者用了比 `main` 旧的 Windows 版 `hub`（它用 `\` 拼接路径来计算摘要）。 | 从 `main` 构建 `hub`，加上[第 1 步](#1-安排仓库结构)的 `.gitattributes`，然后为可编辑源码重新写入摘要并生成新的 GitHub 证明版本，验证下载的 pack；不要给已封存的 Release 重新写入摘要。 |
+| `digest: the bundle hashes to …, the manifest claims …` | 写入摘要之后字节变了：有改动、在 commit 之后才写入摘要（`tools/octo check` 会重新写入）、Git 检出产生了 CRLF 换行，或者用了比 `main` 旧的 Windows 版 `hub`（它用 `\` 拼接路径来计算摘要）。 | 从 `main` 构建 `hub`，加上[第 1 步](#1-安排仓库结构)的 `.gitattributes`，然后为可编辑源码重新写入摘要并生成带 GitHub 证明的新版本，验证下载的 pack；不要给已封存的 Release 重新写入摘要。 |
 | `continuity: existing legacy app ownership cannot be adopted by GitHub provenance` | 该 ID 已登记给未签名或用密钥签名的应用，例如照搬的 `org.octosense.samples.*` ID。 | 换一个新 ID。 |
 | `continuity: GitHub publisher repository, owner or workflow changed` | 更新来自另一个仓库、所有者或工作流文件，或者仓库已重命名或转移。 | 用已登记的仓库和工作流生成 Release。重命名或转移后的仓库不能再更新这个应用；请换用新 ID 发布。 |
 | `version: version … is already published; publish a new version` | 该版本已在签名目录中。 | 提高 `version`，使用新标签并验证工作流生成的新 Release pack（第 5、6 步）。 |
