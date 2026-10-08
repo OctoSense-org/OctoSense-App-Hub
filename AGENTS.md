@@ -23,7 +23,7 @@ change, with the same sections, in the same order and with the same content.
 | Gate rules, capability names and who serves them, reserved ids, manifest, listing and tool fields, `hub` commands, signing | [docs/PUBLISHING.md](docs/PUBLISHING.md), the reference, and its `.zh-CN.md` twin |
 | GitHub-admin catalog publication, environment protection and v2 migration | [docs/GITHUB-PUBLISHING.md](docs/GITHUB-PUBLISHING.md) and its `.zh-CN.md` twin |
 | Host API declarations, `runtime` discovery and which hosts implement them | [docs/HOST-API.md](docs/HOST-API.md) and its `.zh-CN.md` twin |
-| The submission's four stages and its steps: repository layout, release, issue fields, what reviewers check, approval and publication, common refusals, and who runs each `hub` command when | [docs/SUBMITTING.md](docs/SUBMITTING.md) and its `.zh-CN.md` twin |
+| The submission's four stages and its steps: repository layout, release, issue fields, what reviewers check, approval and publication, common refusals, and who runs each `hub` command, in which step | [docs/SUBMITTING.md](docs/SUBMITTING.md) and its `.zh-CN.md` twin |
 | A first app, from a template to an unsigned bundle that passes the gate | [docs/FIRST-APP.md](docs/FIRST-APP.md) and its `.zh-CN.md` twin |
 | The contract's versions and crates.io status | [crates/app-contract/README.md](crates/app-contract/README.md#versions-on-cratesio) |
 | Icons | [docs/ICONS.md](docs/ICONS.md) and its `.zh-CN.md` twin |
@@ -137,15 +137,17 @@ owns those.
 
 ## Submissions
 
-Apply these rules when you help a developer submit an app or a reviewer
-review one:
+Apply these rules when you help a developer submit an app, or help a
+reviewer check one:
 
-- Run Design Flow's `tools/octo doctor` before any build or check, and
-  `hub help` for the exact commands. Use only the commands `hub help` lists.
+- After you build `hub` and `card-host`, run Design Flow's `tools/octo doctor`
+  before you build or check an app. Run `hub help` for the exact commands, and
+  use only the commands it lists.
 - The submission issue is the developer's request to publish. Never treat a
   tag or a GitHub release as a submission or an approval.
 - Check the exact bytes at the submitted tag and in the release pack with
-  `hub check` and `hub publisher-verify`, and post findings in the issue.
+  `hub check`, `hub publisher-unpack` and `hub publisher-verify`, and post
+  findings in the issue.
   No bot reviews submission issues; never claim that one did.
 - A GitHub publisher app needs no developer signing key: its workflow attests
   each release. An app published with an Ed25519 key keeps that key for

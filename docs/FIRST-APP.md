@@ -4,8 +4,8 @@ English | [简体中文](FIRST-APP.zh-CN.md)
 
 You start from a template and finish with an unsigned bundle that runs in
 `card-host` and passes the gate, the admission checks that `hub check` runs.
-[Submit an app to the App Hub](SUBMITTING.md) then takes it from the release
-to publication.
+[Submit an app to the App Hub](SUBMITTING.md) then takes it through the four
+stages of a submission, from request to publication.
 
 A Hub app is one of two kinds, and both are submitted the same way:
 
@@ -344,14 +344,12 @@ the app, catch placeholder text or check your privacy policy.
 
 ## 6. Release and submit
 
-Continue with [Submit an app to the App Hub](SUBMITTING.md). Opening the
-submission issue is your request to publish; you can open it before the
-release is ready, and a tag or release alone submits nothing:
+Continue with steps 5 to 9 of [Submit an app to the App Hub](SUBMITTING.md):
 
 | Step | What you do |
 | --- | --- |
 | [5. Produce the final bytes](SUBMITTING.md#5-produce-the-final-bytes) | Scan the bundle, answer the review questions and add the GitHub release workflow. |
-| [6. Freeze and verify the release](SUBMITTING.md#6-freeze-and-verify-the-release) | Commit, push a new tag, and verify the release pack that the workflow builds. |
+| [6. Freeze and verify the release](SUBMITTING.md#6-freeze-and-verify-the-release) | Commit, push a new tag and verify the release pack that the workflow builds. |
 | [7. Open the submission issue](SUBMITTING.md#7-open-the-submission-issue) | Request publication, then add the tag, the full commit SHA, the release pack and the verification output. |
 | [8. What reviewers check](SUBMITTING.md#8-what-reviewers-check) | See what a reviewer checks; the findings appear in your issue. |
 | [9. After you submit](SUBMITTING.md#9-after-you-submit) | See how an App Hub admin approves and the Hub publishes, and ship updates as new versions. |

@@ -2,7 +2,7 @@
 
 [English](FIRST-APP.md) | 简体中文
 
-你将从模板起步，最终得到一个未签名的应用包：它能在 `card-host` 中运行，并能通过准入检查（由 `hub check` 执行）。之后从生成 Release 到正式发布的步骤，见[向 App Hub 提交应用](SUBMITTING.zh-CN.md)。
+你将从模板起步，最终得到一个未签名的应用包：它能在 `card-host` 中运行，并能通过准入检查（由 `hub check` 执行）。之后，[向 App Hub 提交应用](SUBMITTING.zh-CN.md)会带它走完提交的四个阶段，从请求发布到正式发布。
 
 Hub 应用分为两类，提交方式相同：
 
@@ -232,22 +232,22 @@ hub: the bundle was refused
 
 `PASSED` 表示应用包符合准入规则。`hub check` 不运行应用，发现不了占位文字，也不检查你的隐私政策。
 
-## 6. 发布并提交
+## 6. 生成 Release 并提交
 
-接下来按[向 App Hub 提交应用](SUBMITTING.zh-CN.md)继续。开提交 issue 就是请求发布；发布还没准备好时也可以先开，而只打标签或只发布 release 都不算提交：
+接下来按[向 App Hub 提交应用](SUBMITTING.zh-CN.md)的第 5 到 9 步继续：
 
 | 步骤 | 要做的事 |
 | --- | --- |
-| [5. 生成最终字节](SUBMITTING.zh-CN.md#5-生成最终字节) | 扫描应用包，回答审核问题，并加入 GitHub 发布工作流。 |
+| [5. 生成最终字节](SUBMITTING.zh-CN.md#5-生成最终字节) | 扫描应用包，回答审核问题，并加入 GitHub Release 工作流。 |
 | [6. 冻结并验证发布](SUBMITTING.zh-CN.md#6-冻结并验证发布) | commit 后推送新标签，再验证工作流生成的 Release pack。 |
 | [7. 开提交 issue](SUBMITTING.zh-CN.md#7-开提交-issue) | 请求发布，然后补充标签、完整的 commit SHA、Release pack 和验证输出。 |
 | [8. 审核检查什么](SUBMITTING.zh-CN.md#8-审核检查什么) | 了解审核人员检查什么；发现的问题会出现在你的 issue 中。 |
-| [9. 提交之后](SUBMITTING.zh-CN.md#9-提交之后) | 了解 App Hub 管理员如何批准、Hub 如何发布，并以新版本发布更新。 |
+| [9. 提交之后](SUBMITTING.zh-CN.md#9-提交之后) | 了解 App Hub 管理员如何批准、Hub 如何发布，并以新版本推出更新。 |
 
 整个过程都要遵守两条规则：
 
-- **测试开发源码，绝不修改已封存的发布。** 工作流会封存它发布的字节；任何改动都需要新版本和新标签（[GitHub 发布者来源证明](PUBLISHING.zh-CN.md#github-发布者来源证明)）。
-- **你不需要发布者密钥。** 应用的 GitHub 工作流为每次发布生成证明。只有已经用 Ed25519 密钥发布过的应用，才继续用那把密钥签名（[签名](PUBLISHING.zh-CN.md#签名)）。
+- **测试开发源码，绝不修改已封存的 Release。** 工作流会封存它放进 Release 的字节；任何改动都需要新版本和新标签（[GitHub 发布者来源证明](PUBLISHING.zh-CN.md#github-发布者来源证明)）。
+- **你不需要发布者密钥。** 应用的 GitHub 工作流为每个 Release 生成证明。只有已经用 Ed25519 密钥发布过的应用，才继续用那把密钥签名（[签名](PUBLISHING.zh-CN.md#签名)）。
 
 要在提交前用 OctoSense 桌面版试用应用，请用一个临时信任锚把它发布到本地签名目录（[在本地演练商店流程](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)）。
 
