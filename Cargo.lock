@@ -1614,7 +1614,7 @@ dependencies = [
 
 [[package]]
 name = "octosense-app-contract"
-version = "1.7.0"
+version = "1.7.1"
 dependencies = [
  "blake3",
  "serde",

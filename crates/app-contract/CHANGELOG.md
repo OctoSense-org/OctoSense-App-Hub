@@ -8,6 +8,17 @@ are unpublished, and 1.5.0 includes their changes.
 [README.md](README.md#versions-on-cratesio) shows how to update a lock file
 that holds 1.2.0.
 
+## 1.7.1 — publication pending
+
+- Reserve the exact full app IDs `catalog.json`, `catalog.lock`,
+  `catalog-v2.json` and `catalog-v2.lock`, ignoring ASCII case, so an app's
+  install directory cannot collide with a host catalog or cache-lock file.
+- Export `RESERVED_HOST_FILE_IDS`; `check_reserved_id`, policy resolution and
+  the Hub gate share the refusal. `json` and `lock` are not reserved namespaces:
+  `org.example.json` and `org.example.lock` remain valid.
+- This is a security correction to identity validation. Schema, capability
+  grants, manifest serialization and signature bytes are unchanged.
+
 ## 1.7.0 — 2026-10-07
 
 - `KNOWN_CAPABILITIES` gains `wasm`: the app's own functions, WebAssembly
