@@ -167,8 +167,11 @@ v2 的撤回通过相同的受保护工作流发布带理由的新候选，保�
 
 ## 应用
 
-已认证的公开**签名目录第 13 版**提供以下新的 GitHub 发布者身份。请搜索确切 ID，
-与历史 `org.octosense.samples.*` 条目区分。新 ID 不会迁移旧安装或旧数据。
+已认证的公开**签名目录第 14 版**提供以下 GitHub 发布者身份。三个历史
+`org.octosense.samples.*` 应用的 0.1.0 和 0.1.1 版本均已撤回。旧安装的数据保留，
+新 ID 不会迁移这些数据。RC1 仍将撤回的应用显示为不可用。
+[App Hub #170](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/170) 的发现列表修复
+会在包含该修复的新版宿主中隐藏浏览及搜索里的这些条目。
 
 | 应用 | 确切应用 ID | 最新版本 | 运行平台 |
 | --- | --- | --- | --- |
@@ -183,7 +186,8 @@ Agent 提供建议，不会创建日程。所有应用都不需要 OctoSense 云
 
 公开的[首次准入候选](catalog-candidates/ymote-github-samples-first/admission-review.json)及
 [更新候选](catalog-candidates/ymote-github-samples-updates/independent-review.json)记录了经审核
-的 Release。目录 13 保留之前的条目，包括这些 ID 的 0.2.0/1.1.0 版本。
+的 Release。[撤回审核](catalog-candidates/retire-legacy-connected-samples/review.json)记录了
+六次撤回。目录 14 保留之前的条目，包括这些 ID 的 0.2.0/1.1.0 版本。
 历史 [0.1.1 准入](docs/admissions/connected-apps-0.1.1/README.zh-CN.md)及
 [0.1.0 证据](reviews/connected-apps-0.1.0/README.zh-CN.md)保持原样，描述的是旧
 Ed25519 身份，而不是新的发布路径。安装方法及当前账户/平台限制见
