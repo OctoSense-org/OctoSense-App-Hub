@@ -21,21 +21,24 @@ impl CatalogChannel {
     }
 
     fn select(configured: Option<&str>, root: &Path) -> Result<Self, String> {
-        // Keep the legacy default until the official v2 proof has passed
-        // consumer acceptance. Once selected and cached, never downgrade.
+        // New hosts select the authenticated GitHub channel. Legacy mirrors
+        // require an explicit choice, and a persisted v2 library cannot downgrade.
         let selected = match configured {
             None | Some("") => None,
             Some("legacy") => Some(Self::Legacy),
             Some("github-v2") => Some(Self::GitHub),
             Some(_) => return Err("Unknown OCTOSENSE_HUB_CATALOG channel".into()),
         };
-        if std::fs::symlink_metadata(root.join("catalog-v2.json")).is_ok() {
-            if selected == Some(Self::Legacy) {
-                return Err("This library already uses the GitHub catalog; downgrade refused".into());
-            }
-            return Ok(Self::GitHub);
+        selected.unwrap_or(Self::GitHub).for_library(root)
+    }
+
+    /// Validate an explicit host choice against this library's durable channel.
+    /// A legacy cache alone never opts a new host out of GitHub verification.
+    pub fn for_library(self, root: &Path) -> Result<Self, String> {
+        if self == Self::Legacy && std::fs::symlink_metadata(root.join("catalog-v2.json")).is_ok() {
+            return Err("This library already uses the GitHub catalog; downgrade refused".into());
         }
-        Ok(selected.unwrap_or(Self::Legacy))
+        Ok(self)
     }
 
     pub fn filename(self) -> &'static str {
@@ -96,8 +99,8 @@ impl Origin {
         }
     }
 
-    /// The catalog's bytes. Verification happens in the caller: this only
-    /// fetches.
+    /// Legacy catalog accessor retained for compatibility. Host runners use
+    /// `catalog_for` with their selected channel; verification stays in the caller.
     pub fn catalog(&self) -> Result<String, String> {
         self.catalog_for(CatalogChannel::Legacy)
     }
@@ -141,6 +144,20 @@ mod channel_tests {
     use super::*;
 
     #[test]
+    fn fresh_and_legacy_cached_libraries_default_to_github() {
+        let root = std::env::temp_dir().join(format!("hub-channel-default-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        assert_eq!(CatalogChannel::select(None, &root).unwrap(), CatalogChannel::GitHub);
+        assert_eq!(CatalogChannel::select(Some(""), &root).unwrap(), CatalogChannel::GitHub);
+        std::fs::write(root.join("catalog.json"), "legacy cache is not a channel preference").unwrap();
+        assert_eq!(CatalogChannel::select(None, &root).unwrap(), CatalogChannel::GitHub);
+        assert_eq!(CatalogChannel::select(Some("legacy"), &root).unwrap(), CatalogChannel::Legacy);
+        // Selecting v2 does not synthesize a proof or convert an offline legacy cache.
+        assert!(CatalogChannel::GitHub.read_cache(&root).is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn explicit_channel_and_persisted_v2_prevent_downgrade() {
         let root = std::env::temp_dir().join(format!("hub-channel-{}", std::process::id()));
         std::fs::create_dir_all(&root).unwrap();
@@ -150,6 +167,7 @@ mod channel_tests {
         assert_eq!(CatalogChannel::select(None, &root).unwrap(), CatalogChannel::GitHub);
         assert!(CatalogChannel::Legacy.require_current(&root).is_err());
         assert!(CatalogChannel::select(Some("legacy"), &root).is_err());
+        assert!(CatalogChannel::Legacy.for_library(&root).is_err());
         std::fs::remove_dir_all(root).unwrap();
     }
 

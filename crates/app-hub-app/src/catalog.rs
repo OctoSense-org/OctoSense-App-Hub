@@ -100,6 +100,7 @@ pub struct Backend {
     warning: Option<String>,
     persistence_failed: bool,
     channel: Option<CatalogChannel>,
+    configured_channel: Option<CatalogChannel>,
 }
 
 /// Check a shell launch using local verified state, without waiting on Hub work.
@@ -135,10 +136,31 @@ impl Backend {
         Self::new_unlocked(root, origin, anchor)
     }
 
+    /// An explicit host choice for a custom catalog; never selected by app data
+    /// or fetched documents. Persisted GitHub libraries still refuse Legacy.
+    pub fn with_channel(
+        root: PathBuf,
+        origin: Origin,
+        anchor: String,
+        channel: CatalogChannel,
+    ) -> Self {
+        let _guard = CATALOG_IO.lock().unwrap_or_else(|p| p.into_inner());
+        Self::new_unlocked_with_channel(root, origin, anchor, Some(channel))
+    }
+
     // Caller holds CATALOG_IO. This reads local state and performs recovery;
     // neither constructor nor the shell launch gate contacts the origin.
     fn new_unlocked(root: PathBuf, origin: Origin, anchor: String) -> Self {
-        let selected = CatalogChannel::from_environment(&root);
+        Self::new_unlocked_with_channel(root, origin, anchor, None)
+    }
+
+    fn new_unlocked_with_channel(
+        root: PathBuf,
+        origin: Origin,
+        anchor: String,
+        configured_channel: Option<CatalogChannel>,
+    ) -> Self {
+        let selected = select_channel(configured_channel, &root);
         let mut store = Store::new(&anchor, &root, HostLimits::default()).with_host_api_versions(octosense_appstore::host_api::available_versions());
         let recovery_warning = selected.as_ref().err().cloned().or_else(|| recover_installations(&root).err());
         let channel = selected.ok();
@@ -152,6 +174,7 @@ impl Backend {
             warning: recovery_warning,
             persistence_failed: false,
             channel,
+            configured_channel,
         };
         backend.load_cache();
         backend
@@ -195,7 +218,7 @@ impl Backend {
         let Some(channel) = self.channel else { return; };
         // A v2 cache created by another window/process forbids a stale legacy
         // worker from downgrading the shared library.
-        if CatalogChannel::from_environment(&self.root).ok() != Some(channel) {
+        if select_channel(self.configured_channel, &self.root).ok() != Some(channel) {
             self.persistence_failed = true;
             self.warning = Some("Catalog channel changed; reopen App Hub before continuing.".into());
             return;
@@ -453,11 +476,18 @@ impl Backend {
     }
 
     fn check_sequence_floor(&self) -> Result<(), String> {
-        let channel = CatalogChannel::from_environment(&self.root)?;
+        let channel = select_channel(self.configured_channel, &self.root)?;
         if self.channel != Some(channel) {
             return Err("Catalog channel changed; reopen App Hub before continuing.".into());
         }
         check_verified_catalog_floor(&self.root, &self.anchor, self.store.catalog().map(|catalog| catalog.sequence))
+    }
+}
+
+fn select_channel(configured: Option<CatalogChannel>, root: &Path) -> Result<CatalogChannel, String> {
+    match configured {
+        Some(channel) => channel.for_library(root),
+        None => CatalogChannel::from_environment(root),
     }
 }
 
@@ -680,10 +710,11 @@ mod tests {
         }
 
         fn backend(&self) -> Backend {
-            Backend::new(
+            Backend::with_channel(
                 self.root(),
                 Origin::Directory(self.path.join("hub")),
                 self.anchor.public_hex(),
+                CatalogChannel::Legacy,
             )
         }
 
@@ -814,6 +845,25 @@ mod tests {
     }
 
     #[test]
+    fn github_selection_does_not_adopt_an_offline_legacy_cache() {
+        let f = Fixture::new();
+        f.install_first_version();
+        let legacy = std::fs::read(f.root().join("catalog.json")).unwrap();
+        let mut github = Backend::with_channel(
+            f.root(),
+            Origin::Directory(f.path.join("missing-hub")),
+            f.anchor.public_hex(),
+            CatalogChannel::GitHub,
+        );
+        let snapshot = github.refresh();
+        assert!(!snapshot.verified);
+        assert!(!snapshot.can_install);
+        assert!(github.may_open("test-app").is_err());
+        assert!(!f.root().join("catalog-v2.json").exists());
+        assert_eq!(std::fs::read(f.root().join("catalog.json")).unwrap(), legacy);
+    }
+
+    #[test]
     fn corrupt_v2_cache_never_reopens_available_legacy_channel() {
         let f = Fixture::new();
         f.publish_today(1, vec![f.entry()]);
@@ -823,7 +873,7 @@ mod tests {
         assert!(!older.snapshot().can_install, "existing workers cannot ignore a channel change");
         assert!(older.check_sequence_floor().is_err());
         let mut reopened = f.backend();
-        assert_eq!(reopened.channel, Some(CatalogChannel::GitHub));
+        assert_eq!(reopened.channel, None, "explicit legacy selection must refuse a v2 library");
         let snapshot = reopened.refresh();
         assert!(!snapshot.verified);
         assert!(!snapshot.can_install);
@@ -1244,7 +1294,7 @@ mod tests {
         // Exercise the same post-lock path without racing other tests' workers.
         let _guard = CATALOG_IO.lock().unwrap_or_else(|p| p.into_inner());
         assert!(
-            Backend::new_unlocked(f.root(), missing_origin, f.anchor.public_hex())
+            Backend::new_unlocked_with_channel(f.root(), missing_origin, f.anchor.public_hex(), Some(CatalogChannel::Legacy))
                 .may_open("test-app")
                 .is_ok()
         );
@@ -1266,10 +1316,11 @@ mod tests {
         assert!(check_verified_catalog_floor(&f.root(), &f.anchor.public_hex(),
             direct.catalog().map(|catalog| catalog.sequence)).is_err());
         let _guard = CATALOG_IO.lock().unwrap_or_else(|p| p.into_inner());
-        let error = Backend::new_unlocked(
+        let error = Backend::new_unlocked_with_channel(
             f.root(),
             Origin::Directory(f.path.join("missing-hub")),
             f.anchor.public_hex(),
+            Some(CatalogChannel::Legacy),
         )
         .may_open("test-app")
         .unwrap_err();

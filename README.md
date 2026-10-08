@@ -28,7 +28,9 @@ your Design Flow checkout to build `hub` and `card-host`. Do not edit
 `catalog.json`, `index/` or `artifacts/`.
 
 **Submitting an app?** Follow [Submit an app to the App Hub](docs/SUBMITTING.md):
-you open an issue here for a signed bundle at a tagged commit. The catalog's
+open an issue here with the repository, version/commit, screenshots and
+permissions. You may open it before the release is ready, then add its verified
+release pack. A GitHub release alone is not App Hub approval. The catalog's
 [three reference apps](docs/SUBMITTING.md#the-three-reference-apps) (GitHub
 Notes, Inbox Assistant and Google Calendar) passed admission end to end; their
 repositories show a complete submission. Look up rules, capabilities and
@@ -41,7 +43,8 @@ app declares the host APIs it needs and checks which ones a host implements.
 
 | Path | What it is |
 | --- | --- |
-| `catalog.json` | The legacy signed catalog. Stores verify it against the anchor below before showing anything. |
+| `catalog-v2.json` | The GitHub-attested catalog selected by default in new compatible hosts. Stores verify its complete proof before using it. |
+| `catalog.json` | The unchanged legacy signed catalog for older hosts and explicit legacy mirrors. |
 | `index/<app>-<version>.json` | One admitted entry per app version: its manifest, publisher, source and status. A maintainer exports it from the catalog after `hub publish`. |
 | `artifacts/<app>-<version>.bundle/` | App Hub's copy of the bundle, exactly the bytes that were reviewed. `hub publish` creates it. |
 | `artifacts/<app>-<version>.bundle.pack.json` | The same bundle as one file, which stores download. |
@@ -168,29 +171,41 @@ that signs `catalog.json`. Rotating the working key needs no store release.
 
 ## Point a store at another hub
 
-A store build reads this hub and trusts this anchor by default. To read a
-mirror, set `OCTOSENSE_HUB` to its directory or base URL. A development hub
-signed under its own anchor also needs `OCTOSENSE_HUB_ANCHOR`. This command
-sets both variables to their defaults:
+New compatible hosts select `github-v2` by default and fetch `catalog-v2.json`
+from this hub. `OCTOSENSE_HUB` can select another directory or base URL, but
+changing the origin never changes the trusted GitHub identity or channel.
+A mirror must serve the same verifiable v2 envelope and artifacts.
+
+For a **legacy local test hub**, explicitly select `legacy`, provide its trust
+anchor and use a fresh app-data directory:
 
 ```sh
-OCTOSENSE_HUB=https://raw.githubusercontent.com/OctoSense-org/OctoSense-App-Hub/main/ \
-OCTOSENSE_HUB_ANCHOR=6000284a069ba7cada2925094074e8e0baae07e25d1b7fc31f396c993f363e11 \
+OCTOSENSE_HUB_CATALOG=legacy OCTOSENSE_HUB=/path/to/legacy-mirror \
+OCTOSENSE_HUB_ANCHOR="<test-anchor-hex>" OCTOSENSE_APP_DATA="<fresh-test-directory>" \
 appstore
 ```
+
+Replace the placeholders before running this source-reviewed example. A library
+with any v2 cache refuses a legacy downgrade, even if that cache is malformed.
+An old legacy cache is not converted offline: the first v2 fetch needs network
+access (or an explicitly supplied mirror containing a verified v2 envelope).
+Fetch/proof failure never falls back to legacy. Older released hosts continue
+to use `catalog.json`; a compatible OctoSense release is still pending.
 
 ## How a maintainer publishes an app
 
 After you submit ([Submit an app to the App Hub](docs/SUBMITTING.md)), a
 maintainer reviews the exact bytes of your tagged commit.
 [GitHub admin publication](docs/GITHUB-PUBLISHING.md) signs a new v2 catalog
-without a separate Hub private key; its production activation and compatible
-host release remain pending. The existing `hub publish` path still produces
+without a separate Hub private key. See its delivery-status receipt for
+production publication and consumer acceptance; a compatible host release
+remains pending. The existing `hub publish` path still produces
 the legacy anchor-signed catalog.
 
-A maintainer withdraws a version with `hub withdraw`, and every store honors
-the withdrawal on its next catalog fetch. `hub remove` drops an entry that
-should never have been published.
+For v2, publish a reviewed withdrawal candidate through the same protected
+workflow, retaining history and a reason. Stores honor it after accepting the
+new catalog. `hub withdraw` / `hub remove` affect the legacy catalog only;
+they do not publish a v2 update.
 
 ## Apps
 
