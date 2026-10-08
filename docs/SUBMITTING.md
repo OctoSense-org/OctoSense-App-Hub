@@ -517,8 +517,9 @@ release evidence to the same issue when it is ready; pending fields do not
 mean approval.
 
 Until App Hub first publishes your app, keep this one issue: post each new
-release as a comment with its tag, full commit SHA and workflow-run link.
-After the first publication, each new version needs a new issue
+release as a comment with its tag, full commit SHA and workflow-run link, and
+update the issue title and the Version field in the issue body to the new
+version. After the first publication, each new version needs a new issue
 ([step 9](#9-after-you-submit)).
 
 | Form field | When and what to provide |
@@ -596,7 +597,8 @@ desktop-v0.1.0-beta.2 reads only the legacy `catalog.json` that
 - **Before the first publication, post each new release on the same issue.**
   To fix a finding, raise `version` and repeat steps 4 to 6 (step 4 only if
   the UI changed). Then comment on your submission issue with the new tag,
-  full commit SHA and workflow-run link.
+  full commit SHA and workflow-run link, and update the issue title and
+  Version field ([step 7](#7-open-the-submission-issue)).
 - **After publication, each new version needs a new issue.** Raise
   `version`, open a new issue that links the previous one (it can precede the
   release), repeat steps 4 to 6 and add that release's evidence to the new

@@ -19,7 +19,7 @@
 4. 用你的应用图标替换 `bundle/assets/icon.svg`。
 5. 使用 [图像到卡片流程](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/image-to-card/FLOW.md)，生成并评审 `bundle/page.card`、可选的 `page.data.json`、卡片的 `kit/` 目录和本地素材。
 6. 在 [`card-host`](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/DEVELOPMENT.zh-CN.md#在本地运行应用包card-host) 中运行未签名的应用包，并截取 `bundle/screenshots/01-main.png`。
-7. 按照 [向 App Hub 提交应用](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/SUBMITTING.zh-CN.md) 的说明，为完成后的 `bundle/` 目录写入摘要，再检查、审核、签名并提交。
+7. 按照 [向 App Hub 提交应用](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/SUBMITTING.zh-CN.md) 的说明，为完成后的 `bundle/` 目录写入摘要，再检查和评审，然后通过 GitHub 工作流生成 Release 并提交。
 
 清单中的初始摘要只是占位符，`hub stamp` 会写入真实值。模板既没有 `page.card`，也没有截图，所以只写入摘要、不做其他修改的副本，在准入检查中会得到两项拒绝：
 

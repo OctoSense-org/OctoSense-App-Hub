@@ -8,7 +8,7 @@ body:
         Open this issue to request publication. The release can come later; fill in what is ready and list pending checks.
         App Hub accepts only GitHub-attested releases: your app's GitHub workflow attests each release, so you need no signing key or signing secret.
         Read [the guide](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/SUBMITTING.md) ([简体中文](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/SUBMITTING.zh-CN.md)).
-        Until your app is first published, post each new release here as a comment, with its tag, full commit SHA and workflow-run link. After publication, open a new issue for each new version and link the previous one.
+        Until your app is first published, post each new release here as a comment, with its tag, full commit SHA and workflow-run link, and update this issue's title and Version field to the new version. After publication, open a new issue for each new version and link the previous one.
         A maintainer reviews the exact release pack before catalog admission. A tag or release is not approval.
         Do not submit a PR editing catalog.json, catalog-v2.json, index/ or artifacts/.
   - type: dropdown
@@ -32,7 +32,7 @@ body:
     id: version
     attributes:
       label: "Version"
-      description: "Planned manifest version; each released update needs a higher semantic version."
+      description: "Planned manifest version; each released update needs a higher semantic version. Before first publication, keep it and the issue title at the newest posted release."
       placeholder: "0.1.0"
     validations:
       required: true

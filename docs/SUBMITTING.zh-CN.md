@@ -306,7 +306,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 
 使用 [Submit an app 表单](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/new?template=submit-app.yml)，标题为 `Submit <app id> <version>`。开这个 issue，就是请求发布这个应用。**第 1–6 步尚未完成时也可以先开。** Release 证据准备好后，补充到同一个 issue 中；待完成字段不代表获得批准。
 
-在 App Hub 首次发布你的应用之前，始终使用这一个 issue：每个新 Release 都以评论的形式发在其中，写明它的标签、完整的 commit SHA 和工作流运行链接。首次发布之后，每个新版本都要开新 issue（见[第 9 步](#9-提交之后)）。
+在 App Hub 首次发布你的应用之前，始终使用这一个 issue：每个新 Release 都以评论的形式发在其中，写明它的标签、完整的 commit SHA 和工作流运行链接，并把 issue 标题和正文中的 Version 字段改成新版本。首次发布之后，每个新版本都要开新 issue（见[第 9 步](#9-提交之后)）。
 
 | 表单字段 | 何时提供什么 |
 | --- | --- |
@@ -350,7 +350,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 检查通过后，由 App Hub 管理员审核这次提交并批准；未经批准，Hub 不会发布任何内容。随后，管理员运行受保护的[签名目录工作流](GITHUB-PUBLISHING.zh-CN.md)：工作流准入审核过的原样字节，让 GitHub Actions 用 Sigstore 为新的 `catalog-v2.json` 签名，再把它 commit 到 `main`。之后，用户就能在读取 `catalog-v2.json` 并支持 `publisher-github-v1` 的 OctoSense 构建中搜索、安装和运行这个应用。例如 [RC1 发行版](../README.zh-CN.md#下载兼容宿主)。历史 desktop-v0.1.0-beta.2 只读取 `hub publish` 生成的旧格式 `catalog.json`。
 
 - 审核人员会在 issue 中列出需要修复的问题；应用进入签名目录后，审核人员关闭 issue，并注明应用所在的签名目录版本号。在 issue 中回答提问，但不要改动标签所指的内容。
-- **首次发布之前，每个新 Release 都发在同一个 issue 中。** 要修复问题，就提高 `version` 并重做第 4 到 6 步（界面有变化时才需要第 4 步），然后在提交 issue 中发评论，写明新的标签、完整的 commit SHA 和工作流运行链接。
+- **首次发布之前，每个新 Release 都发在同一个 issue 中。** 要修复问题，就提高 `version` 并重做第 4 到 6 步（界面有变化时才需要第 4 步），然后在提交 issue 中发评论，写明新的标签、完整的 commit SHA 和工作流运行链接，并更新 issue 标题和 Version 字段（见[第 7 步](#7-开提交-issue)）。
 - **发布之后，每个新版本都要开新 issue。** 提高 `version`，开一个新 issue，链接前一个 issue（新 issue 可以先于 Release 开），重做第 4 到 6 步，然后在新 issue 中补充这个 Release 的证据。Hub 从不替换已发布的版本。
 - 维护者 commit 经过审核的撤回候选之后，App Hub 管理员可以通过同一个受保护的工作流，发布附带理由的签名目录撤回记录。各商店下次拉取签名目录时，会停止运行该版本已安装的副本；其他版本不受影响。如需撤回，请开一个 issue，写明应用 ID、版本和要向用户展示的理由。撤回的版本号不能再用，修复请以新版本发布。
 
