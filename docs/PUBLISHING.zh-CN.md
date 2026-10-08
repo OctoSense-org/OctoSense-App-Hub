@@ -86,7 +86,7 @@ my-app/
 
 | 检查项 | 拒绝条件 | 警告条件 |
 | --- | --- | --- |
-| `digest` | `integrity.bundle_blake3` 与应用包不符。修改后为未签名的开发字节写入摘要；已封存的 GitHub Release 需要新的证明。 | |
+| `digest` | `integrity.bundle_blake3` 与应用包不符。修改后为可编辑源码重新写入摘要；已封存的 GitHub Release 需要新的证明。 | |
 | `publisher-signature` | 声明的 GitHub 证明验证失败（即使加了 `--allow-unsigned`）；清单未签名，且没有加 `--allow-unsigned`；或者旧格式的 Ed25519 签名验证失败，或指向未知的密钥（`publisher key "<id>" is not registered with this hub`）。 | 清单未签名，且加了 `--allow-unsigned`。 |
 | `identity` | ID 以 `os.` 开头；ID 本身或其最后一段是保留名称（[ID 与保留名称](#id-与保留名称)）。 | |
 | `contents` | 文件的扩展名不是 `.card`、`.json`、`.l0`、`.octoscript`、`.splash`、`.svg`、`.png`、`.jpg`、`.jpeg`、`.webp`、`.ttf`、`.otf`、`.txt` 或 `.md` 之一，也不是函数模块（`.wasm`，见 `functions`）。准入检查同样拒绝没有扩展名的文件（例如 `.DS_Store` 和 `LICENSE`）。 | |
@@ -166,7 +166,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | `name` | 用户看到的名称。 | |
 | `integrity.bundle_blake3` | 应用包摘要。 | 由 `hub stamp` 写入。不要手工修改。 |
 | `integrity.github` | GitHub 仓库/所有者 ID、工作流、标签、commit 和附加的 Sigstore 证明。 | 需要 `publisher-github-v1`，由 `publisher-prepare` 和 `publisher-attach` 生成。 |
-| `integrity.signature` | `{key_id, value}`，即旧格式的 Ed25519 清单签名。 | 省略此字段：App Hub 只接受带 GitHub 证明的 Release（[签名](#签名)）。 |
+| `integrity.signature` | `{key_id, value}`，即旧格式的 Ed25519 清单签名。 | 省略此字段：App Hub 只接受带 GitHub 证明的 Release（[签名](#签名)）。在 [App Hub #168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168) 落地之前，准入检查仍会让用密钥签名的清单通过；审核人员会拒绝它。 |
 | `capabilities` | 应用可以使用的能力。 | 封闭列表中的名称（[能力](#能力)）。 |
 | `network.hosts` | 应用可以访问的主机。 | 纯主机名，且必须同时请求 `net`（[网络主机](#网络主机)）。 |
 | `storage` | `max_bytes`、`accounts`、`agent_workspace`、`cache_max_bytes`。 | 见[存储与配额](#存储与配额)。 |
@@ -749,7 +749,7 @@ OctoSense 桌面 RC1 可以在[平台限制](../README.zh-CN.md#下载兼容宿�
 | 命令 | 作用 |
 | --- | --- |
 | `hub publisher-prepare/attach/verify/pack/unpack/entry` | 准备 GitHub 规范化主题、附加证明、验证、交付或生成审核候选；详见 [GitHub 发布者来源证明](#github-发布者来源证明)及 `hub --help` 的完整参数。均不会发布目录。 |
-| `hub stamp <bundle>` | 用准入检查的解析器解析 `manifest.json`，然后把应用包摘要写入 `integrity.bundle_blake3` 并输出。准入检查无法读取的清单，它会拒绝处理。 |
+| `hub stamp <bundle>` | 用准入检查的解析器解析 `manifest.json`，然后把应用包摘要写入 `integrity.bundle_blake3` 并输出。准入检查无法读取的清单，或已带 GitHub 证明的 Release，它都会拒绝处理。 |
 | `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app]` | 准入检查本身。输出 `PASSED` 或 `REFUSED`、每个检查结果，以及应用将获得的授权。有拒绝时退出码为 1。`--json` 以 JSON 输出报告（`schema`、`stage`、`passed`、`app_id`、`version`、`digest`、`findings` 和 `resources`）。`--publisher-key` 用于检查旧格式的密钥签名应用包，发布时从不需要它。 |
 | `hub scan <bundle> [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--packet <out.json>] [--reviewer <cmd>] [--system-app]` | 先运行准入检查，再写出审核包，还可以把审核包交给一条审核命令。准入检查拒绝的应用包不会进入扫描。 |
 | `hub verify <catalog> --anchor <hex>` | 用信任锚验证签名目录。 |
@@ -818,7 +818,7 @@ hub publisher-pack bundle --out build/app.bundle.pack.json
 
 `build/` 必须预先存在且位于 `bundle/` 外。`publisher-prepare` 添加 `requires: ["publisher-github-v1"]`，在 `integrity.github` 中记录身份，并为最终应用包写入摘要。规范化签名字节包含身份和应用包摘要，但不包含 `integrity.github.attestation`。随后附加证明；应用包摘要不包含清单，因此不存在哈希循环。证明最多 48 KiB，完整清单最多 64 KiB。Prepare 拒绝已经封存的 Release；Attach 和 Pack 验证最终字节，且不会重新写入摘要；修改后需要生成新的 Release 证明。工作流不使用发布者密钥，也不使用仓库 Secret。
 
-验证使用公开的合成测试应用的 [v0.1.0 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736273522)与 [v0.1.1 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736765473)，没有使用仓库 Secrets。两个工作流均生成并验证了真实 GitHub 证明。[原生验收示例](../crates/app-hub/examples/publisher_acceptance.rs)随后安装两个 Release pack，准备并验证启动、保留完整证明，并拒绝内容/证明/身份篡改、回滚、未签名的归属替换和已撤回版本。[验收记录](../reviews/github-publisher-v1/acceptance.json)绑定输入摘要与原生源码版本。其中的商店使用临时的本地测试签名目录；该测试应用没有 App Hub 提交 issue，也没有签名目录条目。这既不能证明应用界面可以运行，也不能证明手机可以安装 GitHub 发布者应用。
+验证使用公开的合成测试应用的 [v0.1.0 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736273522)与 [v0.1.1 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736765473)，没有使用仓库 Secret。两个工作流均生成并验证了真实 GitHub 证明。[原生验收示例](../crates/app-hub/examples/publisher_acceptance.rs)随后安装两个 Release pack，准备并验证启动、保留完整证明，并拒绝内容/证明/身份篡改、回滚、未签名的归属替换和已撤回版本。[验收记录](../reviews/github-publisher-v1/acceptance.json)绑定输入摘要与原生源码版本。其中的商店使用临时的本地测试签名目录；该测试应用没有 App Hub 提交 issue，也没有签名目录条目。这既不能证明应用界面可以运行，也不能证明手机可以安装 GitHub 发布者应用。
 
 在 macOS 上，[OctoSense 桌面 RC1](../README.zh-CN.md#下载兼容宿主) 可以安装签名目录第 13 版中带 GitHub 证明的示例应用，并在安装和更新时检查这些应用的证明和发布者连续性。iOS、Windows 和 Linux 上的商店安装仍未验证，目前也没有任何已发行的手机版本支持 `publisher-github-v1`。
 
@@ -826,7 +826,7 @@ hub publisher-pack bundle --out build/app.bundle.pack.json
 
 开一个 **App Hub 提交 issue** 来请求发布，issue 可以先于 Release；准备好后，补充仓库、不可变的标签和 commit、Release pack 链接和验证证据。创建标签或 GitHub Release 既不构成提交或批准，也不会把应用列入签名目录。管理员对签名目录的审核仍走[独立的受保护发布流程](GITHUB-PUBLISHING.zh-CN.md)。
 
-旧宿主拒绝新标记；没有来源证明验证器的宿主即使开启未签名开发模式也会拒绝证明。独立 `card-host` 没有发布者验证器：预览时使用未签名的开发副本，已封存的应用请在兼容的商店宿主中测试。准入不等于应用体验或设备验收；仅推出契约 1.8.0，并不等于有了兼容宿主。
+旧宿主拒绝新标记；没有来源证明验证器的宿主即使开启未签名开发模式也会拒绝证明。独立 `card-host` 没有发布者验证器：预览时使用可编辑源码，已封存的应用请在兼容的商店宿主中测试。准入不等于应用体验或设备验收；仅推出契约 1.8.0，并不等于有了兼容宿主。
 
 ### 发布者连续性
 
@@ -844,8 +844,8 @@ hub publisher-pack bundle --out build/app.bundle.pack.json
 
 Release 的证明覆盖清单，包括 `integrity.bundle_blake3`。请遵守以下规则：
 
-- **测试可编辑源码。** `card-host` 会拒绝已封存的 Release：`this host has no GitHub publisher verifier`；旧宿主则会拒绝它的 `publisher-github-v1` 要求。在未签名的开发版应用包上截图和测试；Release 由工作流封存。
-- **绝不修改已封存的 Release。** 修改应用包字节会使摘要失效，修改清单字段会使证明失效。`hub stamp` 不会悄悄让已封存的清单失效，而是拒绝它：`publisher signing metadata cannot be restamped; prepare a new unsigned version`；`card-host --stamp` 同样会拒绝。请修改开发副本，再用新版本和新标签生成 Release。
+- **测试可编辑源码。** `card-host` 会拒绝已封存的 Release：`this host has no GitHub publisher verifier`；旧宿主则会拒绝它的 `publisher-github-v1` 要求。用可编辑源码截图和测试；Release 由工作流封存。
+- **绝不修改已封存的 Release。** 修改应用包字节会使摘要失效，修改清单字段会使证明失效。`hub stamp` 不会悄悄让已封存的清单失效，而是拒绝它：`publisher signing metadata cannot be restamped; prepare a new unsigned version`；`card-host --stamp` 同样会拒绝。请修改可编辑源码，再用新版本和新标签生成 Release。
 - **保持字节原样。** 摘要覆盖除 `manifest.json` 以外的每个文件：文件的路径、长度和字节；在所有平台上，路径各段之间都用 `/` 分隔。换行符转换会改变摘要，所以不要让 Git 转换应用包（[安排仓库结构](SUBMITTING.zh-CN.md#1-安排仓库结构)）。
 
 ## 提交

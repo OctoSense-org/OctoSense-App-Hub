@@ -52,9 +52,9 @@
 
 App Hub 对新应用和更新关闭了 Ed25519 发布者密钥路径。此前没有任何第三方应用用密钥发布过。
 
-- App Hub 只接受带 GitHub 证明的 Release（`publisher-github-v1`）。审核人员不批准用密钥签名的 Release。
+- App Hub 只接受带 GitHub 证明的 Release（`publisher-github-v1`）。
 - 六个用密钥签名的参考条目正在通过新一轮发布从 `catalog-v2.json` 撤回：发布者 `ymote` 的 `org.octosense.samples.githubnotes`、`org.octosense.samples.inbox` 和 `org.octosense.samples.googlecalendar`，各有 0.1.0 和 0.1.1 两个版本。接替它们的是带 GitHub 证明的 `io.github.ymote.*` 应用。
-- 准入检查尚未执行这项规则。要让准入检查拒绝新的密钥签名 Release，还需要一项改动；这项改动由 [App Hub #168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168) 跟踪，尚未合并。在它合并之前，准入检查仍会准入用密钥签名的 Release，只能靠审核关闭这条路径。`hub keygen`、`hub pubkey` 和 `hub sign-manifest` 的去留也由这个 issue 决定。
+- 准入检查尚未执行这项规则。要让准入检查拒绝新的用密钥签名的 Release，还需要一项改动；这项改动由 [App Hub #168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168) 跟踪，尚未合并。在它合并之前，准入检查仍会让用密钥签名的 Release 通过，只能靠审核让这条路径保持关闭。`hub keygen`、`hub pubkey` 和 `hub sign-manifest` 的去留也由这个 issue 决定。
 
 ## 参考
 

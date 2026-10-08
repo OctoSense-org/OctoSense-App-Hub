@@ -133,7 +133,6 @@ App Hub closed the Ed25519 publisher-key route to new apps and to updates. No
 third-party app had been published with a key.
 
 - App Hub accepts only GitHub-attested releases (`publisher-github-v1`).
-  Reviewers do not approve a key-signed release.
 - The six key-signed reference entries are being withdrawn from
   `catalog-v2.json` in a new publication run:
   `org.octosense.samples.githubnotes`, `org.octosense.samples.inbox` and
@@ -143,9 +142,9 @@ third-party app had been published with a key.
 - Gate enforcement is pending. The change that makes the gate refuse new
   key-signed releases is tracked in
   [App Hub #168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168)
-  and is not merged; until it is, the gate still admits a key-signed release,
-  and review alone keeps the route closed. The same issue decides the future
-  of `hub keygen`, `hub pubkey` and `hub sign-manifest`.
+  and is not merged. Until it merges, the gate still admits a key-signed
+  release, and review alone keeps the route closed. The same issue decides the
+  future of `hub keygen`, `hub pubkey` and `hub sign-manifest`.
 
 ## References
 

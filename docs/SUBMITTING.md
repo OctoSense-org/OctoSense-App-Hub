@@ -23,7 +23,7 @@ secret. Installing such an app takes a host that supports
 `publisher-github-v1`; use the
 [RC1 release and download guide](../README.md#download-a-compatible-host).
 
-Public catalog 13 offers the GitHub-attested `io.github.ymote.*` sample apps
+Public catalog 13 offers the GitHub-attested `io.github.ymote.*` reference apps
 ([current apps](../README.md#apps)). App Hub is withdrawing the older
 key-signed `org.octosense.samples.*` entries; later steps still cite them as
 examples ([The three reference apps](#the-three-reference-apps)). The
@@ -111,8 +111,8 @@ lists. The table shows who runs each command and in which step.
 | `hub publisher-verify` | The workflow, you and a reviewer | 6, 8 | Verify the release proof and run the gate. |
 | `hub publisher-entry` | A reviewer | 8 | Build a candidate catalog entry; it publishes nothing. |
 | `hub catalog-prepare`, `hub catalog-envelope`, `hub catalog-verify` | An admin, through the protected catalog workflow | 9 | Prepare, wrap and verify the signed `catalog-v2.json` ([GITHUB-PUBLISHING.md](GITHUB-PUBLISHING.md)). |
-| `hub publish`, `hub withdraw`, `hub remove`, `hub certify`, `hub verify` | A maintainer, for the legacy catalog; you, only for a rehearsal catalog | 9 | Publish, withdraw or remove versions in `catalog.json`, certify its working key, or verify it. |
-| `hub keygen`, `hub pubkey`, `hub sign-manifest` | A maintainer, for the legacy catalog; you, only for a rehearsal catalog | — | Create an Ed25519 key, print its public half, or sign a legacy manifest. Never use them to sign or publish an app: App Hub accepts only GitHub-attested releases. [Issue #168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168) decides whether they stay. |
+| `hub publish`, `hub withdraw`, `hub remove`, `hub certify`, `hub verify` | A maintainer, for the legacy catalog; you run `hub certify`, `hub publish` and `hub verify` only on a rehearsal catalog | 9 | Publish, withdraw or remove versions in `catalog.json`, certify its working key, or verify it. |
+| `hub keygen`, `hub pubkey`, `hub sign-manifest` | A maintainer, for the legacy catalog; you run only `hub keygen`, for a rehearsal catalog's throwaway keys | — | Create an Ed25519 key, print its public half, or sign a legacy manifest. Never use them to sign or publish an app: App Hub accepts only GitHub-attested releases. [Issue #168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168) decides whether they stay. |
 
 App Flow's `tools/octo` runs some of these for you; its
 [`tools/octo` table](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/README.md#toolsocto)
@@ -162,7 +162,8 @@ The RC1 release differs from historical desktop beta.2 in these ways.
 To try a release of your app before App Hub publishes it, install it from a
 local test catalog in a shell built from source
 ([rehearsal](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally)).
-Unverified: the rehearsal with a GitHub-attested release.
+Unverified: the rehearsal with a GitHub-attested release; the recorded run
+used a key-signed test app.
 
 ### Check your platform
 
@@ -184,7 +185,7 @@ Unverified: the rehearsal with a GitHub-attested release.
 
 ## The three reference apps
 
-For current downloads, use the GitHub-attested 0.2.1 releases and fresh IDs in
+For current downloads, use the GitHub-attested 0.2.1 releases and new ids in
 [the public catalog table](../README.md#apps). Their 0.2.0 → 0.2.1 update
 retains the same GitHub publisher identity. None needs a developer signing key.
 
@@ -456,7 +457,7 @@ catalog, use the [RC1 release](../README.md#download-a-compatible-host).
 
 1. Open the submission issue if you have not already done so. Missing release
    evidence can be added later; mark it pending rather than inventing a pass.
-2. Test the unsigned development copy and capture its real UI. Run the gate
+2. Test the editable source and capture its real UI. Run the gate
    and `hub scan bundle --packet build/review.json`, with
    `build/` outside the bundle. Answer every question in that packet: seven,
    or eight when the bundle ships `tools.json`, `AGENT.md` or skills. Include
@@ -472,13 +473,13 @@ catalog, use the [RC1 release](../README.md#download-a-compatible-host).
    attested manifest and final release pack; do not commit those generated
    bytes over your editable source.
 
-Routine updates keep the same repository name, immutable repository and owner
-IDs and workflow, with a higher semantic version. Never restamp a sealed
+Routine updates keep the same repository name, repository ID, owner ID and
+workflow, with a higher semantic version. Never restamp a sealed
 release: change the editable source and release a new version.
 
 ## 6. Freeze and verify the release
 
-The tag identifies the tested development source and workflow. The Release
+The tag identifies the tested editable source and workflow. The Release
 pack contains the final attested manifest; checking a source clone alone
 does not verify that pack.
 
@@ -510,11 +511,11 @@ does not verify that pack.
 
 ## 7. Open the submission issue
 
-Use the [Submit an app form](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/new?template=submit-app.yml),
-titled `Submit <app id> <version>`. Opening the issue is your request to
+Open an issue with the [Submit an app form](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/new?template=submit-app.yml)
+and title it `Submit <app id> <version>`. Opening the issue is your request to
 publish the app. **You can open it before steps 1–6 are complete.** Add the
-release evidence to the same issue when it is ready; pending fields do not
-mean approval.
+release evidence to this issue once the release is ready; pending fields do
+not mean approval.
 
 Until App Hub first publishes your app, keep this one issue: post each new
 release as a comment with its tag, full commit SHA and workflow-run link, and
@@ -591,9 +592,9 @@ and supports `publisher-github-v1`, such as the
 desktop-v0.1.0-beta.2 reads only the legacy `catalog.json` that
 `hub publish` produces.
 
-- A reviewer posts findings to fix in the issue, and closes it with the
-  catalog sequence your app appears in. Answer questions in the issue, and
-  change nothing at your tag.
+- A reviewer posts any findings in the issue and, once your app is published,
+  closes the issue with the catalog sequence it appears in. Answer questions
+  in the issue, and change nothing at your tag.
 - **Before the first publication, post each new release on the same issue.**
   To fix a finding, raise `version` and repeat steps 4 to 6 (step 4 only if
   the UI changed). Then comment on your submission issue with the new tag,

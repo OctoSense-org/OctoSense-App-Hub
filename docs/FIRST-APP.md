@@ -363,10 +363,11 @@ Two rules hold throughout:
   releases, and your app's GitHub workflow attests each one
   ([Signing](PUBLISHING.md#signing)).
 
-To try a release in OctoSense desktop before App Hub publishes it, install it
-from a local test catalog in a shell built from source
+To try a release before App Hub publishes it, install it from a local test
+catalog in an OctoSense desktop shell built from source
 ([Rehearse the store path locally](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally)).
-Unverified: the rehearsal with a GitHub-attested release.
+Unverified: the rehearsal with a GitHub-attested release; the recorded run
+used a key-signed test app.
 
 ## Troubleshooting
 

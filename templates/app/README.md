@@ -33,7 +33,8 @@ Before you submit:
    [`card-host`](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/DEVELOPMENT.md#run-a-bundle-locally-card-host)
    and capture `bundle/screenshots/01-main.png`.
 7. Stamp, check and review the completed `bundle/` directory, release it
-   through the GitHub workflow, and submit it, as
+   through the GitHub release workflow that App Flow's `tools/octo publish-github`
+   installs, and submit it, as
    [Submit an app](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/SUBMITTING.md)
    describes.
 

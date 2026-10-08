@@ -246,10 +246,10 @@ hub: the bundle was refused
 
 整个过程都要遵守两条规则：
 
-- **测试开发源码，绝不修改已封存的 Release。** 工作流会封存它放进 Release 的字节；任何改动都需要新版本和新标签（[GitHub 发布者来源证明](PUBLISHING.zh-CN.md#github-发布者来源证明)）。
+- **测试可编辑源码，绝不修改已封存的 Release。** 工作流会封存它放进 Release 的字节；任何改动都需要新版本和新标签（[GitHub 发布者来源证明](PUBLISHING.zh-CN.md#github-发布者来源证明)）。
 - **你不需要发布者密钥。** App Hub 只接受带 GitHub 证明的 Release，而应用的 GitHub 工作流会为每个 Release 生成证明（[签名](PUBLISHING.zh-CN.md#签名)）。
 
-要在 App Hub 发布之前用 OctoSense 桌面版试用某个 Release，请用从源码构建的 Shell，从本地测试签名目录安装它（[在本地演练商店流程](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)）。未验证：用带 GitHub 证明的 Release 进行演练。
+要在 App Hub 发布之前用 OctoSense 桌面版试用某个 Release，请用从源码构建的 Shell，从本地测试签名目录安装它（[在本地演练商店流程](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)）。未验证：用带 GitHub 证明的 Release 进行演练；已记录的结果来自一个用密钥签名的测试应用。
 
 ## 故障排查
 

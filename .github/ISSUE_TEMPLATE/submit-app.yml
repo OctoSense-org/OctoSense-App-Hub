@@ -32,7 +32,7 @@ body:
     id: version
     attributes:
       label: "Version"
-      description: "Planned manifest version; each released update needs a higher semantic version. Before first publication, keep it and the issue title at the newest posted release."
+      description: "Planned manifest version; each released update needs a higher semantic version. Before first publication, update this field and the issue title to the version of the newest release you posted."
       placeholder: "0.1.0"
     validations:
       required: true

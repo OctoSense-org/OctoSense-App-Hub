@@ -156,9 +156,8 @@ reviewer check one:
   ([ADR 0002](docs/adr/0002-github-attested-publisher-identity.md)): the
   app's workflow attests each release, so a developer needs no signing key.
   Never ask a developer for a private key.
-- Never approve or help with key-signed publishing. Do not approve a
-  key-signed release, even when the gate passes it: gate enforcement is
-  pending in [#168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168).
+- Never approve a key-signed release, even when the gate passes it: gate
+  enforcement is pending in [#168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168).
   Do not help anyone create a publisher key, sign a manifest or pass
   `--publisher-key` to publish an app.
 
