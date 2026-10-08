@@ -2,7 +2,7 @@
 
 [English](0002-github-attested-publisher-identity.md) | 简体中文
 
-状态：已接受、已实现，并已投入生产。App Hub #153 在应用契约 1.8.0 中实现了这项决定，该版本新增 `publisher-github-v1` 宿主要求。一个测试应用的两个 Release 均由标签推送生成，并通过了原生商店的安装、更新和启动检查（[证据与限制](../PUBLISHING.zh-CN.md#github-发布者来源证明)）。公开签名目录第 13 版提供三个参考应用的 0.2.1 版和 Camera Card Demo 的 1.1.1 版，全部以 GitHub 来源证明发布，每个应用在更新前后都保持同一 GitHub 身份。OctoSense 桌面版 0.1.0-rc.1（下称 RC1）可以在 macOS 上安装这些应用，并在安装和更新时检查它们的证明和发布者连续性。[2026-10-08 修订](#2026-10-08-修订)：App Hub 只接受带 GitHub 证明的 Release；准入检查尚未执行这项规则。
+状态：已接受、已实现，并已投入生产。App Hub #153 在应用契约 1.8.0 中实现了这项决定，该版本新增 `publisher-github-v1` 宿主要求。一个测试应用的两个 Release 均由标签推送生成，并通过了原生商店的安装、更新和启动检查（[证据与限制](../PUBLISHING.zh-CN.md#github-发布者来源证明)）。公开签名目录第 14 版提供三个参考应用的 0.2.1 版和 Camera Card Demo 的 1.1.1 版，全部以 GitHub 来源证明发布，每个应用在更新前后都保持同一 GitHub 身份。OctoSense 桌面版 0.1.0-rc.1（下称 RC1）可以在 macOS 上安装这些应用，并在安装和更新时检查它们的证明和发布者连续性。[2026-10-08 修订](#2026-10-08-修订)：App Hub 只接受带 GitHub 证明的 Release；准入检查尚未执行这项规则。
 
 ## 背景
 
