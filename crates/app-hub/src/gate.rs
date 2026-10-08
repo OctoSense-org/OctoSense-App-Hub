@@ -411,7 +411,11 @@ fn external_references(root: &Path, manifest: &AppManifest) -> Result<Vec<String
             found.extend(script_references(&file, &text, manifest));
             continue;
         }
-        if !matches!(extension.as_str(), "card" | "json" | "l0" | "octoscript" | "txt" | "md") {
+        // Plain documentation (including a bundled font's required license)
+        // does not load its links. Agent guidance was checked above; executable
+        // card data and SVG resources remain subject to their normal checks.
+        // This never adds a network grant to the app's resolved policy.
+        if !matches!(extension.as_str(), "card" | "json" | "l0" | "octoscript") {
             continue;
         }
         for needle in ["http://", "https://", "file://", "../"] {

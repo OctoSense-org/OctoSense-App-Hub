@@ -120,6 +120,8 @@ makepad_widgets:resources/LXGWWenKaiBold.ttf
 
 其他内置名称和 crate 路径仍会被拒绝。如果需要上述资源以外的字体，请在许可允许的范围内随包提供字体子集。
 
+请随包保留字体所要求的许可证和来源说明。普通 `.txt` 和 `.md` 文档中的链接不属于素材加载，也不会授予网络权限。Agent 指令和技能仍受声明主机检查约束；卡片数据、脚本代码和 SVG 素材继续执行各自的资源检查。
+
 打包字体计入 8 MiB 上限，所以较大的 CJK 字体请只打包所需的子集。准入检查只核对字体路径，不解码字体文件，因此请在 `card-host` 中测试完整的应用包。用 Makepad 的 International 字体集构建的宿主（例如 `card-host`）还会用内置的 CJK 后备字体显示中文，这个字体在首次用到时才加载。
 
 OctoSense 桌面版 0.1.0-beta.2 发布时还没有加载打包字体的功能：它会安装带打包字体的应用，但卡片不会加载这些字体。要在该版本上显示中文，请用角色 kit 组合卡片，并且不设 `font_src`。角色 kit 是 `Surface`、`TextTitle`、`TextBody` 等组件背后的 OctoScript 模块集合：把 OctoScript-Makepad 的 `components/l0/` 中的 `_kit.octoscript`、`_derive.octoscript`、`_derive_color.octoscript`、`_palette_light.octoscript` 和 `_palette_dark.octoscript` 复制到应用包的 `kit/` 中。它会用 Makepad 内置的 CJK 字体 LXGW WenKai（霞鹜文楷）显示中文。

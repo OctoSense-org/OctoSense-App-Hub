@@ -160,6 +160,11 @@ array, is refused with
 Other built-in names and crate paths are refused. Bundle a licensed font
 subset when it is not one of these shipped resources.
 
+Keep the font's required license and attribution with the bundle. Links in
+plain `.txt` and `.md` documentation are not asset loads and grant no network
+access. Agent instructions and skills still follow the declared-host checks;
+card data, script code and SVG resources keep their own resource checks.
+
 A bundled font counts toward the 8 MiB limit, so bundle a subset of a large
 CJK font. The gate checks the font's path but does not decode the file, so
 test the complete bundle in `card-host`. A host built with Makepad's
