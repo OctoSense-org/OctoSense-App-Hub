@@ -62,11 +62,13 @@ OctoSense `main` 与 desktop-v0.1.0-beta.2 有以下不同，这些改动尚未�
 
 ### 确认你的平台
 
-- **macOS（Apple 芯片）**：已验证，本文所有命令都在这个平台上运行过。
+- **macOS（Apple 芯片）**：历史参考应用命令已验证；新的 GitHub 发布者工作流以第 5 步单独列出的待验收状态为准。
 - **Windows**：尚未在当前 `main` 上验证。开放中的 issue [#41](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/41) 记录了在较早版本上完成的 Windows 11 原生构建和运行，由社区成员而非维护者验证。用 `python tools/octo` 运行 Design Flow 的工具，它能找到 `hub.exe` 和 `card-host.exe`。commit 应用包之前，先加上[第 1 步](#1-安排仓库结构)的 `.gitattributes`；最后一次检查要在全新克隆上做（[第 6 步](#6-冻结并验证发布)）。
 - **Linux**：未经验证。另有报告称，在软件渲染（llvmpipe、WSL）下截取画面（`/g`）会超时，这一点同样未经验证。
 
 ### 保护发布者密钥
+
+本节只适用于历史 Ed25519 发布流程。新的 GitHub 发布者应用无需开发者签名密钥，请走[第 5 步](#5-生成最终字节)中的新路径。契约 1.8.0 和兼容宿主仍待发布，已有宿主发布版尚不能消费新证明。
 
 发布者 ID 是你在签名目录中的名字；发布者密钥为你发布的每个版本签名。一旦有一个由这把密钥签名的版本进入签名目录，Hub 就只接受同一把密钥签名的后续版本。没有任何命令能替换丢失的密钥；万一丢失，请在 issue 中联系审核人员。
 
@@ -109,7 +111,7 @@ octosense-github-notes/
   PRIVACY.md       privacy_policy_url 指向的页面
   SUPPORT.md       如何报告问题
   README.md        应用做什么，以及如何验证发布
-  publisher.json   发布者 ID、算法 "Ed25519" 和公钥
+  publisher.json   历史 Ed25519 发布者 ID、算法和公钥
   review/          签名后应用包的准入检查输出（GATE.txt）和扫描问题的回答（ANSWERS.md）
   LICENSE, NOTICE
   .gitignore       把密钥、build/ 和 .local-state/ 挡在 Git 之外
@@ -221,6 +223,15 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 `hub scan` 生成的审核包不含截图。审核人员会在应用包和你的 issue 中查看截图。
 
 ## 5. 生成最终字节
+
+对于**新应用**，GitHub 发布者路径不再要求开发者管理密钥。本实现分支准备契约 1.8.0；真实工作流验收和兼容宿主发布版仍待完成。
+
+1. 创建 App Hub submission issue，发起发布请求。可以先开 issue、后生成 release；准备、审核和发布是不同步骤。
+2. 先测试未签名开发副本，再由公开仓库的标签推送工作流准备规范化清单、获取 GitHub 证明、附加证明并打包最终应用。原生命令及身份限制见 [GitHub 发布者来源证明](PUBLISHING.zh-CN.md#github-发布者来源证明)。
+3. 在 issue 中补充不可变标签/commit、GitHub Release pack 和验证证据。单独创建标签或 Release 不等于提交或批准。
+4. 用 `hub publisher-unpack` 和 `publisher-verify` 审核精确的发布 pack，不要重新写入摘要。源码标签中是开发清单，Actions 在发布 pack 内生成最终带证明的清单。批准及目录发布是管理员的独立步骤。
+
+常规更新继续使用同一不可变仓库/所有者/工作流身份和更高语义版本，无需发布者私钥。新路径不能接管历史应用 ID。第 5–6 步剩余命令记录的是**历史 Ed25519/未签名路径**及已有参考应用；GitHub 发布者应用不应运行其中的密钥生成或签名步骤。
 
 像参考应用一样为应用包签名。Hub 也准入未签名的首个版本，但之后该应用的每个版本都必须签名（见发布参考的[Signing](PUBLISHING.zh-CN.md#签名)一节）。如果提交未签名的版本，跳过子步骤 4、5、7，之后运行 `hub check` 时都用 `--allow-unsigned` 代替 `--publisher-key`。
 

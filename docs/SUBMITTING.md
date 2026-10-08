@@ -95,7 +95,8 @@ The rehearsal is verified only with a shell built from source.
 
 ### Check your platform
 
-- **macOS on Apple silicon** is verified: every command in this guide ran on it.
+- **macOS on Apple silicon** verified the historical reference-app commands.
+  The new GitHub publisher workflow has the separate pending status in step 5.
 - **Windows** is unverified on current `main`. Open issue
   [#41](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/41) records
   a native Windows 11 build and run at an earlier revision, verified by a
@@ -108,6 +109,11 @@ The rehearsal is verified only with a shell built from source.
   out under software rendering (llvmpipe, WSL).
 
 ### Protect your publisher key
+
+This section applies only to historical Ed25519 publishing. New GitHub
+publisher apps require no developer signing key; follow the new route in
+[step 5](#5-produce-the-final-bytes). Contract 1.8.0 and a compatible host are
+still pending; existing release hosts cannot consume the new proof yet.
 
 Your publisher id names you in the catalog; your publisher key signs every
 version you publish. Once a version signed by the key is in the catalog, the
@@ -198,7 +204,7 @@ octosense-github-notes/
   PRIVACY.md       the page privacy_policy_url points to
   SUPPORT.md       how to report problems
   README.md        what the app does and how to verify a release
-  publisher.json   publisher id, algorithm "Ed25519" and public key
+  publisher.json   legacy Ed25519 publisher id, algorithm and public key
   review/          gate output for the signed bundle (GATE.txt) and scan answers (ANSWERS.md)
   LICENSE, NOTICE
   .gitignore       keeps keys, build/ and .local-state/ out of Git
@@ -368,6 +374,31 @@ The `hub scan` packet carries no screenshots. Reviewers see them in the bundle
 and in your issue.
 
 ## 5. Produce the final bytes
+
+For a **new app**, the GitHub publisher route removes developer key
+management. This implementation branch prepares contract 1.8.0; the real
+workflow acceptance and a compatible released host are still pending.
+
+1. Open an App Hub submission issue to request publication. The issue may
+   precede the release; preparation, review and publication remain separate.
+2. Test an unsigned development copy, then let the public repository's
+   tag-push workflow prepare the canonical manifest, obtain GitHub's proof,
+   attach it and package the final bundle. The native commands and identity
+   limits are in [GitHub publisher provenance](PUBLISHING.md#github-publisher-provenance).
+3. Add the immutable tag/commit, GitHub Release pack and verification evidence
+   to the issue. A tag or Release alone does not submit or approve the app.
+4. Review the exact release pack with `hub publisher-unpack` and
+   `publisher-verify`, without restamping. The source tag contains the
+   development manifest; Actions creates the final attested manifest inside
+   the release pack. Approval and catalog publication are the administrator's
+   separate step.
+
+Routine updates use the same immutable repository/owner/workflow identity
+and a higher semantic version; they require no publisher private key.
+Existing legacy app IDs cannot be adopted by this new route. The remaining
+commands in steps 5–6 document the **historical Ed25519/unsigned route** and
+its existing reference apps; do not run their key-generation or signing
+steps for a GitHub publisher app.
 
 Sign your bundle, as the reference apps did. The Hub also admits an unsigned
 first version, but every later version of the app must then be signed
