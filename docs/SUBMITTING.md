@@ -122,8 +122,9 @@ GitHub publishing skip this section; they create no developer signing key.
 
 This section applies only to historical Ed25519 publishing. New GitHub
 publisher apps require no developer signing key; follow the new route in
-[step 5](#5-produce-the-final-bytes). Contract 1.8.0 and a compatible host are
-still pending; existing release hosts cannot consume the new proof yet.
+[step 5](#5-produce-the-final-bytes). Contract 1.8.0 is published; a compatible
+OctoSense host release is still pending. Existing release hosts cannot consume
+the new proof yet.
 
 Your publisher id names you in the catalog; your publisher key signs every
 version you publish. Once a version signed by the key is in the catalog, the

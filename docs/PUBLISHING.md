@@ -1121,7 +1121,7 @@ packet on stdin. Its failure or invalid output still requires human review.
 
 New apps can use GitHub-managed publisher provenance: developers do not
 create, store or rotate a publisher private key. This source implementation
-prepares contract **1.8.0** and `publisher-github-v1`; a compatible released
+uses published contract **1.8.0** and `publisher-github-v1`; a compatible released
 host is still pending. Two real tag-push releases passed the workflow and
 native Store acceptance described below. The historical Ed25519 route
 remains below for existing packages.
