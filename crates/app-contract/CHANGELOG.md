@@ -3,12 +3,16 @@
 `octosense-app-contract` follows the rules in [README.md](README.md#stability):
 within `1.x` it only grows.
 
-crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0 1.7.0 and 1.7.1; 1.3.0 and 1.4.0
+crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0, 1.7.0, 1.7.1 and 1.8.0; 1.3.0 and 1.4.0
 are unpublished, and 1.5.0 includes their changes.
 [README.md](README.md#versions-on-cratesio) shows how to update a lock file
 that holds 1.2.0.
 
-## 1.8.0 — publication pending
+## 1.8.0 — 2026-10-08
+
+Published through the [release workflow](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37739082884);
+the [publication receipt](../../reviews/github-publisher-v1/contract-1.8.0-publication.json)
+records the registry and downloaded archive checksum.
 
 - Adds optional `Integrity::github` / `GithubPublisher`, the required
   `publisher-github-v1` marker and the default-refusing
