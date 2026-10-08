@@ -2,7 +2,7 @@
 
 use octosense_app_hub::{Availability, Listing, Store};
 use octosense_app_policy::HostLimits;
-use octosense_appstore::source::Origin;
+use octosense_appstore::source::{CatalogChannel, Origin};
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -85,6 +85,7 @@ pub struct Backend {
     store: Store,
     warning: Option<String>,
     persistence_failed: bool,
+    channel: Option<CatalogChannel>,
 }
 
 /// Check a shell launch using local verified state, without waiting on Hub work.
@@ -123,8 +124,11 @@ impl Backend {
     // Caller holds CATALOG_IO. This reads local state and performs recovery;
     // neither constructor nor the shell launch gate contacts the origin.
     fn new_unlocked(root: PathBuf, origin: Origin, anchor: String) -> Self {
-        let store = Store::new(&anchor, &root, HostLimits::default()).with_host_api_versions(octosense_appstore::host_api::available_versions());
-        let recovery_warning = recover_installations(&root).err();
+        let selected = CatalogChannel::from_environment(&root);
+        let mut store = Store::new(&anchor, &root, HostLimits::default()).with_host_api_versions(octosense_appstore::host_api::available_versions());
+        let recovery_warning = selected.as_ref().err().cloned().or_else(|| recover_installations(&root).err());
+        let channel = selected.ok();
+        if let Some(channel) = channel { store = channel.configure(store); }
         let mut backend = Self {
             root_key: root_identity(&root),
             root,
@@ -133,6 +137,7 @@ impl Backend {
             store,
             warning: recovery_warning,
             persistence_failed: false,
+            channel,
         };
         backend.load_cache();
         backend
@@ -151,7 +156,10 @@ impl Backend {
     }
 
     fn load_cache(&mut self) {
-        match std::fs::read_to_string(self.root.join("catalog.json")) {
+        let Some(channel) = self.channel else { return; };
+        let path = self.root.join(channel.filename());
+        if !path.exists() { return; }
+        match channel.read_cache(&self.root) {
             Ok(json) => {
                 if let Err(error) = self
                     .store
@@ -163,7 +171,6 @@ impl Backend {
                     self.persistence_failed = false;
                 }
             }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => {
                 self.warning = Some(format!("Could not read the cached catalog: {error}"))
             }
@@ -171,20 +178,30 @@ impl Backend {
     }
 
     fn refresh_catalog(&mut self) {
+        let Some(channel) = self.channel else { return; };
+        // A v2 cache created by another window/process forbids a stale legacy
+        // worker from downgrading the shared library.
+        if CatalogChannel::from_environment(&self.root).ok() != Some(channel) {
+            self.persistence_failed = true;
+            self.warning = Some("Catalog channel changed; reopen App Hub before continuing.".into());
+            return;
+        }
         let recovery_warning = recover_installations(&self.root).err();
         self.warning = recovery_warning.clone();
         // Establish the durable sequence floor before accepting network bytes,
         // including when another Hub instance refreshed since this worker did.
         self.load_cache();
-        match self.origin.catalog().and_then(|json| {
-            let mut candidate = Store::new(&self.anchor, &self.root, HostLimits::default()).with_host_api_versions(octosense_appstore::host_api::available_versions());
-            if let Some(held) = self.store.catalog() {
-                candidate
-                    .accept_catalog(&serde_json::to_string(held).map_err(|e| e.to_string())?)?;
-            }
+        match self.origin.catalog_for(channel).and_then(|json| {
+            let mut candidate = self.store.clone();
             candidate.accept_catalog(&json)?;
             self.remember_sequence(candidate.catalog().unwrap().sequence)?;
-            if let Err(error) = persist_catalog(&self.root, &json) {
+            let persistence = match channel {
+                CatalogChannel::Legacy => persist_catalog(&self.root, &json),
+                CatalogChannel::GitHub => std::fs::create_dir_all(&self.root)
+                    .map_err(|e| e.to_string())
+                    .and_then(|()| candidate.accept_catalog_and_cache(&json, &self.root.join(channel.filename()))),
+            };
+            if let Err(error) = persistence {
                 self.persistence_failed = true;
                 return Err(error);
             }
@@ -359,14 +376,7 @@ impl Backend {
             }
             // The Hub backend copies into its own root. Give it a staging root
             // so a failed copy cannot remove or expose a partial live bundle.
-            let mut prepared_store = Store::new(
-                &self.anchor,
-                &workspace.join("verified"),
-                HostLimits::default(),
-            ).with_host_api_versions(octosense_appstore::host_api::available_versions());
-            prepared_store.accept_catalog(
-                &serde_json::to_string(self.store.catalog().unwrap()).map_err(|e| e.to_string())?,
-            )?;
+            let mut prepared_store = self.store.for_install_root(&workspace.join("verified"));
             prepared_store.install_staged(
                 &consent.app_id,
                 &staged,
@@ -428,6 +438,10 @@ impl Backend {
     }
 
     fn check_sequence_floor(&self) -> Result<(), String> {
+        let channel = CatalogChannel::from_environment(&self.root)?;
+        if self.channel != Some(channel) {
+            return Err("Catalog channel changed; reopen App Hub before continuing.".into());
+        }
         let floors = VERIFIED_SEQUENCES
             .get_or_init(|| Mutex::new(BTreeMap::new()))
             .lock()
@@ -810,6 +824,25 @@ mod tests {
         assert!(snapshot.entries.is_empty());
         assert!(snapshot.can_install);
         assert!(snapshot.warning.is_none());
+    }
+
+    #[test]
+    fn corrupt_v2_cache_never_reopens_available_legacy_channel() {
+        let f = Fixture::new();
+        f.publish_today(1, vec![f.entry()]);
+        let mut older = f.backend();
+        assert!(older.refresh().can_install);
+        std::fs::write(f.root().join("catalog-v2.json"), "invalid proof").unwrap();
+        assert!(!older.snapshot().can_install, "existing workers cannot ignore a channel change");
+        assert!(older.check_sequence_floor().is_err());
+        let mut reopened = f.backend();
+        assert_eq!(reopened.channel, Some(CatalogChannel::GitHub));
+        let snapshot = reopened.refresh();
+        assert!(!snapshot.verified);
+        assert!(!snapshot.can_install);
+        assert!(snapshot.entries.is_empty());
+        assert!(snapshot.warning.is_some());
+        assert_eq!(std::fs::read_to_string(f.root().join("catalog-v2.json")).unwrap(), "invalid proof");
     }
 
     #[test]

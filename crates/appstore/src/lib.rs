@@ -193,7 +193,15 @@ impl AppStoreView {
         // overrides it for development.
         self.app_data_root = data_root(cx);
         let anchor = std::env::var("OCTOSENSE_HUB_ANCHOR").unwrap_or_else(|_| DEFAULT_ANCHOR.to_string());
-        let mut store = Store::new(&anchor, &self.app_data_root, HostLimits::default()).with_host_api_versions(crate::host_api::available_versions());
+        let channel = match source::CatalogChannel::from_environment(&self.app_data_root) {
+            Ok(channel) => channel,
+            Err(error) => {
+                self.status = error;
+                self.refresh(cx);
+                return;
+            }
+        };
+        let mut store = channel.configure(Store::new(&anchor, &self.app_data_root, HostLimits::default()).with_host_api_versions(crate::host_api::available_versions()));
 
         // A hub override on disk (`<data dir>/hub.txt`, a path or a base URL)
         // wins over the built-in hub: how a device with no route to the
@@ -210,15 +218,13 @@ impl AppStoreView {
         };
         match &self.origin {
             None => self.status = "No hub configured. Set OCTOSENSE_HUB to a hub mirror.".into(),
-            Some(origin) => match origin.catalog().and_then(|json| store.accept_catalog(&json)) {
+            Some(origin) => match origin.catalog_for(channel).and_then(|json| {
+                std::fs::create_dir_all(&self.app_data_root).map_err(|e| e.to_string())?;
+                store.accept_catalog_and_cache(&json, &self.app_data_root.join(channel.filename()))
+            }) {
                 Ok(()) => {
-                    // The verified catalog is kept beside the apps, so an app
-                    // opened later (without the store) can still check that
-                    // its version is offered and not withdrawn.
-                    if let Ok(json) = origin.catalog() {
-                        let _ = std::fs::create_dir_all(&self.app_data_root);
-                        let _ = std::fs::write(self.app_data_root.join("catalog.json"), json);
-                    }
+                    // Persist exactly the verified bytes, including v2 proof,
+                    // for launches later. Never fetch a second unverified copy.
                     let count = store.catalog().map(|c| c.entries.len()).unwrap_or(0);
                     let today = octosense_app_hub::today();
                     self.status = match store.installs_allowed(&today) {

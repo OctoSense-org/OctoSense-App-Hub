@@ -89,12 +89,16 @@ impl CardAppView {
                 if let Err(e) = octosense_app_hub::adopt_legacy_install(&root, &self.app_id) {
                     return self.refuse(cx, &format!("Cannot open: {e}"));
                 }
-                let mut store = Store::new(&anchor, &root, HostLimits::default())
-                    .with_host_api_versions(crate::host_api::available_versions());
+                let channel = match crate::source::CatalogChannel::from_environment(&root) {
+                    Ok(channel) => channel,
+                    Err(e) => return self.refuse(cx, &format!("Cannot open: {e}")),
+                };
+                let mut store = channel.configure(Store::new(&anchor, &root, HostLimits::default())
+                    .with_host_api_versions(crate::host_api::available_versions()));
                 // The catalog the store last verified. Without one, nothing
                 // runs: an app the device cannot show was offered is not run
                 // on trust.
-                let catalog = std::fs::read_to_string(root.join("catalog.json")).unwrap_or_default();
+                let catalog = channel.read_cache(&root).unwrap_or_default();
                 if let Err(e) = store.accept_catalog(&catalog) {
                     return self.refuse(cx, &format!("Cannot open {}: no verified catalog on this device ({e})", self.app_id));
                 }

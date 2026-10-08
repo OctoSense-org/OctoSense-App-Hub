@@ -36,6 +36,12 @@ impl Remote {
         self.get("catalog.json")
     }
 
+    /// The GitHub-attested channel. A missing or invalid response must not
+    /// cause a caller to fetch the legacy catalog instead.
+    pub fn github_catalog(&self) -> Result<String, String> {
+        self.get("catalog-v2.json")
+    }
+
     /// An artifact's pack, unverified.
     pub fn pack(&self, artifact: &str) -> Result<Pack, String> {
         let text = self.get(&format!("{artifact}.pack.json"))?;
