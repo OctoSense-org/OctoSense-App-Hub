@@ -48,9 +48,11 @@ Find the guide for your task:
 
 A store bundle carries no native code. New native Rust or JNI code, Python
 services and browser controllers do not install as a card app or a script app.
-Rust compiled to a WebAssembly module can ship in a store app under the `wasm`
-capability, in a sandbox with no files, network or clock
-([Run your own Rust code](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/RUST.md)).
+Rust code compiled to a WebAssembly module can ship in a store app under the
+`wasm` capability, in a sandbox with no files, network or clock. Only
+OctoSense builds with the `wasm-lab` feature run it, and no release enables
+that feature yet (Design Flow's
+[Run your own Rust code](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/RUST.md)).
 
 Some Design Flow examples include a native service or a website integration.
 Before you base a Hub app on one, check that every behavior runs inside the

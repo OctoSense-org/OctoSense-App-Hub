@@ -472,7 +472,7 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | `microphone` | `microphone.permission.status` | |
 | `location` | `location.permission.status`、`location.get` | |
 
-`wasm.<function>` 运行应用自带的函数之一（`fns/*.wasm`，`wasm` 能力）；目前还没有任何 OctoSense 发布版提供它。目前还没有任何 OctoSense 发布版提供上表中的 `auth`、`runtime`、`camera`、`microphone` 和 `location` 方法（[宿主 API 兼容性](HOST-API.zh-CN.md)）。上面的规则同样适用于这些方法，`runtime.list` 和 `runtime.describe` 也不例外。通过准入不等于已经配置账户、取得权限或补上缺少的 API：请用 `runtime.describe` 查询宿主实现了什么。映射到 `auth.backend.request` 的工具只能执行后端声明的 `GET` 操作；写操作仍须应用在前台，并由用户在宿主的原生审阅界面上批准。权限的 `request` 和 `revoke`、账户管理，以及 `app_tools.dispatch@1` 等运行时 ABI，都没有 `host_method`。
+`wasm.<function>` 运行应用自带的函数之一（`fns/*.wasm`，`wasm` 能力）。目前还没有任何 OctoSense 发布版提供它，也没有提供上表中的 `auth`、`runtime`、`camera`、`microphone` 和 `location` 方法（[宿主 API 兼容性](HOST-API.zh-CN.md)）。上面的规则同样适用于这些方法，`runtime.list` 和 `runtime.describe` 也不例外。通过准入不等于已经配置账户、取得权限或补上缺少的 API：请用 `runtime.describe` 查询宿主实现了什么。映射到 `auth.backend.request` 的工具只能执行后端声明的 `GET` 操作；写操作仍须应用在前台，并由用户在宿主的原生审阅界面上批准。权限的 `request` 和 `revoke`、账户管理，以及 `app_tools.dispatch@1` 等运行时 ABI，都没有 `host_method`。
 
 上述七个媒体别名需要 [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368)，
 尚无发布版宿主实现它们。它们仍要求 `model` 能力和 `private_data: true`。

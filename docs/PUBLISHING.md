@@ -596,9 +596,9 @@ The gate refuses a `host_method` unless every rule holds:
 | `location` | `location.permission.status`, `location.get` | |
 
 `wasm.<function>` runs one of the app's own functions (`fns/*.wasm`, the
-`wasm` capability); no OctoSense release serves it yet.
-No OctoSense release serves the `auth`, `runtime`, `camera`, `microphone`
-and `location` methods above yet ([Host API compatibility](HOST-API.md)).
+`wasm` capability). No OctoSense release serves it, or the `auth`,
+`runtime`, `camera`, `microphone` and `location` methods above yet
+([Host API compatibility](HOST-API.md)).
 The rules above apply to them too, `runtime.list` and `runtime.describe`
 included. Admission does not configure an account, grant a permission or
 add a missing API: check what the host implements with `runtime.describe`.
