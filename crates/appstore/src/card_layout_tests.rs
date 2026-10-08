@@ -118,3 +118,63 @@ fn script_apps_keep_their_own_layout_and_scrolling() {
         source
     );
 }
+
+#[test]
+fn flow_card_fills_its_resized_pane_without_measured_placements() {
+    let fixture = Fixture::new();
+    std::fs::write(
+        fixture.0.join("page.card"),
+        "theme dark\nview root Col { Rule() Rule() }\n",
+    )
+    .unwrap();
+    std::fs::write(fixture.0.join("page.data.json"), "{}").unwrap();
+    // A minimal role kit with responsive dimensions, no native placement ledger.
+    for name in [
+        "_palette_dark.octoscript",
+        "_derive_color.octoscript",
+        "_derive.octoscript",
+    ] {
+        std::fs::write(fixture.0.join("kit").join(name), "").unwrap();
+    }
+    std::fs::write(
+        fixture.0.join("kit/_kit.octoscript"),
+        r#"
+fn l0_col(kids) { return {t: "column", fillw: 1, fith: 1, c: kids} }
+fn l0_rule() { return {t: "button", fillw: 1, h: 44, text: "Action"} }
+"#,
+    )
+    .unwrap();
+    let source = crate::card_source(&fixture.0, "http://127.0.0.1:12345/").unwrap();
+    let (mut cx, root) = mount(&source);
+    for width in [300.0, 640.0, 240.0] {
+        let pos = dvec2(84.0, 138.0);
+        draw(
+            &mut cx,
+            &root,
+            Rect {
+                pos,
+                size: dvec2(width, 500.0),
+            },
+        );
+        let first = root.button(&cx, ids!(beauty_0_0)).area().rect(&cx);
+        let second = root.button(&cx, ids!(beauty_0_1)).area().rect(&cx);
+        assert_eq!(first.pos.x, pos.x);
+        assert_eq!(second.pos.x, pos.x);
+        assert_eq!(first.size, dvec2(width, 44.0));
+        assert_eq!(second.size, dvec2(width, 44.0));
+        assert!(first.pos.y >= pos.y);
+        assert!(second.pos.y >= first.pos.y + first.size.y);
+        assert!(second.pos.y + second.size.y < pos.y + 500.0);
+    }
+}
+
+#[test]
+fn invalid_measured_kit_does_not_silently_use_the_role_fallback() {
+    let fixture = Fixture::new();
+    let path = fixture.0.join("kit/native/light/kit.json");
+    let mut kit: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    kit["components"]["surface"]["style"]["t"] = json!("column");
+    std::fs::write(path, kit.to_string()).unwrap();
+    assert!(crate::card_source(&fixture.0, "http://127.0.0.1:12345/").is_err());
+}

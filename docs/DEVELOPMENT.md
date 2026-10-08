@@ -51,6 +51,7 @@ renderer positions descendants relative to that pane; a native two-axis scroll
 view keeps controls reachable when the canvas exceeds the available space.
 Validate at a nonzero pane position and in a viewport shorter or narrower than
 the authored canvas, including scrolling to and clicking its final control.
+Role-based L0 without placements uses the same flow lowering as `card-host`.
 Script apps continue to manage their own responsive layout and scrolling.
 
 A store bundle carries no native code. New native Rust or JNI code, Python
