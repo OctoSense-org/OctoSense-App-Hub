@@ -129,9 +129,9 @@ impl PublisherRegistry for CatalogPublishers {
 /// recorded keys, never a caller's.
 pub fn verify_continuity(manifest: &AppManifest, registry: &dyn PublisherRegistry) -> Result<(), String> {
     let owner = registry.app_owner(&manifest.id);
-    if manifest.integrity.github.is_some() {
+    if let Some(github)=&manifest.integrity.github {
         authorize_github_update(manifest,registry)?;
-        crate::github_publisher::verify(manifest.integrity.github.as_ref().unwrap(), &manifest.signing_bytes()?)?;
+        crate::github_publisher::verify(github, &manifest.signing_bytes()?)?;
         return Ok(());
     }
     if registry.github_binding(&manifest.id).is_some() {
