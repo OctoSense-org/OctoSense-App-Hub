@@ -31,6 +31,8 @@ mod tool_schema;
 pub mod source;
 pub mod system;
 pub mod ui;
+#[cfg(test)]
+mod card_layout_tests;
 
 pub use makepad_widgets;
 
@@ -493,9 +495,27 @@ pub(crate) fn card_source(bundle: &std::path::Path, asset_origin: &str) -> Resul
     let data_text = std::fs::read_to_string(bundle.join("page.data.json")).unwrap_or_else(|_| "{}".into());
     let mut data: serde_json::Value = serde_json::from_str(&data_text).map_err(|e| format!("page.data.json: {e}"))?;
     octosense_app_policy::rewrite_assets(&mut data, asset_origin);
-    let prepared = card_assets::prepare(&card, &data, bundle, asset_origin)?;
-    let ui = octoscript_makepad::design::to_makepad_ui(&prepared.tree)?;
-    Ok(format!("width:Fill height:Fill flow:Overlay {ui}"))
+    let mut prepared = card_assets::prepare(&card, &data, bundle, asset_origin)?;
+    // The card occupies a host-owned pane, which need not start at (0, 0).
+    // Measured frames are card-local; absolute window coordinates misplace
+    // descendants when the same bundle opens inside the desktop shell.
+    let ui = match octoscript_makepad::design::to_makepad_ui_in_slot(&prepared.tree) {
+        Ok(ui) => ui,
+        Err(error) if prepared.native_components => return Err(error),
+        Err(_) => {
+            // Role-based L0 (Col, Surface, ...) has no measured frames. Use
+            // the same flow lowering as card-host; malformed measured kits
+            // above must still fail rather than change rendering semantics.
+            octoscript_makepad::l0::inspectable(&mut prepared.tree);
+            octoscript_makepad::to_makepad_l0_ui(&prepared.tree)
+        }
+    };
+    // Preserve the measured canvas instead of clipping its controls when the
+    // host pane is smaller. Native scrolling supplies both axes and keeps
+    // clipping/hit testing inside the app's own viewport. Script apps above
+    // continue to own their responsive layout and scroll containers.
+    Ok(format!("width:Fill height:Fill flow:Overlay\n\
+        l0_canvas := ScrollXYView {{ width:Fill height:Fill flow:Overlay\n{ui}\n}}"))
 }
 
 impl Widget for AppStoreView {
