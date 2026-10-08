@@ -544,7 +544,7 @@ The gate admits these tools, but in a store app each call fails with
 | `risk` | `read` (only reads), `act` (changes the app's own state) or `destructive` (sends, posts, shares, buys, deletes: anything past the app). Required. The tool broker's `Read`, `Act` and `Destructive` spellings are accepted. |
 | `background` | The tool may run in a turn the person did not start. Default `false`. |
 | `shareable` | Callers other than the app's own agent may be granted it, such as OctoSense's system agent (the device-wide agent the person talks to) and other apps' agents. Default `false`. |
-| `private_data` | The result carries the person's private data. A shareable tool of a `local_only` app must say `false`; a `host_method` tool must say `true`. |
+| `private_data` | The result carries the person's private data. A shareable tool of a `local_only` app must say `false`; a `host_method` tool must say `true`, except one that runs `wasm.<function>`, which sees only its input. |
 | `implemented_by` | `host-service`: a host service runs it. `app`: the app's own script runs it, in the open app ([Script tool execution](#script-tool-execution-script-tools-v1)). Required. |
 | `host_method` | A reviewed shared-service method the tool runs on ([Map a tool to a shared service](#map-a-tool-to-a-shared-service-host_method)). Optional. |
 | `outward` | Set it on an `act` tool whose call reaches outside the device (sends, posts, shares). Each call then waits for the person, as a destructive call does. Default `false`; refused on a `read` tool. |

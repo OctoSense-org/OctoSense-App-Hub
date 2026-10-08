@@ -46,8 +46,11 @@ Find the guide for your task:
 | Built-in native app | Source compiled into a shell release, built with the native workspace and the owning app's instructions. The shared icon conventions apply. | With the shell release. An icon declaration does not make it installable from the Hub. |
 | Agent-generated app type | Specifications and lint rules in OctoSense `apps/appcard` that teach AppCard's agents to compose a new kind of app. | Not a bundle. |
 
-A store bundle carries no native code. New Rust or JNI code, Python services
-and browser controllers do not install as a card app or a script app.
+A store bundle carries no native code. New native Rust or JNI code, Python
+services and browser controllers do not install as a card app or a script app.
+Rust compiled to a WebAssembly module can ship in a store app under the `wasm`
+capability, in a sandbox with no files, network or clock
+([Run your own Rust code](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/RUST.md)).
 
 Some Design Flow examples include a native service or a website integration.
 Before you base a Hub app on one, check that every behavior runs inside the

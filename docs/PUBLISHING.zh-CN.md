@@ -425,7 +425,7 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | `risk` | `read`（只读取）、`act`（修改应用自身的状态）或 `destructive`（发送、发帖、分享、购买、删除，即任何超出应用本身的操作）。必填。也接受工具代理的写法 `Read`、`Act` 和 `Destructive`。 |
 | `background` | 工具可以在并非由用户发起的一轮对话中运行。默认 `false`。 |
 | `shareable` | 可以授权给应用自身 Agent 以外的调用方，例如 OctoSense 的系统 Agent（覆盖整台设备，用户直接与它对话）和其他应用的 Agent。默认 `false`。 |
-| `private_data` | 结果中含有用户的私人数据。`local_only` 应用的可共享工具必须设为 `false`；带 `host_method` 的工具必须设为 `true`。 |
+| `private_data` | 结果中含有用户的私人数据。`local_only` 应用的可共享工具必须设为 `false`；带 `host_method` 的工具必须设为 `true`，但运行 `wasm.<function>` 的工具除外，因为函数只能看到自己的输入。 |
 | `implemented_by` | `host-service`：由宿主服务运行。`app`：由应用自己的脚本在已打开的应用中运行（[脚本工具执行](#脚本工具执行script-tools-v1)）。必填。 |
 | `host_method` | 工具映射到的已审核共享服务方法（[把工具映射到共享服务](#把工具映射到共享服务host_method)）。可选。 |
 | `outward` | 如果 `act` 工具的调用会触及设备之外（发送、发帖、分享），就设置此项。这样每次调用都会像破坏性（`destructive`）调用一样，等待用户批准。默认 `false`；准入检查拒绝在 `read` 工具上设置它。 |
