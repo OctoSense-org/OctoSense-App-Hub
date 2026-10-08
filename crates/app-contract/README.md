@@ -48,10 +48,9 @@ limits.
 
 ## Versions on crates.io
 
-crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0 and 1.6.0. Versions 1.3.0 and 1.4.0 exist
-only in this repository ([CHANGELOG.md](CHANGELOG.md)); 1.5.0 includes their
-changes. 1.7.0, which adds `wasm`, is in this repository and not yet on
-crates.io. A lock file that still holds 1.2.0 refuses every capability added
+crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0 and 1.7.0. Versions 1.3.0 and
+1.4.0 exist only in this repository ([CHANGELOG.md](CHANGELOG.md)); 1.5.0
+includes their changes. A lock file that still holds 1.2.0 refuses every capability added
 since, such as `auth`:
 
 ```text
@@ -59,7 +58,8 @@ app org.example.connect requests unknown capability "auth"
 ```
 
 `cargo update -p octosense-app-contract` moves an unconstrained 1.x consumer
-to 1.6.0. Hosts using the new API declarations must select 1.6 or later;
+to 1.7.0. Hosts using the new API declarations must select 1.6 or later, and
+hosts serving `wasm` 1.7 or later;
 older checked-in lock files remain on their existing version. OctoSense
 desktop 0.1.0-beta.2 patched the crate to an App Hub revision. To build
 against a contract newer than the latest release, patch crates.io's copy with
