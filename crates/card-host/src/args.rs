@@ -25,7 +25,8 @@ Options:
                            manifest is still refused: card-host verifies no
                            publisher keys.
   --stamp                  Rewrite the manifest's integrity.bundle_blake3 to
-                           match the directory before admitting.
+                           match the directory before admitting. Refuses any
+                           publisher signature or GitHub signing metadata.
   --system                 Admit as a system app: by digest only, under the
                            system ceilings. An empty digest is filled in memory.
   --static <prefix>=<dir>  Serve <dir>'s files at <prefix>/... from memory.

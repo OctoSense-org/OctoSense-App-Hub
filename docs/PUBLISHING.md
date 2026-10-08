@@ -1206,6 +1206,11 @@ Catalog administrators can use [GitHub-managed catalog signing](GITHUB-PUBLISHIN
 without a separate Hub private key. Existing Ed25519 publisher history and
 its signature bytes remain unchanged:
 
+`hub stamp` and `card-host --stamp` refuse existing signing metadata without
+rewriting it. To edit a signed release, first create an unsigned development
+copy; keep the original release intact, then stamp and sign the final new
+version. An absent or null `integrity.signature` remains unsigned.
+
 Your publisher id is your signature's key id. The key on record is the one in
 the published catalog, never one a submission supplies:
 
@@ -1233,13 +1238,12 @@ these rules:
   signature from key "<id>" cannot be checked`. Capture screenshots and test
   on the unsigned bundle, then stamp and sign.
 - **Stamp, then sign.** Signing an unstamped manifest signs the wrong digest.
-- **Stamp and sign again after any edit.** Changing any file other than
-  `manifest.json` makes `hub check` refuse with `digest: the bundle hashes to
-  …, the manifest claims …`. After `hub stamp` alone, `hub check` still
-  refuses, now with `publisher-signature: the signature from key "<id>" does
-  not match the manifest`. Changing `manifest.json` itself gives that second
-  refusal at once. Run `hub stamp`, then `hub sign-manifest`, then
-  `hub check --publisher-key` again.
+- **Prepare a new unsigned copy after an edit.** Changing bundle bytes
+  invalidates their digest; changing signed manifest fields invalidates the
+  signature. Preserve the original release. In the development copy, remove
+  the old `integrity.signature`, then run `hub stamp`, `hub sign-manifest`
+  and `hub check --publisher-key` for the final new version. `hub stamp`
+  refuses the old signature instead of silently invalidating it.
 - **Check signed bytes with the key.** Unless `--catalog` already records
   your key, `hub check` refuses a signed bundle without
   `--publisher-key <id>=<hex>`, even with `--allow-unsigned`. `hub scan` takes

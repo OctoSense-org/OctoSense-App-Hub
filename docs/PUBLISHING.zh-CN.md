@@ -839,6 +839,8 @@ hub publisher-pack bundle --out build/app.bundle.pack.json
 
 目录管理员可使用 [GitHub 管理的目录签名](GITHUB-PUBLISHING.zh-CN.md)，无需额外的 Hub 私钥。已有 Ed25519 发布者历史及其签名字节保持不变：
 
+`hub stamp` 和 `card-host --stamp` 遇到已有签名元数据时会拒绝，且不会改写清单。编辑已签名发布包前，先创建未签名的开发副本；保留原发布包，再为最终新版本写入摘要并签名。缺失或为 null 的 `integrity.signature` 仍表示未签名。
+
 发布者 ID 就是你签名所用的密钥 ID。已登记的密钥以已发布签名目录中的记录为准，提交时附带的密钥一律不算：
 
 | 情形 | 规则 | 拒绝消息 |
@@ -856,7 +858,7 @@ hub publisher-pack bundle --out build/app.bundle.pack.json
 
 - **签名放在最后。** `card-host` 以及任何没有签名验证器的宿主，都会拒绝已签名的应用包：`no signature verifier is installed, so the signature from key "<id>" cannot be checked`。先在未签名的应用包上截图和测试，再写入摘要并签名。
 - **先写入摘要，再签名。** 为尚未写入摘要的清单签名，签下的是错误的摘要。
-- **任何改动之后，都要重新写入摘要并签名。** 改动 `manifest.json` 以外的任何文件，`hub check` 都会拒绝，报 `digest: the bundle hashes to …, the manifest claims …`。只重新运行 `hub stamp` 的话，`hub check` 仍会拒绝，这次报 `publisher-signature: the signature from key "<id>" does not match the manifest`。直接改动 `manifest.json` 本身，会立即得到第二种拒绝。请依次重新运行 `hub stamp`、`hub sign-manifest` 和 `hub check --publisher-key`。
+- **修改后准备新的未签名副本。** 修改应用包字节会使摘要失效，修改已签名清单字段会使签名失效。保留原发布包。在开发副本中移除旧的 `integrity.signature`，然后为最终新版本依次运行 `hub stamp`、`hub sign-manifest` 和 `hub check --publisher-key`。`hub stamp` 会拒绝旧签名，而不是静默使其失效。
 - **用密钥检查签名后的字节。** 除非 `--catalog` 指定的签名目录已经记录了你的密钥，否则不带 `--publisher-key <id>=<hex>` 时，`hub check` 会拒绝已签名的应用包，即使加了 `--allow-unsigned` 也一样。`hub scan` 没有 `--allow-unsigned` 参数：它直接接受未签名的应用包，而已签名的应用包同样需要提供密钥。
 - **保持字节原样。** 摘要覆盖除 `manifest.json` 以外的每个文件：文件的路径、长度和字节；在所有平台上，路径各段之间都用 `/` 分隔。换行符转换会改变摘要，所以不要让 Git 转换应用包（[安排仓库结构](SUBMITTING.zh-CN.md#1-安排仓库结构)）。
 

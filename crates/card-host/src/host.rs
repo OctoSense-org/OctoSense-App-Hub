@@ -87,6 +87,10 @@ fn policy_for(args: &Args) -> Result<AppPolicy, String> {
 
     if args.stamp {
         let mut value: serde_json::Value = serde_json::from_str(&manifest_json).map_err(|e| e.to_string())?;
+        if !value["integrity"]["signature"].is_null() || !value["integrity"]["github"].is_null()
+            || value["requires"].as_array().is_some_and(|features| features.iter().any(|f| f == "publisher-github-v1")) {
+            return Err("card-host --stamp refuses publisher signing metadata; use an unsigned development copy".into());
+        }
         value["integrity"]["bundle_blake3"] = serde_json::Value::String(digest.clone());
         manifest_json = serde_json::to_string_pretty(&value).map_err(|e| e.to_string())?;
         std::fs::write(&manifest_path, format!("{manifest_json}\n")).map_err(|e| e.to_string())?;
@@ -465,6 +469,45 @@ mod tests {
             }
         }
         fn draw_walk(&mut self, _: &mut Cx2d, _: &mut Scope, _: Walk) -> DrawStep { DrawStep::done() }
+    }
+
+    #[test]
+    fn stamp_never_rewrites_publisher_signing_metadata() {
+        for (index, metadata) in [
+            serde_json::json!({"signature":{}}),
+            serde_json::json!({"signature":{"key":"fixture","hex":"00"}}),
+            serde_json::json!({"github":{"repository":"example/app","attestation":null}}),
+            serde_json::json!({"github":{"repository":"example/app","attestation":{"proof":"fixture"}}}),
+        ].into_iter().enumerate() {
+            let dir = std::env::temp_dir().join(format!("card-host-sealed-{}-{index}", std::process::id()));
+            std::fs::create_dir(&dir).unwrap();
+            let path = dir.join("manifest.json");
+            let mut manifest = serde_json::json!({"schema":1,"id":"example.fixture","version":"1.0.0","name":"Fixture","integrity":{"bundle_blake3":""}});
+            manifest["integrity"].as_object_mut().unwrap().extend(metadata.as_object().unwrap().clone());
+            let before = serde_json::to_vec(&manifest).unwrap();
+            std::fs::write(&path, &before).unwrap();
+            std::fs::write(dir.join("main.splash"), r#"Label{text:"fixture"}"#).unwrap();
+            let args = crate::args::parse(["--bundle".into(), dir.to_str().unwrap().into(), "--stamp".into(), "--allow-unsigned".into()]).unwrap();
+            let error = policy_for(&args).err().expect("signing metadata must be refused before rewriting");
+            assert!(error.contains("signing metadata"), "{error}");
+            assert_eq!(std::fs::read(&path).unwrap(), before);
+            std::fs::remove_dir_all(dir).unwrap();
+        }
+    }
+
+    #[test]
+    fn stamp_preserves_unsigned_null_signature_support() {
+        let dir = std::env::temp_dir().join(format!("card-host-unsigned-null-{}", std::process::id()));
+        std::fs::create_dir(&dir).unwrap();
+        let path = dir.join("manifest.json");
+        std::fs::write(&path, r#"{"schema":1,"id":"example.unsigned","version":"1.0.0","name":"Fixture","integrity":{"bundle_blake3":"","signature":null}}"#).unwrap();
+        std::fs::write(dir.join("main.splash"), r#"Label{text:"fixture"}"#).unwrap();
+        let args = crate::args::parse(["--bundle".into(), dir.to_str().unwrap().into(), "--stamp".into(), "--allow-unsigned".into()]).unwrap();
+        policy_for(&args).expect("typed unsigned null-signature manifest must remain runnable");
+        let manifest = octosense_app_policy::AppManifest::parse(&std::fs::read_to_string(path).unwrap()).unwrap();
+        assert!(manifest.integrity.signature.is_none());
+        assert_eq!(manifest.integrity.bundle_blake3, octosense_app_policy::digest_dir(&dir).unwrap());
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

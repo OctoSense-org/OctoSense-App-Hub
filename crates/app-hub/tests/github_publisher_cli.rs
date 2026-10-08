@@ -266,3 +266,65 @@ fn downloaded_pack_traversal_is_refused_before_writing_outside_output() {
     assert!(!output.exists());
     assert!(!f.root.join("escape.txt").exists());
 }
+
+#[test]
+fn authoring_commands_preserve_prepared_and_attested_github_manifests() {
+    let f = unsigned();
+    assert!(prepare(&f).status.success());
+    for attested in [false, true] {
+        let mut manifest = read(&f);
+        if attested {
+            manifest.integrity.github.as_mut().unwrap().attestation =
+                Some(json!({"fixture": true}));
+            fs::write(
+                f.bundle.join("manifest.json"),
+                serde_json::to_vec(&manifest).unwrap(),
+            )
+            .unwrap();
+        }
+        let before = fs::read(f.bundle.join("manifest.json")).unwrap();
+        let out = Command::new(env!("CARGO_BIN_EXE_hub"))
+            .arg("stamp")
+            .arg(&f.bundle)
+            .output()
+            .unwrap();
+        assert!(!out.status.success());
+        assert!(String::from_utf8_lossy(&out.stderr).contains("cannot be restamped"));
+        assert_eq!(fs::read(f.bundle.join("manifest.json")).unwrap(), before);
+        let value = serde_json::to_value(&manifest).unwrap();
+        assert!(
+            octosense_app_hub::sign_manifest(&f.publisher, &mut manifest, "legacy-fixture")
+                .is_err()
+        );
+        assert_eq!(serde_json::to_value(&manifest).unwrap(), value);
+    }
+}
+
+#[test]
+fn stamp_refuses_legacy_signatures_without_breaking_unsigned_null_signatures() {
+    let f = Fixture::new();
+    let before = fs::read(f.bundle.join("manifest.json")).unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_hub"))
+        .arg("stamp")
+        .arg(&f.bundle)
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert_eq!(fs::read(f.bundle.join("manifest.json")).unwrap(), before);
+    let f = unsigned();
+    assert!(serde_json::from_slice::<serde_json::Value>(
+        &fs::read(f.bundle.join("manifest.json")).unwrap()
+    )
+    .unwrap()["integrity"]["signature"]
+        .is_null());
+    let out = Command::new(env!("CARGO_BIN_EXE_hub"))
+        .arg("stamp")
+        .arg(&f.bundle)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
