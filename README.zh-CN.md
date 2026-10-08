@@ -22,6 +22,8 @@ App Hub 为 OctoSense 发布应用。本仓库包含：
 
 **要提交应用？** 请按照[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)操作：在本仓库开一个 issue，提交一个已签名的应用包；它必须位于打了 tag 的 commit 上。目录中的[三个参考应用](docs/SUBMITTING.zh-CN.md#三个参考应用)（GitHub Notes、Inbox Assistant 和 Google Calendar）完整通过了准入，它们的仓库展示了一次完整的提交。规则、能力和字段请查阅[发布参考](docs/PUBLISHING.zh-CN.md)。
 
+**要使用宿主 API？** [宿主 API 兼容性](docs/HOST-API.zh-CN.md)说明应用如何声明所需的宿主 API，以及如何查询宿主实现了哪些 API。
+
 ## 仓库结构
 
 | 路径 | 说明 |
@@ -33,10 +35,11 @@ App Hub 为 OctoSense 发布应用。本仓库包含：
 | `docs/FIRST-APP.md` | 第一个应用（卡片应用或脚本应用）的分步教程：创建、运行、截图与检查。 |
 | `docs/SUBMITTING.md` | 提交流程的分步说明：仓库、清单、商店信息、截图、签名、发布、issue 与审核。 |
 | `docs/PUBLISHING.md` | 参考文档：准入规则；能力及其提供方；清单、商店信息和工具的字段；宿主服务；`hub` 命令；签名。 |
+| `docs/HOST-API.md` | 声明应用需要的宿主 API、用 `runtime` 发现宿主 API，以及目前各宿主实现了哪些 API。 |
 | `docs/ICONS.md` | 规范图标的归属、导出约束与视觉评审。 |
 | `docs/DEVELOPMENT.md` | 指南导航、交付路径、`card-host` 及其远程控制路由，以及 `card-studio`。 |
 | `templates/app/` | 卡片应用仓库脚手架，包含元数据、示例图标和链接好的 Agent 指引。 |
-| `crates/app-contract` | 应用契约 `octosense-app-contract`（[OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)）：清单、应用获得的策略、应用包完整性校验与运行应用包所需的内容。在 `1.x` 内只做增量变更（[README](crates/app-contract/README.md)）。最新版本 1.5.0 已发布到 crates.io（[crates.io 上的版本](crates/app-contract/README.md#versions-on-cratesio)，英文）。 |
+| `crates/app-contract` | 应用契约 `octosense-app-contract`（[OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)）：清单、应用获得的策略、应用包完整性校验与运行应用包所需的内容。在 `1.x` 内只做增量变更（[README](crates/app-contract/README.md)）。最新版本 1.6.0 已发布到 crates.io（[crates.io 上的版本](crates/app-contract/README.md#versions-on-cratesio)，英文）。 |
 | `crates/app-policy` | 签名清单与商店信息、准入，以及解析为隔离环境设置和 Agent 会话配置（[OctoSense Home ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0002-agentic-app-security-model.md)）；应用自带的 Agent（`tools.json`、`AGENT.md`、技能）加载为 `AgentBundle`；原生模块的工具清单共用同一套 `tools.json` 解析与检查（`ToolManifest::load`）。它还重新导出应用契约。 |
 | `crates/app-hub` | 索引、签名目录、准入检查、Agent 扫描、设备端客户端和 `hub` 命令（[OctoSense Home ADR 0003](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0003-app-hub-and-store.md)）。 |
 | `crates/appstore` | 作为 OctoSense 模块的商店；把已安装应用作为独立客户端运行的 `card` 模块；系统应用（`os.` 前缀 id）；以及宿主服务及其面板。 |
@@ -74,15 +77,17 @@ OCTOSENSE_PREVIEW_SIZE=1200x860 OCTOSENSE_APP_DATA="$(mktemp -d)" target/release
 
 ## 宿主目前提供什么
 
-准入检查接受 103 个能力名称，但只有宿主提供了对应的服务，能力才会生效。[能力](docs/PUBLISHING.zh-CN.md#能力)一节列出了每项能力目前由谁提供。
+准入检查接受 104 个能力名称，但只有宿主提供了对应的服务，能力才会生效。[能力](docs/PUBLISHING.zh-CN.md#能力)一节列出了每项能力目前由谁提供。
 
-- `card-host` 不提供任何宿主服务，也不运行 Agent。
+- 除了用于发现宿主 API 的 `runtime`，`card-host` 不提供任何宿主服务，也不运行 Agent。
 - OctoSense 向每个获得授权的应用提供 `mail`、`model` 和 `glance`。
 - 宿主配置好 OAuth 客户端注册信息后，OctoSense 桌面版 0.1.0-beta.2 提供已连接账户相关的能力（`auth`、`github`、`gcalendar`、`gmail`）。令牌留在宿主中，应用只拿到连接句柄。
-- OctoSense `main`（尚未进入任何发布版本）还能通过 `auth` 让应用登录它自己的后端，前提是设备的运维人员登记了这个后端（[登录应用自己的后端](docs/PUBLISHING.zh-CN.md#登录自己的后端)）。
+- [OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360) 的实现（`feat/host-api-contract`，尚未发布）能在 macOS 和 Android 上通过 `auth` 让应用登录清单声明的后端，并执行清单列出的后端操作。每次写操作都要等用户确认（[登录应用自己的后端](docs/PUBLISHING.zh-CN.md#登录自己的后端)）。
+- 该 PR 还在 macOS 和 Android 上向声明了 `host-api-v1` 和相应能力的应用提供设备权限方法：`camera.permission.*`、`microphone.permission.*` 和 `location.permission.*`，各含 `status`、`request` 和 `revoke`。在 Android 上，它还提供 `location.get`。只有在前台的应用才能请求权限，并由用户在宿主面板上批准，如果操作系统要求，还要在系统提示中确认（[宿主 API 兼容性](docs/HOST-API.zh-CN.md)）。
 - OctoSense `main` 还要求亲手点按才能批准 GitHub 或 Google 日历的保存，拒绝应用 Agent 发布可执行 Splash（`script`）卡片，并且只保留从 30 天前到 366 天后的 Google 日历日程（尚未进入任何发布版本）。OctoSense 桌面版 0.1.0-beta.2 不具备其中任何一项。
 - OctoSense 只向自己的系统应用提供 `calendar`、`llm` 和 `news`。对于 `photos` 和 `youtube`，它只向 `os.photos` 和 `os.youtube` 提供一个 `notify` 方法。尚未提供：面向商店应用的媒体服务。
-- OctoSense 运行应用 Agent 已获授权的 `implemented_by: "host-service"` 工具，包括用 `host_method` 映射到已审核共享服务的工具。它还把 `AGENT.md` 和技能作为指引加载，但拒绝运行 `implemented_by: "app"` 的工具（[应用的 Agent 与工具](docs/PUBLISHING.zh-CN.md#应用的-agent-与工具)）。
+- OctoSense 运行应用 Agent 已获授权的 `implemented_by: "host-service"` 工具，包括用 `host_method` 映射到已审核共享服务的工具，并把 `AGENT.md` 和技能作为指引加载（[应用的 Agent 与工具](docs/PUBLISHING.zh-CN.md#应用的-agent-与工具)）。
+- 目前还没有任何 OctoSense 发布版本运行 `implemented_by: "app"` 的工具：桌面版 0.1.0-beta.2 会拒绝它们，返回 `app_tool_unavailable`。PR #360 的实现提供 `app_tools.dispatch@1`，会在已打开的应用中运行这类工具，前提是应用声明了 `requires: ["script-tools-v1"]`；应用关闭时返回 `app_not_running`（[脚本工具执行](docs/PUBLISHING.zh-CN.md#脚本工具执行script-tools-v1)）。
 
 ## 信任锚
 

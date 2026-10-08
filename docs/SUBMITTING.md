@@ -65,20 +65,23 @@ revision ([step 6](#6-freeze-and-verify-the-release)).
 
 | Host | Runs | Does not |
 | --- | --- | --- |
-| `card-host` | One unsigned bundle, with a remote bridge to drive and capture it | Serve any host service. Every `host.request` fails with `no service answers "<family>" on this device`. It also refuses signed bundles. |
+| `card-host` | One unsigned bundle, with a remote bridge to drive and capture it | Serve any host service except `runtime` discovery: every other `host.request` fails with `no service answers "<family>" on this device`. It also refuses signed bundles and apps that require `host-api-v1`, `backend-api-v1` or `script-tools-v1`. |
 | desktop-v0.1.0-beta.2 (macOS, Apple silicon) | Installed apps, including apps that use `auth`, `github`, `gmail` and `gcalendar` | Sign in to GitHub or Google until the host has an OAuth registration in `oauth/clients.json` ([setup](https://github.com/OctoSense-org/OctoSense/blob/desktop-v0.1.0-beta.2/crates/oauth-service/README.md)); the release ships none. Sign an app in to its own backend. Unverified on this release: live provider sign-in. |
 | desktop-v0.1.0-beta.1 and home-v0.1.0-beta.1 (the only released phone build) | Store apps that use only capabilities their older app contract knows | Install an app that requests `auth`, `github`, `gmail`, `gcalendar`, `calendar`, `photos`, `youtube` or `palpo.*`. Their stores refuse it, for example with `unknown capability "auth"`. |
 
-OctoSense `main` differs from desktop-v0.1.0-beta.2 in these ways, and no
-release has them yet.
+OctoSense `main` and the separately identified PR #360 implementation differ
+from desktop-v0.1.0-beta.2 in these ways; no release has these changes yet.
 
 - A distributor can compile GitHub and Google registrations into its build. A
   build you make from source has no registrations until you add them, for
   example in `oauth/clients.json`
   ([Connected accounts](PUBLISHING.md#connected-accounts)).
-- An app can sign in to its own backend once the device's operator registers
-  that backend
+- In [OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360)
+  (`feat/host-api-contract`) on macOS and Android, an app can sign in to the backend that its manifest
+  declares and call the backend operations the manifest names
   ([Sign in to your own backend](PUBLISHING.md#sign-in-to-your-own-backend)).
+- In the same PR, an app that declares `host-api-v1` gets the device-permission methods on
+  macOS and Android ([Host API compatibility](HOST-API.md)).
 - Approving a GitHub or Google Calendar save takes a physical press on the
   host's confirmation sheet, as approving a Gmail send does on both builds.
 - An app agent's `glance.publish` refuses executable Splash (`script`) and L1
@@ -696,7 +699,7 @@ cannot read gets no report, only one `hub: …` line. The full rules are in
 | `hub: manifest is not valid: unknown field …`, with no report | `hub stamp` and `hub check` cannot parse the manifest. | Remove or rename the field. The message lists the valid ones. |
 | `contents: <file> has extension "…", which a bundle may not hold` | `.DS_Store`, `LICENSE` or another file without an allowed extension. | Delete it or move it out of `bundle/`. |
 | `contents-invalid (<file>): cannot decode the image: …` | A corrupt image, another format renamed to `.png` or an image over 4096 pixels a side. | Capture or export it again. |
-| `resource-invalid (…/font_src): not a portable bundle path: "makepad_widgets:resources/…"` | A card kit names a built-in font other than `makepad_widgets:resources/Inter.ttf`, such as the CJK font ([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). | Use `makepad_widgets:resources/Inter.ttf` for Latin text. For Chinese, build the card from the role kit and set no `font_src` ([Fonts](PUBLISHING.md#fonts)). A bundled font passes the gate but does not load in a card. |
+| `resource-invalid (…/font_src): not a portable bundle path: "makepad_widgets:resources/…"` | A card kit names a built-in font other than `makepad_widgets:resources/Inter.ttf`, such as the CJK font ([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). | Use `makepad_widgets:resources/Inter.ttf` for Latin text. For other text, such as Chinese, bundle a `.ttf` or `.otf`, a subset if the font is large, and name it with a bundle-relative path, such as `"font_src": "assets/Body.ttf"`. OctoSense desktop 0.1.0-beta.2 does not load a bundled font; there, use the role kit and set no `font_src` ([Fonts](PUBLISHING.md#fonts)). |
 | `assets: <file> contains https://…`, or `assets: main.splash reaches <host>, which the manifest does not declare in network.hosts` | A URL in a bundled `.txt`, `.md`, `.json` or `.card` file, such as a license, or a script host missing from `network.hosts`. | Move the file out of `bundle/` or drop the URL. Declare each script host in `network.hosts` and request `net`. |
 | `identity: … is under os.`, or `identity: app id "…" ends in "…", which is reserved` | The id is under `os.`, or the id or its last segment is one of `agents` `apphub` `appcard` `browser` `calculator` `card` `clock` `dev` `notes` `octos` `octoscode` `os` `reference` `reminders` `rinx` `sheets` `shell` `system` `task` `terminal` `toolbox` `weather` `workflow`. | Choose another id before your first release. |
 | `listing: listing has more than 10 keywords`, `… more than 8 screenshots` or `listing platform "…" is not one of […]` | The listing breaks a limit or misspells a name. | Trim the list, or use a name from the message. |
@@ -711,14 +714,14 @@ cannot read gets no report, only one `hub: …` line. The full rules are in
 
 | You want | Status | Instead |
 | --- | --- | --- |
-| Sign in to your own backend | Only on OctoSense `main`, not yet in any release, and only on devices whose operator registered your backend; a bundle cannot register it ([#16](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/16)). The app gets the person's verified identity, not a session for your backend's other APIs ([Sign in to your own backend](PUBLISHING.md#sign-in-to-your-own-backend)). | To identify the person, use identity-only sign-in: `auth` with GitHub's `read:user`, or Google's `openid`, `email` and `profile`. For provider data, add `github`, `gmail` or `gcalendar`. |
+| Sign in to your own backend | In [OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360), not yet released, on macOS and Android. Declare the backend in the manifest; the app then calls only the backend operations it declares, and each write waits for the person's review on the host ([Sign in to your own backend](PUBLISHING.md#sign-in-to-your-own-backend)). | On a released build, identify the person with identity-only sign-in: `auth` with GitHub's `read:user`, or Google's `openid`, `email` and `profile`. For provider data, add `github`, `gmail` or `gcalendar`. |
 | Keep an API key or token in the app | Not supported. The gate refuses only password and one-time-code fields, so it does not catch a key typed into a plain field or kept in storage. | Ship no keys. For text generation, use `model`, which calls the person's own AI provider. |
 | Generate images, audio, video or embeddings | Not yet. `model` serves only `model.complete` and `model.budget`. `model.image`, `model.audio`, `model.video` and `model.embeddings` are unknown capabilities ([#85](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/85)–[#88](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/88)). | Use `model.complete` for text. |
 | Use `llm`, `news`, `calendar`, `prompt`, `ledger.read`, `clipboard` or `palpo.*` | The gate admits them, but no host serves them to a store app. `llm` and `news` answer only `os.*` apps, and `calendar` only `os.calendar`. Nothing acts on the others. | Do not request them. For Google Calendar, use `gcalendar`. |
-| Ship tools that run your app's own logic | Not supported. OctoSense refuses `implemented_by: "app"` tools with `app_tool_unavailable`. A `host-service` tool without `host_method` calls the service named by your app's namespace, which is not a capability, so the call fails with `not_granted`. The gate admits both. | Map each tool with `host_method` to a method of `github`, `gcalendar`, `gmail` or `glance`; OctoSense runs those ([Map a tool to a shared service](PUBLISHING.md#map-a-tool-to-a-shared-service-host_method)). |
+| Run your app's own logic in agent tools | Not in any release. The PR #360 implementation runs `implemented_by: "app"` tools while the full app is open; a closed app answers `app_not_running`. OctoSense desktop 0.1.0-beta.2 refuses these tools with `app_tool_unavailable`. A `host-service` tool without `host_method` calls the service named by your app's namespace, which is not a capability, so the call fails with `not_granted`. | To reach a shared service, map the tool with `host_method` to a method of `github`, `gcalendar`, `gmail` or `glance` ([Map a tool to a shared service](PUBLISHING.md#map-a-tool-to-a-shared-service-host_method)). For your own logic, declare `requires: ["script-tools-v1"]` and implement the `app_tool` hook ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)). Test it in the `feat/host-api-contract` implementation linked above. |
 | Submit a system app (`os.*`) or a native app | No route here. System apps ship with the shells, and native code needs a shell release ([delivery paths](DEVELOPMENT.md#choose-a-delivery-path)). | Build a store app with an id of your own. |
 | Install an `auth` app on a phone | No released phone build can. | Test on desktop-v0.1.0-beta.2. |
-| Name Makepad's built-in CJK font in a card kit | Not yet ([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). A bundled font passes the gate but does not load in a card. | Build the card from the role kit and set no `font_src`: the role kit draws Chinese with the built-in CJK face ([Fonts](PUBLISHING.md#fonts)). Unverified: how the OctoSense shells draw it. |
+| Name Makepad's built-in CJK font in a card kit | Not yet ([#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)). | Bundle a `.ttf` or `.otf` and name it with a bundle-relative `font_src` ([Fonts](PUBLISHING.md#fonts)). A host built with Makepad's International font set, such as `card-host`, also draws Chinese with a built-in CJK fallback. OctoSense desktop 0.1.0-beta.2 loads no bundled font; on that release, build the card from the role kit and set no `font_src`. Unverified: how the OctoSense shells draw Chinese. |
 
 Design Flow's
 [HOST-SERVICES.md](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md)

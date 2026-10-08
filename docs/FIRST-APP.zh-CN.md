@@ -102,7 +102,7 @@ my-app/
 - 引用应用包自带的素材时，使用 `{{assets}}`，例如 `Image{src: http_resource("{{assets}}/assets/logo.png")}`。宿主会把 `{{assets}}` 替换为一个本地回环地址，这个地址只提供本应用包的内容。不要自己写这个地址，也不要写 `file://` 路径或 `../` 路径。
 - `main.splash` 中的 `https://` 地址只能指向清单的 `network.hosts` 中列出的主机；应用请求了 `images` 或 `web` 时不受此限。准入检查拒绝 `http://`。
 - 不要让用户输入密码、PIN 或一次性验证码。准入检查会拒绝这类输入框，即使到了运行时，它们也不接受输入。登录由宿主服务负责，它在自己的面板上收集这些机密信息。面板是宿主覆盖在应用之上绘制的界面（详见[面板](PUBLISHING.zh-CN.md#面板应用从不收集机密信息)）。
-- `card-host` 不提供任何宿主服务：每个 `host.request` 都只会得到 `no service answers "<family>" on this device`。用到宿主服务的界面，请在 OctoSense 桌面版 0.1.0-beta.2 中测试（[开始之前](SUBMITTING.zh-CN.md#开始之前)）。
+- 除了用于发现宿主 API 的 `runtime`，`card-host` 不提供任何宿主服务：其他 `host.request` 都只会得到 `no service answers "<family>" on this device`。用到宿主服务的界面，请在 OctoSense 桌面版 0.1.0-beta.2 中测试（[开始之前](SUBMITTING.zh-CN.md#开始之前)）。
 
 ### 卡片应用
 
@@ -123,7 +123,7 @@ my-app/
       01-main.png        # 真实截图，在第 4 节添加
 ```
 
-卡片的 `font_src`，准入检查只接受应用包中的字体文件或内置的 `makepad_widgets:resources/Inter.ttf`，但打包的字体目前在卡片中不会加载。设置字体或显示中文之前，请先阅读[字体](PUBLISHING.zh-CN.md#字体)。
+卡片的 `font_src`，准入检查只接受应用包中的字体文件或内置的 `makepad_widgets:resources/Inter.ttf`。OctoSense 桌面版 0.1.0-beta.2 不加载打包字体。设置字体或显示中文之前，请先阅读[字体](PUBLISHING.zh-CN.md#字体)。
 
 ### 两类应用都适用
 
@@ -257,7 +257,7 @@ hub: the bundle was refused
 | --- | --- |
 | `cargo build` 停止并报 `no variant … TextInputStateQuery` | 见 [`card-host` 构建失败](DEVELOPMENT.zh-CN.md#card-host-构建失败)。 |
 | `card-host: refused: no signature verifier is installed, so the signature from key "<id>" cannot be checked` | 应用包已签名。运行未签名的副本。 |
-| `no service answers "<family>" on this device` | `card-host` 不提供任何宿主服务。在 OctoSense 桌面版 0.1.0-beta.2 中测试这个界面。 |
+| `no service answers "<family>" on this device` | 除了用于发现宿主 API 的 `runtime`，`card-host` 不提供任何宿主服务。在 OctoSense 桌面版 0.1.0-beta.2 中测试这个界面。 |
 | 请求 `/g?raw=1` 时报 `curl: (22) The requested URL returned error: 404` | 还没有绘制出任何一帧。等几秒再截取一次。 |
 | `[refused] identity: app id "…" ends in "…", which is reserved` | ID 的最后一段是[保留名称](PUBLISHING.zh-CN.md#id-与保留名称)。在首次发布之前换一个 ID。 |
 | `[refused] digest: the bundle hashes to …, the manifest claims …` | 应用包在 `hub stamp` 之后有改动。重新写入摘要。 |

@@ -45,14 +45,15 @@ hub
 
 | 宿主 | 能运行 | 不能 |
 | --- | --- | --- |
-| `card-host` | 单个未签名的应用包，并提供远程控制接口，用于驱动和截图 | 提供任何宿主服务。每个 `host.request` 都会失败，返回 `no service answers "<family>" on this device`。它也拒绝已签名的应用包。 |
+| `card-host` | 单个未签名的应用包，并提供远程控制接口，用于驱动和截图 | 提供用于发现宿主 API 的 `runtime` 以外的任何宿主服务：其他每个 `host.request` 都会失败，返回 `no service answers "<family>" on this device`。它也拒绝已签名的应用包，以及要求 `host-api-v1`、`backend-api-v1` 或 `script-tools-v1` 的应用。 |
 | desktop-v0.1.0-beta.2（macOS，Apple 芯片） | 已安装的应用，包括使用 `auth`、`github`、`gmail` 和 `gcalendar` 的应用 | 在宿主的 `oauth/clients.json` 中配好 OAuth 注册之前，登录 GitHub 或 Google（[配置方法](https://github.com/OctoSense-org/OctoSense/blob/desktop-v0.1.0-beta.2/crates/oauth-service/README.md)）；该发布版不附带任何注册信息。让应用登录它自己的后端。未在该发布版上验证：真实的提供商登录。 |
 | desktop-v0.1.0-beta.1 和 home-v0.1.0-beta.1（目前唯一发布的手机版本） | 所用能力都在旧版应用契约之内的商店应用 | 安装请求 `auth`、`github`、`gmail`、`gcalendar`、`calendar`、`photos`、`youtube` 或 `palpo.*` 的应用。它们的商店会拒绝这类应用，例如报 `unknown capability "auth"`。 |
 
-OctoSense `main` 与 desktop-v0.1.0-beta.2 有以下不同，这些改动尚未进入任何发布版。
+OctoSense `main` 以及下文单独标明的 PR #360 实现，与 desktop-v0.1.0-beta.2 有以下不同；这些改动尚未进入任何发布版。
 
 - 发行方可以在构建时编入 GitHub 和 Google 注册信息。你自己从源码构建的版本不带注册信息，需要自行添加，例如写入 `oauth/clients.json`（见发布参考的[已连接账户](PUBLISHING.zh-CN.md#已连接账户)一节）。
-- 设备的运维人员登记了应用自己的后端之后，应用就可以登录这个后端（见发布参考的[登录自己的后端](PUBLISHING.zh-CN.md#登录自己的后端)一节）。
+- 在 [OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360)（`feat/host-api-contract`）的 macOS 和 Android 实现中，应用可以登录清单声明的后端，并调用清单列出的后端操作（见发布参考的[登录自己的后端](PUBLISHING.zh-CN.md#登录自己的后端)一节）。
+- 在同一个 PR 中，声明了 `host-api-v1` 的应用可以在 macOS 和 Android 上使用设备权限方法（见[宿主 API 兼容性](HOST-API.zh-CN.md)）。
 - 批准 GitHub 或 Google 日历的保存时，须在宿主的确认面板上亲手点按；批准 Gmail 发送在两个版本上都有这个要求。
 - 应用 Agent 调用 `glance.publish` 时，宿主拒绝可执行的 Splash（`script`）和 L1 卡片源码。
 - 宿主只保留从 30 天前到 366 天后的 Google 日历日程，而不是日历的全部历史。
@@ -452,7 +453,7 @@ mkdir -p build review
 | `hub: manifest is not valid: unknown field …`，没有报告 | `hub stamp` 和 `hub check` 无法解析清单。 | 删除该字段，或改用正确的字段名。消息中列出了合法字段。 |
 | `contents: <file> has extension "…", which a bundle may not hold` | `.DS_Store`、`LICENSE`，或其他扩展名不在允许范围内的文件。 | 删除它，或移出 `bundle/`。 |
 | `contents-invalid (<file>): cannot decode the image: …` | 图片损坏、其他格式改名成了 `.png`，或者单边超过 4096 像素。 | 重新截图或导出。 |
-| `resource-invalid (…/font_src): not a portable bundle path: "makepad_widgets:resources/…"` | 卡片 kit 引用了 `makepad_widgets:resources/Inter.ttf` 以外的内置字体，例如内置的 CJK 字体（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。 | 拉丁文字用 `makepad_widgets:resources/Inter.ttf`。中文请改用角色 kit 组合卡片，并且不设 `font_src`（见发布参考的[字体](PUBLISHING.zh-CN.md#字体)一节）。打包的字体能通过准入检查，但在卡片中不会加载。 |
+| `resource-invalid (…/font_src): not a portable bundle path: "makepad_widgets:resources/…"` | 卡片 kit 引用了 `makepad_widgets:resources/Inter.ttf` 以外的内置字体，例如内置的 CJK 字体（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。 | 拉丁文字用 `makepad_widgets:resources/Inter.ttf`。中文等其他文字，请在应用包中附带 `.ttf` 或 `.otf` 文件（字体较大时只打包所需的子集），并用相对路径引用，例如 `"font_src": "assets/Body.ttf"`。OctoSense 桌面版 0.1.0-beta.2 不加载打包的字体，在该版本上请改用角色 kit，并且不设 `font_src`（见发布参考的[字体](PUBLISHING.zh-CN.md#字体)一节）。 |
 | `assets: <file> contains https://…`，或 `assets: main.splash reaches <host>, which the manifest does not declare in network.hosts` | 应用包中的 `.txt`、`.md`、`.json` 或 `.card` 文件（例如许可证）含有 URL，或者脚本访问的主机没有列在 `network.hosts` 中。 | 把文件移出 `bundle/`，或删掉 URL。在 `network.hosts` 中声明脚本访问的每个主机，并请求 `net`。 |
 | `identity: … is under os.`，或 `identity: app id "…" ends in "…", which is reserved` | ID 以 `os.` 开头，或者 ID 本身或其最后一段是以下名称之一：`agents` `apphub` `appcard` `browser` `calculator` `card` `clock` `dev` `notes` `octos` `octoscode` `os` `reference` `reminders` `rinx` `sheets` `shell` `system` `task` `terminal` `toolbox` `weather` `workflow`。 | 在首次发布之前换一个 ID。 |
 | `listing: listing has more than 10 keywords`、`… more than 8 screenshots` 或 `listing platform "…" is not one of […]` | 商店信息超出上限，或名称拼错。 | 精简列表，或使用消息中给出的名称。 |
@@ -467,13 +468,13 @@ mkdir -p build review
 
 | 需求 | 现状 | 替代做法 |
 | --- | --- | --- |
-| 登录你自己的后端 | 只有 OctoSense `main` 支持，尚未进入任何发布版；而且只在设备运维人员登记了你的后端的设备上可用，应用包无法自行登记（[#16](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/16)）。应用拿到的是用户经过验证的身份，而不是可用来调用你后端其他 API 的会话（见发布参考的[登录自己的后端](PUBLISHING.zh-CN.md#登录自己的后端)一节）。 | 只需识别用户身份时，使用只验证身份的登录：`auth` 搭配 GitHub 的 `read:user`，或 Google 的 `openid`、`email` 和 `profile`。需要提供商数据时，再加上 `github`、`gmail` 或 `gcalendar`。 |
+| 登录你自己的后端 | 由 [OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360) 的 macOS 和 Android 实现提供，尚未发布。在清单中声明后端之后，应用只能调用自己声明的后端操作，每次写操作都要等用户在宿主上确认（见发布参考的[登录自己的后端](PUBLISHING.zh-CN.md#登录自己的后端)一节）。 | 在已发布的版本上，用只验证身份的登录来识别用户：`auth` 搭配 GitHub 的 `read:user`，或 Google 的 `openid`、`email` 和 `profile`。需要提供商数据时，再加上 `github`、`gmail` 或 `gcalendar`。 |
 | 在应用中保存 API 密钥或令牌 | 不支持。准入检查只拒绝密码和一次性验证码字段，因此发现不了输入到普通字段或存放在存储中的密钥。 | 不要附带任何密钥。生成文本请用 `model`，它调用的是用户自己的 AI 提供商。 |
 | 生成图片、音频、视频或向量嵌入 | 尚不支持。`model` 只提供 `model.complete` 和 `model.budget`；`model.image`、`model.audio`、`model.video` 和 `model.embeddings` 都是未知能力（[#85](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/85)–[#88](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/88)）。 | 用 `model.complete` 生成文本。 |
 | 使用 `llm`、`news`、`calendar`、`prompt`、`ledger.read`、`clipboard` 或 `palpo.*` | 准入检查接受它们，但没有宿主向商店应用提供这些服务。`llm` 和 `news` 只响应 `os.*` 应用，`calendar` 只响应 `os.calendar`，其余的没有任何宿主处理。 | 不要请求它们。访问 Google 日历请用 `gcalendar`。 |
-| 附带运行应用自身逻辑的工具 | 不支持。OctoSense 拒绝 `implemented_by: "app"` 的工具，返回 `app_tool_unavailable`。没有 `host_method` 的 `host-service` 工具会调用以应用的命名空间命名的服务，而命名空间不是能力，所以调用失败，返回 `not_granted`。准入检查接受这两种工具。 | 用 `host_method` 把每个工具映射到 `github`、`gcalendar`、`gmail` 或 `glance` 的某个方法，OctoSense 会运行这样的工具（见发布参考的[把工具映射到共享服务](PUBLISHING.zh-CN.md#把工具映射到共享服务host_method)一节）。 |
+| 用 Agent 工具运行应用自身的逻辑 | 尚未进入任何发布版。PR #360 的实现会在完整应用打开期间运行 `implemented_by: "app"` 的工具；应用关闭时返回 `app_not_running`。OctoSense 桌面版 0.1.0-beta.2 拒绝这类工具，返回 `app_tool_unavailable`。没有 `host_method` 的 `host-service` 工具会调用以应用的命名空间命名的服务，而命名空间不是能力，所以调用失败，返回 `not_granted`。 | 要调用共享服务，用 `host_method` 把工具映射到 `github`、`gcalendar`、`gmail` 或 `glance` 的某个方法（见发布参考的[把工具映射到共享服务](PUBLISHING.zh-CN.md#把工具映射到共享服务host_method)一节）。要运行应用自身的逻辑，在清单中声明 `requires: ["script-tools-v1"]`，并实现 `app_tool` 钩子（见发布参考的[脚本工具执行](PUBLISHING.zh-CN.md#脚本工具执行script-tools-v1)一节）。请在上文链接的 `feat/host-api-contract` 实现分支上测试。 |
 | 提交系统应用（`os.*`）或原生应用 | 这里没有提交途径。系统应用随 Shell 一起发布，原生代码需要随 Shell 新版本发布（[交付路径](DEVELOPMENT.zh-CN.md#选择合适的交付路径)）。 | 用自己的 ID 做一个商店应用。 |
 | 在手机上安装 `auth` 应用 | 目前没有任何已发布的手机版本能做到。 | 在 desktop-v0.1.0-beta.2 上测试。 |
-| 在卡片 kit 中引用 Makepad 内置的 CJK 字体 | 尚不支持（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。打包的字体能通过准入检查，但在卡片中不会加载。 | 用角色 kit 组合卡片，并且不设 `font_src`：角色 kit 会用内置的 CJK 字体显示中文（见发布参考的[字体](PUBLISHING.zh-CN.md#字体)一节）。未验证：OctoSense Shell 中的显示效果。 |
+| 在卡片 kit 中引用 Makepad 内置的 CJK 字体 | 尚不支持（[#75](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/75)）。 | 在应用包中附带 `.ttf` 或 `.otf`，并用相对路径的 `font_src` 引用（见发布参考的[字体](PUBLISHING.zh-CN.md#字体)一节）。用 Makepad 的 International 字体集构建的宿主（例如 `card-host`）还会用内置的 CJK 后备字体显示中文。OctoSense 桌面版 0.1.0-beta.2 不加载打包的字体；在该版本上，请用角色 kit 组合卡片，并且不设 `font_src`。未验证：OctoSense Shell 中的中文显示效果。 |
 
 哪个 Shell 提供哪项宿主服务，见 Design Flow 的 [HOST-SERVICES.zh-CN.md](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。

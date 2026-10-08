@@ -22,7 +22,12 @@ use octosense_app_policy::HostLimits;
 use std::path::PathBuf;
 
 pub mod cardapp;
+pub mod card_assets;
+pub mod host_api;
 pub mod services;
+pub mod script_tools;
+mod script_tools_json;
+mod tool_schema;
 pub mod source;
 pub mod system;
 pub mod ui;
@@ -188,7 +193,7 @@ impl AppStoreView {
         // overrides it for development.
         self.app_data_root = data_root(cx);
         let anchor = std::env::var("OCTOSENSE_HUB_ANCHOR").unwrap_or_else(|_| DEFAULT_ANCHOR.to_string());
-        let mut store = Store::new(&anchor, &self.app_data_root, HostLimits::default());
+        let mut store = Store::new(&anchor, &self.app_data_root, HostLimits::default()).with_host_api_versions(crate::host_api::available_versions());
 
         // A hub override on disk (`<data dir>/hub.txt`, a path or a base URL)
         // wins over the built-in hub: how a device with no route to the
@@ -376,6 +381,10 @@ impl AppStoreView {
         };
         let splash = self.view.splash(cx, ids!(card));
         let applied = octosense_app_policy::splash_adapter::apply(&splash, cx, &settings);
+        if let Err(error) = apply_device_consent(cx, &bundle, &splash) {
+            self.status = format!("Cannot apply app permissions: {error}");
+            return self.refresh(cx);
+        }
         match card_source(&bundle, &origin) {
             Ok(code) => {
                 splash.set_text(cx, &code);
@@ -417,6 +426,7 @@ pub(crate) fn register_card_vocabulary() {
     fn kit(vm: &mut ScriptVm) {
         octoscript_widgets::kit::script_mod(vm);
     }
+    makepad_widgets::widget_async::register_splash_isolate_mod(crate::script_tools::script_mod);
     makepad_widgets::widget_async::register_splash_isolate_mod(design);
     makepad_widgets::widget_async::register_splash_isolate_mod(kit);
     // `sys`: places, routes, weather and the other live-data helpers a
@@ -425,6 +435,29 @@ pub(crate) fn register_card_vocabulary() {
     // `agent.notify`, which an app under a policy may call only with the
     // `agent` grant.
     makepad_widgets::widget_async::register_splash_isolate_mod(makepad_widgets::splash::register_agent_module);
+}
+
+/// Inventory for the patched runtime's policy ABI, independent of which
+/// device services a shell registers. Plain Makepad must not advertise it.
+pub fn register_policy_runtime_features() {
+    #[cfg(feature = "text-input-state-query")]
+    crate::host_api::register_runtime_feature("app_policy.device_consent", 1);
+}
+
+/// Apply the host-only device consent marker before untrusted source runs.
+/// Plain Makepad hosts cannot advertise OctoSense's permission boundary.
+pub fn apply_device_consent(cx: &mut Cx, bundle: &std::path::Path, splash: &SplashRef) -> Result<(), String> {
+    let text = std::fs::read_to_string(bundle.join("manifest.json")).map_err(|error| error.to_string())?;
+    let manifest = octosense_app_policy::AppManifest::parse(&text)?;
+    let required = manifest.requires.iter().any(|feature| feature == "host-api-v1");
+    #[cfg(feature = "text-input-state-query")]
+    splash.set_device_consent(cx, required);
+    #[cfg(not(feature = "text-input-state-query"))]
+    {
+        let _ = (cx, splash);
+        if required { return Err("This standalone build does not implement the host-api-v1 device permission broker".into()); }
+    }
+    Ok(())
 }
 
 /// Lower a bundle to isolate source. Nothing outside the bundle is read. A
@@ -437,7 +470,7 @@ pub(crate) fn card_source(bundle: &std::path::Path, asset_origin: &str) -> Resul
     let data_text = std::fs::read_to_string(bundle.join("page.data.json")).unwrap_or_else(|_| "{}".into());
     let mut data: serde_json::Value = serde_json::from_str(&data_text).map_err(|e| format!("page.data.json: {e}"))?;
     octosense_app_policy::rewrite_assets(&mut data, asset_origin);
-    let prepared = octoscript_makepad::l0::prepare(&card, &data, &bundle.join("kit"))?;
+    let prepared = card_assets::prepare(&card, &data, bundle, asset_origin)?;
     let ui = octoscript_makepad::design::to_makepad_ui(&prepared.tree)?;
     Ok(format!("width:Fill height:Fill flow:Overlay {ui}"))
 }
@@ -553,6 +586,7 @@ impl AppModule for AppStoreModule {
         OpenSchema::new(1).arg("app", OpenArgKind::Text, false)
     }
     fn register(&self, vm: &mut ScriptVm) {
+        register_policy_runtime_features();
         octoscript_widgets::design::script_mod(vm);
         octoscript_widgets::kit::script_mod(vm);
         script_mod(vm);
@@ -616,6 +650,16 @@ mod card_vocabulary_tests {
         });
         cx.free_splash_vm(card);
         errors
+    }
+
+    #[test]
+    fn policy_abi_is_advertised_only_by_the_patched_runner() {
+        register_policy_runtime_features();
+        let versions = crate::host_api::available_versions();
+        #[cfg(feature = "text-input-state-query")]
+        assert_eq!(versions.get("app_policy.device_consent"),Some(&1));
+        #[cfg(not(feature = "text-input-state-query"))]
+        assert!(!versions.contains_key("app_policy.device_consent"));
     }
 
     #[test]

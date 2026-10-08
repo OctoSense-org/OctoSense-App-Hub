@@ -28,7 +28,7 @@ pub const SCHEMA_MINOR: u32 = 0;
 /// build honours. Empty in `1.0.0`: every feature added in `1.x` that
 /// restricts or changes what an app gets is added here, with the field
 /// that carries it, in the same release.
-pub const KNOWN_FEATURES: &[&str] = &["palpo-admin-v1"];
+pub const KNOWN_FEATURES: &[&str] = &["palpo-admin-v1", "host-api-v1", "backend-api-v1", "script-tools-v1"];
 
 /// Parse a manifest: [`AppManifest::parse`].
 pub fn parse(json: &str) -> Result<AppManifest, String> {
@@ -39,6 +39,8 @@ pub fn parse(json: &str) -> Result<AppManifest, String> {
 /// capability that is not here cannot be granted, so adding one is a change
 /// to this file and to the service that enforces it, together.
 pub const KNOWN_CAPABILITIES: &[&str] = &[
+    // Read implemented API descriptions; this does not grant their capabilities.
+    "runtime",
     // Read and write inside the app's own storage jail.
     "storage",
     // Make requests, but only to the hosts in `network.hosts`.
@@ -257,6 +259,12 @@ pub struct AppManifest {
     /// manifest written before it existed signs exactly as it did.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub research: Option<ResearchScope>,
+    /// Required and optional API ABI versions, checked again by the running host.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_api: Option<crate::host_api::HostApiRequirements>,
+    /// Public developer backend registration. Tokens remain host-owned.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backend: Option<crate::backend::BackendRegistration>,
     /// Features added in `1.x` that this manifest needs a host to honour,
     /// because they restrict or change what the app gets. A host that does
     /// not know one ([`KNOWN_FEATURES`]) refuses the app rather than run it
@@ -644,12 +652,39 @@ impl AppManifest {
     /// running it would give the app less containment, or something other,
     /// than its author declared.
     pub fn check_requires(&self) -> Result<(), String> {
+        if let Some(api) = &self.host_api {
+            if !self.requires.iter().any(|f| f == "host-api-v1") {
+                return Err("host_api requires host-api-v1".into());
+            }
+            api.validate()?;
+        }
+        if let Some(backend) = &self.backend {
+            if !self.requires.iter().any(|f| f == "backend-api-v1") {
+                return Err("backend requires backend-api-v1".into());
+            }
+            if !self.capabilities.iter().any(|c| c == "auth") || !self.storage.accounts {
+                return Err("backend requires auth and storage.accounts".into());
+            }
+            backend.validate()?;
+        }
         let unknown: Vec<&str> =
             self.requires.iter().map(String::as_str).filter(|feature| !KNOWN_FEATURES.contains(feature)).collect();
         if unknown.is_empty() {
             return Ok(());
         }
         Err(format!("app {} needs a newer host: {}", self.id, unknown.join(", ")))
+    }
+
+    /// Device-side compatibility. Admission validates declarations separately;
+    /// installers and runners must supply their actual implemented API versions.
+    pub fn check_host_apis(&self, available: &BTreeMap<String, u32>) -> Result<(), String> {
+        if let Some(api) = &self.host_api { api.check_available(available)?; }
+        for (feature, method) in [("host-api-v1", "app_policy.device_consent"), ("backend-api-v1", "auth.backend.request"), ("script-tools-v1", "app_tools.dispatch")] {
+            if self.requires.iter().any(|f| f == feature) && available.get(method) != Some(&1) {
+                return Err(format!("app {} needs a host implementing {method}@1", self.id));
+            }
+        }
+        Ok(())
     }
 
     /// The research scope as the host grants it (normalised), for the words

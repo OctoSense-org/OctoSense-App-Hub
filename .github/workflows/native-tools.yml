@@ -82,3 +82,6 @@ jobs:
           cargo test --locked --release -p octosense-appstore --no-default-features --lib
           cargo test --locked --release -p octosense-app-hub-app --no-default-features --lib
           cargo test --locked --release -p octosense-card-host --bin card-host
+      - name: Native bundled-font path with system fallback disabled
+        working-directory: app-hub
+        run: python3 crates/card-host/tests/native_fonts.py

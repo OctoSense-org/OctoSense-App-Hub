@@ -34,6 +34,9 @@ Notes, Inbox Assistant and Google Calendar) passed admission end to end; their
 repositories show a complete submission. Look up rules, capabilities and
 fields in the [publishing reference](docs/PUBLISHING.md).
 
+**Using host APIs?** [Host API compatibility](docs/HOST-API.md) shows how an
+app declares the host APIs it needs and checks which ones a host implements.
+
 ## Repository layout
 
 | Path | What it is |
@@ -45,10 +48,11 @@ fields in the [publishing reference](docs/PUBLISHING.md).
 | `docs/FIRST-APP.md` | A first-app walkthrough for a card app or a script app: create, run, capture and check. |
 | `docs/SUBMITTING.md` | The submission, step by step: repository, manifest, listing, screenshots, signing, release, issue and review. |
 | `docs/PUBLISHING.md` | The reference: gate rules; capabilities and who serves them; manifest, listing and tool fields; host services; `hub` commands; signing. |
+| `docs/HOST-API.md` | Declaring the host APIs an app needs, `runtime` discovery and what today's hosts implement. |
 | `docs/ICONS.md` | Canonical icon ownership, export constraints and visual review. |
 | `docs/DEVELOPMENT.md` | The guide map, delivery paths, `card-host` and its remote-control routes, and `card-studio`. |
 | `templates/app/` | A card app repository scaffold with metadata, an example icon and linked agent instructions. |
-| `crates/app-contract` | The app contract, `octosense-app-contract` ([OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)): the manifest, the policy an app gets, bundle integrity and running a bundle. Within `1.x` it only grows ([README](crates/app-contract/README.md)). Its latest version, 1.5.0, is on crates.io ([Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)). |
+| `crates/app-contract` | The app contract, `octosense-app-contract` ([OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)): the manifest, the policy an app gets, bundle integrity and running a bundle. Within `1.x` it only grows ([README](crates/app-contract/README.md)). Its latest version, 1.6.0, is on crates.io ([Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)). |
 | `crates/app-policy` | The signed manifest and listing, admission, and resolution into an isolate's settings and an agent session profile ([OctoSense Home ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0002-agentic-app-security-model.md)); an app's own agent (`tools.json`, `AGENT.md`, skills) loaded as an `AgentBundle`; the `tools.json` parser and checks that native modules' tool manifests share (`ToolManifest::load`). It also re-exports the app contract. |
 | `crates/app-hub` | The index, the signed catalog, the gate, the agent scan, the device client and the `hub` command ([OctoSense Home ADR 0003](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0003-app-hub-and-store.md)). |
 | `crates/appstore` | The store as an OctoSense module, the `card` module that runs an installed app as its own client, system apps (`os.` ids) and host services with their sheets. |
@@ -107,17 +111,30 @@ are in [AGENTS.md](AGENTS.md).
 
 ## What hosts serve today
 
-The gate admits 103 capability names, but a capability works only where a host
+The gate admits 104 capability names, but a capability works only where a host
 serves it. [Capabilities](docs/PUBLISHING.md#capabilities) lists who serves
 each one today.
 
-- `card-host` serves no host services and runs no agent.
+- `card-host` serves no host service except `runtime` discovery, and runs no
+  agent.
 - OctoSense serves `mail`, `model` and `glance` to any app granted them.
 - OctoSense desktop 0.1.0-beta.2 serves the connected-account capabilities
   (`auth`, `github`, `gcalendar`, `gmail`) once the host has OAuth client
   registrations. Tokens stay with the host; apps get connection handles.
-- OctoSense `main`, not yet in any release, also signs an app in to its own
-  backend through `auth`, once the device's operator registers that backend ([Sign in to your own backend](docs/PUBLISHING.md#sign-in-to-your-own-backend)).
+- The implementation in [OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360)
+  (`feat/host-api-contract`, not yet released) signs an app in through
+  `auth` to the backend that its manifest declares, on macOS and Android. It
+  then runs the backend operations that the manifest names, and each write
+  waits for the person's review
+  ([Sign in to your own backend](docs/PUBLISHING.md#sign-in-to-your-own-backend)).
+- That PR also serves the device-permission methods on macOS and
+  Android to an app that declares `host-api-v1` and the matching capability:
+  `camera.permission.*`, `microphone.permission.*` and
+  `location.permission.*`, each with `status`, `request` and `revoke`. On
+  Android it also serves `location.get`. Only an app in the foreground can
+  request a permission, and the person approves it on a host sheet, then in
+  the system prompt if the OS asks
+  ([Host API compatibility](docs/HOST-API.md)).
 - OctoSense `main` also requires a physical press to approve a GitHub or
   Google Calendar save, refuses executable Splash (`script`) cards from app agents,
   and keeps Google Calendar events from 30 days back to 366 days ahead
@@ -128,9 +145,14 @@ each one today.
   and `os.youtube`. Not yet: media services for store apps.
 - OctoSense runs an app agent's granted `implemented_by: "host-service"`
   tools, including tools mapped to a reviewed shared service with
-  `host_method`, and loads `AGENT.md` and skills as guidance. It refuses tools
-  with `implemented_by: "app"`
+  `host_method`, and loads `AGENT.md` and skills as guidance
   ([The app's agent and tools](docs/PUBLISHING.md#the-apps-agent-and-tools)).
+- No OctoSense release runs `implemented_by: "app"` tools yet: desktop
+  0.1.0-beta.2 refuses them with `app_tool_unavailable`. The PR #360
+  implementation advertises `app_tools.dispatch@1` and runs them in the open app, for an app
+  that declares `requires: ["script-tools-v1"]`; a closed app answers
+  `app_not_running`
+  ([Script tool execution](docs/PUBLISHING.md#script-tool-execution-script-tools-v1)).
 
 ## Trust anchor
 

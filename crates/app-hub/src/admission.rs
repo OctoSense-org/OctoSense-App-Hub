@@ -129,15 +129,18 @@ pub struct ResourceReference {
 
 /// JSON pointers name the property a developer has to fix. Display URLs are
 /// recorded apart from loads; the gate's textual URL rule still applies.
-fn resources(value: &Value, path: &str, out: &mut Vec<ResourceReference>, rendered: bool) {
+fn resources(value: &Value, path: &str, out: &mut Vec<ResourceReference>, rendered: bool, tokens: &Value, findings: &mut Vec<Finding>) {
     match value {
         Value::Object(object) => {
             for (key, value) in object {
                 let pointer = format!("{path}/{}", key.replace('~', "~0").replace('/', "~1"));
+                if rendered && key == "font_src" {
+                    font_resource(value, &pointer, tokens, out, findings);
+                    continue;
+                }
                 if let Some(target) = value.as_str() {
                     let kind = match key.as_str() {
                         "src" | "image" if rendered => Some(ResourceKind::Image),
-                        "font_src" if rendered => Some(ResourceKind::Font),
                         _ if target.contains("https://") || target.contains("http://") => Some(ResourceKind::DisplayUrl),
                         _ => None,
                     };
@@ -145,15 +148,36 @@ fn resources(value: &Value, path: &str, out: &mut Vec<ResourceReference>, render
                         out.push(ResourceReference { path: pointer.clone(), target: target.into(), kind });
                     }
                 }
-                resources(value, &pointer, out, rendered);
+                resources(value, &pointer, out, rendered, tokens, findings);
             }
         }
         Value::Array(items) => {
             for (index, value) in items.iter().enumerate() {
-                resources(value, &format!("{path}/{index}"), out, rendered);
+                resources(value, &format!("{path}/{index}"), out, rendered, tokens, findings);
             }
         }
         _ => {}
+    }
+}
+
+/// Native kits resolve one token layer before constructing typed font attributes.
+/// Arbitrary objects and nested references must not bypass asset validation.
+fn font_resource(value: &Value, path: &str, tokens: &Value, out: &mut Vec<ResourceReference>, findings: &mut Vec<Finding>) {
+    let resolved = match value.as_object() {
+        Some(object) if object.len() == 1 => object.get("$token").and_then(Value::as_str)
+            .and_then(|key| tokens.get(key)).and_then(|token| token.get("value")),
+        Some(_) => None,
+        None => Some(value),
+    };
+    match resolved {
+        Some(Value::String(target)) if !target.is_empty() => out.push(ResourceReference {
+            path: path.into(), target: target.clone(), kind: ResourceKind::Font,
+        }),
+        // The renderer treats absent, null and empty fonts as its default family.
+        Some(Value::Null) => {},
+        Some(Value::String(target)) if target.is_empty() => {},
+        _ => findings.push(Finding::at("resource-invalid", path,
+            "font_src must be a bundled font path, a supported built-in font, or one token resolving to a string")),
     }
 }
 
@@ -182,13 +206,16 @@ pub fn validate(root: &Path, files: &[BundleFile]) -> (Vec<Finding>, Vec<Resourc
                     if name != octosense_app_policy::MANIFEST_FILE && name != octosense_app_policy::LISTING_FILE {
                         // App data and kit prop declarations are not resource
                         // requests; only the renderer's known fields are.
-                        resources(&value, &name, &mut refs, false);
+                        resources(&value, &name, &mut refs, false, &Value::Null, &mut findings);
                         if name == "page.data.json" {
-                            resources(&value["$kit"]["placements"], "page.data.json/$kit/placements", &mut refs, true);
+                            resources(&value["$kit"]["placements"], "page.data.json/$kit/placements", &mut refs, true, &Value::Null, &mut findings);
                         } else if name.starts_with("kit/native/") && name.ends_with("/kit.json") {
+                            if let Some(font) = value["tokens"]["typography.body.font_src"].get("value") {
+                                font_resource(font, &format!("{name}/tokens/typography.body.font_src/value"), &Value::Null, &mut refs, &mut findings);
+                            }
                             if let Some(components) = value["components"].as_object() {
                                 for (component, spec) in components {
-                                    resources(&spec["style"], &format!("{name}/components/{component}/style"), &mut refs, true);
+                                    resources(&spec["style"], &format!("{name}/components/{component}/style"), &mut refs, true, &value["tokens"], &mut findings);
                                 }
                             }
                         }

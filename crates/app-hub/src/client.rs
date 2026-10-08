@@ -9,6 +9,7 @@ use crate::index::{Catalog, Entry};
 use crate::signing::{verify_catalog, PublisherKeys};
 use octosense_app_policy::{digest_dir, AppPolicy, HostLimits, SignatureVerifier};
 use std::path::{Path, PathBuf};
+use std::collections::BTreeMap;
 
 /// How stale a cached catalog may be before installs stop. Running apps are
 /// unaffected: the point is that a device kept offline cannot become a place
@@ -117,6 +118,7 @@ pub struct Store {
     app_data_root: PathBuf,
     limits: HostLimits,
     catalog: Option<Catalog>,
+    host_api_versions: BTreeMap<String, u32>,
 }
 
 /// An installed release, verified and copied out of its jail, ready to
@@ -180,7 +182,15 @@ impl Store {
             app_data_root: app_data_root.to_path_buf(),
             limits,
             catalog: None,
+            host_api_versions: BTreeMap::new(),
         }
+    }
+
+    /// Bind this device's implemented API versions. Empty by default: an older
+    /// embedding cannot accidentally claim new services merely by linking the contract.
+    pub fn with_host_api_versions(mut self, versions: BTreeMap<String, u32>) -> Self {
+        self.host_api_versions = versions;
+        self
     }
 
     /// Accept a catalog if it verifies and is not older than the one held.
@@ -390,6 +400,7 @@ impl Store {
         let policy = octosense_app_policy::admit_and_resolve_dir(&staged_json, &digest, &self.limits, &self.publisher_keys())?;
 
         let target = self.install_dir(app_id);
+        entry.manifest.check_host_apis(&self.host_api_versions)?;
         if target.exists() {
             std::fs::remove_dir_all(&target).map_err(|e| format!("cannot replace the installed app: {e}"))?;
         }
@@ -460,6 +471,7 @@ impl Store {
     }
 
     fn verify_release_bundle(&self, entry: &Entry, bundle: &Path) -> Result<AppPolicy, String> {
+        entry.manifest.check_host_apis(&self.host_api_versions)?;
         if let crate::index::Status::Withdrawn(reason) = &entry.status {
             return Err(format!("{} {} was withdrawn: {reason}", entry.app_id(), entry.version()));
         }

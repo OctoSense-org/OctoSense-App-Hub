@@ -112,13 +112,21 @@ The `realize` report has four parts. Read it with the `/log` route
 | `lowering` or `lower_error` | `design` for a native kit pack; `l0-kit` for a card composed from the role kit, whose nodes get inspectable ids `beauty_0_1_…`. |
 
 `card-host` registers no host services, including `model` and the `octos.*`
-services that reach octos, the agent kernel OctoSense runs. A script app that
+services that reach octos, the agent kernel OctoSense runs. Only `runtime`
+discovery answers there. A script app that
 calls `host.request("mail.list", …)` gets
 `no service answers "mail" on this device`. Test a service-backed app in an
 OctoSense shell that registers the service.
 [Host services](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/HOST-SERVICES.md)
 lists which shell serves which. The connected-account services need
 desktop-v0.1.0-beta.2 or later.
+
+`card-host` also refuses an app whose manifest requires `host-api-v1`,
+`backend-api-v1` or `script-tools-v1`, because it implements none of the APIs
+they need. The window shows "card-host refused this bundle" and
+`app <id> needs a host implementing <method>@1`. Test such an app in an
+OctoSense shell built from the `feat/host-api-contract` implementation in
+[OctoSense PR #360](https://github.com/OctoSense-org/OctoSense/pull/360), not an unmodified `main` while that PR is unmerged.
 
 ### Drive it over HTTP: `MAKEPAD_REMOTE`
 

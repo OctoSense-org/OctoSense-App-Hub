@@ -45,6 +45,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
+pub use octosense_app_policy::contract::host_api::{AgentAccess, HostApiMethod};
 
 /// How long a request may wait for its service, unless the service says
 /// otherwise ([`HostService::timeout`]).
@@ -120,6 +121,12 @@ fn queue_reply(heap_key: usize, req_id: u64, result: Result<String, String>) {
 }
 
 impl Replier {
+    /// Services must check this before opening a delayed OS prompt or doing work
+    /// after the owning isolate closed. It is not permission to perform a write.
+    pub fn is_pending(&self) -> bool {
+        with_pending(|pending| pending.get(&(self.heap_key, self.req_id))
+            .is_some_and(|entry| entry.deadline.is_none_or(|deadline| deadline > Instant::now())))
+    }
     /// Answer the request. An answer after the request timed out, or after
     /// its isolate closed, or a second answer, goes nowhere.
     pub fn send(self, result: Result<Value, String>) {
@@ -252,6 +259,9 @@ pub trait ServiceHost {
 pub trait HostService: Send {
     /// The capability family this service answers: `mail`.
     fn family(&self) -> &'static str;
+    /// Only describe methods actually implemented by this service. Descriptors
+    /// do not grant the capability or claim that an account is connected.
+    fn api_methods(&self) -> Vec<HostApiMethod> { Vec::new() }
     /// How long a call may wait for its answer. A sheet the service raises
     /// holds its call open, whatever this says.
     fn timeout(&self, _call: &ServiceCall) -> Duration {
@@ -265,8 +275,10 @@ static SERVICES: Mutex<Vec<Box<dyn HostService>>> = Mutex::new(Vec::new());
 /// Offer a service to every app granted its family. A second registration
 /// for a family replaces the first.
 pub fn register_host_service(service: Box<dyn HostService>) {
-    let mut services = SERVICES.lock().unwrap();
     let family = service.family();
+    let methods = service.api_methods();
+    crate::host_api::register_methods(family, methods);
+    let mut services = SERVICES.lock().unwrap();
     services.retain(|s| s.family() != family);
     services.push(service);
 }
@@ -288,12 +300,28 @@ pub fn dispatch(call: ServiceCall, heap_key: usize, req_id: u64, host: &mut dyn 
         return;
     }
     let reply = Replier { heap_key, req_id };
+    if family == "runtime" {
+        drop(services);
+        crate::host_api::dispatch(call, reply);
+        return;
+    }
     // What the person types on a sheet reaches only the sheet's methods,
     // whatever the service does: an app calling one is refused here.
-    if call.method().starts_with("sheet.") && !call.from_sheet {
+    if call.method().split('.').rev().skip(1).any(|part| part == "sheet") && !call.from_sheet {
         drop(services);
         reply.send(Err(format!("{} is for the host's sheet, not an app", call.service)));
         return;
+    }
+    // Agent hooks and background cards cannot gain foreground authority by
+    // wrapping a described method in another script host.request call.
+    if !call.from_sheet && !call.may_prompt {
+        if let Some(method) = crate::host_api::methods().into_iter().find(|m| m.name == call.service) {
+            if method.agent_access != AgentAccess::Allowed || !method.supports(crate::host_api::platform()) {
+                drop(services);
+                reply.send(Err(format!("{} is unavailable to agents/background surfaces", call.service)));
+                return;
+            }
+        }
     }
     match service {
         Some(i) => services[i].call(call, reply, host),
@@ -594,6 +622,30 @@ mod tests {
         assert!(mine[0].2.as_ref().unwrap().contains("\"method\":\"sheet\""));
         let other = take_replies_for(&[7002]);
         assert!(other[0].2.as_ref().unwrap_err().contains("no service"), "an unanswered family fails, not hangs");
+    }
+
+    #[test]
+    fn described_methods_keep_foreground_and_sheet_authority_through_wrappers() {
+        struct Described;
+        impl HostService for Described {
+            fn family(&self) -> &'static str { "background_probe" }
+            fn api_methods(&self) -> Vec<HostApiMethod> {
+                [("read", AgentAccess::Allowed), ("login", AgentAccess::ForegroundOnly), ("admin", AgentAccess::Denied)]
+                    .into_iter().map(|(name, access)| HostApiMethod::new(
+                        &format!("background_probe.{name}"), 1, "runtime", "fixture", serde_json::json!({}), serde_json::json!({}))
+                        .with_platforms(&[crate::host_api::platform()]).with_agent_access(access)).collect()
+            }
+            fn call(&mut self, _call: ServiceCall, reply: Replier, _: &mut dyn ServiceHost) { reply.send(Ok(Value::Bool(true))); }
+        }
+        register_host_service(Box::new(Described));
+        let mut host = Host::default();
+        for (index, method, allowed) in [(0,"read",true), (1,"login",false), (2,"admin",false), (3,"backend.sheet.save",false)] {
+            let mut request = call(&format!("background_probe.{method}")); request.may_prompt=false;
+            dispatch(request, 7990, index, &mut host);
+            assert_eq!(take_replies_for(&[7990])[0].2.is_ok(), allowed, "{method}");
+        }
+        dispatch(call("background_probe.login"), 7990, 5, &mut host);
+        assert!(take_replies_for(&[7990])[0].2.is_ok());
     }
 
     #[test]

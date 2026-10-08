@@ -16,7 +16,29 @@ fn manifest_with(body: &str) -> String {
 fn palpo_extension_preserves_schema_and_declares_its_host_feature() {
     assert_eq!(SCHEMA, 1);
     assert_eq!(SCHEMA_MINOR, 0);
-    assert_eq!(KNOWN_FEATURES, &["palpo-admin-v1"]);
+    assert_eq!(KNOWN_FEATURES, &["palpo-admin-v1", "host-api-v1", "backend-api-v1", "script-tools-v1"]);
+}
+
+#[test]
+fn host_api_requirements_need_the_feature_and_do_not_grant_access() {
+    assert!(parse(&manifest_with(r#""host_api":{"required":{"camera.permission.status":1}}"#)).is_err());
+    let manifest = parse(&manifest_with(r#""requires":["host-api-v1"],"host_api":{"required":{"camera.permission.status":1}},"capabilities":["runtime"]"#)).unwrap();
+    let policy = resolve(&manifest, &HostLimits::default().with_require_signature(false)).unwrap();
+    assert!(policy.allows("runtime"));
+    assert!(!policy.allows("camera"));
+}
+
+#[test]
+fn host_api_marker_requires_the_policy_abi_even_without_a_device_method() {
+    let manifest = parse(&manifest_with(r#""requires":["host-api-v1"]"#)).unwrap();
+    let mut versions = std::collections::BTreeMap::new();
+    assert!(manifest.check_host_apis(&versions).unwrap_err().contains("app_policy.device_consent@1"));
+    versions.insert("camera.permission.status".into(), 1);
+    assert!(manifest.check_host_apis(&versions).is_err(), "a method is not the policy ABI");
+    versions.insert("app_policy.device_consent".into(), 2);
+    assert!(manifest.check_host_apis(&versions).is_err(), "ABI majors match exactly");
+    versions.insert("app_policy.device_consent".into(), 1);
+    assert!(manifest.check_host_apis(&versions).is_ok());
 }
 
 #[test]

@@ -156,9 +156,10 @@ my-app/
   field, and at runtime such a field accepts no input. Sign-in belongs to a
   host service, which collects the secret on its own sheet, a panel the host
   draws over the app ([Sheets](PUBLISHING.md#sheets-apps-never-collect-secrets)).
-- `card-host` serves no host service: every `host.request` answers
-  `no service answers "<family>" on this device`. Test those screens in
-  OctoSense desktop 0.1.0-beta.2 ([Before you start](SUBMITTING.md#before-you-start)).
+- `card-host` serves no host service except `runtime` discovery: every other
+  `host.request` answers `no service answers "<family>" on this device`. Test
+  those screens in OctoSense desktop 0.1.0-beta.2
+  ([Before you start](SUBMITTING.md#before-you-start)).
 
 ### A card app
 
@@ -185,9 +186,9 @@ my-app/
 ```
 
 The gate accepts a card's `font_src` only as a font file in the bundle or the
-built-in `makepad_widgets:resources/Inter.ttf`, yet a bundled font does not
-load in a card today. Read [Fonts](PUBLISHING.md#fonts) before you set a font
-or show Chinese text.
+built-in `makepad_widgets:resources/Inter.ttf`. OctoSense desktop
+0.1.0-beta.2 does not load a bundled font. Read [Fonts](PUBLISHING.md#fonts)
+before you set a font or show Chinese text.
 
 ### Both kinds
 
@@ -372,7 +373,7 @@ catalog with a throwaway anchor
 | --- | --- |
 | `cargo build` stops with `no variant … TextInputStateQuery` | See [`card-host` fails to build](DEVELOPMENT.md#card-host-fails-to-build). |
 | `card-host: refused: no signature verifier is installed, so the signature from key "<id>" cannot be checked` | The bundle is signed. Run an unsigned copy. |
-| `no service answers "<family>" on this device` | `card-host` serves no host service. Test the screen in OctoSense desktop 0.1.0-beta.2. |
+| `no service answers "<family>" on this device` | `card-host` serves no host service except `runtime` discovery. Test the screen in OctoSense desktop 0.1.0-beta.2. |
 | `curl: (22) The requested URL returned error: 404` from `/g?raw=1` | No frame is drawn yet. Wait a few seconds and capture again. |
 | `[refused] identity: app id "…" ends in "…", which is reserved` | The id's last segment is a [reserved name](PUBLISHING.md#ids-and-reserved-names). Choose another before your first release. |
 | `[refused] digest: the bundle hashes to …, the manifest claims …` | The bundle changed after `hub stamp`. Stamp again. |

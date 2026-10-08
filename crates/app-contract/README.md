@@ -33,9 +33,22 @@ fn open(package: &std::path::Path) -> Result<octosense_app_contract::AppPolicy, 
 }
 ```
 
+## Host API declarations (1.6)
+
+`host_api::HostApiRequirements` records required and optional exact ABI-major
+versions. `AppManifest::check_host_apis` compares required methods and feature
+ABIs with the host's implemented inventory. Hosts must perform this check at
+install and launch; admission alone does not prove runtime support.
+
+`backend::BackendRegistration` describes an app's public HTTPS login and named
+business operations. Credentials remain in the host. Backend and device access
+still require separate grants, supported native adapters and the person's
+consent. See [Host API compatibility](../../docs/HOST-API.md) for examples and
+limits.
+
 ## Versions on crates.io
 
-crates.io has 1.0.0, 1.1.0, 1.2.0 and 1.5.0. Versions 1.3.0 and 1.4.0 exist
+crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0 and 1.6.0. Versions 1.3.0 and 1.4.0 exist
 only in this repository ([CHANGELOG.md](CHANGELOG.md)); 1.5.0 includes their
 changes. A lock file that still holds 1.2.0 refuses every capability added
 since, such as `auth`:
@@ -44,11 +57,12 @@ since, such as `auth`:
 app org.example.connect requests unknown capability "auth"
 ```
 
-`cargo update -p octosense-app-contract` moves it to 1.5.0. OctoSense `main`
-resolves 1.5.0 from crates.io with no patch; OctoSense desktop 0.1.0-beta.2
-patched the crate to an App Hub revision. To build against a contract newer
-than the latest release, patch crates.io's copy with an App Hub revision, then
-update the lock file:
+`cargo update -p octosense-app-contract` moves an unconstrained 1.x consumer
+to 1.6.0. Hosts using the new API declarations must select 1.6 or later;
+older checked-in lock files remain on their existing version. OctoSense
+desktop 0.1.0-beta.2 patched the crate to an App Hub revision. To build
+against a contract newer than the latest release, patch crates.io's copy with
+an App Hub revision, then update the lock file:
 
 ```toml
 [patch.crates-io]

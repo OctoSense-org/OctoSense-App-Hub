@@ -213,7 +213,7 @@ fn card_source(bundle: &Path, asset_origin: &str) -> Result<String, String> {
     let mut data: serde_json::Value = serde_json::from_str(&data_text).map_err(|e| format!("page.data.json: {e}"))?;
     octosense_app_policy::rewrite_assets(&mut data, asset_origin);
     let mut report = realize_report(&card, &data);
-    let lowered = lower(&card, &data, &bundle.join("kit"));
+    let lowered = lower(&card, &data, bundle, asset_origin);
     match &lowered {
         Ok((_, lowering)) => report["lowering"] = serde_json::Value::String((*lowering).into()),
         Err(e) => report["lower_error"] = serde_json::Value::String(e.clone()),
@@ -232,8 +232,8 @@ fn card_source(bundle: &Path, asset_origin: &str) -> Result<String, String> {
 /// no placements, so the measured lowering refuses it ("unsupported measured
 /// design node"); it falls back to the kit lowering the Card runner uses,
 /// with inspectable ids (`beauty_0_1_…`) so `/snap` can name every node.
-fn lower(card: &str, data: &serde_json::Value, kit: &Path) -> Result<(String, &'static str), String> {
-    let mut prepared = octoscript_makepad::l0::prepare(card, data, kit)?;
+fn lower(card: &str, data: &serde_json::Value, bundle: &Path, asset_origin: &str) -> Result<(String, &'static str), String> {
+    let mut prepared = octosense_appstore::card_assets::prepare(card, data, bundle, asset_origin)?;
     match octoscript_makepad::design::to_makepad_ui(&prepared.tree) {
         Ok(ui) => Ok((ui, "design")),
         Err(e) if prepared.native_components => Err(e),
@@ -394,6 +394,16 @@ impl App {
             }
         }
 
+        let compatible = std::fs::read_to_string(args.bundle.join("manifest.json"))
+            .map_err(|error|error.to_string())
+            .and_then(|text|octosense_app_policy::AppManifest::parse(&text))
+            .and_then(|manifest|octosense_appstore::host_api::check_manifest(&manifest))
+            .and_then(|_|octosense_appstore::apply_device_consent(cx, &args.bundle, &splash));
+        if let Err(error) = compatible {
+            self.refused = true;
+            splash.set_text(cx, &refusal_card(&error));
+            return;
+        }
         match card_source(&args.bundle, &origin) {
             Ok(source) => splash.set_text(cx, &source),
             Err(e) => error!("card-host: the card did not lower: {e}"),
