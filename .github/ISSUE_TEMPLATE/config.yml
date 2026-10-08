@@ -5,4 +5,4 @@ contact_links:
     about: Read the step-by-step submission guide (English and 简体中文) before you open a submission.
   - name: Questions about building an app
     url: https://github.com/OctoSense-org/OctoSense-App-Flow/issues
-    about: Ask how to build, run or test an OctoSense app in the OctoSense App Flow repository (formerly Design Flow).
+    about: Ask in the OctoSense App Flow repository (formerly Design Flow) how to build, run or test an OctoSense app.

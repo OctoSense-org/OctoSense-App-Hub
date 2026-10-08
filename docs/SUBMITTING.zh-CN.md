@@ -81,7 +81,7 @@ tools/octo doctor
 | `hub keygen`、`hub pubkey`、`hub sign-manifest` | 你，仅限旧协议 Ed25519 应用 | 5 | 创建发布者密钥，并为清单签名（[签名](PUBLISHING.zh-CN.md#签名)）。 |
 | `hub publish`、`hub withdraw`、`hub remove`、`hub certify`、`hub verify` | 维护者，仅用于旧格式签名目录 | 9 | 在 `catalog.json` 中发布、撤回或删除版本，为它的工作密钥签发证书，或验证它。 |
 
-App Flow 的 `tools/octo` 会替你运行其中几个命令，参数见 App Flow 的 [`tools/octo` 命令表](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/README.zh-CN.md#toolsocto)。
+App Flow 的 `tools/octo` 会替你运行其中几个命令，参数见其 [`tools/octo` 命令表](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/README.zh-CN.md#toolsocto)。
 
 | `tools/octo` 命令 | 运行的 `hub` 命令 |
 | --- | --- |
