@@ -2,11 +2,12 @@
 
 English | [简体中文](SUBMITTING.zh-CN.md)
 
-You submit an app as a signed bundle at a tagged commit in your own public
-repository, then open an issue on this repository. A reviewer, one of the App
-Hub maintainers, checks the exact bytes at your tag and runs the gate
-(`hub check`) on them again. If the app passes review, the reviewer publishes
-those bytes in the signed catalog that every OctoSense store reads.
+You submit an app as a bundle at a tagged commit in your own public
+repository, then open an issue on this repository. Sign the bundle with your
+publisher key; only an app's first version may be unsigned. A reviewer, one
+of the App Hub maintainers, checks the exact bytes at your tag and runs the
+gate (`hub check`) on them again. If the app passes review, the reviewer
+publishes those bytes in the signed catalog that every OctoSense store reads.
 
 The three reference apps in catalog sequence 10, the tenth signed version of
 the catalog, are the worked examples. Unless a step says otherwise, the
