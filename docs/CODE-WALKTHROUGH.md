@@ -207,7 +207,10 @@ installs. Installed apps stay subject to `may_run`.
 `CardAppView::start` reopens the last verified catalog and calls
 `Store::may_run` for an installed app. A withdrawn version is refused at the
 next open that uses that catalog. A running instance keeps running until the
-host closes it. System apps come from
+host closes it. Discovery excludes withdrawn listings from Today, Apps and
+Search. Installed copies remain in Library with their withdrawal reason;
+their local data is retained and the launch refusal still applies. This
+discovery filtering is newer than desktop 0.1.0-rc.1. System apps come from
 [`system::prepare`](../crates/appstore/src/system.rs) instead, which unpacks a
 compiled-in pack and applies the system limits.
 
