@@ -360,8 +360,9 @@ fn stamp_bundle(bundle: &Path) -> Result<String, String> {
     let path = bundle.join(octosense_app_policy::MANIFEST_FILE);
     let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let manifest=AppManifest::parse(&text)?;
-    if manifest.integrity.github.as_ref().is_some_and(|g|g.attestation.is_some()) {
-        return Err("GitHub-attested bundle is sealed; prepare a new unsigned version".into());
+    if manifest.integrity.signature.is_some() || manifest.integrity.github.is_some()
+        || manifest.requires.iter().any(|f| f == "publisher-github-v1") {
+        return Err("publisher signing metadata cannot be restamped; prepare a new unsigned version".into());
     }
     let digest = octosense_app_policy::digest_dir(bundle)?;
     let mut value: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
