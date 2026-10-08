@@ -561,10 +561,21 @@ pub const RESERVED_NAMES: &[&str] = &[
     "reference", "reminders", "rinx", "sheets", "shell", "system", "task", "terminal", "toolbox", "weather", "workflow",
 ];
 
+/// Exact app ids which would collide with host-owned files beneath an install
+/// root. These are not namespace suffixes: `org.example.json` remains valid.
+/// Compare without ASCII case so the rule also holds on case-insensitive hosts.
+pub const RESERVED_HOST_FILE_IDS: &[&str] = &[
+    "catalog.json", "catalog.lock", "catalog-v2.json", "catalog-v2.lock",
+];
+
 /// Refuse an app id that is, or whose namespace is, a [`RESERVED_NAMES`]
-/// entry. Every script app passes through it: [`crate::policy::resolve`],
+/// entry, or exactly matches a [`RESERVED_HOST_FILE_IDS`] entry ignoring case.
+/// Every script app passes through it: [`crate::policy::resolve`],
 /// App Hub's agent review (`AgentBundle::load`) and the store's gate.
 pub fn check_reserved_id(app_id: &str) -> Result<(), String> {
+    if RESERVED_HOST_FILE_IDS.iter().any(|name| app_id.eq_ignore_ascii_case(name)) {
+        return Err(format!("app id {app_id:?} is reserved: it names a host catalog or cache lock file"));
+    }
     let namespace = short_id(app_id);
     if RESERVED_NAMES.contains(&app_id) {
         return Err(format!("app id {app_id:?} is reserved: it names a native app or the host itself"));

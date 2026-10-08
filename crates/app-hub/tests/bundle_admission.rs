@@ -13,6 +13,26 @@ fn runnable_script_fixture_passes() {
 }
 
 #[test]
+fn signed_bundles_cannot_claim_host_catalog_or_cache_lock_files() {
+    for id in ["catalog.json", "catalog.lock", "catalog-v2.json", "catalog-v2.lock", "Catalog-V2.Json"] {
+        let mut f = Fixture::new();
+        f.manifest.id = id.into();
+        f.sign();
+        let report = f.report(None);
+        assert!(!report.passed(), "{id} must be refused");
+        assert!(report.findings.iter().any(|finding|
+            finding.check == "identity" && finding.detail.contains("host catalog or cache lock file")
+        ), "{}", report.render());
+    }
+    for id in ["org.example.json", "org.example.lock"] {
+        let mut f = Fixture::new();
+        f.manifest.id = id.into();
+        f.sign();
+        assert!(f.report(None).passed(), "{id} remains a valid signed app");
+    }
+}
+
+#[test]
 fn runnable_card_fixture_passes() {
     let mut f = Fixture::new();
     f.card();
