@@ -80,7 +80,7 @@ tools/octo doctor
 | `hub keygen`、`hub pubkey`、`hub sign-manifest` | 你，仅限旧版 Ed25519 应用 | 5 | 创建发布者密钥，并为清单签名（[签名](PUBLISHING.zh-CN.md#签名)）。 |
 | `hub publish`、`hub withdraw`、`hub remove`、`hub certify`、`hub verify` | 维护者，仅用于旧格式签名目录 | 9 | 在 `catalog.json` 中发布、撤回或删除版本，为它的工作密钥签发证书，或验证它。 |
 
-Design Flow 的 `tools/octo` 会替你运行其中几个命令。`tools/octo new` 运行 `hub stamp`。`tools/octo check` 先运行 `hub stamp`，再运行 `hub check --allow-unsigned`，并把 `--catalog` 和 `--publisher-key` 原样传给 `hub check`。`tools/octo doctor` 运行 `hub help`，确认找到的正是这个 `hub`。这些命令的参数见 Design Flow 的 [`tools/octo` 命令表](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/README.zh-CN.md#toolsocto)。在本地[商店演练](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)中，你还要用一次性密钥和旧格式测试签名目录，亲自运行 `hub keygen`、`hub certify`、`hub publish` 和 `hub verify`。
+Design Flow 的 `tools/octo` 会替你运行其中几个命令。`tools/octo new` 运行 `hub stamp`。`tools/octo check` 先运行 `hub stamp`，再运行 `hub check --allow-unsigned`，并把 `--catalog` 和 `--publisher-key` 原样传给 `hub check`。`tools/octo doctor` 运行 `hub help`，确认找到的正是这个 `hub`。`tools/octo publish-github` 安装发布工作流；推送标签时，该工作流运行 `hub publisher-prepare`、`hub publisher-attach`、`hub publisher-verify` 和 `hub publisher-pack`。这些命令的参数见 Design Flow 的 [`tools/octo` 命令表](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/README.zh-CN.md#toolsocto)。在本地[商店演练](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)中，你还要用一次性密钥和旧格式测试签名目录，亲自运行 `hub keygen`、`hub certify`、`hub publish` 和 `hub verify`。
 
 ### 应用能在哪里运行
 

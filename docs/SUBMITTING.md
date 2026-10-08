@@ -112,7 +112,9 @@ Design Flow's `tools/octo` runs some of these for you. `tools/octo new` runs
 `hub stamp`. `tools/octo check` runs `hub stamp`, then
 `hub check --allow-unsigned`, and passes `--catalog` and `--publisher-key` on
 to `hub check`. `tools/octo doctor` runs `hub help` to confirm that it found
-this `hub`. Design Flow's
+this `hub`. `tools/octo publish-github` installs the release workflow, which
+runs `hub publisher-prepare`, `hub publisher-attach`, `hub publisher-verify`
+and `hub publisher-pack` on the tag push. Design Flow's
 [`tools/octo` table](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/README.md#toolsocto)
 lists their flags. In a local
 [store rehearsal](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally),
