@@ -18,12 +18,13 @@ approve it.
 For a new app's first version and every update, your app's GitHub workflow
 prepares, attests and packs the release, so you need no publisher private key
 or repository signing secret. Installing such an app takes a host that
-supports `publisher-github-v1`; a compatible OctoSense release is still
-pending.
+supports `publisher-github-v1`; use the
+[RC candidate and download guide](../README.md#download-a-compatible-host).
 
-The three reference apps from catalog sequence 10 are historical worked
-examples. Their Ed25519 keys and signed-source layout are optional legacy
-compatibility, not steps required for a GitHub publisher app. The gate,
+Public catalog 13 offers new GitHub-proven `io.github.ymote.*` sample IDs
+([current apps](../README.md#apps)). The earlier catalog-10 Ed25519 identities
+and signed-source layout are historical compatibility examples, not steps
+required for a GitHub publisher app. The gate,
 capability, manifest and signing rules are in [PUBLISHING.md](PUBLISHING.md).
 
 ```text
@@ -47,7 +48,7 @@ A host runs your bundle: `card-host` while you develop, and an OctoSense shell
 | `hub` | App Hub `main` | Stamp editable source, check and scan it, then prepare, verify and pack GitHub-attested releases. Reviewers run the same code. |
 | `card-host` | App Hub `main` | Run the unsigned bundle, drive it and capture screenshots. |
 | `tools/octo` | [Design Flow](https://github.com/OctoSense-org/OctoScript-App-Design-Flow) | Create, run and capture an app. It wraps `card-host` and `hub`. |
-| OctoSense desktop | The [0.1.0-beta.2](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-beta.2) release for macOS on Apple silicon | Run apps that use host services, including [connected accounts](PUBLISHING.md#connected-accounts). |
+| OctoSense desktop | [RC candidate, source `933abbcf`](../README.md#download-a-compatible-host); publication status and platform packages in that guide | Install GitHub-proven releases and run compatible host services. Use macOS for the connected samples; OAuth registrations are not included. |
 
 Set up the workspace as described in
 [QUICKSTART §1](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/QUICKSTART.md#1-prerequisites),
@@ -131,18 +132,19 @@ yourself, with throwaway keys and a legacy test catalog.
 | Host | Runs | Does not |
 | --- | --- | --- |
 | `card-host` | One unsigned bundle, with a remote bridge to drive and capture it | Serve any host service except `runtime` discovery: every other `host.request` fails with `no service answers "<family>" on this device`. It also refuses signed bundles and apps that require `host-api-v1`, `backend-api-v1` or `script-tools-v1`. |
-| desktop-v0.1.0-beta.2 (macOS, Apple silicon) | Installed apps, including apps that use `auth`, `github`, `gmail` and `gcalendar` | Sign in to GitHub or Google until the host has an OAuth registration in `oauth/clients.json` ([setup](https://github.com/OctoSense-org/OctoSense/blob/desktop-v0.1.0-beta.2/crates/oauth-service/README.md)); the release ships none. Sign an app in to its own backend. Install an app that requests `wasm`: its store refuses it with `unknown capability "wasm"`. Unverified on this release: live provider sign-in. |
+| RC candidate `933abbcf` | Public v2 catalog, `publisher-github-v1`, discovery and open-app Splash tools; services within their platform limits | Ship OAuth registrations, enable `wasm-lab` by default, or run macOS-only listings on other OSes. Linux/Windows embedded backend login and protected writes remain unsupported; external-browser backend login and reads are implemented separately. |
+| Historical desktop-v0.1.0-beta.2 (macOS, Apple silicon) | Installed apps, including apps that use `auth`, `github`, `gmail` and `gcalendar` | Sign in to GitHub or Google until the host has an OAuth registration in `oauth/clients.json` ([setup](https://github.com/OctoSense-org/OctoSense/blob/desktop-v0.1.0-beta.2/crates/oauth-service/README.md)); the release ships none. Sign an app in to its own backend. Install an app that requests `wasm`: its store refuses it with `unknown capability "wasm"`. Unverified on this release: live provider sign-in. |
 | desktop-v0.1.0-beta.1 and home-v0.1.0-beta.1 (the only released phone build) | Store apps that use only capabilities their older app contract knows | Install an app that requests `auth`, `github`, `gmail`, `gcalendar`, `calendar`, `photos`, `youtube`, `wasm` or `palpo.*`. Their stores refuse it, for example with `unknown capability "auth"`. |
 
-OctoSense `main` differs from desktop-v0.1.0-beta.2 in these ways, and no
-release has them yet.
+The RC candidate differs from historical desktop beta.2 in these ways.
+[Check asset publication before downloading](../README.md#download-a-compatible-host).
 
 - A distributor can compile GitHub and Google registrations into its build. A
   build you make from source has no registrations until you add them, for
   example in `oauth/clients.json`
   ([Connected accounts](PUBLISHING.md#connected-accounts)).
-- On macOS and Android, an app can sign in to the backend that its manifest
-  declares and call the backend operations the manifest names
+- An app can sign in to the backend its manifest declares, then call the
+  operations it lists, within the [platform limits below](#check-your-platform)
   ([Sign in to your own backend](PUBLISHING.md#sign-in-to-your-own-backend)).
 - An app that declares `host-api-v1` gets the device-permission methods on
   macOS and Android ([Host API compatibility](HOST-API.md)).
@@ -159,17 +161,21 @@ The rehearsal is verified only with a shell built from source.
 
 ### Check your platform
 
-- **macOS on Apple silicon** verified the historical reference-app commands.
-  The new GitHub publisher workflow has separate source and release status in step 5.
-- **Windows** is unverified on current `main`. A community member reported a
-  native Windows 11 build and run at an earlier revision; the maintainers have
-  not verified it. Run Design Flow's tool as
-  `python tools/octo`; it finds `hub.exe` and `card-host.exe`. Add the
-  `.gitattributes` file from [step 1](#1-lay-out-the-repository) before you
-  commit the bundle, and run the final check from a fresh clone
-  ([step 6](#6-freeze-and-verify-the-release)).
-- **Linux** is unverified, and so are reports that frame capture (`/g`) times
-  out under software rendering (llvmpipe, WSL).
+- **macOS on Apple silicon:** use the compatible RC candidate for the current
+  public samples. Installation, local drafts and updates are separate from
+  authenticated provider effects; see [download and account limits](../README.md#download-a-compatible-host).
+- **Windows x64 / Linux x86_64:** planned RC packages do not change an app's
+  `listing.platforms`. The four current samples declare macOS only. Native
+  browser and host tests are not acceptance of your app; validate every claimed
+  platform, including its dependencies and missing-service states.
+- On Windows, use `python tools/octo`; it finds `.exe` binaries. Preserve
+  bundle bytes using [step 1's `.gitattributes`](#1-lay-out-the-repository),
+  then verify a fresh checkout ([step 6](#6-freeze-and-verify-the-release)).
+- Linux WebReader requires GTK 3/WebKitGTK and X11/XWayland; native Wayland
+  is unsupported. Windows uses WebView2; these engines are not bundled.
+  Linux/Windows implement external-browser backend login and declared reads,
+  without live sign-in acceptance here. Embedded backend login and protected
+  writes remain unsupported and fail closed. See the [browser requirements](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/docs/desktop-embedded-browser.md).
 
 ### Protect your publisher key
 
@@ -178,9 +184,9 @@ GitHub publishing skip this section; they create no developer signing key.
 
 This section applies only to historical Ed25519 publishing. New GitHub
 publisher apps require no developer signing key; follow the new route in
-[step 5](#5-produce-the-final-bytes). Contract 1.8.0 is published; a compatible
-OctoSense host release is still pending. Existing release hosts cannot consume
-the new proof yet.
+[step 5](#5-produce-the-final-bytes). Contract 1.8.0 is published;
+[the RC candidate](../README.md#download-a-compatible-host) consumes the new
+proof. Historical beta hosts cannot.
 
 Your publisher id names you in the catalog; your publisher key signs every
 version you publish. Once a version signed by the key is in the catalog, the
@@ -194,6 +200,12 @@ replaces a lost key: if you lose it, ask a reviewer in an issue.
 > your user can read.
 
 ## The three reference apps
+
+For current downloads, use the GitHub-proven 0.2.1 releases and fresh IDs in
+[the public catalog table](../README.md#apps). Their 0.2.0 → 0.2.1 update
+retains the same GitHub publisher identity. None needs a developer signing key.
+
+### Historical 0.1.x examples
 
 Catalog sequence 10 holds three macOS developer previews from the publisher
 `ymote`, each in two versions: 0.1.0, the first, and 0.1.1, which addresses the
@@ -232,8 +244,8 @@ addresses. Avoid each one from the start:
   to 16 KiB as well as a `template`. OctoSense desktop 0.1.0-beta.2 runs an
   agent's `script` card under the app's policy, so a prompt-injected
   background turn could publish arbitrary Splash code. Inbox 0.1.1
-  accepts only its admitted template with `initial` data, and OctoSense `main`
-  (in no release yet) refuses an agent's `script` card. Accept only
+  accepts only its admitted template with `initial` data, and the RC candidate
+  refuses an agent's `script` card. Accept only
   `template` with `initial`, or an L0 `source` with `data`.
 - **Declare `agent` if you ship tools.** GitHub Notes 0.1.0 shipped three tools
   in `tools.json` with `"agent": null`. The Hub admitted them as an app agent,
@@ -250,8 +262,7 @@ addresses. Avoid each one from the start:
   event, and the agent's `cached` tool returns them all. Google Calendar 0.1.1
   shows "past 30 days / next 366 days" when the host reports that range and
   "date range unavailable" when it does not, and no longer reports an event
-  outside the range as deleted. OctoSense `main` (in no release yet)
-  syncs only that range. Show a date range, and give the agent the selected
+  outside the range as deleted. The RC candidate syncs only that range. Show a date range, and give the agent the selected
   event, not the whole cache.
 
 One pattern remains in 0.1.1. Inbox's background tools can rewrite a reply
@@ -447,8 +458,8 @@ and in your issue.
 For both first submissions and updates, use GitHub publisher provenance.
 Contract 1.8.0 adds `publisher-github-v1`. Two real tag-push releases and
 native Store install/update/launch checks passed ([evidence and
-limits](PUBLISHING.md#github-publisher-provenance)); a compatible released
-host is still pending.
+limits](PUBLISHING.md#github-publisher-provenance)). For the current public
+catalog, use the [RC candidate](../README.md#download-a-compatible-host).
 
 1. Open the submission issue if you have not already done so. Missing release
    evidence can be added later; mark it pending rather than inventing a pass.
@@ -571,7 +582,7 @@ lists what was confirmed for each one:
 | The gate passes on the downloaded bundle | `downloaded_gate_output` | The same check |
 | The bundle digest matches your issue | `bundle_digest` | `integrity.bundle_blake3` |
 
-The record for 0.1.1, the current versions, is
+The historical record for 0.1.1 is
 [`docs/admissions/connected-apps-0.1.1`](../docs/admissions/connected-apps-0.1.1/README.md).
 It also keeps each app's signed gate output and source review, and records a
 test that installs each app with the store's code and upgrades it from 0.1.0.
@@ -594,7 +605,8 @@ protected [catalog workflow](GITHUB-PUBLISHING.md). The workflow admits the
 exact reviewed bytes, has GitHub Actions sign the new `catalog-v2.json` with
 Sigstore, and commits the catalog to `main`. People can then search for,
 install and run the app in an OctoSense build that reads `catalog-v2.json`
-and supports `publisher-github-v1`. No OctoSense release does yet:
+and supports `publisher-github-v1`, such as the
+[RC candidate](../README.md#download-a-compatible-host). Historical
 desktop-v0.1.0-beta.2 reads only the legacy `catalog.json` that
 `hub publish` produces.
 
@@ -651,14 +663,14 @@ cannot read gets no report, only one `hub: …` line. The full rules are in
 
 | You want | Status | Instead |
 | --- | --- | --- |
-| Sign in to your own backend | Only on OctoSense `main`, not yet in any release, on macOS and Android. Declare the backend in the manifest; the app then calls only the backend operations it declares, and each write waits for the person's review on the host ([Sign in to your own backend](PUBLISHING.md#sign-in-to-your-own-backend)). | On a released build, identify the person with identity-only sign-in: `auth` with GitHub's `read:user`, or Google's `openid`, `email` and `profile`. For provider data, add `github`, `gmail` or `gcalendar`. |
+| Sign in to your own backend | The RC implements host-run backend sign-in and declared reads, within the [platform limits](#check-your-platform); compatible Android source builds have a separate embedded route. Each write requires a supported native review path ([Sign in to your own backend](PUBLISHING.md#sign-in-to-your-own-backend)). | For provider identity only, identify the person with identity-only sign-in: `auth` with GitHub's `read:user`, or Google's `openid`, `email` and `profile`. For provider data, add `github`, `gmail` or `gcalendar`. |
 | Keep an API key or token in the app | Not supported. The gate refuses only password and one-time-code fields, so it does not catch a key typed into a plain field or kept in storage. | Ship no keys. For text generation, use `model`, which calls the person's own AI provider. |
-| Generate images, audio, video or embeddings | Not yet. `model` serves only `model.complete` and `model.budget`. `model.image`, `model.audio`, `model.video` and `model.embeddings` are unknown capabilities ([#85](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/85)–[#88](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/88)). | Use `model.complete` for text. |
+| Generate images, audio, video or embeddings | The RC has methods under the `model` capability; media method names are not separate capabilities. Provider configuration, entitlement and platform limits still apply. | Discover methods at runtime and handle unavailable providers; see the [media guide](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/AI-SERVICES.md#media-and-embeddings-model). |
 | Use `llm`, `news`, `calendar`, `prompt`, `ledger.read`, `clipboard` or `palpo.*` | The gate admits them, but no host serves them to a store app. `llm` and `news` answer only `os.*` apps, and `calendar` only `os.calendar`. Nothing acts on the others. | Do not request them. For Google Calendar, use `gcalendar`. |
-| Run your app's own logic in agent tools | Not in any release. OctoSense `main` runs `implemented_by: "app"` tools while the full app is open; a closed app answers `app_not_running`. OctoSense desktop 0.1.0-beta.2 refuses these tools with `app_tool_unavailable`. A `host-service` tool without `host_method` calls the service named by your app's namespace, which is not a capability, so the call fails with `not_granted`. | To reach a shared service, map the tool with `host_method` to a method of `github`, `gcalendar`, `gmail` or `glance` ([Map a tool to a shared service](PUBLISHING.md#map-a-tool-to-a-shared-service-host_method)). For your own logic, declare `requires: ["script-tools-v1"]` and implement the `app_tool` hook ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)). Test it in an OctoSense shell built from `main`. |
+| Run your app's own logic in agent tools | The RC candidate runs `implemented_by: "app"` tools while the full app is open; a closed app answers `app_not_running`. OctoSense desktop 0.1.0-beta.2 refuses these tools with `app_tool_unavailable`. A `host-service` tool without `host_method` calls the service named by your app's namespace, which is not a capability, so the call fails with `not_granted`. | To reach a shared service, map the tool with `host_method` to a method of `github`, `gcalendar`, `gmail` or `glance` ([Map a tool to a shared service](PUBLISHING.md#map-a-tool-to-a-shared-service-host_method)). For your own logic, declare `requires: ["script-tools-v1"]` and implement the `app_tool` hook ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)). Test it in the [compatible RC candidate](../README.md#download-a-compatible-host). |
 | Ship native Rust code | A store bundle cannot carry it. The gate refuses native libraries, and native code needs a shell release ([delivery paths](DEVELOPMENT.md#choose-a-delivery-path)). | For pure computation, compile your Rust code to a WebAssembly module in `fns/` and request `wasm` ([Capabilities](PUBLISHING.md#capabilities)). Only OctoSense builds with the `wasm-lab` feature run it, and no release enables that feature yet. Design Flow's [Run your own Rust code](https://github.com/OctoSense-org/OctoScript-App-Design-Flow/blob/main/docs/RUST.md) shows how to build it, and which route to take for device APIs, the network and files. |
 | Submit a system app (`os.*`) or a native app | No route here. System apps ship with the shells, and native code needs a shell release ([delivery paths](DEVELOPMENT.md#choose-a-delivery-path)). | Build a store app with an id of your own. |
-| Install an `auth` app on a phone | No released phone build can. | Test on desktop-v0.1.0-beta.2. |
+| Install an `auth` app on a phone | No released phone build can. | Use the compatible RC on macOS for these macOS-only samples; Android Google authorization is unavailable. |
 | Name Makepad's built-in CJK font in a card kit | Supported by the current Hub and pinned runtime for the exact Regular/Bold resources. | See [Fonts](PUBLISHING.md#fonts) for names, bundled fonts and older-host limits. Native `card-host` rendering is verified on Mac; every shell/platform is not yet verified. |
 
 Design Flow's
