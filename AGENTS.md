@@ -156,7 +156,8 @@ reviewer check one:
   [HOST-API-FAMILIES](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-FAMILIES.md): a family that answers only
   system apps (`llm`, `news`, `calendar`, the engine services) or that nothing
   serves (`clipboard`, `matrix.*` outside Rinx) is a finding, and so is an app
-  that depends on sending mail on RC1.
+  whose listing names only Windows or Linux but depends on sending mail:
+  RC2's native send review exists on macOS and Android only.
 - App Hub accepts only GitHub-attested releases
   ([ADR 0002](docs/adr/0002-github-attested-publisher-identity.md)): the
   app's workflow attests each release, so a developer needs no signing key.
