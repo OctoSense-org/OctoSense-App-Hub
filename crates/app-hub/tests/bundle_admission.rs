@@ -461,8 +461,10 @@ fn a_bundle_carries_at_most_eight_modules_and_hears_about_none() {
 /// from OctoSense's `crates/wasm-host/tests/fixtures` (its
 /// `tests/component-guest/build.sh` builds them). `notes` imports the clock,
 /// random numbers and the filesystem; `netprobe` imports `wasi:sockets`;
-/// `fetch` imports `wasi:http` (OctoSense ADR 0014 phase 3).
+/// `fetch` imports `wasi:http` and `hostcall` `octosense:host` (OctoSense
+/// ADR 0014 phase 3).
 const NOTES: &[u8] = include_bytes!("fixtures/notes.component.wasm");
+const HOSTCALL: &[u8] = include_bytes!("fixtures/hostcall.component.wasm");
 const NETPROBE: &[u8] = include_bytes!("fixtures/netprobe.component.wasm");
 const FETCH: &[u8] = include_bytes!("fixtures/fetch.component.wasm");
 
@@ -532,6 +534,18 @@ fn a_component_that_uses_http_needs_net_and_hosts_and_reviewers_see_them() {
         let finding = refusal(&report, "functions").unwrap_or_else(|| panic!("{}", report.render()));
         assert!(finding.detail.contains("imports wasi:http, which needs the net capability"), "{}", finding.detail);
     }
+}
+
+#[test]
+fn a_component_may_call_its_apps_host_services_with_no_grant_of_its_own() {
+    let report = with_component(true, &["wasm"], HOSTCALL);
+    assert!(report.passed(), "{}", report.render());
+    let reach = report
+        .findings
+        .iter()
+        .find(|f| f.path.as_deref() == Some("fns/notes.wasm"))
+        .unwrap_or_else(|| panic!("no reach line: {}", report.render()));
+    assert!(reach.detail.contains("its app's host services"), "{}", reach.detail);
 }
 
 #[test]

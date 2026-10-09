@@ -119,7 +119,7 @@ admission. A warning does not.
 | `publisher-signature` | The declared GitHub proof fails verification (even with `--allow-unsigned`); or the legacy signature does not verify against the key given with `--publisher-key` or recorded in the catalog; no key was given for a signed manifest (`publisher key "<id>" is not registered with this hub`); the manifest is unsigned and `--allow-unsigned` is absent. | The manifest is unsigned and `--allow-unsigned` is given. |
 | `identity` | The id starts with `os.`; the id, or its last segment, is a reserved name ([Ids and reserved names](#ids-and-reserved-names)). | |
 | `contents` | A file's extension is not one of `.card`, `.json`, `.l0`, `.octoscript`, `.splash`, `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.ttf`, `.otf`, `.txt` or `.md`, and it is not a function module (`.wasm`, see `functions`). Files with no extension, such as `.DS_Store` and `LICENSE`, are refused too. | |
-| `functions` | The bundle carries a `.wasm` file without the `wasm` capability, or more than 8. A file that is not at `fns/<name>.wasm` (the name `[a-z0-9_-]`, at most 64 characters), or is neither a WebAssembly core module (the 8-byte header of version 1) nor a valid component, is refused as `contents-invalid`, as is a component that imports anything outside `wasi:cli`, `wasi:clocks`, `wasi:filesystem`, `wasi:http`, `wasi:io` and `wasi:random`. A component is refused here when the manifest does not require `wasm-components-v1`, when it imports `wasi:filesystem` without the `storage` capability, or when it imports `wasi:http` without the `net` capability and at least one host in `network.hosts` ([WebAssembly components](#webassembly-components)). The gate checks nothing else inside a core module; the host checks its imports and exports when it loads the module. | The app declares `wasm` but carries no `fns/*.wasm`. The manifest requires `wasm-components-v1` but `fns/` holds no component. Each admitted component gets a line saying what it reaches. |
+| `functions` | The bundle carries a `.wasm` file without the `wasm` capability, or more than 8. A file that is not at `fns/<name>.wasm` (the name `[a-z0-9_-]`, at most 64 characters), or is neither a WebAssembly core module (the 8-byte header of version 1) nor a valid component, is refused as `contents-invalid`, as is a component that imports anything outside `wasi:cli`, `wasi:clocks`, `wasi:filesystem`, `wasi:http`, `wasi:io`, `wasi:random` and `octosense:host`. A component is refused here when the manifest does not require `wasm-components-v1`, when it imports `wasi:filesystem` without the `storage` capability, or when it imports `wasi:http` without the `net` capability and at least one host in `network.hosts` ([WebAssembly components](#webassembly-components)). The gate checks nothing else inside a core module; the host checks its imports and exports when it loads the module. | The app declares `wasm` but carries no `fns/*.wasm`. The manifest requires `wasm-components-v1` but `fns/` holds no component. Each admitted component gets a line saying what it reaches. |
 | `contents-invalid` (text and images) | A text file (`.splash`, `.card`, `.json`, `.l0`, `.octoscript`, `.txt` or `.md`) is over 1 MiB or not UTF-8; JSON does not parse; a PNG, JPEG or WebP does not decode or is over 4096 px a side; the listing icon is not square, or is a bitmap over 1 MiB or 1024 px a side. | |
 | `contents-invalid` (SVG) | An SVG does not parse; lacks a numeric `width` and `height` or a `viewBox`; is over 4096 px a side; or holds a script, a `foreignObject` or an `on…` handler. Its styling (a `style` attribute or a `<style>` block) imports a stylesheet, uses an escape, uses a comment or points `url()` anywhere but a `#fragment` in the same file. | |
 | `entry` | The bundle has neither `main.splash` nor `page.card`; `page.card` is not valid L0; `page.data.json` is not JSON; neither `kit/native/<theme>/kit.json` nor every OctoScript kit module the card needs is in the bundle. | |
@@ -216,16 +216,19 @@ The gate admits a component when:
   capability. A host whose `wasm` service loads only core modules does not
   know the feature, so it refuses the app instead of failing at its first call;
 - it validates and imports interfaces only from `wasi:cli`, `wasi:clocks`,
-  `wasi:filesystem`, `wasi:http`, `wasi:io` and `wasi:random`. A type the
-  component defines, such as a record one of its functions returns, does not
-  count as an import. `wasi:sockets` and anything else are refused as
-  `contents-invalid`;
+  `wasi:filesystem`, `wasi:http`, `wasi:io`, `wasi:random` and
+  `octosense:host`. A type the component defines, such as a record one of its
+  functions returns, does not count as an import. `wasi:sockets` and anything
+  else are refused as `contents-invalid`;
 - it imports `wasi:filesystem` only with the `storage` capability. Under
   ADR 0014 the host gives it only the app's own storage folder;
 - it imports `wasi:http` only with the `net` capability and at least one host
   in `network.hosts`. Under ADR 0014's phase 3 the host lets it reach only
   those hosts, by the rule a script's requests follow, over HTTPS (plain HTTP
-  only to the device itself).
+  only to the device itself);
+- `octosense:host` needs no grant of its own: through it the component calls
+  only the host services its app is granted, as the app's script does, and
+  never one that opens a sheet or asks the person.
 
 A component follows a module's name and size rules and counts toward the 8
 function files. Each admitted component gets a warning that tells a reviewer
@@ -246,6 +249,13 @@ Without `net`, or with no hosts, the gate refuses it:
 
 ```text
 [refused] functions: fns/fetch.wasm imports wasi:http, which needs the net capability and the hosts it reaches in network.hosts
+```
+
+A component that imports `octosense:host` (App Hub's `hostcall` fixture, in
+an app with only `wasm`) gets:
+
+```text
+[warning] functions (fns/hostcall.wasm): fns/hostcall.wasm is a component that reaches the clock and its app's host services, but no files, network or other app
 ```
 
 `hub component-info <file.wasm>` prints what a function file is (`component`

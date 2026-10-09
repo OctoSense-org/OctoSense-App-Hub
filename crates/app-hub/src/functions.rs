@@ -19,12 +19,13 @@ use wasmparser::component_types::{ComponentDefinedType, ComponentEntityType, Com
 use wasmparser::types::TypesRef;
 use wasmparser::{ComponentTypeRef, Parser, Payload, PrimitiveValType, TypeBounds, Validator, WasmFeatures};
 
-/// The WASI packages a component may import: every interface of these, each
+/// The packages a component may import: every interface of these, each
 /// scoped to its app by the host. `wasi:http` reaches only the app's
-/// `network.hosts`, over HTTPS (OctoSense ADR 0014 phase 3). Nothing else
-/// (`wasi:sockets`, non-WASI imports) is admitted.
+/// `network.hosts`, over HTTPS, and `octosense:host` only the host services
+/// the app is granted, as its script does (OctoSense ADR 0014 phase 3).
+/// Nothing else (`wasi:sockets`, other packages) is admitted.
 pub const ALLOWED_COMPONENT_IMPORTS: &[&str] =
-    &["wasi:cli/", "wasi:clocks/", "wasi:filesystem/", "wasi:http/", "wasi:io/", "wasi:random/"];
+    &["wasi:cli/", "wasi:clocks/", "wasi:filesystem/", "wasi:http/", "wasi:io/", "wasi:random/", "octosense:host/"];
 
 /// The feature a manifest requires when its `fns/` holds a component.
 pub const COMPONENTS_FEATURE: &str = "wasm-components-v1";
@@ -83,6 +84,12 @@ impl ComponentInfo {
         self.imports.iter().any(|name| name.starts_with("wasi:http/"))
     }
 
+    /// Whether it imports `octosense:host`: the host services its app is
+    /// granted, which it calls as the app's script does.
+    pub fn uses_host_services(&self) -> bool {
+        self.imports.iter().any(|name| name.starts_with("octosense:host/"))
+    }
+
     /// What it reaches, for a reviewer, with the app's network `hosts`: "the
     /// clock, files in its app folder and HTTPS to api.example.com, but no
     /// other app".
@@ -101,6 +108,9 @@ impl ComponentInfo {
         let network = self.uses_http() && !hosts.is_empty();
         if network {
             reaches.push(format!("HTTPS to {}", hosts.join(", ")));
+        }
+        if self.uses_host_services() {
+            reaches.push("its app's host services".to_string());
         }
         let not = match (self.uses_files(), network) {
             (true, true) => "no other app",
@@ -363,6 +373,10 @@ mod tests {
             info(&["wasi:http/outgoing-handler@0.2.4", "wasi:filesystem/types@0.2.9"]).reach(&hosts[..1]),
             "files in its app folder and HTTPS to api.example.com, but no other app"
         );
+        assert_eq!(
+            info(&["octosense:host/services@0.1.0"]).reach(&[]),
+            "its app's host services, but no files, network or other app"
+        );
         // Hosts reach nothing without the import, and the import nothing
         // without hosts.
         assert_eq!(info(&["wasi:clocks/wall-clock@0.2.9"]).reach(&hosts), "the clock, but no files, network or other app");
@@ -371,8 +385,8 @@ mod tests {
 
     #[test]
     fn only_the_scoped_wasi_packages_are_allowed() {
-        let component = info(&["wasi:io/poll@0.2.9", "wasi:sockets/network@0.2.9", "wasi:http/types@0.2.9", "my:pkg/host"]);
-        assert_eq!(component.refused_imports(), ["wasi:sockets/network@0.2.9", "my:pkg/host"]);
+        let component = info(&["wasi:io/poll@0.2.9", "wasi:sockets/network@0.2.9", "wasi:http/types@0.2.9", "my:pkg/host", "octosense:host/services@0.1.0", "octosense:hostile/x"]);
+        assert_eq!(component.refused_imports(), ["wasi:sockets/network@0.2.9", "my:pkg/host", "octosense:hostile/x"]);
         assert!(component.uses_http());
         // A package name is matched whole: wasi:clocksmith is not wasi:clocks.
         assert_eq!(info(&["wasi:clocksmith/x"]).refused_imports(), ["wasi:clocksmith/x"]);
