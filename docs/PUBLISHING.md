@@ -258,53 +258,53 @@ other name:
 A capability lets the app make requests; it does not provide a service to
 answer them. A **host service**, code in the OctoSense shell that does what the
 app may not do itself, answers them. **Served today** says what answers on
-[desktop RC1](../README.md#download-a-compatible-host), within its stated
-platform and provider limits; historical beta differences are explicit.
+[desktop RC2](../README.md#download-a-compatible-host), within its stated
+platform and provider limits; RC1 and historical beta differences are explicit.
 
 | Capability | Grants | The store says | Served today |
 | --- | --- | --- | --- |
 | `storage` | The app's own storage folder: `fs.*`, camera captures and local files a widget reads. Without it every `fs.*` call fails. | Keep its own data on this device | The runtime, in every host |
-| `files` | Import and export files selected in the host's native dialog. Import/export also needs `storage`; the app receives an app-relative file, never general filesystem access. Require the specific `files.*` methods the app uses. | Import and export files you choose in the system file dialog | Published in contract 1.10.0; requires a compatible host implementation, absent from desktop RC1 |
+| `files` | Import and export files selected in the host's native dialog. Import/export also needs `storage`; the app receives an app-relative file, never general filesystem access. Require the specific `files.*` methods the app uses. | Import and export files you choose in the system file dialog | Desktop RC2 on macOS and Windows, on Linux with a dialog helper (zenity, qarma, matedialog or kdialog), and compatible Android builds; absent from RC1. 1 MiB per file; `files.share` is Android-only and confirms only the chooser handoff |
 | `net` | Requests to the hosts in `network.hosts`, and no others. | Reach only: *hosts* | The runtime, in every host |
 | `images` | Pictures from any public https host, not only `network.hosts`. | Show pictures from any website | The runtime |
-| `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime on supported platforms, including RC1 Windows/WebView2 and Linux X11/XWayland/WebKitGTK; native Wayland embedding is unsupported ([requirements](../README.md#download-a-compatible-host)). |
-| `location` | The device's location. On macOS in desktop RC1 and in compatible Android source builds, an app that declares `host-api-v1` must first ask with `location.permission.request`; on Android only, it can then read the last-known fix with `location.get` ([Host API compatibility](HOST-API.md)). | Use your location | The runtime, where the device has it |
-| `camera` | The camera. A capture is saved in the app's storage, so the app also needs `storage`. On macOS in desktop RC1 and in compatible Android source builds, an app that declares `host-api-v1` must first ask with `camera.permission.request`. | Use the camera | The runtime, where the device has it |
-| `microphone` | Record sound after app and OS consent. Foreground `microphone.record_*` sessions are an unreleased host extension; earlier hosts may expose permission methods without recording. Declare the exact required methods and first request `microphone.permission.request`. | Use the microphone | The runtime, where the device has it |
-| `audio` | Play app-local audio while the app is active. Does not imply microphone, storage or background access. | Play its own audio files while the app is active | Contract 1.10.0 is published; requires a matching native host, absent from desktop RC1. |
+| `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime on supported platforms, including Windows/WebView2 and Linux X11/XWayland/WebKitGTK since RC1; native Wayland embedding is unsupported ([requirements](../README.md#download-a-compatible-host)). |
+| `location` | The device's location. On macOS since desktop RC1 and in compatible Android source builds, an app that declares `host-api-v1` must first ask with `location.permission.request`; it can then read a fresh fix with `location.sample` on macOS and Android (RC2), or the last-known fix with `location.get` on Android only ([Host API compatibility](HOST-API.md)). | Use your location | The runtime, where the device has it |
+| `camera` | The camera. A capture is saved in the app's storage, so the app also needs `storage`. On macOS since desktop RC1 and in compatible Android source builds, an app that declares `host-api-v1` must first ask with `camera.permission.request`. | Use the camera | The runtime, where the device has it |
+| `microphone` | Record sound after app and OS consent. Foreground `microphone.record_*` sessions arrive with desktop RC2 on macOS and compatible Android builds (clips of up to 30 seconds into the app's storage; hardware acceptance pending); earlier hosts, and Windows and Linux, expose permission methods without recording. Declare the exact required methods and first request `microphone.permission.request`. | Use the microphone | The runtime, where the device has it |
+| `audio` | Play app-local audio while the app is active. Does not imply microphone, storage or background access. | Play its own audio files while the app is active | Desktop RC2 on macOS and compatible Android builds, with `storage` (files of at most 1 MiB and 60 seconds); not Windows, Linux or RC1; hardware acceptance pending. |
 | `library` | Offering captures to the system photo library, where other apps can see them. | Save to your photo library, where other apps can see it | The runtime, where the device has it |
 | `clipboard` | The clipboard. | Use the clipboard | Not yet: no API uses it |
 | `prompt` | Questions the app asks the person. | Ask you questions | Not yet: no host reads it. An app agent asks with `ask_user_question`. |
 | `ledger.read` | Reading the shared ledger. | Read your shared data | Not yet: no `ledger` service |
-| `mail` | Mail through the host's `mail` service, from accounts the person signs in to on a host [sheet](#sheets-apps-never-collect-secrets). | Read and send mail from accounts you sign in to on the device | OctoSense |
-| `auth` | Connecting the app's own GitHub or Google accounts. In OctoSense desktop RC1, also signing in to the app's own backend and calling the operations the manifest declares ([Sign in to your own backend](#sign-in-to-your-own-backend)). | Connect its own GitHub or Google accounts, or sign in to its developer’s backend, through the host | OctoSense, with OAuth client registrations on the host ([Connected accounts](#connected-accounts)) |
+| `mail` | Mail through the host's `mail` service, from accounts the person signs in to on a host [sheet](#sheets-apps-never-collect-secrets). | Read and send mail from accounts you sign in to on the device | OctoSense. Since desktop RC2 a store app can also keep drafts (`mail.compose`) and request the native send review (`mail.review_send`), which approves only on macOS and Android ([Host API compatibility](HOST-API.md#reviewed-mail-drafts-desktop-rc2)) |
+| `auth` | Connecting the app's own GitHub or Google accounts. Since OctoSense desktop RC1, also signing in to the app's own backend and calling the operations the manifest declares ([Sign in to your own backend](#sign-in-to-your-own-backend)). | Connect its own GitHub or Google accounts, or sign in to its developer’s backend, through the host | OctoSense, with OAuth client registrations on the host ([Connected accounts](#connected-accounts)) |
 | `github` | Reading repositories; each Markdown commit waits for the person's review. | Read authorized repositories and ask you to review Markdown commits | As `auth` |
 | `gcalendar` | Reading Google calendars; each event change waits for the person's review. | Read authorized Google calendars and ask you to review event changes | As `auth` |
 | `gmail` | Reading Gmail and keeping reply drafts; each send waits for the person's review. Separate from `mail`. | Read authorized Gmail messages, keep reply drafts and request native send review | As `auth` |
 | `calendar` | Calendar's local event store and UI. Not Google Calendar. | Read and manage local events through the device's Calendar service | System app `os.calendar` only; store apps use `gcalendar` |
-| `device_calendar` | Read selected native device calendars and request review of event changes. Separate app consent, OS permission and calendar selection are required. | Read device calendars you choose and ask you to review event changes | Contract 1.10.0 is published. Requires a compatible host adapter; not in desktop RC1 or Home beta.1. Declare exact required methods. |
+| `device_calendar` | Read selected native device calendars and request review of event changes. Separate app consent, OS permission and calendar selection are required. | Read device calendars you choose and ask you to review event changes | Desktop RC2 on macOS (EventKit) and Android Home builds with the adapter; not Windows, Linux, RC1 or Home beta.1. Writes take a physical press; OS-calendar interaction is pending acceptance. Declare exact required methods. |
 | `llm` | Managing the device's AI providers through the `llm` service. | Manage the assistant's AI providers, whose keys stay with the device | System apps only |
 | `news` | Items the device collects from its feeds and topic feeds. | Read news the device collects from its feeds and topics | System apps only |
 | `photos` | Photos' own library and collections. | Read Photos's own library and publish collections | System apps only: OctoSense serves just `photos.notify`, to `os.photos` |
 | `youtube` | YouTube search and music recommendations. | Search YouTube and manage music recommendations | System apps only: OctoSense serves just `youtube.notify`, to `os.youtube` |
 | `glance` | Publishing Glance cards to the Glance screen (`glance.publish`, `glance.withdraw`, `glance.list`). The host checks, caps and expires the cards; a card opens only its own app. | Show cards on your glance screen | OctoSense |
-| `model` | `model.complete` and `model.budget`, within a daily budget per app. `model.complete` takes a model class (`fast` or `strong`) and a JSON Schema. Image, audio, video and embedding methods are implemented in [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368), included in desktop RC1. | Send what you give it to the AI provider you configured, within a daily budget | OctoSense; media methods require the new implementation and a compatible configured provider |
+| `model` | `model.complete` and `model.budget`, within a daily budget per app. `model.complete` takes a model class (`fast` or `strong`) and a JSON Schema. Image, audio, video and embedding methods are implemented in [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368), included since desktop RC1. | Send what you give it to the AI provider you configured, within a daily budget | OctoSense; media methods require the new implementation and a compatible configured provider |
 | `research` | Searching through the system toolbox, within the manifest's research scope ([The research scope](#the-research-scope)). The host runs every search. | Search *what the scope allows* | System apps only, in phone builds |
 | `crawl` | Crawling sites through the system toolbox, up to the scope's `max_depth` and `max_pages`, inside its domain lists. More reach than `research`. | Crawl websites, *within the scope*, which reaches more than searching | As `research` |
 | `runtime` | Asking which APIs the host implements, with `runtime.list` and `runtime.describe` ([Host API compatibility](HOST-API.md)). It grants none of the APIs it lists. | Inspect available host APIs without gaining access to their data or permissions | Not on OctoSense desktop 0.1.0-beta.2, whose store refuses the name. App Hub's request dispatcher answers it in every host built from App Hub `main`, `card-host` included. |
-| `wasm` | The app's own functions: WebAssembly modules in the bundle's `fns/` (at most 8), run by the host's `wasm` service in a sandbox with a deadline and a memory cap. A function gets only its input and reaches no file, network, clock or other app. An agent tool can run one with `host_method: "wasm.<function>"`. To write, build and call a function, see App Flow's [Run your own Rust code](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.md). | Run its own sandboxed functions on this device | Not in any release yet: standard desktop RC1 packages leave it disabled. Every standard desktop and Home build of OctoSense `main` serves it on macOS, Linux and Android, with limited support ([the service and its limits](https://github.com/OctoSense-org/OctoSense/blob/main/docs/wasm.md#the-service)). Builds for Windows, iOS and OpenHarmony leave it out: a call there answers `no service answers "wasm" on this device`. |
-| `sheet` | Spreadsheets through the `sheet` engine (gridcraft): workbooks, formulas, recalculation and xlsx, inside the app's own files. | Use the device's spreadsheet engine on its own files | System apps only. Not in any release yet: OctoSense `main` serves it in desktop and Home builds. |
-| `photo` | Images and photo documents through the `photo` engine (photocraft): inspect, convert, edit commands and previews, inside the app's own files. | Use the device's image-editing engine on its own files | System apps only. Not in any release yet: OctoSense `main` serves it in desktop and Home builds. |
-| `word` | Documents through the `word` engine (wordcraft): create, read, inspect, and convert between docx, Markdown, HTML, RTF, ODT and PDF, inside the app's own files. | Use the device's document engine on its own files | System apps only. Not in any release yet: OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
-| `deck` | Slide decks through the `deck` engine (deckcraft): create from an outline, render slides, and convert to PPTX or PDF, inside the app's own files. | Use the device's presentation engine on its own files | System apps only. Not in any release yet: OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
-| `cad` | Drawings through the `cad` engine (cadcraft): inspect, query, measure, render, and convert DXF and DWG, inside the app's own files. | Use the device's CAD engine on its own files | System apps only. Not in any release yet: OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
-| `light` | Raw photos through the `light` engine (lightcraft): metadata, develop controls, and single or batch develop, inside the app's own files. | Use the device's raw-photo engine on its own files | System apps only. Not in any release yet: OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
-| `sound` | Audio files through the `sound` engine (soundcraft), offline: info, waveform peaks, convert, trim and mix; it never opens an audio device, inside the app's own files. | Use the device's audio-editing engine on its own files | System apps only. Not in any release yet: OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
-| `design` | Page layouts through the `design` engine (designcraft): document info, page renders, and PDF, IDML or EPUB export, inside the app's own files. | Use the device's page-layout engine on its own files | System apps only. Not in any release yet: OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
-| `film` | Video through the `film` engine (filmcraft): container info, frames as PNG, and bounded exports with its own codecs, inside the app's own files. | Use the device's video-editing engine on its own files | System apps only. Not in any release yet: OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
-| `effect` | Motion graphics through the `effect` engine (effectcraft): project info, frame renders, and Lottie import and export, inside the app's own files. | Use the device's motion-graphics engine on its own files | System apps only. Not in any release yet: OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
-| `vector` | Vector art through the `vector` engine (vectorcraft): inspect, convert, and render SVG, PDF, EPS and DXF, inside the app's own files. | Use the device's vector-drawing engine on its own files | System apps only. Not in any release yet: OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
-| `pdf` | PDFs through the `pdf` engine (pdfcraft): info, text, page renders, merge and split, inside the app's own files. | Use the device's PDF engine on its own files | System apps only. Not in any release yet: OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
+| `wasm` | The app's own functions: WebAssembly modules in the bundle's `fns/` (at most 8), run by the host's `wasm` service in a sandbox with a deadline and a memory cap. A function gets only its input and reaches no file, network, clock or other app. An agent tool can run one with `host_method: "wasm.<function>"`. To write, build and call a function, see App Flow's [Run your own Rust code](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.md). | Run its own sandboxed functions on this device | Desktop RC2 serves it in standard builds on macOS and Linux, with limited support ([the service and its limits](https://github.com/OctoSense-org/OctoSense/blob/main/docs/wasm.md#the-service)); RC1 left it disabled. Supported Android Home source builds serve it too. Builds for Windows, iOS and OpenHarmony leave it out: a call there answers `no service answers "wasm" on this device`. |
+| `sheet` | Spreadsheets through the `sheet` engine (gridcraft): workbooks, formulas, recalculation and xlsx, inside the app's own files. | Use the device's spreadsheet engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop and Home builds. |
+| `photo` | Images and photo documents through the `photo` engine (photocraft): inspect, convert, edit commands and previews, inside the app's own files. | Use the device's image-editing engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop and Home builds. |
+| `word` | Documents through the `word` engine (wordcraft): create, read, inspect, and convert between docx, Markdown, HTML, RTF, ODT and PDF, inside the app's own files. | Use the device's document engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
+| `deck` | Slide decks through the `deck` engine (deckcraft): create from an outline, render slides, and convert to PPTX or PDF, inside the app's own files. | Use the device's presentation engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
+| `cad` | Drawings through the `cad` engine (cadcraft): inspect, query, measure, render, and convert DXF and DWG, inside the app's own files. | Use the device's CAD engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
+| `light` | Raw photos through the `light` engine (lightcraft): metadata, develop controls, and single or batch develop, inside the app's own files. | Use the device's raw-photo engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
+| `sound` | Audio files through the `sound` engine (soundcraft), offline: info, waveform peaks, convert, trim and mix; it never opens an audio device, inside the app's own files. | Use the device's audio-editing engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
+| `design` | Page layouts through the `design` engine (designcraft): document info, page renders, and PDF, IDML or EPUB export, inside the app's own files. | Use the device's page-layout engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
+| `film` | Video through the `film` engine (filmcraft): container info, frames as PNG, and bounded exports with its own codecs, inside the app's own files. | Use the device's video-editing engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
+| `effect` | Motion graphics through the `effect` engine (effectcraft): project info, frame renders, and Lottie import and export, inside the app's own files. | Use the device's motion-graphics engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
+| `vector` | Vector art through the `vector` engine (vectorcraft): inspect, convert, and render SVG, PDF, EPS and DXF, inside the app's own files. | Use the device's vector-drawing engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
+| `pdf` | PDFs through the `pdf` engine (pdfcraft): info, text, page renders, merge and split, inside the app's own files. | Use the device's PDF engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
 
 No capability implies another. Not yet: `photos` and `youtube` services for
 store apps. For how a script calls each capability, see App Flow's
@@ -615,7 +615,9 @@ The gate refuses a `host_method` unless every rule holds:
 | `location` | `location.permission.status`, `location.get` | |
 
 App Hub admits the `device_calendar` aliases and `mail.compose` /
-`mail.compose_status`; their host implementations are not in desktop RC1. All require `private_data: true` and the corresponding
+`mail.compose_status`; desktop RC2 implements them on macOS and compatible
+Android builds, RC1 does not, and Windows and Linux compose and read a draft's
+status but cannot approve a send. All require `private_data: true` and the corresponding
 capability. Calendar permission prompts, calendar selection and event writes
 are foreground-only; so are `mail.review_send` and `mail.send`. Preparing a
 draft does not send it. The compatible host must check authorization again
@@ -623,9 +625,9 @@ and show its own immutable review before a person approves an external write.
 
 `wasm.<function>` runs one of the app's own functions (`fns/*.wasm`, the
 `wasm` capability), only on hosts that serve `wasm`
-([Capabilities](#capabilities)); standard desktop RC1 packages leave it
-disabled. RC1 implements the `auth`, `runtime`, `camera`,
-`microphone` and `location` methods above within the
+([Capabilities](#capabilities)): desktop RC2 on macOS and Linux, while RC1
+left it disabled. RC2 implements the `auth`, `runtime`, `camera`,
+`microphone`, `location`, `device_calendar` and `mail` methods above within the
 [platform limits](HOST-API.md#limits).
 The rules above apply to them too, `runtime.list` and `runtime.describe`
 included. Admission does not configure an account, grant a permission or
@@ -637,7 +639,7 @@ person's approval on the host's native review screen. Permission `request` and
 have no `host_method`.
 
 The seven media aliases above require [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368);
-desktop RC1 includes them. They keep the `model` capability and
+desktop RC1 and RC2 include them. They keep the `model` capability and
 `private_data: true` requirements. Generation and embeddings may be billable,
 so they and video cancellation require `act` risk and use the bounded model
 service. Discovery does not prove provider entitlement; video cancellation
@@ -654,7 +656,7 @@ For a tool mapped to `glance.publish`, let `input_schema` accept only
 `template` with `initial`, or an L0 `source` with `data`. Never accept
 `script`. OctoSense desktop 0.1.0-beta.2 publishes an agent's script card
 under the app's own policy, so a model-written `script` runs as your app.
-OctoSense desktop RC1 refuses it with
+Since OctoSense desktop RC1, the host refuses it with
 `Agents cannot publish executable Splash; choose an admitted template with initial data, or L0 source`,
 and refuses an L1 `source` too.
 
@@ -664,7 +666,7 @@ Source: `SHARED_HOST_METHODS` in `crates/app-policy/src/agent.rs`.
 
 A script tool is a tool with `"implemented_by": "app"`: the app's own Splash
 code runs it, inside the open app. It needs a host that advertises
-`app_tools.dispatch@1`, such as [desktop RC1](../README.md#download-a-compatible-host). OctoSense desktop 0.1.0-beta.2 refuses these tools with
+`app_tools.dispatch@1`, such as [desktop RC2](../README.md#download-a-compatible-host). OctoSense desktop 0.1.0-beta.2 refuses these tools with
 `app_tool_unavailable`.
 
 To add one:
@@ -827,7 +829,7 @@ On OctoSense desktop 0.1.0-beta.2, each part works as follows:
 | `agent.model` | Not yet: OctoSense ignores it. |
 | Glance cards from the agent | Any card the app may publish, a `script` card included. |
 
-OctoSense desktop RC1 changes four things:
+OctoSense desktop RC1 changed four things, and RC2 keeps them:
 
 - Tools with `implemented_by: "app"` run in the open app
   ([Script tool execution](#script-tool-execution-script-tools-v1)).
@@ -932,7 +934,7 @@ What the host enforces depends on its build and platform. Protected writes
 remain unsupported and fail closed on Windows/Linux; see
 [platform limits](../README.md#download-a-compatible-host):
 
-| | OctoSense desktop 0.1.0-beta.2 | OctoSense desktop RC1 |
+| | OctoSense desktop 0.1.0-beta.2 | OctoSense desktop RC1 and RC2 |
 | --- | --- | --- |
 | Approving a Gmail send | A physical press on the native Approve & Send control | The same |
 | Approving a GitHub or Google Calendar save | The host's review sheet, which does not check that the press is physical | A physical press on the native Approve & Save control; script and agent requests cannot approve |
@@ -949,11 +951,11 @@ Sign-in needs the provider's OAuth registration in the host:
 | Host | Registrations come from | Without one, `auth.connect` fails with |
 | --- | --- | --- |
 | OctoSense desktop 0.1.0-beta.2 | The host's `oauth/clients.json`, which the release does not ship | `OAuth is not configured. Add provider registrations in the host's oauth/clients.json` |
-| OctoSense desktop RC1 | Distributor build settings or a host `oauth/clients.json` override; the public RC1 packages include no registrations | `GitHub sign-in is unavailable in this build. Check for an OctoSense update or contact its distributor.`, or the same for Google |
+| OctoSense desktop RC1 and RC2 | Distributor build settings or a host `oauth/clients.json` override; the public RC1 and RC2 packages include no registrations | `GitHub sign-in is unavailable in this build. Check for an OctoSense update or contact its distributor.`, or the same for Google |
 
 ### Sign in to your own backend
 
-OctoSense desktop RC1 can sign an app in to its developer's
+Since OctoSense desktop RC1, the host can sign an app in to its developer's
 backend and call the backend operations that the app declares, within the
 [platform limits](../README.md#download-a-compatible-host). Declare the
 backend in the manifest. The declaration is public and holds no credential:
@@ -1020,15 +1022,18 @@ sessions, and the person signs in again.
 Where it works:
 
 - Only a host that implements `auth.backend.request@1` installs the app:
-  desktop RC1 advertises it on macOS, Windows and Linux; compatible Android
-  source builds also implement it. Windows/Linux use external-browser login
-  and declared reads; embedded login and protected writes are unsupported.
+  desktop RC1 and RC2 advertise it on macOS, Windows and Linux; compatible
+  Android source builds also implement it. Windows/Linux use external-browser
+  login (RC2 adds the native link openers it needs) and declared reads;
+  embedded login and protected writes are unsupported.
   A host missing the method refuses it with
   `app <id> needs a host implementing auth.backend.request@1`. iOS has no backend sign-in.
 - An app without a `backend` block signs in only on devices whose operator
   registered its backend in the host's `oauth/backends.json`. Windows and Linux
-  use the browser for that sign-in (unverified).
-- Unverified: a live sign-in and an approved write on a device.
+  use the browser for that sign-in.
+- Verified on Windows with RC2's source: a fixture completed a browser sign-in
+  against a synthetic backend. Unverified: sign-in against a real backend,
+  sign-in on Linux, and an approved write on a device.
 
 What an app cannot do:
 
@@ -1153,7 +1158,7 @@ packet on stdin. Its failure or invalid output still requires human review.
 New apps can use GitHub-managed publisher provenance: developers do not
 create, store or rotate a publisher private key. This source implementation
 uses published contract **1.10.0**, retaining `publisher-github-v1` from 1.8.0.
-[Desktop RC1](../README.md#download-a-compatible-host) is a compatible released host. Two real tag-push releases passed the workflow and
+[Desktop RC2](../README.md#download-a-compatible-host) is the compatible released host, as RC1 was. Two real tag-push releases passed the workflow and
 native Store acceptance described below. The historical Ed25519 route
 remains below for existing packages.
 
@@ -1209,9 +1214,10 @@ binds the input hashes and native source. Its Store catalog was an ephemeral
 local test catalog; the fixture has no App Hub submission or catalog entry.
 This does not establish app UI execution or phone publisher installation.
 
-On macOS, [OctoSense desktop RC1](../README.md#download-a-compatible-host)
-installs the GitHub-attested sample apps in catalog sequence 13 and checks
-their attestations and publisher continuity at install and update. Store
+On macOS, OctoSense desktop RC1 installed the GitHub-attested sample apps in
+catalog sequence 13 and checked their attestations and publisher continuity at
+install and update; [RC2](../README.md#download-a-compatible-host) reads the
+catalog the same way. Store
 installs on iOS, Windows and Linux remain unverified, and no released phone
 build supports `publisher-github-v1`.
 
