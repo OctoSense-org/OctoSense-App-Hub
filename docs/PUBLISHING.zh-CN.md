@@ -150,7 +150,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 
 - 清单在 `requires` 中声明了 `wasm-components-v1`，这需要 `wasm` 能力。`wasm` 服务只能加载核心模块的宿主不认识这个特性，因此会拒绝这个应用，而不是等到第一次调用时才失败；
 - 组件能通过验证，且只从 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:io` 和 `wasi:random` 导入接口。组件自己定义的类型（例如某个函数返回的记录）不算导入。`wasi:sockets`、`wasi:http` 及其他任何导入都以 `contents-invalid` 拒绝；
-- 只有应用有 `storage` 能力时，组件才可以导入 `wasi:filesystem`。宿主只给它应用自己的存储文件夹。
+- 只有应用有 `storage` 能力时，组件才可以导入 `wasi:filesystem`。按 ADR 0014，宿主只给它应用自己的存储文件夹。
 
 组件遵守与模块相同的名称和大小规则，并计入 8 个函数文件的上限。每个准入的组件都有一条警告，告诉审核人员它能访问什么：
 
@@ -158,7 +158,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 [warning] functions (fns/notes.wasm): fns/notes.wasm is a component that reaches the clock, random numbers and files in its app folder, but no network or other app
 ```
 
-`hub component-info <file.wasm>` 输出函数文件的类型（`component` 或 `module`）、它的导入，以及它导出的函数，每个函数都附上 WIT 写法的参数和结果。下面是对 App Hub 测试中的 notes 组件（`crates/app-hub/tests/fixtures/notes.component.wasm`）运行的结果，省略处以 `…` 标出：
+`hub component-info <file.wasm>` 输出函数文件的类型（`component` 或 `module`）、它的导入，以及它导出的函数，每个函数都附上 WIT 写法的参数和结果。下面在一个应用包中运行它，包中的 `fns/notes.wasm` 就是 App Hub 测试中的 notes 组件（`crates/app-hub/tests/fixtures/notes.component.wasm`），省略处以 `…` 标出：
 
 ```console
 $ hub component-info fns/notes.wasm

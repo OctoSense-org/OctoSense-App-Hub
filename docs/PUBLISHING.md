@@ -220,8 +220,8 @@ The gate admits a component when:
   such as a record one of its functions returns, does not count as an import.
   `wasi:sockets`, `wasi:http` and anything else are refused as
   `contents-invalid`;
-- it imports `wasi:filesystem` only with the `storage` capability. The host
-  gives it the app's own storage folder and nothing else.
+- it imports `wasi:filesystem` only with the `storage` capability. Under
+  ADR 0014 the host gives it only the app's own storage folder.
 
 A component follows a module's name and size rules and counts toward the 8
 function files. Each admitted component gets a warning that tells a reviewer
@@ -233,7 +233,8 @@ what it reaches:
 
 `hub component-info <file.wasm>` prints what a function file is (`component`
 or `module`), its imports and its exported functions, each with its parameters
-and result as WIT writes them. Run on the notes component in App Hub's tests
+and result as WIT writes them. Here it runs in a bundle whose
+`fns/notes.wasm` is the notes component from App Hub's tests
 (`crates/app-hub/tests/fixtures/notes.component.wasm`), with the output
 shortened at `…`:
 
