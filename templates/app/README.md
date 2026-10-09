@@ -32,8 +32,10 @@ Before you submit:
 6. Run the unsigned bundle in
    [`card-host`](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/DEVELOPMENT.md#run-a-bundle-locally-card-host)
    and capture `bundle/screenshots/01-main.png`.
-7. Stamp, check, review, sign and submit the completed `bundle/` directory,
-   as [Submit an app](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/SUBMITTING.md)
+7. Stamp, check and review the completed `bundle/` directory, release it
+   through the GitHub release workflow that App Flow's `tools/octo publish-github`
+   installs, and submit it, as
+   [Submit an app](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/SUBMITTING.md)
    describes.
 
 The manifest's initial digest is a placeholder; `hub stamp` writes the real

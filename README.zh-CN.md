@@ -28,20 +28,19 @@ App Hub 为 OctoSense 发布应用。本仓库包含：
 
 ## 下载兼容宿主
 
-[**桌面版 0.1.0-rc.1 已发布**](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.1)，源码为 `933abbcf`，
-支持带 GitHub 证明的应用、公开 v2 目录和 Host API v1。
+[**桌面版 0.1.0-rc.2 已发布**](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.2)，源码为 `4ccf8e06`，2026-10-09 发布，支持带 GitHub 证明的应用、公开 v2 目录和 Host API v1，并在各自支持的平台上新增文档、设备日历、邮件草稿和音频 API（[宿主目前提供什么](#宿主目前提供什么)）。
 
 | 平台 | 下载 |
 | --- | --- |
-| macOS Apple 芯片 | [DMG](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/OctoSense_0.1.0-rc.1_aarch64.dmg) 或 [应用 ZIP](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/OctoSense_0.1.0-rc.1_macos_aarch64.app.zip) |
-| Windows x64 | [安装程序](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_x64-setup.exe) |
-| Linux x86_64 | [Debian 包](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_amd64.deb) 或 [AppImage](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_x86_64.AppImage) |
+| macOS Apple 芯片 | [DMG](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/OctoSense_0.1.0-rc.2_aarch64.dmg) 或 [应用 ZIP](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/OctoSense_0.1.0-rc.2_macos_aarch64.app.zip) |
+| Windows x64 | [安装程序](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/octosense_0.1.0-rc.2_x64-setup.exe) |
+| Linux x86_64 | [Debian 包](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/octosense_0.1.0-rc.2_amd64.deb) 或 [AppImage](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/octosense_0.1.0-rc.2_x86_64.AppImage) |
 
-请用 [SHA256SUMS](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/SHA256SUMS) 核对下载，并阅读发行说明中的平台要求。
+请用 [SHA256SUMS](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/SHA256SUMS) 核对下载，并阅读[发行说明](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/RELEASE-NOTES.zh-CN.md)中的平台限制。
 这些预发行包**没有 Apple Developer ID 签名、公证或 Windows 发布者签名**。
-macOS 包在本机构建并验收，Windows/Linux 包来自标签 CI 打包任务。
-[发行来源记录](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/RELEASE-PROVENANCE.json)记载确切文件及签名状态。
-自行构建请按[固定源码的环境准备指南](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/README.zh-CN.md#环境准备)操作。
+macOS 包在本机构建并以 ad-hoc 签名封存，Windows 和 Linux 包来自标签 CI 任务，Linux 打包的修正记录在发行来源记录中。
+[发行来源记录](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/RELEASE-PROVENANCE.json)记载确切文件及签名状态。
+自行构建请按[固定源码的环境准备指南](https://github.com/OctoSense-org/OctoSense/blob/4ccf8e068399b1da139771a9ed94cef05fa6ae60/README.zh-CN.md#环境准备)操作。
 
 下面四个示例请在 **Apple 芯片 Mac** 上运行。打开 **App Hub → Search**，
 输入确切应用 ID，选择 **Get**，审阅权限后选择 **Install**，再点 **Open**。
@@ -50,15 +49,14 @@ macOS 包在本机构建并验收，Windows/Linux 包来自标签 CI 打包任�
 旧 beta.2 宿主无法读取新的发布者证明或公开 v2 目录：请换用兼容宿主，
 不要修改应用证明或目录设置。
 
-RC **没有附带公开的 GitHub/Google OAuth 客户端注册信息**。本地草稿和未连接
+RC2 **没有附带公开的 GitHub/Google OAuth 客户端注册信息**。本地草稿和未连接
 账户时的界面可用；提供商登录需要宿主发行方或运维人员提供注册信息
-（[配置](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/crates/oauth-service/README.zh-CN.md)）。普通用户不应被要求注册
+（[配置](https://github.com/OctoSense-org/OctoSense/blob/4ccf8e068399b1da139771a9ed94cef05fa6ae60/crates/oauth-service/README.zh-CN.md)）。普通用户不应被要求注册
 Google 开发者项目。安装成功不代表登录、邮件投递、GitHub commit 或日历写入已验证。
-连接账户示例只声明 macOS。Linux/Windows 已实现外部浏览器后端登录和清单声明的后端读取，
-但这里未验证这些平台的真实登录。嵌入式后端登录及受保护的写操作仍不支持，会拒绝执行。
+连接账户示例只声明 macOS。Linux/Windows 已实现外部浏览器后端登录和清单声明的后端读取；RC2 补上了登录所需的原生链接打开方式，用 RC2 源码构建的 Windows 测试程序已对一个模拟后端完成浏览器登录，Linux 上的登录仍未验证。嵌入式后端登录及受保护的写操作仍不支持，会拒绝执行。
 Android Google 授权仍不可用。普通 WebReader 与登录是不同的流程；Linux 需要
 GTK 3/WebKitGTK 和 X11/XWayland，Windows 需要 WebView2。这些引擎不随包附带，
-见[浏览器要求](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/docs/desktop-embedded-browser.zh-CN.md)。
+见[浏览器要求](https://github.com/OctoSense-org/OctoSense/blob/4ccf8e068399b1da139771a9ed94cef05fa6ae60/docs/desktop-embedded-browser.zh-CN.md)。
 
 ## 仓库结构
 
@@ -117,26 +115,29 @@ OCTOSENSE_PREVIEW_SIZE=1200x860 OCTOSENSE_APP_DATA="$(mktemp -d)" target/release
 ## 宿主目前提供什么
 
 准入检查接受能力名称；每次调用仍需要宿主实现并授权。
-完整参考见[能力](docs/PUBLISHING.zh-CN.md#能力)。[RC1 发行版](#下载兼容宿主)包含：
+完整参考见[能力](docs/PUBLISHING.zh-CN.md#能力)。[RC2 发行版](#下载兼容宿主)包含 RC1 的全部内容，以及标为 RC2 的新增项：
 
-- 公开 GitHub v2 目录及 `publisher-github-v1` 验证，使用契约 1.8.0。
+- 公开 GitHub v2 目录及 `publisher-github-v1` 验证，使用契约 1.10.0（RC1 为 1.8.0）。
 - `runtime` 发现和 `script-tools-v1`：已准入的 `implemented_by: "app"` 工具
   调用已打开的完整应用中的 Splash 处理函数；应用关闭时返回 `app_not_running`。
 - 已连接账户服务（`auth`、`github`、`gmail`、`gcalendar`），受提供商注册和平台
   限制约束。令牌保留在宿主中。
 - macOS、Android、Linux 和 Windows 上由清单声明的后端读取；受保护的写操作需要
   受支持的原生批准流程。相机、麦克风和位置的逐应用授权支持 macOS/Android；
-  `location.get` 仅在 Android 上提供。
+  `location.get` 仅在 Android 上提供，RC2 的 `location.sample` 在 macOS 和 Android 上读取新鲜位置。
 - 支持平台上的 GitHub/Calendar 保存和 Gmail 发送需要亲手确认；Agent 发布速览
   卡片时拒绝可执行 Splash `script`；Calendar 同步限定日期范围。
 - `model` 的媒体及文本方法，仍需已配置且有相应权益的提供商。方法已注册不代表
   已通过真实提供商执行验证。
+- RC2：文档导入导出和照片选择（`files.*`），支持 macOS、Windows 和 Android，Linux 需安装对话框辅助程序；Android 上可分享文本；可向应用存储写入二进制文件（`fs.write_bytes`）。单文件上限 1 MiB。
+- RC2：设备日历（`device_calendar.*`），macOS 上通过 EventKit 提供，Android Home 上通过其适配器提供，写入须亲手点按确认；与系统日历的实际交互仍待验收。
+- RC2：任何获得 `mail` 授权的应用都可以保存邮件草稿（`mail.compose`、`mail.compose_status`）并请求原生发送审阅（`mail.review_send`）；审阅只在 macOS 和 Android 上可以批准。
+- RC2：前台音频播放和录音（`audio.*`、`microphone.record_*`），支持 macOS 和 Android，文件位于应用存储内；硬件验收待完成。
+- RC2：`Video` 控件的播放控制接口，以及 Windows 和 Linux 上 `LinkLabel` 的原生链接打开方式（浏览器启动未验证）。
 
 `card-host` 仅提供 `runtime` 发现，不运行 Agent，并拒绝封存的 Release 和仅宿主
 支持的要求标记。`calendar`、`llm`、`news` 仍为系统应用服务；`photos`/`youtube`
-通知仅供各自的系统应用使用。Wasm **在 RC1 及其他所有发行版中均未启用**；OctoSense
-`main` 在 macOS、Linux 和 Android 上的标准桌面版和 Home 构建中运行它，属于有限支持。
-声明能力不能添加原生代码或开启构建特性。见[宿主 API 兼容性](docs/HOST-API.zh-CN.md)。
+通知仅供各自的系统应用使用。Wasm **在 RC2 的 macOS 和 Linux 上已启用**：标准构建运行应用自带的 `fns/*.wasm`，属于有限支持；Windows、iOS 和 OpenHarmony 的构建不包含它，RC1 及更早的发行版都未启用。受支持的 Android Home 源码构建也运行它。声明能力不能添加原生代码或开启构建特性。见[宿主 API 兼容性](docs/HOST-API.zh-CN.md)。
 
 ## 信任锚
 
@@ -158,11 +159,11 @@ OCTOSENSE_HUB_ANCHOR="<test-anchor-hex>" OCTOSENSE_APP_DATA="<fresh-test-directo
 appstore
 ```
 
-此示例仅按源码核对；运行前替换占位符。应用库只要已有 v2 缓存，即使损坏，也会拒绝降级到旧格式。旧缓存不会离线转换：第一次获取 v2 需要网络，或显式提供含有效 v2 信封的镜像。拉取或证明失败不会回退。较旧的宿主发布版继续读取 `catalog.json`；公开 v2 目录需要[兼容的 RC1 发行版](#下载兼容宿主)。
+此示例仅按源码核对；运行前替换占位符。应用库只要已有 v2 缓存，即使损坏，也会拒绝降级到旧格式。旧缓存不会离线转换：第一次获取 v2 需要网络，或显式提供含有效 v2 信封的镜像。拉取或证明失败不会回退。较旧的宿主发布版继续读取 `catalog.json`；公开 v2 目录需要[兼容的 RC2 发行版](#下载兼容宿主)。
 
 ## Hub 如何发布应用
 
-你开了提交 issue（[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)）之后，审核人员会对 Release 中的原样字节运行准入检查，并在 issue 中反馈发现的问题。随后由 App Hub 管理员批准这次提交；未经批准，Hub 不会发布任何内容。管理员通过 [GitHub 管理员发布](docs/GITHUB-PUBLISHING.zh-CN.md)发布已批准的条目：GitHub Actions 用 Sigstore 为新的 `catalog-v2.json` 签名，因此管理员无需另外保管 Hub 私钥。RC1 发行版读取 `catalog-v2.json`；OctoSense 桌面版 0.1.0-beta.2 只读取 `hub publish` 生成、由信任锚签名的旧格式 `catalog.json`。
+你开了提交 issue（[向 App Hub 提交应用](docs/SUBMITTING.zh-CN.md)）之后，审核人员会对 Release 中的原样字节运行准入检查，并在 issue 中反馈发现的问题。随后由 App Hub 管理员批准这次提交；未经批准，Hub 不会发布任何内容。管理员通过 [GitHub 管理员发布](docs/GITHUB-PUBLISHING.zh-CN.md)发布已批准的条目：GitHub Actions 用 Sigstore 为新的 `catalog-v2.json` 签名，因此管理员无需另外保管 Hub 私钥。RC1 和 RC2 发行版读取 `catalog-v2.json`；OctoSense 桌面版 0.1.0-beta.2 只读取 `hub publish` 生成、由信任锚签名的旧格式 `catalog.json`。
 
 v2 的撤回通过相同的受保护工作流发布带理由的新候选，保留历史。商店在获取并验证新目录后执行撤回。`hub withdraw` / `hub remove` 仅修改旧格式目录，不能代替 v2 发布。
 
@@ -170,9 +171,7 @@ v2 的撤回通过相同的受保护工作流发布带理由的新候选，保�
 
 已认证的公开**签名目录第 14 版**提供以下 GitHub 发布者身份。三个历史
 `org.octosense.samples.*` 应用的 0.1.0 和 0.1.1 版本均已撤回。旧安装的数据保留，
-新 ID 不会迁移这些数据。RC1 仍将撤回的应用显示为不可用。
-[App Hub #170](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/170) 的发现列表修复
-会在包含该修复的新版宿主中隐藏浏览及搜索里的这些条目。
+新 ID 不会迁移这些数据。RC1 仍将撤回的应用显示为不可用；RC2 包含 [App Hub #170](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/170) 的发现列表修复，会在浏览及搜索中隐藏这些条目。
 
 | 应用 | 确切应用 ID | 最新版本 | 运行平台 |
 | --- | --- | --- | --- |

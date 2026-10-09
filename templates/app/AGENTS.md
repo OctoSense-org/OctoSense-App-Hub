@@ -28,10 +28,12 @@ record its revision. Do not invent missing requirements.
   Report exactly which platforms and flows you tested.
 - Run `hub stamp` after every bundle edit, then `hub check`. Keep the review
   packet that `hub scan` writes outside the bundle.
-- Run and capture the unsigned bundle: a host without a signature verifier,
-  `card-host` included, refuses a signed one. Sign only the final bytes; any
-  later edit needs a new stamp and a new signature. Keep publisher keys
-  private and outside the repository.
+- Run and capture the unsigned bundle: `card-host` has no publisher verifier
+  and refuses a sealed release. Release through the GitHub workflow that App
+  Flow's `tools/octo publish-github` installs. App Hub accepts only
+  GitHub-attested releases, so never create a publisher key or sign a
+  manifest. Never edit a sealed release: a change needs a new version and
+  tag.
 - Keep `bundle/` byte-exact in Git: keep the starter's `.gitattributes` with the line
   `bundle/** -text`. A checkout that
   converts line endings (`core.autocrlf=true`, common on Windows) changes the
