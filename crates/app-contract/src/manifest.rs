@@ -28,7 +28,13 @@ pub const SCHEMA_MINOR: u32 = 0;
 /// build honours. Empty in `1.0.0`: every feature added in `1.x` that
 /// restricts or changes what an app gets is added here, with the field
 /// that carries it, in the same release.
-pub const KNOWN_FEATURES: &[&str] = &["palpo-admin-v1", "host-api-v1", "backend-api-v1", "script-tools-v1", "publisher-github-v1"];
+///
+/// `wasm-components-v1`: the bundle's `fns/` holds a WebAssembly component
+/// (OctoSense ADR 0014), not only core modules. A host whose `wasm` service
+/// loads only modules does not know it, so it refuses the app instead of
+/// failing when the app first calls its functions. It needs `wasm`.
+pub const KNOWN_FEATURES: &[&str] =
+    &["palpo-admin-v1", "host-api-v1", "backend-api-v1", "script-tools-v1", "publisher-github-v1", "wasm-components-v1"];
 
 /// Parse a manifest: [`AppManifest::parse`].
 pub fn parse(json: &str) -> Result<AppManifest, String> {
@@ -124,9 +130,12 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // search results; neither implies the other.
     "crawl",
     // Run the app's own WebAssembly functions (its bundle's `fns/*.wasm`)
-    // through the host's `wasm` service: computing only, in a sandbox with a
-    // deadline and a memory cap. A function reaches no file, network, clock
-    // or other app; it gets its input and returns its output.
+    // through the host's `wasm` service, in a sandbox with a deadline and a
+    // memory cap. A core module reaches no file, network, clock or other
+    // app: it gets its input and returns its output. A component
+    // (`wasm-components-v1`, OctoSense ADR 0014) may also read the clock and
+    // random numbers and, with `storage`, the app's own files; it reaches no
+    // network or other app.
     "wasm",
     // The craft engines (OctoSense ADR 0013), each behind its host service:
     // spreadsheets, images, documents, slide decks, drawings, raw photos,
@@ -780,6 +789,9 @@ impl AppManifest {
                 return Err("backend requires auth and storage.accounts".into());
             }
             backend.validate()?;
+        }
+        if self.requires.iter().any(|f| f == "wasm-components-v1") && !self.capabilities.iter().any(|c| c == "wasm") {
+            return Err("wasm-components-v1 requires the wasm capability".into());
         }
         let unknown: Vec<&str> =
             self.requires.iter().map(String::as_str).filter(|feature| !KNOWN_FEATURES.contains(feature)).collect();

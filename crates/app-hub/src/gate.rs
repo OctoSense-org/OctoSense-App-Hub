@@ -50,6 +50,9 @@ impl Finding {
     pub(crate) fn at(check: &'static str, path: impl Into<String>, detail: impl Into<String>) -> Self {
         Finding { severity: Severity::Refusal, check, detail: detail.into(), path: Some(path.into()) }
     }
+    fn warn_at(check: &'static str, path: impl Into<String>, detail: impl Into<String>) -> Self {
+        Finding { severity: Severity::Warning, check, detail: detail.into(), path: Some(path.into()) }
+    }
 }
 
 #[derive(Debug)]
@@ -210,6 +213,7 @@ fn check_bundle_for(
     // ---- contents -------------------------------------------------------
     let mut total = 0u64;
     let mut modules = 0usize;
+    let mut function_files = Vec::new();
     for file in list_files(bundle)? {
         let path = bundle.join(&file);
         let size = std::fs::metadata(&path).map_err(|e| e.to_string())?.len();
@@ -217,6 +221,7 @@ fn check_bundle_for(
         let extension = file.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
         if extension == "wasm" {
             modules += 1;
+            function_files.push(file.clone());
         } else if !ALLOWED_EXTENSIONS.contains(&extension.as_str()) {
             findings.push(Finding::refuse(
                 "contents",
@@ -248,6 +253,44 @@ fn check_bundle_for(
     }
     if declares_wasm && modules == 0 {
         findings.push(Finding::warn("functions", "the bundle declares the wasm capability but carries no fns/*.wasm"));
+    }
+    // A component (OctoSense ADR 0014) also reaches the clock, random numbers
+    // and, with `storage`, the app's own files. Admission has validated it
+    // and its imports; the manifest must require the feature, so a host whose
+    // `wasm` service loads only modules refuses the app instead of failing at
+    // its first call, and must grant storage for files. Reviewers see what
+    // each component reaches.
+    let requires_components = manifest.requires.iter().any(|f| f == crate::functions::COMPONENTS_FEATURE);
+    let declares_storage = manifest.capabilities.iter().any(|c| c == "storage");
+    let mut components = 0usize;
+    for file in &function_files {
+        let name = octosense_app_policy::portable_path(file).unwrap_or_else(|| file.to_string_lossy().replace('\\', "/"));
+        let Ok(bytes) = crate::admission::read_bounded(&bundle.join(file), MAX_BUNDLE_BYTES) else { continue };
+        if !crate::functions::is_component(&bytes) {
+            continue;
+        }
+        // Admission reported a component that does not validate.
+        let Ok(info) = crate::functions::inspect_component(&bytes) else { continue };
+        components += 1;
+        if !requires_components {
+            findings.push(Finding::refuse(
+                "functions",
+                format!("{name} is a WebAssembly component; the manifest must require {}", crate::functions::COMPONENTS_FEATURE),
+            ));
+        }
+        if info.uses_files() && !declares_storage {
+            findings.push(Finding::refuse(
+                "functions",
+                format!("{name} imports wasi:filesystem, the app's own files, which needs the storage capability"),
+            ));
+        }
+        findings.push(Finding::warn_at("functions", name.clone(), format!("{name} is a component: {}", info.reach())));
+    }
+    if requires_components && components == 0 {
+        findings.push(Finding::warn(
+            "functions",
+            format!("the manifest requires {} but fns/ holds no component; hosts without it refuse the app", crate::functions::COMPONENTS_FEATURE),
+        ));
     }
 
     // ---- assets are local ----------------------------------------------

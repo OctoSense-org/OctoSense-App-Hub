@@ -9,6 +9,7 @@
 //! hub publish <bundle> --catalog <file> --key <working> --anchor-cert <hex>
 //!             --publisher <id> --repo <url> --commit <sha> [--out <dir>] [--anchor <hex>]
 //! hub verify <catalog> --anchor <hex>
+//! hub component-info <file.wasm>          # a function file's kind, imports and exports
 //! ```
 //!
 //! `check` is the gate: a developer runs it before submitting and sees the
@@ -133,6 +134,15 @@ fn run() -> Result<(), String> {
         "pubkey" => {
             let key = load_key(&positional.ok_or("usage: hub pubkey <key file>")?)?;
             println!("{}", key.public_hex());
+            Ok(())
+        }
+        "component-info" => {
+            // What a function file is and what it reaches (ADR 0014): kind,
+            // imports and exports, each with its WIT parameters and result.
+            let path = positional.ok_or("usage: hub component-info <file.wasm>")?;
+            let bytes = admission::read_bounded(Path::new(&path), gate::MAX_BUNDLE_BYTES)?;
+            let info = functions::describe(&bytes).map_err(|e| format!("{path}: {e}"))?;
+            println!("{}", serde_json::to_string_pretty(&info).map_err(|e| e.to_string())?);
             Ok(())
         }
         "certify" => {

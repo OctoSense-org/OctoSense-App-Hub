@@ -37,6 +37,10 @@ sigstore-verify = { version = "=0.14.0", default-features = false }
 sigstore-trust-root = { version = "=0.14.0", default-features = false }
 sigstore-types = "=0.14.0"
 fs2 = "0.4"
+# The app's own functions (functions.rs): validate a WebAssembly component and
+# read its imports and exports (OctoSense ADR 0014). The version Wasmtime 49
+# uses, so a host that links both builds one copy; parsing only.
+wasmparser = { version = "0.258.3", default-features = false, features = ["std", "validate", "component-model", "features", "simd"] }
 
 [[bin]]
 name = "hub"

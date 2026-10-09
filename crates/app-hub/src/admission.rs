@@ -430,9 +430,12 @@ fn check_svg_css(css: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// An app's own function module, run by the host's `wasm` service under the
-/// `wasm` capability: a WebAssembly core module at `fns/<name>.wasm`. Its
-/// imports and exports are the host's to check when it loads the module.
+/// An app's own functions, run by the host's `wasm` service under the `wasm`
+/// capability, at `fns/<name>.wasm`: a WebAssembly core module, whose
+/// imports and exports are the host's to check when it loads it, or a
+/// component (OctoSense ADR 0014), validated here, whose imports must all be
+/// WASI packages a host scopes to the app ([`crate::functions`]). Whether
+/// the manifest may carry a component is the gate's check.
 fn validate_wasm(path: &Path, name: &str) -> Result<(), String> {
     let stem = name
         .strip_prefix("fns/")
@@ -444,9 +447,18 @@ fn validate_wasm(path: &Path, name: &str) -> Result<(), String> {
     {
         return Err("a function module is named fns/<name>.wasm, the name [a-z0-9_-] and at most 64 characters".into());
     }
-    let header = read_bounded(path, MAX_BUNDLE_BYTES)?;
-    if !header.starts_with(b"\0asm\x01\0\0\0") {
-        return Err("not a WebAssembly core module (magic and version 1)".into());
+    let bytes = read_bounded(path, MAX_BUNDLE_BYTES)?;
+    if crate::functions::is_module(&bytes) {
+        return Ok(());
+    }
+    if !crate::functions::is_component(&bytes) {
+        return Err("not a WebAssembly core module (magic and version 1) or component".into());
+    }
+    let info = crate::functions::inspect_component(&bytes)?;
+    if let Some(import) = info.refused_imports().first() {
+        return Err(format!(
+            "the component imports {import}; a component may import only wasi:cli, wasi:clocks, wasi:filesystem, wasi:io and wasi:random"
+        ));
     }
     Ok(())
 }
