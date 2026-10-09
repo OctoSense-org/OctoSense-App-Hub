@@ -10,12 +10,18 @@ the app's grants. The same contract lets a bundle declare its own backend
 run its own agent tools
 ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)).
 
-These declarations are included in contract 1.8.0. The
+These discovery declarations shipped in contract 1.8.0. The
 [RC1 release](../README.md#download-a-compatible-host), source `933abbcf`,
 implements them within the platform limits below; its download status is
 tracked in that guide.
 An older host, such as OctoSense desktop 0.1.0-beta.2, serves none of these
 APIs and refuses an app that requires them.
+
+Published contract **1.10.0** also admits `files`, `device_calendar` and
+`audio` ([version and publication receipt](../crates/app-contract/README.md#versions-on-cratesio)).
+Its file declarations include the unpublished 1.9.0 work. The new native
+adapters described below are separate host changes; the contract package
+does not add them to RC1.
 
 ## Declare what the app needs
 
@@ -50,7 +56,7 @@ host still serves.
 
 ## Discover what the host implements
 
-### Native device calendars (unreleased contract 1.10)
+### Native device calendars (contract 1.10)
 
 The new `device_calendar` capability is separate from `calendar` (the system
 Calendar app's own store) and `gcalendar` (Google's connector). It does not
@@ -59,8 +65,9 @@ declares `device_calendar` and `host-api-v1`, with
 `host_api.required: {"device_calendar.events.list": 1}` and any other methods
 its workflow requires. A host without those methods refuses installation.
 
-This source change admits the capability and read tool aliases. It does not
-install a native adapter into desktop RC1 or Home beta.1. The adapter must
+The published contract admits the capability; App Hub's policy admits the
+read tool aliases. This does not install a native adapter into desktop RC1 or
+Home beta.1. The adapter must
 also enforce app/account scope, OS permission, selected calendars and trusted
 review of mutations. Runtime and device acceptance of the new adapter are
 separate from these contract tests. The service's method descriptions remain
@@ -98,7 +105,7 @@ configured and authorized, call its status or account methods. Declaring a
 requirement neither turns on an OS permission nor adds a provider
 registration.
 
-## Selected-file transfer (contract 1.9, unreleased)
+## Selected-file transfer (published in contract 1.10)
 
 The `files` capability grants access to host-owned file dialogs, not arbitrary
 host paths. Import/export also need `storage`; neither grant implies the other.
@@ -136,7 +143,7 @@ has an agent alias. Declare each method version and check the host's status;
 these source APIs are not included in desktop RC1. Device validation of the
 new adapters remains pending.
 
-## Foreground audio sessions (contract 1.10, unreleased)
+## Foreground audio sessions (contract 1.10)
 
 A compatible macOS or Android host exposes these methods; declare the method
 versions rather than inferring support from the capability name:

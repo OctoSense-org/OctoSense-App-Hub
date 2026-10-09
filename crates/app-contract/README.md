@@ -48,33 +48,35 @@ limits.
 
 ## Versions on crates.io
 
-This checkout prepares **1.10.0 (unpublished)**, including 1.9.0's `files`
+**[1.10.0 is published on crates.io](https://crates.io/crates/octosense-app-contract/1.10.0)**
+([publication receipt](../../reviews/public-os-api-v1/contract-1.10.0-publication.json)).
+It includes the unpublished 1.9.0 work's `files`
 capability, the distinct `device_calendar` capability and separate `audio`
 playback grant. Audio implies no recording, storage or background authority. `files` provides
 host-owned import/export dialogs, separate from `storage`; it grants no
 arbitrary filesystem access. `device_calendar` is separate from `calendar`
-and `gcalendar`. Neither declaration installs a host adapter or grants OS
-access: declare required method versions and check the actual host. Until
-publication, consumers of this App Policy need the matching git-patched
-contract described below. Released hosts do not gain these APIs by parsing
-new capabilities.
+and `gcalendar`. These declarations do not install a host adapter or grant OS
+access: declare required method versions and check the actual host. App Policy
+now requires contract 1.10, which consumers can resolve from crates.io without
+a git patch. Released hosts do not gain these APIs by parsing new capabilities.
 
-crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0, 1.7.0, 1.7.1 and 1.8.0. Versions 1.3.0 and
-1.4.0 exist only in this repository ([CHANGELOG.md](CHANGELOG.md)); 1.5.0
-includes their changes. A lock file that still holds 1.2.0 refuses every capability added
-since, such as `auth`:
+crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0, 1.7.0, 1.7.1, 1.8.0 and 1.10.0.
+Versions 1.3.0, 1.4.0 and 1.9.0 exist only in this repository
+([CHANGELOG.md](CHANGELOG.md)); 1.5.0 includes the first two versions' changes,
+and 1.10.0 includes 1.9.0's changes. A lock file that still holds 1.2.0 refuses
+every capability added since, such as `auth`:
 
 ```text
 app org.example.connect requests unknown capability "auth"
 ```
 
-**[1.8.0 is published on crates.io](https://crates.io/crates/octosense-app-contract/1.8.0)**
-([publication receipt](../../reviews/github-publisher-v1/contract-1.8.0-publication.json)). It adds optional
+[1.8.0](https://crates.io/crates/octosense-app-contract/1.8.0)
+([publication receipt](../../reviews/github-publisher-v1/contract-1.8.0-publication.json)) added optional
 `integrity.github`, the required `publisher-github-v1` marker and a
 `SignatureVerifier::verify_github` extension that refuses by default. Existing
 manifests and Ed25519 signing bytes remain unchanged. Hosts must supply a real
 provenance verifier; accepting the new marker alone does not authenticate an
-app. Released App Policy requires 1.8.0, which consumers can resolve from crates.io.
+app. These additions remain available in 1.10.0.
 The contract release does not deliver a compatible OctoSense shell binary.
 
 Published 1.7.1 reserves exactly four full app IDs, ignoring ASCII case:
@@ -83,8 +85,9 @@ Published 1.7.1 reserves exactly four full app IDs, ignoring ASCII case:
 `org.example.lock` remain valid.
 
 `cargo update -p octosense-app-contract` moves an unconstrained 1.x consumer
-to 1.8.0. Hosts using the new API declarations must select 1.6 or later, and
-hosts serving `wasm` 1.7 or later;
+to 1.10.0. Hosts using API declarations must select 1.6 or later,
+hosts serving `wasm` 1.7 or later, and hosts admitting `files`,
+`device_calendar` or `audio` a published version of at least 1.10;
 older checked-in lock files remain on their existing version. OctoSense
 desktop 0.1.0-beta.2 patched the crate to an App Hub revision. To build
 against a contract newer than the latest release, patch crates.io's copy with
