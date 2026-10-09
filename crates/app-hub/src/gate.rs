@@ -269,9 +269,13 @@ fn check_bundle_for(
         if !crate::functions::is_component(&bytes) {
             continue;
         }
-        // Admission reported a component that does not validate.
-        let Ok(info) = crate::functions::inspect_component(&bytes) else { continue };
         components += 1;
+        // Admission reported a component that does not validate or imports
+        // what no host gives it.
+        let Ok(info) = crate::functions::inspect_component(&bytes) else { continue };
+        if !info.refused_imports().is_empty() {
+            continue;
+        }
         if !requires_components {
             findings.push(Finding::refuse(
                 "functions",
@@ -284,7 +288,7 @@ fn check_bundle_for(
                 format!("{name} imports wasi:filesystem, the app's own files, which needs the storage capability"),
             ));
         }
-        findings.push(Finding::warn_at("functions", name.clone(), format!("{name} is a component: {}", info.reach())));
+        findings.push(Finding::warn_at("functions", name.clone(), format!("{name} is a component that reaches {}", info.reach())));
     }
     if requires_components && components == 0 {
         findings.push(Finding::warn(

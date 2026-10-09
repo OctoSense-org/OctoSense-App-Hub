@@ -13,10 +13,10 @@
 //! with each function's parameters and result written as WIT writes them
 //! (the same text OctoSense's `wasm.functions` shows).
 
-use serde_json::{json, Value};
+use serde::Serialize;
 use wasmparser::component_types::{ComponentDefinedType, ComponentEntityType, ComponentFuncTypeId, ComponentValType};
 use wasmparser::types::TypesRef;
-use wasmparser::{Parser, Payload, PrimitiveValType, Validator, WasmFeatures};
+use wasmparser::{ComponentTypeRef, Parser, Payload, PrimitiveValType, TypeBounds, Validator, WasmFeatures};
 
 /// The WASI packages a component may import: every interface of these, each
 /// scoped to its app by the host. Nothing else (`wasi:sockets`, `wasi:http`,
@@ -39,8 +39,9 @@ pub fn is_component(bytes: &[u8]) -> bool {
 }
 
 /// One function a component exports: `name`, or `interface.name` for a
-/// function in an exported interface.
-#[derive(Clone, Debug, PartialEq)]
+/// function in an exported interface. Each parameter is `(name, type)`; a
+/// core module's parameters are named `p0`, `p1`, ….
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Export {
     pub name: String,
     pub params: Vec<(String, String)>,
@@ -50,7 +51,9 @@ pub struct Export {
 /// A validated component's imports and exports.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ComponentInfo {
-    /// Every top-level import, as `package:namespace/interface@version`.
+    /// Every top-level import of an interface or a function, as
+    /// `package:namespace/interface@version`. A type the world names is
+    /// not one: it reaches nothing.
     pub imports: Vec<String>,
     /// Its functions, sorted by name.
     pub exports: Vec<Export>,
@@ -72,18 +75,26 @@ impl ComponentInfo {
         self.imports.iter().any(|name| name.starts_with("wasi:filesystem/"))
     }
 
-    /// What it reaches, for a reviewer: "the clock, random numbers, files in
-    /// its app folder; no network or other apps".
+    /// What it reaches, for a reviewer: "the clock, random numbers and
+    /// files in its app folder, but no network or other app".
     pub fn reach(&self) -> String {
-        let mut parts = Vec::new();
-        if self.imports.iter().any(|n| n.starts_with("wasi:clocks/")) {
-            parts.push("the clock");
+        let imports = |prefix: &str| self.imports.iter().any(|n| n.starts_with(prefix));
+        let mut reaches = Vec::new();
+        if imports("wasi:clocks/") {
+            reaches.push("the clock");
         }
-        if self.imports.iter().any(|n| n.starts_with("wasi:random/")) {
-            parts.push("random numbers");
+        if imports("wasi:random/") {
+            reaches.push("random numbers");
         }
-        parts.push(if self.uses_files() { "files in its app folder" } else { "no files" });
-        format!("{}; no network or other apps", parts.join(", "))
+        if self.uses_files() {
+            reaches.push("files in its app folder");
+        }
+        let not = if self.uses_files() { "no network or other app" } else { "no files, network or other app" };
+        match reaches.as_slice() {
+            [] => "nothing but its input".into(),
+            [one] => format!("{one}, but {not}"),
+            [init @ .., last] => format!("{} and {last}, but {not}", init.join(", ")),
+        }
     }
 }
 
@@ -100,13 +111,13 @@ pub fn inspect_component(bytes: &[u8]) -> Result<ComponentInfo, String> {
     let (imports, export_names) = top_level_names(bytes)?;
     let mut exports = Vec::new();
     for name in export_names {
-        match types.component_entity_type_of_export(&name) {
+        match types.component_item_for_export(&name).map(|item| item.ty) {
             Some(ComponentEntityType::Func(id)) => exports.push(function(&types, name.clone(), id)),
             Some(ComponentEntityType::Instance(id)) => {
                 let short = short_name(&name).to_string();
-                for (fname, entity) in types[id].exports.iter() {
-                    if let ComponentEntityType::Func(fid) = entity {
-                        exports.push(function(&types, format!("{short}.{fname}"), *fid));
+                for (fname, item) in types[id].exports.iter() {
+                    if let ComponentEntityType::Func(fid) = item.ty {
+                        exports.push(function(&types, format!("{short}.{fname}"), fid));
                     }
                 }
             }
@@ -117,16 +128,20 @@ pub fn inspect_component(bytes: &[u8]) -> Result<ComponentInfo, String> {
     Ok(ComponentInfo { imports, exports })
 }
 
-/// `hub component-info`: what a function file is, imports and exports.
-pub fn describe(bytes: &[u8]) -> Result<Value, String> {
+/// `hub component-info`'s answer, in this order: `kind` (`component` or
+/// `module`), `imports` and `exports`.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Description {
+    pub kind: &'static str,
+    pub imports: Vec<String>,
+    pub exports: Vec<Export>,
+}
+
+/// `hub component-info`: what a function file is, its imports and exports.
+pub fn describe(bytes: &[u8]) -> Result<Description, String> {
     if is_component(bytes) {
-        let info = inspect_component(bytes)?;
-        let exports: Vec<Value> = info
-            .exports
-            .iter()
-            .map(|e| json!({"name": e.name, "params": e.params, "result": e.result}))
-            .collect();
-        return Ok(json!({"kind": "component", "imports": info.imports, "exports": exports}));
+        let ComponentInfo { imports, exports } = inspect_component(bytes)?;
+        return Ok(Description { kind: "component", imports, exports });
     }
     if is_module(bytes) {
         return describe_module(bytes);
@@ -136,7 +151,7 @@ pub fn describe(bytes: &[u8]) -> Result<Value, String> {
 
 /// A core module's imports (`module.name`) and exported functions with their
 /// core types.
-fn describe_module(bytes: &[u8]) -> Result<Value, String> {
+fn describe_module(bytes: &[u8]) -> Result<Description, String> {
     let mut validator = Validator::new_with_features(WasmFeatures::default());
     let types = validator
         .validate_all(bytes)
@@ -160,32 +175,24 @@ fn describe_module(bytes: &[u8]) -> Result<Value, String> {
                     }
                     let ty = types.core_function_at(export.index);
                     let func = types[ty].unwrap_func();
-                    let params: Vec<Value> = func
-                        .params()
-                        .iter()
-                        .enumerate()
-                        .map(|(i, t)| json!([format!("p{i}"), t.to_string()]))
-                        .collect();
+                    let params = func.params().iter().enumerate().map(|(i, t)| (format!("p{i}"), t.to_string())).collect();
                     let result = match func.results() {
-                        [] => Value::Null,
-                        [one] => json!(one.to_string()),
-                        many => json!(format!(
-                            "({})",
-                            many.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(", ")
-                        )),
+                        [] => None,
+                        [one] => Some(one.to_string()),
+                        many => Some(format!("({})", many.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(", "))),
                     };
-                    exports.push(json!({"name": export.name, "params": params, "result": result}));
+                    exports.push(Export { name: export.name.to_string(), params, result });
                 }
             }
             _ => {}
         }
     }
-    Ok(json!({"kind": "module", "imports": imports, "exports": exports}))
+    Ok(Description { kind: "module", imports, exports })
 }
 
-/// The top-level component's import names and function or instance export
-/// names, in order. Nested modules and components (`parse_all` flattens
-/// them) are skipped by depth.
+/// The top-level component's imports, not counting the types it names, and
+/// its function and instance exports, in order. Nested modules and
+/// components (`parse_all` flattens them) are skipped by depth.
 fn top_level_names(bytes: &[u8]) -> Result<(Vec<String>, Vec<String>), String> {
     let mut imports = Vec::new();
     let mut exports = Vec::new();
@@ -196,7 +203,14 @@ fn top_level_names(bytes: &[u8]) -> Result<(Vec<String>, Vec<String>), String> {
             Payload::End(_) => depth = depth.saturating_sub(1),
             Payload::ComponentImportSection(reader) if depth == 0 => {
                 for import in reader {
-                    imports.push(import.map_err(|e| e.to_string())?.name.0.to_string());
+                    let import = import.map_err(|e| e.to_string())?;
+                    // A type the world defines (a record a function returns,
+                    // say) is imported as `(type (eq …))`: a name for a type
+                    // the component already has, which reaches nothing.
+                    if matches!(import.ty, ComponentTypeRef::Type(TypeBounds::Eq(_))) {
+                        continue;
+                    }
+                    imports.push(import.name.name.to_string());
                 }
             }
             Payload::ComponentExportSection(reader) if depth == 0 => {
@@ -206,7 +220,7 @@ fn top_level_names(bytes: &[u8]) -> Result<(Vec<String>, Vec<String>), String> {
                         export.kind,
                         wasmparser::ComponentExternalKind::Func | wasmparser::ComponentExternalKind::Instance
                     ) {
-                        exports.push(export.name.0.to_string());
+                        exports.push(export.name.name.to_string());
                     }
                 }
             }
@@ -255,7 +269,8 @@ fn primitive(p: &PrimitiveValType) -> &'static str {
 }
 
 /// A value type as WIT writes it: records, variants and enums by their shape,
-/// the same text OctoSense's `wasm.functions` shows.
+/// the same text OctoSense's `wasm.functions` shows. Anything else (a
+/// resource handle, a future, a stream, a map) is `resource`, as there.
 fn wit(types: &TypesRef<'_>, ty: &ComponentValType) -> String {
     let id = match ty {
         ComponentValType::Primitive(p) => return primitive(p).to_string(),
@@ -281,7 +296,7 @@ fn wit(types: &TypesRef<'_>, ty: &ComponentValType) -> String {
                     .collect()
             )
         ),
-        ComponentDefinedType::List(t) => format!("list<{}>", wit(types, t)),
+        ComponentDefinedType::List { element, .. } => format!("list<{}>", wit(types, element)),
         ComponentDefinedType::Tuple(tuple) => {
             format!("tuple<{}>", join(tuple.types.iter().map(|t| wit(types, t)).collect()))
         }
@@ -291,13 +306,43 @@ fn wit(types: &TypesRef<'_>, ty: &ComponentValType) -> String {
         ComponentDefinedType::Enum(names) => {
             format!("enum {{ {} }}", join(names.iter().map(|n| n.to_string()).collect()))
         }
-        ComponentDefinedType::Option(t) => format!("option<{}>", wit(types, t)),
-        ComponentDefinedType::Result { ok, err } => match (ok, err) {
+        ComponentDefinedType::Option { ty, .. } => format!("option<{}>", wit(types, ty)),
+        ComponentDefinedType::Result { ok, err, .. } => match (ok, err) {
             (Some(ok), Some(err)) => format!("result<{}, {}>", wit(types, ok), wit(types, err)),
             (Some(ok), None) => format!("result<{}>", wit(types, ok)),
             (None, Some(err)) => format!("result<_, {}>", wit(types, err)),
             (None, None) => "result".into(),
         },
         _ => "resource".into(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn info(imports: &[&str]) -> ComponentInfo {
+        ComponentInfo { imports: imports.iter().map(|i| i.to_string()).collect(), exports: Vec::new() }
+    }
+
+    #[test]
+    fn the_reach_line_names_what_a_component_imports() {
+        assert_eq!(info(&["wasi:cli/stdout@0.2.9"]).reach(), "nothing but its input");
+        assert_eq!(
+            info(&["wasi:clocks/wall-clock@0.2.9", "wasi:random/random@0.2.9"]).reach(),
+            "the clock and random numbers, but no files, network or other app"
+        );
+        assert_eq!(
+            info(&["wasi:filesystem/types@0.2.9"]).reach(),
+            "files in its app folder, but no network or other app"
+        );
+    }
+
+    #[test]
+    fn only_the_scoped_wasi_packages_are_allowed() {
+        let component = info(&["wasi:io/poll@0.2.9", "wasi:sockets/network@0.2.9", "wasi:http/types@0.2.9", "my:pkg/host"]);
+        assert_eq!(component.refused_imports(), ["wasi:sockets/network@0.2.9", "wasi:http/types@0.2.9", "my:pkg/host"]);
+        // A package name is matched whole: wasi:clocksmith is not wasi:clocks.
+        assert_eq!(info(&["wasi:clocksmith/x"]).refused_imports(), ["wasi:clocksmith/x"]);
     }
 }

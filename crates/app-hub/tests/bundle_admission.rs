@@ -492,7 +492,7 @@ fn a_component_passes_under_its_feature_and_tells_reviewers_what_it_reaches() {
     assert_eq!(reach.severity, octosense_app_hub::Severity::Warning);
     assert_eq!(
         reach.detail,
-        "fns/notes.wasm is a component: the clock, random numbers, files in its app folder; no network or other apps"
+        "fns/notes.wasm is a component that reaches the clock, random numbers and files in its app folder, but no network or other app"
     );
 }
 
@@ -516,6 +516,13 @@ fn a_component_that_imports_sockets_or_does_not_validate_is_refused() {
     let finding = refusal(&report, "contents-invalid").unwrap_or_else(|| panic!("{}", report.render()));
     assert!(finding.detail.contains("imports wasi:sockets/"), "{}", finding.detail);
     assert_eq!(finding.path.as_deref(), Some("fns/notes.wasm"));
+    // No reach line claims "no network" for it, and it still counts as a
+    // component.
+    assert!(
+        !report.findings.iter().any(|f| f.detail.contains("is a component that reaches") || f.detail.contains("holds no component")),
+        "{}",
+        report.render()
+    );
     let truncated = &NOTES[..NOTES.len() / 2];
     let report = with_component(true, &["wasm", "storage"], truncated);
     let finding = refusal(&report, "contents-invalid").unwrap_or_else(|| panic!("{}", report.render()));
