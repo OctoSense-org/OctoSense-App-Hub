@@ -119,7 +119,7 @@ admission. A warning does not.
 | `publisher-signature` | The declared GitHub proof fails verification, even with `--allow-unsigned`; the manifest is unsigned and `--allow-unsigned` is absent; or a legacy Ed25519 signature fails verification or names an unknown key (`publisher key "<id>" is not registered with this hub`). | The manifest is unsigned and `--allow-unsigned` is given. |
 | `identity` | The id starts with `os.`; the id, or its last segment, is a reserved name ([Ids and reserved names](#ids-and-reserved-names)). | |
 | `contents` | A file's extension is not one of `.card`, `.json`, `.l0`, `.octoscript`, `.splash`, `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.ttf`, `.otf`, `.txt` or `.md`, and it is not a function module (`.wasm`, see `functions`). Files with no extension, such as `.DS_Store` and `LICENSE`, are refused too. | |
-| `functions` | The bundle carries a `.wasm` module without the `wasm` capability, or more than 8 modules. A module that is not at `fns/<name>.wasm` (the name `[a-z0-9_-]`, at most 64 characters) or does not start with the 8-byte header of a WebAssembly core module, version 1, is refused as `contents-invalid`. The gate checks nothing else inside a module; the host checks its imports and exports when it loads the module. | The app declares `wasm` but carries no `fns/*.wasm`. |
+| `functions` | The bundle carries a `.wasm` file without the `wasm` capability, or more than 8. A file that is not at `fns/<name>.wasm` (the name `[a-z0-9_-]`, at most 64 characters), or is neither a WebAssembly core module (the 8-byte header of version 1) nor a valid component, is refused as `contents-invalid`, as is a component that imports anything outside `wasi:cli`, `wasi:clocks`, `wasi:filesystem`, `wasi:io` and `wasi:random`. A component is refused here when the manifest does not require `wasm-components-v1`, or when it imports `wasi:filesystem` without the `storage` capability ([WebAssembly components](#webassembly-components)). The gate checks nothing else inside a core module; the host checks its imports and exports when it loads the module. | The app declares `wasm` but carries no `fns/*.wasm`. The manifest requires `wasm-components-v1` but `fns/` holds no component. Each admitted component gets a line saying what it reaches. |
 | `contents-invalid` (text and images) | A text file (`.splash`, `.card`, `.json`, `.l0`, `.octoscript`, `.txt` or `.md`) is over 1 MiB or not UTF-8; JSON does not parse; a PNG, JPEG or WebP does not decode or is over 4096 px a side; the listing icon is not square, or is a bitmap over 1 MiB or 1024 px a side. | |
 | `contents-invalid` (SVG) | An SVG does not parse; lacks a numeric `width` and `height` or a `viewBox`; is over 4096 px a side; or holds a script, a `foreignObject` or an `on…` handler. Its styling (a `style` attribute or a `<style>` block) imports a stylesheet, uses an escape, uses a comment or points `url()` anywhere but a `#fragment` in the same file. | |
 | `entry` | The bundle has neither `main.splash` nor `page.card`; `page.card` is not valid L0; `page.data.json` is not JSON; neither `kit/native/<theme>/kit.json` nor every OctoScript kit module the card needs is in the bundle. | |
@@ -201,6 +201,79 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 
 Unverified: how the OctoSense shells draw these fonts.
 
+### WebAssembly components
+
+A file in `fns/` may be a WebAssembly **component** instead of a core module:
+an ordinary Rust crate built with `cargo build --target wasm32-wasip2`
+([OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436),
+proposed). Its functions take and return typed values, keep their state
+between calls and may use part of WASI. No OctoSense build loads components
+yet; the `wasm` service gains them in ADR 0014's phase 2.
+
+The gate admits a component when:
+
+- the manifest requires `wasm-components-v1`, which needs the `wasm`
+  capability. A host whose `wasm` service loads only core modules does not
+  know the feature, so it refuses the app instead of failing at its first call;
+- it validates and imports interfaces only from `wasi:cli`, `wasi:clocks`,
+  `wasi:filesystem`, `wasi:io` and `wasi:random`. A type the component defines,
+  such as a record one of its functions returns, does not count as an import.
+  `wasi:sockets`, `wasi:http` and anything else are refused as
+  `contents-invalid`;
+- it imports `wasi:filesystem` only with the `storage` capability. Under
+  ADR 0014 the host gives it only the app's own storage folder.
+
+A component follows a module's name and size rules and counts toward the 8
+function files. Each admitted component gets a warning that tells a reviewer
+what it reaches:
+
+```text
+[warning] functions (fns/notes.wasm): fns/notes.wasm is a component that reaches the clock, random numbers and files in its app folder, but no network or other app
+```
+
+`hub component-info <file.wasm>` prints what a function file is (`component`
+or `module`), its imports and its exported functions, each with its parameters
+and result as WIT writes them. Here it runs in a bundle whose
+`fns/notes.wasm` is the notes component from App Hub's tests
+(`crates/app-hub/tests/fixtures/notes.component.wasm`), with the output
+shortened at `…`:
+
+```console
+$ hub component-info fns/notes.wasm
+{
+  "kind": "component",
+  "imports": [
+    "wasi:io/poll@0.2.9",
+    "wasi:clocks/monotonic-clock@0.2.9",
+    …
+    "wasi:filesystem/preopens@0.2.9",
+    "wasi:random/insecure-seed@0.2.9"
+  ],
+  "exports": [
+    {
+      "name": "analyze",
+      "params": [
+        [
+          "markdown",
+          "string"
+        ]
+      ],
+      "result": "record { words: u32, lines: u32, headings: list<string> }"
+    },
+    …
+  ]
+}
+```
+
+For a core module it prints `"kind": "module"`, its imports as `module.name`
+and its exported functions with their core types, the parameters named `p0`,
+`p1` and so on.
+
+The [`host_method` rules](#map-a-tool-to-a-shared-service-host_method) for a
+`wasm.<function>` tool were written for core modules, whose functions see only
+their input. They apply to components unchanged for now, although a component
+with `storage` can read the app's files.
+
 ## The manifest
 
 ```json
@@ -232,7 +305,7 @@ Unverified: how the OctoSense shells draw these fonts.
 | `compute` | `instruction_budget`, `memory_bytes`. | Clamped to the host's ceilings. |
 | `agent` | The app's own agent. | Optional ([The manifest's `agent`](#the-manifests-agent)). |
 | `research` | The scope of `research` and `crawl`. | Required with `research` or `crawl`; refused when the manifest requests neither ([The research scope](#the-research-scope)). |
-| `requires` | Host features the app needs. | Each must be a feature the host knows: `palpo-admin-v1`, `host-api-v1`, `backend-api-v1`, `script-tools-v1` or `publisher-github-v1`. GitHub publishing requires a real provenance verifier; the three API markers also need a host that implements their APIs ([Host API compatibility](HOST-API.md)). |
+| `requires` | Host features the app needs. | Each must be a feature the host knows: `palpo-admin-v1`, `host-api-v1`, `backend-api-v1`, `script-tools-v1`, `publisher-github-v1` or `wasm-components-v1`. GitHub publishing requires a real provenance verifier; the three API markers also need a host that implements their APIs ([Host API compatibility](HOST-API.md)). `wasm-components-v1` needs the `wasm` capability ([WebAssembly components](#webassembly-components)). |
 | `host_api` | The host API methods the app needs (`required`) or can use (`optional`), each with its ABI major version. | Optional; needs `host-api-v1` in `requires`. The store checks the `required` methods at install and at every launch ([Declare what the app needs](HOST-API.md#declare-what-the-app-needs)). |
 | `backend` | The app's own backend: its public sign-in endpoints and the operations the app may call. | Optional; needs `backend-api-v1` in `requires`, the `auth` capability and `storage.accounts: true`. Holds no credentials ([Sign in to your own backend](#sign-in-to-your-own-backend)). |
 | `schema_minor` | Which additions to schema 1 the manifest uses. | Leave it out. |
@@ -292,7 +365,7 @@ platform and provider limits; RC1 and historical beta differences are explicit.
 | `research` | Searching through the system toolbox, within the manifest's research scope ([The research scope](#the-research-scope)). The host runs every search. | Search *what the scope allows* | System apps only, in phone builds |
 | `crawl` | Crawling sites through the system toolbox, up to the scope's `max_depth` and `max_pages`, inside its domain lists. More reach than `research`. | Crawl websites, *within the scope*, which reaches more than searching | As `research` |
 | `runtime` | Asking which APIs the host implements, with `runtime.list` and `runtime.describe` ([Host API compatibility](HOST-API.md)). It grants none of the APIs it lists. | Inspect available host APIs without gaining access to their data or permissions | Not on OctoSense desktop 0.1.0-beta.2, whose store refuses the name. App Hub's request dispatcher answers it in every host built from App Hub `main`, `card-host` included. |
-| `wasm` | The app's own functions: WebAssembly modules in the bundle's `fns/` (at most 8), run by the host's `wasm` service in a sandbox with a deadline and a memory cap. A function gets only its input and reaches no file, network, clock or other app. An agent tool can run one with `host_method: "wasm.<function>"`. To write, build and call a function, see App Flow's [Run your own Rust code](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.md). | Run its own sandboxed functions on this device | Desktop RC2 serves it in standard builds on macOS and Linux, with limited support ([the service and its limits](https://github.com/OctoSense-org/OctoSense/blob/main/docs/wasm.md#the-service)); RC1 left it disabled. Supported Android Home source builds serve it too. Builds for Windows, iOS and OpenHarmony leave it out: a call there answers `no service answers "wasm" on this device`. |
+| `wasm` | The app's own functions: WebAssembly core modules or components in the bundle's `fns/` (at most 8), run by the host's `wasm` service in a sandbox with a deadline and a memory cap. A core module's function gets only its input and reaches no file, network, clock or other app. A component may also read the clock and random numbers and, with `storage`, the app's own files, but reaches no network or other app ([WebAssembly components](#webassembly-components)). An agent tool can run one with `host_method: "wasm.<function>"`. To write, build and call a function, see App Flow's [Run your own Rust code](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.md). | Run its own sandboxed functions on this device; they reach no network or other apps | Desktop RC2 serves it in standard builds on macOS and Linux, with limited support ([the service and its limits](https://github.com/OctoSense-org/OctoSense/blob/main/docs/wasm.md#the-service)); RC1 left it disabled. Supported Android Home source builds serve it too. Builds for Windows, iOS and OpenHarmony leave it out: a call there answers `no service answers "wasm" on this device`. No build loads components yet. |
 | `sheet` | Spreadsheets through the `sheet` engine (gridcraft): workbooks, formulas, recalculation and xlsx, inside the app's own files. | Use the device's spreadsheet engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop and Home builds. |
 | `photo` | Images and photo documents through the `photo` engine (photocraft): inspect, convert, edit commands and previews, inside the app's own files. | Use the device's image-editing engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop and Home builds. |
 | `word` | Documents through the `word` engine (wordcraft): create, read, inspect, and convert between docx, Markdown, HTML, RTF, ODT and PDF, inside the app's own files. | Use the device's document engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
@@ -1088,6 +1161,7 @@ none of them reads a bundle or writes a file. An unknown command fails with
 | `hub stamp <bundle>` | Parses `manifest.json` with the gate's parser, then writes the bundle's digest into `integrity.bundle_blake3` and prints it. Refuses a manifest the gate cannot read or an already GitHub-attested release. |
 | `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app]` | The gate. Prints `PASSED` or `REFUSED`, every finding and what the app will be granted. Exits 1 on a refusal. `--json` prints the report as JSON (`schema`, `stage`, `passed`, `app_id`, `version`, `digest`, `findings` and `resources`). `--publisher-key` checks a legacy key-signed bundle; publishing never needs it. |
 | `hub scan <bundle> [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--packet <out.json>] [--reviewer <cmd>] [--system-app]` | Runs the gate, then writes the review packet and optionally hands it to a reviewer command. A bundle the gate refuses gets no scan. |
+| `hub component-info <file.wasm>` | Prints what a function file is (`component` or `module`), its imports and its exported functions with their parameters and results, as JSON ([WebAssembly components](#webassembly-components)). It reads only that file. A file that is neither a core module nor a valid component fails with `hub: <file>: not a WebAssembly core module or component` or the validator's error. |
 | `hub verify <catalog> --anchor <hex>` | Verifies a catalog against a trust anchor. |
 | `hub keygen`, `hub pubkey`, `hub sign-manifest` | Legacy Ed25519 key tools. Maintainers use them for the legacy catalog, and a local rehearsal uses `hub keygen` for its throwaway catalog keys. Never use them to sign an app: App Hub accepts only GitHub-attested releases. [Issue #168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168) decides whether they stay. |
 

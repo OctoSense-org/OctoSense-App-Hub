@@ -16,7 +16,20 @@ fn manifest_with(body: &str) -> String {
 fn palpo_extension_preserves_schema_and_declares_its_host_feature() {
     assert_eq!(SCHEMA, 1);
     assert_eq!(SCHEMA_MINOR, 0);
-    assert_eq!(KNOWN_FEATURES, &["palpo-admin-v1", "host-api-v1", "backend-api-v1", "script-tools-v1", "publisher-github-v1"]);
+    assert_eq!(
+        KNOWN_FEATURES,
+        &["palpo-admin-v1", "host-api-v1", "backend-api-v1", "script-tools-v1", "publisher-github-v1", "wasm-components-v1"]
+    );
+}
+
+#[test]
+fn wasm_components_need_the_wasm_capability() {
+    // ADR 0014: a bundle with a component in fns/ requires the feature, and
+    // the feature means nothing without the wasm capability.
+    assert!(parse(&manifest_with(r#""requires":["wasm-components-v1"]"#)).is_err());
+    assert!(parse(&manifest_with(r#""requires":["wasm-components-v1"],"capabilities":["storage"]"#)).is_err());
+    let manifest = parse(&manifest_with(r#""requires":["wasm-components-v1"],"capabilities":["wasm","storage"]"#)).unwrap();
+    assert_eq!(manifest.requires, ["wasm-components-v1"]);
 }
 
 #[test]

@@ -454,3 +454,91 @@ fn a_bundle_carries_at_most_eight_modules_and_hears_about_none() {
         report.render()
     );
 }
+
+// ---- components (OctoSense ADR 0014, wasm-components-v1) ----------------
+
+/// Components built with plain `cargo build --target wasm32-wasip2`, copied
+/// from OctoSense's `crates/wasm-host/tests/fixtures` (its
+/// `tests/component-guest/build.sh` builds them). `notes` imports the clock,
+/// random numbers and the filesystem; `netprobe` imports `wasi:sockets`.
+const NOTES: &[u8] = include_bytes!("fixtures/notes.component.wasm");
+const NETPROBE: &[u8] = include_bytes!("fixtures/netprobe.component.wasm");
+
+fn with_component(requires: bool, capabilities: &[&str], bytes: &[u8]) -> octosense_app_hub::GateReport {
+    let mut f = Fixture::new();
+    fs::create_dir_all(f.bundle.join("fns")).unwrap();
+    fs::write(f.bundle.join("fns/notes.wasm"), bytes).unwrap();
+    f.manifest.capabilities.extend(capabilities.iter().map(|c| c.to_string()));
+    if requires {
+        f.manifest.requires.push("wasm-components-v1".into());
+    }
+    f.sign();
+    f.report(None)
+}
+
+fn refusal<'a>(report: &'a octosense_app_hub::GateReport, check: &str) -> Option<&'a octosense_app_hub::Finding> {
+    report.findings.iter().find(|f| f.check == check && f.severity == octosense_app_hub::Severity::Refusal)
+}
+
+#[test]
+fn a_component_passes_under_its_feature_and_tells_reviewers_what_it_reaches() {
+    let report = with_component(true, &["wasm", "storage"], NOTES);
+    assert!(report.passed(), "{}", report.render());
+    let reach = report
+        .findings
+        .iter()
+        .find(|f| f.path.as_deref() == Some("fns/notes.wasm"))
+        .unwrap_or_else(|| panic!("no reach line: {}", report.render()));
+    assert_eq!(reach.severity, octosense_app_hub::Severity::Warning);
+    assert_eq!(
+        reach.detail,
+        "fns/notes.wasm is a component that reaches the clock, random numbers and files in its app folder, but no network or other app"
+    );
+}
+
+#[test]
+fn a_component_is_refused_unless_the_manifest_requires_components() {
+    let report = with_component(false, &["wasm", "storage"], NOTES);
+    let finding = refusal(&report, "functions").unwrap_or_else(|| panic!("{}", report.render()));
+    assert!(finding.detail.contains("must require wasm-components-v1"), "{}", finding.detail);
+}
+
+#[test]
+fn a_component_that_uses_files_needs_the_storage_capability() {
+    let report = with_component(true, &["wasm"], NOTES);
+    let finding = refusal(&report, "functions").unwrap_or_else(|| panic!("{}", report.render()));
+    assert!(finding.detail.contains("storage capability"), "{}", finding.detail);
+}
+
+#[test]
+fn a_component_that_imports_sockets_or_does_not_validate_is_refused() {
+    let report = with_component(true, &["wasm", "storage"], NETPROBE);
+    let finding = refusal(&report, "contents-invalid").unwrap_or_else(|| panic!("{}", report.render()));
+    assert!(finding.detail.contains("imports wasi:sockets/"), "{}", finding.detail);
+    assert_eq!(finding.path.as_deref(), Some("fns/notes.wasm"));
+    // No reach line claims "no network" for it, and it still counts as a
+    // component.
+    assert!(
+        !report.findings.iter().any(|f| f.detail.contains("is a component that reaches") || f.detail.contains("holds no component")),
+        "{}",
+        report.render()
+    );
+    let truncated = &NOTES[..NOTES.len() / 2];
+    let report = with_component(true, &["wasm", "storage"], truncated);
+    let finding = refusal(&report, "contents-invalid").unwrap_or_else(|| panic!("{}", report.render()));
+    assert!(finding.detail.contains("not a valid WebAssembly component"), "{}", finding.detail);
+}
+
+#[test]
+fn a_module_needs_no_feature_and_the_feature_alone_is_only_a_warning() {
+    let report = with_functions(true, &[("fns/rank.wasm", MODULE)]);
+    assert!(report.passed(), "{}", report.render());
+    assert!(report.findings.iter().all(|f| f.path.as_deref() != Some("fns/rank.wasm")), "{}", report.render());
+    let report = with_component(true, &["wasm"], MODULE);
+    assert!(report.passed(), "{}", report.render());
+    assert!(
+        report.findings.iter().any(|f| f.check == "functions" && f.detail.contains("holds no component")),
+        "{}",
+        report.render()
+    );
+}

@@ -1,0 +1,348 @@
+//! The app's own functions, `fns/*.wasm`: WebAssembly core modules
+//! (OctoSense ADR 0011) and components (OctoSense ADR 0014).
+//!
+//! A core module is checked by its header only; the host checks its imports
+//! and exports when it loads it. A component is validated here, and its
+//! imports must all come from the WASI packages a host scopes to the app
+//! ([`ALLOWED_COMPONENT_IMPORTS`]). Whether the manifest may carry one
+//! (`requires: ["wasm-components-v1"]`, `storage` for files) is the gate's
+//! check ([`crate::gate`]), which also tells reviewers what each component
+//! reaches ([`ComponentInfo::reach`]).
+//!
+//! [`describe`] is `hub component-info`: a file's kind, imports and exports,
+//! with each function's parameters and result written as WIT writes them
+//! (the same text OctoSense's `wasm.functions` shows).
+
+use serde::Serialize;
+use wasmparser::component_types::{ComponentDefinedType, ComponentEntityType, ComponentFuncTypeId, ComponentValType};
+use wasmparser::types::TypesRef;
+use wasmparser::{ComponentTypeRef, Parser, Payload, PrimitiveValType, TypeBounds, Validator, WasmFeatures};
+
+/// The WASI packages a component may import: every interface of these, each
+/// scoped to its app by the host. Nothing else (`wasi:sockets`, `wasi:http`,
+/// non-WASI imports) is admitted.
+pub const ALLOWED_COMPONENT_IMPORTS: &[&str] =
+    &["wasi:cli/", "wasi:clocks/", "wasi:filesystem/", "wasi:io/", "wasi:random/"];
+
+/// The feature a manifest requires when its `fns/` holds a component.
+pub const COMPONENTS_FEATURE: &str = "wasm-components-v1";
+
+/// Whether `bytes` starts like a WebAssembly core module, version 1.
+pub fn is_module(bytes: &[u8]) -> bool {
+    bytes.starts_with(b"\0asm\x01\0\0\0")
+}
+
+/// Whether `bytes` starts like a WebAssembly component (the preamble's
+/// version and layer fields are `0d 00 01 00`).
+pub fn is_component(bytes: &[u8]) -> bool {
+    bytes.starts_with(b"\0asm\x0d\0\x01\0")
+}
+
+/// One function a component exports: `name`, or `interface.name` for a
+/// function in an exported interface. Each parameter is `(name, type)`; a
+/// core module's parameters are named `p0`, `p1`, ….
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Export {
+    pub name: String,
+    pub params: Vec<(String, String)>,
+    pub result: Option<String>,
+}
+
+/// A validated component's imports and exports.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ComponentInfo {
+    /// Every top-level import of an interface or a function, as
+    /// `package:namespace/interface@version`. A type the world names is
+    /// not one: it reaches nothing.
+    pub imports: Vec<String>,
+    /// Its functions, sorted by name.
+    pub exports: Vec<Export>,
+}
+
+impl ComponentInfo {
+    /// The imports outside [`ALLOWED_COMPONENT_IMPORTS`].
+    pub fn refused_imports(&self) -> Vec<&str> {
+        self.imports
+            .iter()
+            .map(String::as_str)
+            .filter(|name| !ALLOWED_COMPONENT_IMPORTS.iter().any(|p| name.starts_with(p)))
+            .collect()
+    }
+
+    /// Whether it imports `wasi:filesystem`: the app's own files, which the
+    /// host gives it only with the `storage` capability.
+    pub fn uses_files(&self) -> bool {
+        self.imports.iter().any(|name| name.starts_with("wasi:filesystem/"))
+    }
+
+    /// What it reaches, for a reviewer: "the clock, random numbers and
+    /// files in its app folder, but no network or other app".
+    pub fn reach(&self) -> String {
+        let imports = |prefix: &str| self.imports.iter().any(|n| n.starts_with(prefix));
+        let mut reaches = Vec::new();
+        if imports("wasi:clocks/") {
+            reaches.push("the clock");
+        }
+        if imports("wasi:random/") {
+            reaches.push("random numbers");
+        }
+        if self.uses_files() {
+            reaches.push("files in its app folder");
+        }
+        let not = if self.uses_files() { "no network or other app" } else { "no files, network or other app" };
+        match reaches.as_slice() {
+            [] => "nothing but its input".into(),
+            [one] => format!("{one}, but {not}"),
+            [init @ .., last] => format!("{} and {last}, but {not}", init.join(", ")),
+        }
+    }
+}
+
+/// Validates a component and reads its imports and exports.
+pub fn inspect_component(bytes: &[u8]) -> Result<ComponentInfo, String> {
+    if !is_component(bytes) {
+        return Err("not a WebAssembly component".into());
+    }
+    let mut validator = Validator::new_with_features(WasmFeatures::default() | WasmFeatures::COMPONENT_MODEL);
+    let types = validator
+        .validate_all(bytes)
+        .map_err(|e| format!("not a valid WebAssembly component: {e}"))?;
+    let types = types.as_ref();
+    let (imports, export_names) = top_level_names(bytes)?;
+    let mut exports = Vec::new();
+    for name in export_names {
+        match types.component_item_for_export(&name).map(|item| item.ty) {
+            Some(ComponentEntityType::Func(id)) => exports.push(function(&types, name.clone(), id)),
+            Some(ComponentEntityType::Instance(id)) => {
+                let short = short_name(&name).to_string();
+                for (fname, item) in types[id].exports.iter() {
+                    if let ComponentEntityType::Func(fid) = item.ty {
+                        exports.push(function(&types, format!("{short}.{fname}"), fid));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    exports.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(ComponentInfo { imports, exports })
+}
+
+/// `hub component-info`'s answer, in this order: `kind` (`component` or
+/// `module`), `imports` and `exports`.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Description {
+    pub kind: &'static str,
+    pub imports: Vec<String>,
+    pub exports: Vec<Export>,
+}
+
+/// `hub component-info`: what a function file is, its imports and exports.
+pub fn describe(bytes: &[u8]) -> Result<Description, String> {
+    if is_component(bytes) {
+        let ComponentInfo { imports, exports } = inspect_component(bytes)?;
+        return Ok(Description { kind: "component", imports, exports });
+    }
+    if is_module(bytes) {
+        return describe_module(bytes);
+    }
+    Err("not a WebAssembly core module or component".into())
+}
+
+/// A core module's imports (`module.name`) and exported functions with their
+/// core types.
+fn describe_module(bytes: &[u8]) -> Result<Description, String> {
+    let mut validator = Validator::new_with_features(WasmFeatures::default());
+    let types = validator
+        .validate_all(bytes)
+        .map_err(|e| format!("not a valid WebAssembly module: {e}"))?;
+    let types = types.as_ref();
+    let mut imports = Vec::new();
+    let mut exports = Vec::new();
+    for payload in Parser::new(0).parse_all(bytes) {
+        match payload.map_err(|e| e.to_string())? {
+            Payload::ImportSection(reader) => {
+                for import in reader.into_imports() {
+                    let import = import.map_err(|e| e.to_string())?;
+                    imports.push(format!("{}.{}", import.module, import.name));
+                }
+            }
+            Payload::ExportSection(reader) => {
+                for export in reader {
+                    let export = export.map_err(|e| e.to_string())?;
+                    if export.kind != wasmparser::ExternalKind::Func {
+                        continue;
+                    }
+                    let ty = types.core_function_at(export.index);
+                    let func = types[ty].unwrap_func();
+                    let params = func.params().iter().enumerate().map(|(i, t)| (format!("p{i}"), t.to_string())).collect();
+                    let result = match func.results() {
+                        [] => None,
+                        [one] => Some(one.to_string()),
+                        many => Some(format!("({})", many.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(", "))),
+                    };
+                    exports.push(Export { name: export.name.to_string(), params, result });
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(Description { kind: "module", imports, exports })
+}
+
+/// The top-level component's imports, not counting the types it names, and
+/// its function and instance exports, in order. Nested modules and
+/// components (`parse_all` flattens them) are skipped by depth.
+fn top_level_names(bytes: &[u8]) -> Result<(Vec<String>, Vec<String>), String> {
+    let mut imports = Vec::new();
+    let mut exports = Vec::new();
+    let mut depth = 0usize;
+    for payload in Parser::new(0).parse_all(bytes) {
+        match payload.map_err(|e| e.to_string())? {
+            Payload::ModuleSection { .. } | Payload::ComponentSection { .. } => depth += 1,
+            Payload::End(_) => depth = depth.saturating_sub(1),
+            Payload::ComponentImportSection(reader) if depth == 0 => {
+                for import in reader {
+                    let import = import.map_err(|e| e.to_string())?;
+                    // A type the world defines (a record a function returns,
+                    // say) is imported as `(type (eq …))`: a name for a type
+                    // the component already has, which reaches nothing.
+                    if matches!(import.ty, ComponentTypeRef::Type(TypeBounds::Eq(_))) {
+                        continue;
+                    }
+                    imports.push(import.name.name.to_string());
+                }
+            }
+            Payload::ComponentExportSection(reader) if depth == 0 => {
+                for export in reader {
+                    let export = export.map_err(|e| e.to_string())?;
+                    if matches!(
+                        export.kind,
+                        wasmparser::ComponentExternalKind::Func | wasmparser::ComponentExternalKind::Instance
+                    ) {
+                        exports.push(export.name.name.to_string());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok((imports, exports))
+}
+
+fn function(types: &TypesRef<'_>, name: String, id: ComponentFuncTypeId) -> Export {
+    let ty = &types[id];
+    Export {
+        name,
+        params: ty
+            .params
+            .iter()
+            .map(|(n, t)| (n.to_string(), wit(types, t)))
+            .collect(),
+        result: ty.result.as_ref().map(|t| wit(types, t)),
+    }
+}
+
+/// `my:pkg/markdown@0.1.0` → `markdown`.
+fn short_name(full: &str) -> &str {
+    let tail = full.rsplit('/').next().unwrap_or(full);
+    tail.split('@').next().unwrap_or(tail)
+}
+
+fn primitive(p: &PrimitiveValType) -> &'static str {
+    match p {
+        PrimitiveValType::Bool => "bool",
+        PrimitiveValType::S8 => "s8",
+        PrimitiveValType::U8 => "u8",
+        PrimitiveValType::S16 => "s16",
+        PrimitiveValType::U16 => "u16",
+        PrimitiveValType::S32 => "s32",
+        PrimitiveValType::U32 => "u32",
+        PrimitiveValType::S64 => "s64",
+        PrimitiveValType::U64 => "u64",
+        PrimitiveValType::F32 => "f32",
+        PrimitiveValType::F64 => "f64",
+        PrimitiveValType::Char => "char",
+        PrimitiveValType::String => "string",
+        PrimitiveValType::ErrorContext => "error-context",
+    }
+}
+
+/// A value type as WIT writes it: records, variants and enums by their shape,
+/// the same text OctoSense's `wasm.functions` shows. Anything else (a
+/// resource handle, a future, a stream, a map) is `resource`, as there.
+fn wit(types: &TypesRef<'_>, ty: &ComponentValType) -> String {
+    let id = match ty {
+        ComponentValType::Primitive(p) => return primitive(p).to_string(),
+        ComponentValType::Type(id) => *id,
+    };
+    let join = |items: Vec<String>| items.join(", ");
+    match &types[id] {
+        ComponentDefinedType::Primitive(p) => primitive(p).to_string(),
+        ComponentDefinedType::Record(record) => format!(
+            "record {{ {} }}",
+            join(record.fields.iter().map(|(n, t)| format!("{n}: {}", wit(types, t))).collect())
+        ),
+        ComponentDefinedType::Variant(variant) => format!(
+            "variant {{ {} }}",
+            join(
+                variant
+                    .cases
+                    .iter()
+                    .map(|(n, case)| match &case.ty {
+                        Some(t) => format!("{n}({})", wit(types, t)),
+                        None => n.to_string(),
+                    })
+                    .collect()
+            )
+        ),
+        ComponentDefinedType::List { element, .. } => format!("list<{}>", wit(types, element)),
+        ComponentDefinedType::Tuple(tuple) => {
+            format!("tuple<{}>", join(tuple.types.iter().map(|t| wit(types, t)).collect()))
+        }
+        ComponentDefinedType::Flags(names) => {
+            format!("flags {{ {} }}", join(names.iter().map(|n| n.to_string()).collect()))
+        }
+        ComponentDefinedType::Enum(names) => {
+            format!("enum {{ {} }}", join(names.iter().map(|n| n.to_string()).collect()))
+        }
+        ComponentDefinedType::Option { ty, .. } => format!("option<{}>", wit(types, ty)),
+        ComponentDefinedType::Result { ok, err, .. } => match (ok, err) {
+            (Some(ok), Some(err)) => format!("result<{}, {}>", wit(types, ok), wit(types, err)),
+            (Some(ok), None) => format!("result<{}>", wit(types, ok)),
+            (None, Some(err)) => format!("result<_, {}>", wit(types, err)),
+            (None, None) => "result".into(),
+        },
+        _ => "resource".into(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn info(imports: &[&str]) -> ComponentInfo {
+        ComponentInfo { imports: imports.iter().map(|i| i.to_string()).collect(), exports: Vec::new() }
+    }
+
+    #[test]
+    fn the_reach_line_names_what_a_component_imports() {
+        assert_eq!(info(&["wasi:cli/stdout@0.2.9"]).reach(), "nothing but its input");
+        assert_eq!(
+            info(&["wasi:clocks/wall-clock@0.2.9", "wasi:random/random@0.2.9"]).reach(),
+            "the clock and random numbers, but no files, network or other app"
+        );
+        assert_eq!(
+            info(&["wasi:filesystem/types@0.2.9"]).reach(),
+            "files in its app folder, but no network or other app"
+        );
+    }
+
+    #[test]
+    fn only_the_scoped_wasi_packages_are_allowed() {
+        let component = info(&["wasi:io/poll@0.2.9", "wasi:sockets/network@0.2.9", "wasi:http/types@0.2.9", "my:pkg/host"]);
+        assert_eq!(component.refused_imports(), ["wasi:sockets/network@0.2.9", "wasi:http/types@0.2.9", "my:pkg/host"]);
+        // A package name is matched whole: wasi:clocksmith is not wasi:clocks.
+        assert_eq!(info(&["wasi:clocksmith/x"]).refused_imports(), ["wasi:clocksmith/x"]);
+    }
+}

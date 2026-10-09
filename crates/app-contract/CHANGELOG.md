@@ -9,6 +9,14 @@ versions' changes, and 1.10.0 includes 1.9.0's changes.
 [README.md](README.md#versions-on-cratesio) shows how to update a lock file
 that holds 1.2.0.
 
+## Unreleased
+
+- Add the `wasm-components-v1` feature. An app whose `fns/` holds a
+  WebAssembly component (OctoSense ADR 0014) must list it in `requires`, with
+  the `wasm` capability. A host that does not know it refuses the app instead
+  of failing when the app first calls its functions. Existing manifests and
+  their signing bytes do not change.
+
 ## 1.10.0 — 2026-10-09
 
 Published through the [release workflow](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37901486707);

@@ -205,7 +205,7 @@ pub fn privacy_summary_with_tools(manifest: &AppManifest, tools: &[ToolSpec]) ->
         ("news", "Reads news the device collects from its feeds and topics."),
         ("photos", "Reads Photos's own library and publishes photo collections."),
         ("youtube", "Searches YouTube videos and manages music recommendations; playback requires a tap."),
-        ("wasm", "Runs its own functions in a sandbox on this device; they reach no files, network or other apps."),
+        ("wasm", "Runs its own functions in a sandbox on this device; they reach at most its own files, never the network or other apps."),
         ("glance", "Shows short cards on your glance screen; each opens only this app."),
         ("model", "Sends what you give it to the AI provider you configured, for one-off answers within a daily budget; it never sees your API keys."),
     ] {

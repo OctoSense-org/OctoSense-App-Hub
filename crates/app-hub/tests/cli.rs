@@ -130,3 +130,57 @@ fn system_mode_accepts_unsigned_system_bundles_but_refuses_store_ids() {
     let result = hub(&fixture, &["check", "bundle", "--system-app"]);
     assert!(result.status.success(), "{}\n{}", String::from_utf8_lossy(&result.stdout), String::from_utf8_lossy(&result.stderr));
 }
+
+#[test]
+fn component_info_prints_a_function_files_kind_imports_and_typed_exports() {
+    use serde_json::{json, Value};
+    let fixture = Fixture::new();
+    fs::write(fixture.root.join("notes.wasm"), include_bytes!("fixtures/notes.component.wasm")).unwrap();
+    let result = hub(&fixture, &["component-info", "notes.wasm"]);
+    assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+    let info: Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(info["kind"], "component");
+    let imports: Vec<&str> = info["imports"].as_array().unwrap().iter().map(|i| i.as_str().unwrap()).collect();
+    assert!(imports.iter().any(|i| i.starts_with("wasi:filesystem/")), "{imports:?}");
+    assert!(imports.iter().all(|i| i.starts_with("wasi:")), "{imports:?}");
+    let names: Vec<&str> = info["exports"].as_array().unwrap().iter().map(|e| e["name"].as_str().unwrap()).collect();
+    assert_eq!(
+        names,
+        ["analyze", "count", "echo-bytes", "grow", "now-ms", "random-u64", "read-file", "save-html", "spin", "to-html"]
+    );
+    assert_eq!(
+        info["exports"][0],
+        json!({
+            "name": "analyze",
+            "params": [["markdown", "string"]],
+            "result": "record { words: u32, lines: u32, headings: list<string> }"
+        })
+    );
+
+    // A core module: (module (import "octo" "log" (func (param i32 i32)))
+    //   (func (export "add") (param i32 i32) (result i32)
+    //     local.get 0 local.get 1 i32.add))
+    let module: &[u8] = b"\0asm\x01\0\0\0\
+        \x01\x0c\x02\x60\x02\x7f\x7f\x01\x7f\x60\x02\x7f\x7f\x00\
+        \x02\x0c\x01\x04octo\x03log\x00\x01\
+        \x03\x02\x01\x00\
+        \x07\x07\x01\x03add\x00\x01\
+        \x0a\x09\x01\x07\x00\x20\x00\x20\x01\x6a\x0b";
+    fs::write(fixture.root.join("rank.wasm"), module).unwrap();
+    let result = hub(&fixture, &["component-info", "rank.wasm"]);
+    assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+    assert_eq!(
+        serde_json::from_slice::<Value>(&result.stdout).unwrap(),
+        json!({
+            "kind": "module",
+            "imports": ["octo.log"],
+            "exports": [{"name": "add", "params": [["p0", "i32"], ["p1", "i32"]], "result": "i32"}]
+        })
+    );
+
+    fs::write(fixture.root.join("script.wasm"), "#!/bin/sh\necho hi\n").unwrap();
+    let result = hub(&fixture, &["component-info", "script.wasm"]);
+    assert!(!result.status.success());
+    assert!(result.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("not a WebAssembly core module or component"));
+}

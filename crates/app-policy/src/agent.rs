@@ -502,10 +502,12 @@ fn check_host_method(tool: &ToolSpec) -> Result<(), String> {
         return Err("host_method cannot target a host sheet or approve an action".into());
     }
     // The app's own WebAssembly function (`wasm.<function>`, contract 1.7):
-    // the host runs the bundle's module in a sandbox where a function
-    // reaches nothing but its input, so no shared data sets a risk floor or
-    // calls for `private_data`. `check` still requires the app to declare
-    // the `wasm` capability.
+    // the host runs the bundle's code in a sandbox. A module reaches nothing
+    // but its input; a component (`wasm-components-v1`) also reaches the
+    // clock, random numbers and, with `storage`, the app's own folder, as
+    // the app's script does. Neither reaches shared data, so nothing sets a
+    // risk floor or calls for `private_data`. `check` still requires the
+    // app to declare the `wasm` capability.
     if method.split('.').count() == 2 && method.starts_with("wasm.") {
         return Ok(());
     }

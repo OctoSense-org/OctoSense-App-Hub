@@ -15,6 +15,7 @@
 //! and the runtime decide what is allowed.
 pub mod admission;
 pub mod client;
+pub mod functions;
 pub mod gate;
 pub mod github_catalog;
 pub mod github_publisher;
