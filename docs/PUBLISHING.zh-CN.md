@@ -222,7 +222,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | `runtime` | 用 `runtime.list` 和 `runtime.describe` 查询宿主实现了哪些 API（[宿主 API 兼容性](HOST-API.zh-CN.md)）。它不授予所列的任何 API。 | Inspect available host APIs without gaining access to their data or permissions | OctoSense 桌面版 0.1.0-beta.2 不提供，它的商店会拒绝这个名称。在基于 App Hub `main` 构建的每个宿主中（包括 `card-host`），由 App Hub 的请求分派器响应。 |
 | `wasm` | 应用自带的函数：应用包 `fns/` 中的 WebAssembly 模块（最多 8 个），由宿主的 `wasm` 服务在沙盒中运行，有截止时间和内存上限。函数只拿到自己的输入，接触不到文件、网络、时钟或其他应用。Agent 工具可以用 `host_method: "wasm.<function>"` 运行它。函数的编写、构建和调用方法见 App Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.zh-CN.md)。 | Run its own sandboxed functions on this device | 仅启用 `wasm-lab` 的构建提供；标准桌面 RC1 包默认关闭 |
 
-任何能力都不隐含其他能力。尚不支持：面向商店应用的 `photos` 和 `youtube` 服务。脚本如何调用各项能力，见 App Flow 的[能力](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.zh-CN.md)文档。
+任何能力都不隐含其他能力。尚不支持：面向商店应用的 `photos` 和 `youtube` 服务。脚本如何调用各项能力，见 App Flow 的[能力](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.zh-CN.md)文档；哪些能力会真正响应商店应用、支持哪些平台、从哪个版本开始，见其[宿主 API 能力族](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-FAMILIES.zh-CN.md)。
 
 源码：`crates/app-contract/src/manifest.rs` 中的 `KNOWN_CAPABILITIES`。
 

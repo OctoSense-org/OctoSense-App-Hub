@@ -293,7 +293,9 @@ platform and provider limits; historical beta differences are explicit.
 
 No capability implies another. Not yet: `photos` and `youtube` services for
 store apps. For how a script calls each capability, see App Flow's
-[Capabilities](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.md).
+[Capabilities](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.md); for which capabilities actually answer a
+store app, on which platforms and since which release, its
+[Host API families](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-FAMILIES.md).
 
 Source: `KNOWN_CAPABILITIES` in `crates/app-contract/src/manifest.rs`.
 

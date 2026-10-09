@@ -338,6 +338,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 | 下载的 Release 上，发布者的证明验证通过 | `downloaded_publisher_signature_verified` | 对下载的 pack 先运行 `hub publisher-unpack`，再运行 `hub publisher-verify`（第 6 步） |
 | 下载的应用包通过准入检查 | `downloaded_gate_output` | 同上 |
 | 应用包摘要与 issue 中的一致 | `bundle_digest` | `integrity.bundle_blake3` |
+| 每项申请的能力所属的能力族会在所列平台上响应商店应用 | 0.1.0 记录中没有；从签名目录第 14 版起检查 | App Flow 的 [HOST-API-FAMILIES](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-FAMILIES.zh-CN.md) |
 
 历史版本 0.1.1 的记录见 [`docs/admissions/connected-apps-0.1.1`](../docs/admissions/connected-apps-0.1.1/README.zh-CN.md)。这份记录还保存了每个应用签名后的准入检查输出和源码审核结论，并记录了一项测试：用商店的代码安装每个应用，并从 0.1.0 升级。
 
@@ -386,11 +387,12 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 | 登录你自己的后端 | RC 在[平台限制](#确认你的平台)内提供宿主运行的后端登录和清单声明的读取；兼容 Android 源码构建另有嵌入式流程。每次写操作都需要受支持的原生审阅流程（见发布参考的[登录自己的后端](PUBLISHING.zh-CN.md#登录自己的后端)一节）。 | 只需提供商身份时，用仅验证身份的登录来识别用户：`auth` 搭配 GitHub 的 `read:user`，或 Google 的 `openid`、`email` 和 `profile`。需要提供商数据时，再加上 `github`、`gmail` 或 `gcalendar`。 |
 | 在应用中保存 API 密钥或令牌 | 不支持。准入检查只拒绝密码和一次性验证码字段，因此发现不了输入到普通字段或存放在存储中的密钥。 | 不要附带任何密钥。生成文本请用 `model`，它调用的是用户自己的 AI 提供商。 |
 | 生成图片、音频、视频或向量嵌入 | RC 在 `model` 能力下提供相应方法；媒体方法名不是独立能力。仍受提供商配置、权益和平台限制约束。 | 运行时发现方法，并处理提供商不可用的状态；见[媒体指南](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/AI-SERVICES.zh-CN.md#媒体与嵌入向量model)。 |
-| 使用 `llm`、`news`、`calendar`、`prompt`、`ledger.read`、`clipboard` 或 `palpo.*` | 准入检查接受它们，但没有宿主向商店应用提供这些服务。`llm` 和 `news` 只响应 `os.*` 应用，`calendar` 只响应 `os.calendar`，其余的没有任何宿主处理。 | 不要请求它们。访问 Google 日历请用 `gcalendar`。 |
+| 使用 `llm`、`news`、`calendar`、`matrix.*`、`prompt`、`ledger.read`、`clipboard` 或 `palpo.*` | 准入检查接受它们，但没有宿主向商店应用提供这些服务。`llm` 和 `news` 只响应 `os.*` 应用，`calendar` 只响应 `os.calendar`，`matrix.*` 只有 Rinx 内部由 Rinx 自己的宿主提供；引擎服务（`sheet`、`photo`、`word`、`deck`、`cad`、`light`、`sound`、`design`、`film`、`effect`、`vector`、`pdf`）根本不是能力。其余的没有任何宿主处理。 | 不要请求它们。访问 Google 日历请用 `gcalendar`。哪些能力族会响应商店应用、支持哪些平台、从哪个版本开始，见 App Flow 的 [HOST-API-FAMILIES](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-FAMILIES.zh-CN.md)。 |
+| 在应用中发送邮件 | RC1 上做不到：`mail.send` 返回 `approval_required`，`mail.review_send` 和各个草稿方法只响应 Mail（[OctoSense #409](https://github.com/OctoSense-org/OctoSense/issues/409)）。 | 读取已授权的账户（`mail.accounts`、`mail.folders`、`mail.list`、`mail.message`）并发出通知；发送由用户在 Mail 应用中完成。 |
 | 用 Agent 工具运行应用自身的逻辑 | RC1 发行版会在完整应用打开期间运行 `implemented_by: "app"` 的工具；应用关闭时返回 `app_not_running`。OctoSense 桌面版 0.1.0-beta.2 拒绝这类工具，返回 `app_tool_unavailable`。没有 `host_method` 的 `host-service` 工具会调用以应用的命名空间命名的服务，而命名空间不是能力，所以调用失败，返回 `not_granted`。 | 要调用共享服务，用 `host_method` 把工具映射到 `github`、`gcalendar`、`gmail` 或 `glance` 的某个方法（见发布参考的[把工具映射到共享服务](PUBLISHING.zh-CN.md#把工具映射到共享服务host_method)一节）。要运行应用自身的逻辑，在清单中声明 `requires: ["script-tools-v1"]`，并实现 `app_tool` 钩子（见发布参考的[脚本工具执行](PUBLISHING.zh-CN.md#脚本工具执行script-tools-v1)一节）。请在[兼容 RC1 发行版](../README.zh-CN.md#下载兼容宿主)中测试。 |
 | 在应用中附带原生 Rust 代码 | 商店应用包不能携带原生代码。准入检查会拒绝原生库，原生代码需要随 Shell 新版本发布（[交付路径](DEVELOPMENT.zh-CN.md#选择合适的交付路径)）。 | 要做纯计算，把 Rust 代码编译成 `fns/` 中的 WebAssembly 模块，并请求 `wasm` 能力（见发布参考的[能力](PUBLISHING.zh-CN.md#能力)一节）。只有启用 `wasm-lab` 特性的 OctoSense 构建会运行它，目前还没有任何发布版启用这项特性。具体做法，以及设备 API、网络和文件各走哪条路，见 App Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.zh-CN.md)。 |
 | 提交系统应用（`os.*`）或原生应用 | 这里没有提交途径。系统应用随 Shell 一起发布，原生代码需要随 Shell 新版本发布（[交付路径](DEVELOPMENT.zh-CN.md#选择合适的交付路径)）。 | 用自己的 ID 做一个商店应用。 |
 | 在手机上安装 `auth` 应用 | 目前没有任何已发布的手机版本能做到。 | 这些只声明 macOS 的示例使用 Mac 上的兼容 RC；Android Google 授权不可用。 |
 | 在卡片 kit 中引用 Makepad 内置的 CJK 字体 | 当前 Hub 和锁定运行时支持 Regular 与 Bold 的准确资源名。 | 名称、打包字体及旧版宿主限制见[字体](PUBLISHING.zh-CN.md#字体)。Mac 上已验证 `card-host` 原生显示；尚未在每种 Shell 和平台上验证。 |
 
-哪个 Shell 提供哪项宿主服务，见 App Flow 的 [HOST-SERVICES.zh-CN.md](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。
+每个宿主 API 能力族由哪些 Shell 向谁提供、支持哪些平台、从哪个版本开始，见 App Flow 的 [HOST-API-FAMILIES.zh-CN.md](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-FAMILIES.zh-CN.md)；各项服务的说明见 [HOST-SERVICES.zh-CN.md](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。
