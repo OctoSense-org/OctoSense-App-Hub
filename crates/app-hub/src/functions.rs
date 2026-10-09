@@ -27,6 +27,17 @@ use wasmparser::{ComponentTypeRef, Parser, Payload, PrimitiveValType, TypeBounds
 pub const ALLOWED_COMPONENT_IMPORTS: &[&str] =
     &["wasi:cli/", "wasi:clocks/", "wasi:filesystem/", "wasi:http/", "wasi:io/", "wasi:random/", "octosense:host/"];
 
+/// The allowed packages in words: "wasi:cli, wasi:clocks, … and
+/// octosense:host".
+pub fn allowed_import_packages() -> String {
+    let names: Vec<&str> = ALLOWED_COMPONENT_IMPORTS.iter().map(|p| p.trim_end_matches('/')).collect();
+    match names.split_last() {
+        Some((last, [])) => last.to_string(),
+        Some((last, init)) => format!("{} and {last}", init.join(", ")),
+        None => String::new(),
+    }
+}
+
 /// The feature a manifest requires when its `fns/` holds a component.
 pub const COMPONENTS_FEATURE: &str = "wasm-components-v1";
 
@@ -34,23 +45,12 @@ pub const COMPONENTS_FEATURE: &str = "wasm-components-v1";
 /// the catalog (`components`, App Hub ADR 0003).
 pub const SHARED_COMPONENTS_FEATURE: &str = "wasm-shared-components-v1";
 
-/// The packages [`ALLOWED_COMPONENT_IMPORTS`] names, for a refusal a
-/// publisher can act on: `wasi:cli, wasi:clocks, … and octosense:host`.
-pub fn allowed_packages() -> String {
-    let names: Vec<&str> = ALLOWED_COMPONENT_IMPORTS.iter().map(|p| p.trim_end_matches('/')).collect();
-    match names.split_last() {
-        Some((last, init)) if !init.is_empty() => format!("{} and {last}", init.join(", ")),
-        Some((last, _)) => last.to_string(),
-        None => String::new(),
-    }
-}
-
 /// Validate `bytes` as a component whose imports a host scopes to its app:
 /// what admission requires of an app's own component and of a shared one.
 pub fn admissible_component(bytes: &[u8]) -> Result<ComponentInfo, String> {
     let info = inspect_component(bytes)?;
     if let Some(import) = info.refused_imports().first() {
-        return Err(format!("the component imports {import}; a component may import only {}", allowed_packages()));
+        return Err(format!("the component imports {import}; a component may import only {}", allowed_import_packages()));
     }
     Ok(info)
 }
@@ -414,6 +414,10 @@ mod tests {
         let component = info(&["wasi:io/poll@0.2.9", "wasi:sockets/network@0.2.9", "wasi:http/types@0.2.9", "my:pkg/host", "octosense:host/services@0.1.0", "octosense:hostile/x"]);
         assert_eq!(component.refused_imports(), ["wasi:sockets/network@0.2.9", "my:pkg/host", "octosense:hostile/x"]);
         assert!(component.uses_http());
+        assert_eq!(
+            allowed_import_packages(),
+            "wasi:cli, wasi:clocks, wasi:filesystem, wasi:http, wasi:io, wasi:random and octosense:host"
+        );
         // A package name is matched whole: wasi:clocksmith is not wasi:clocks.
         assert_eq!(info(&["wasi:clocksmith/x"]).refused_imports(), ["wasi:clocksmith/x"]);
     }
