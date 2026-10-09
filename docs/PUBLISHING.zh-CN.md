@@ -233,7 +233,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | 组 | 名称 | 授予的权限 | 目前由谁提供 |
 | --- | --- | --- | --- |
 | `octos.*` | 4 个：`octos.session.open`、`octos.session.history`、`octos.turn.start`、`octos.turn.interrupt` | 与应用自己的 Agent 对话，对话由 OctoSense 运行的 Agent 内核 octos 承载：打开对话、读取对话历史、开始一轮、停止应用发起的那一轮。应用从不指定提供商、模型或密钥。 | OctoSense，前提是用户允许了该应用的 Agent。在此之前，调用会得到 `Waiting for the person to allow this app's agent (OctoSense asks the first time)`。 |
-| `matrix.*` | 45 个，例如 `matrix.read_messages`、`matrix.room_members`、`matrix.send_message` | 每个名称对应一项 Matrix 操作，使用用户当前的账户，限于用户允许的房间。 | 没有任何 OctoSense 宿主服务提供它们。未验证：OctoSense 随附的原生应用 Rinx 会向导入其中的应用包提供这些名称。 |
+| `matrix.*` | 45 个，例如 `matrix.read_messages`、`matrix.room_members`、`matrix.send_message` | 每个名称对应一项 Matrix 操作，使用用户当前的账户，限于用户允许的房间。 | 没有任何 OctoSense 宿主服务提供它们。OctoSense 随附的原生应用 Rinx 通过自己的宿主，向用户导入其中的迷你应用提供这些名称；这不属于 App Hub 的安装途径。 |
 | `palpo.*` | 29 个，例如 `palpo.projects.list`、`palpo.inbox.decide` | 每个名称对应一项 Palpo 管理操作。 | 尚不支持：OctoSense 中没有任何组件提供它们。 |
 
 源码：商店为每个名称显示的文字位于 `crates/app-policy/src/services.rs` 和 `crates/app-contract/src/palpo.rs`。

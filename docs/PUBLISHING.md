@@ -309,7 +309,7 @@ person granted it.
 | Group | Names | Grants | Served today |
 | --- | --- | --- | --- |
 | `octos.*` | 4: `octos.session.open`, `octos.session.history`, `octos.turn.start`, `octos.turn.interrupt` | A conversation with the app's own agent, run by octos, the agent kernel OctoSense runs: open it, read its history, start a turn, stop a turn the app started. The app never names a provider, a model or a key. | OctoSense, once the person allows the app's agent. Until then a call answers `Waiting for the person to allow this app's agent (OctoSense asks the first time)`. |
-| `matrix.*` | 45, such as `matrix.read_messages`, `matrix.room_members`, `matrix.send_message` | One Matrix operation each, on the person's current account, in the rooms they allow. | No OctoSense host service serves them. Unverified: Rinx, a native app OctoSense ships, serves them to bundles imported into it. |
+| `matrix.*` | 45, such as `matrix.read_messages`, `matrix.room_members`, `matrix.send_message` | One Matrix operation each, on the person's current account, in the rooms they allow. | No OctoSense host service serves them. Rinx, a native app OctoSense ships, serves them through its own host to the bundles a person imports into it as mini-apps; that is not the App Hub install path. |
 | `palpo.*` | 29, such as `palpo.projects.list`, `palpo.inbox.decide` | One Palpo administration operation each. | Not yet: nothing in OctoSense serves them. |
 
 Source: the store's words for each name are in
