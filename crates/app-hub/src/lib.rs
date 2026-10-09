@@ -14,6 +14,7 @@
 //! `octosense-app-policy` crate. The hub decides what is offered; the policy
 //! and the runtime decide what is allowed.
 pub mod admission;
+pub mod advisories;
 pub mod client;
 pub mod functions;
 pub mod gate;

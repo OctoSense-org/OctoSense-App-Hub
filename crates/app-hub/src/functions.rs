@@ -38,6 +38,50 @@ pub fn allowed_import_packages() -> String {
     }
 }
 
+/// The custom section in which a component lists the crates it is built
+/// from (App Flow's `tools/octo wasm build` and its release workflow write
+/// it): JSON `{"schema": 1, "crates": [{"name", "version", "source",
+/// "checksum"?}]}`. Reviewers see it, and `hub check --advisory-db` checks it
+/// against RustSec ([`crate::advisories`]). It says what the publisher's
+/// build linked; the gate cannot check it against the code.
+pub const CRATES_SECTION: &str = "octosense-crates";
+
+/// One crate a component is built from.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
+pub struct Crate {
+    pub name: String,
+    pub version: String,
+    /// `crates.io`, `git+<url>#<commit>`, `path`, or another registry's
+    /// source as Cargo writes it.
+    pub source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checksum: Option<String>,
+}
+
+/// The crates a reviewer reads, in one line: "3 crates: getrandom 0.4.0,
+/// pulldown-cmark 0.13.4 and wit-bindgen 0.62.0", the first 12 by name.
+pub fn crate_line(crates: &[Crate]) -> String {
+    const SHOWN: usize = 12;
+    let names: Vec<String> = crates.iter().take(SHOWN).map(|c| format!("{} {}", c.name, c.version)).collect();
+    let more = crates.len().saturating_sub(SHOWN);
+    let count = match crates.len() {
+        0 => return "no crates".into(),
+        1 => "1 crate".to_string(),
+        n => format!("{n} crates"),
+    };
+    match (names.split_last(), more) {
+        (Some((last, [])), 0) => format!("{count}: {last}"),
+        (Some((last, init)), 0) => format!("{count}: {} and {last}", init.join(", ")),
+        (_, more) => format!("{count}: {} and {more} more", names.join(", ")),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct CrateList {
+    schema: u32,
+    crates: Vec<Crate>,
+}
+
 /// The feature a manifest requires when its `fns/` holds a component.
 pub const COMPONENTS_FEATURE: &str = "wasm-components-v1";
 
@@ -71,6 +115,9 @@ pub struct ComponentInfo {
     pub imports: Vec<String>,
     /// Its functions, sorted by name.
     pub exports: Vec<Export>,
+    /// The crates it says it is built from ([`CRATES_SECTION`]); `None`
+    /// when it does not say.
+    pub crates: Option<Vec<Crate>>,
 }
 
 impl ComponentInfo {
@@ -147,7 +194,7 @@ pub fn inspect_component(bytes: &[u8]) -> Result<ComponentInfo, String> {
         .validate_all(bytes)
         .map_err(|e| format!("not a valid WebAssembly component: {e}"))?;
     let types = types.as_ref();
-    let (imports, export_names) = top_level_names(bytes)?;
+    let (imports, export_names, crates) = top_level_names(bytes)?;
     let mut exports = Vec::new();
     for name in export_names {
         match types.component_item_for_export(&name).map(|item| item.ty) {
@@ -164,7 +211,7 @@ pub fn inspect_component(bytes: &[u8]) -> Result<ComponentInfo, String> {
         }
     }
     exports.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(ComponentInfo { imports, exports })
+    Ok(ComponentInfo { imports, exports, crates })
 }
 
 /// `hub component-info`'s answer, in this order: `kind` (`component` or
@@ -174,13 +221,15 @@ pub struct Description {
     pub kind: &'static str,
     pub imports: Vec<String>,
     pub exports: Vec<Export>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub crates: Option<Vec<Crate>>,
 }
 
 /// `hub component-info`: what a function file is, its imports and exports.
 pub fn describe(bytes: &[u8]) -> Result<Description, String> {
     if is_component(bytes) {
-        let ComponentInfo { imports, exports } = inspect_component(bytes)?;
-        return Ok(Description { kind: "component", imports, exports });
+        let ComponentInfo { imports, exports, crates } = inspect_component(bytes)?;
+        return Ok(Description { kind: "component", imports, exports, crates });
     }
     if is_module(bytes) {
         return describe_module(bytes);
@@ -226,15 +275,18 @@ fn describe_module(bytes: &[u8]) -> Result<Description, String> {
             _ => {}
         }
     }
-    Ok(Description { kind: "module", imports, exports })
+    Ok(Description { kind: "module", imports, exports, crates: None })
 }
 
 /// The top-level component's imports, not counting the types it names, and
 /// its function and instance exports, in order. Nested modules and
 /// components (`parse_all` flattens them) are skipped by depth.
-fn top_level_names(bytes: &[u8]) -> Result<(Vec<String>, Vec<String>), String> {
+type TopLevel = (Vec<String>, Vec<String>, Option<Vec<Crate>>);
+
+fn top_level_names(bytes: &[u8]) -> Result<TopLevel, String> {
     let mut imports = Vec::new();
     let mut exports = Vec::new();
+    let mut crates = None;
     let mut depth = 0usize;
     for payload in Parser::new(0).parse_all(bytes) {
         match payload.map_err(|e| e.to_string())? {
@@ -252,6 +304,17 @@ fn top_level_names(bytes: &[u8]) -> Result<(Vec<String>, Vec<String>), String> {
                     imports.push(import.name.name.to_string());
                 }
             }
+            Payload::CustomSection(reader) if depth == 0 && reader.name() == CRATES_SECTION => {
+                if crates.is_some() {
+                    return Err(format!("more than one {CRATES_SECTION} section"));
+                }
+                let list: CrateList = serde_json::from_slice(reader.data())
+                    .map_err(|e| format!("its {CRATES_SECTION} section is not a crate list: {e}"))?;
+                if list.schema != 1 {
+                    return Err(format!("its {CRATES_SECTION} section has schema {}, not 1", list.schema));
+                }
+                crates = Some(list.crates);
+            }
             Payload::ComponentExportSection(reader) if depth == 0 => {
                 for export in reader {
                     let export = export.map_err(|e| e.to_string())?;
@@ -266,7 +329,7 @@ fn top_level_names(bytes: &[u8]) -> Result<(Vec<String>, Vec<String>), String> {
             _ => {}
         }
     }
-    Ok((imports, exports))
+    Ok((imports, exports, crates))
 }
 
 fn function(types: &TypesRef<'_>, name: String, id: ComponentFuncTypeId) -> Export {
@@ -361,7 +424,7 @@ mod tests {
     use super::*;
 
     fn info(imports: &[&str]) -> ComponentInfo {
-        ComponentInfo { imports: imports.iter().map(|i| i.to_string()).collect(), exports: Vec::new() }
+        ComponentInfo { imports: imports.iter().map(|i| i.to_string()).collect(), exports: Vec::new(), crates: None }
     }
 
     #[test]

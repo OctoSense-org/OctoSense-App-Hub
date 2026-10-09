@@ -258,6 +258,43 @@ an app with only `wasm`) gets:
 [warning] functions (fns/hostcall.wasm): fns/hostcall.wasm is a component that reaches the clock and its app's host services, but no files, network or other app
 ```
 
+### The crates a component lists
+
+A component may say which crates it is built from, in a custom section named
+`octosense-crates`: JSON `{"schema": 1, "crates": [{"name", "version",
+"source", "checksum"}]}`, with `source` `crates.io`, `git+<url>#<commit>` or
+`path`. App Flow's `tools/octo wasm build` writes it, and so does App Flow's
+release workflow, which builds the component from the tagged commit and takes
+the list from its `Cargo.lock`, so GitHub attests both. It lists only what the
+binary links: build scripts' and procedural macros' crates are left out. The
+gate cannot check the list against the code: it shows it to reviewers. This
+is the notes component with the list App Flow writes for it:
+
+```text
+[warning] functions (fns/notes.wasm): fns/notes.wasm is built from 8 crates: bitflags 2.13.2, cfg-if 1.0.5, getrandom 0.4.3, memchr 2.8.3, pulldown-cmark 0.13.4, pulldown-cmark-escape 0.11.0, unicase 2.10.0 and wit-bindgen 0.62.0
+```
+
+A component without the section is admitted, with:
+
+```text
+[warning] functions (fns/hostcall.wasm): fns/hostcall.wasm does not list the crates it is built from (its octosense-crates section); tools/octo wasm build and App Flow's release workflow add it
+```
+
+Two such sections, or one that is not a crate list, are refused as
+`contents-invalid`. `hub check <bundle> --advisory-db <dir>`, with `<dir>` a
+checkout of [RustSec's advisory database](https://github.com/rustsec/advisory-db),
+also reports every listed crates.io crate that an advisory affects. These
+lines are from a component listing two old crates, checked against the
+database as of 9 October 2026:
+
+```text
+[warning] advisories (fns/notes.wasm): fns/notes.wasm includes smallvec 0.6.9, which RUSTSEC-2019-0009 reports as a vulnerability: Double-free and use-after-free in SmallVec::grow(); fixed in >= 0.6.10
+[warning] advisories (fns/notes.wasm): fns/notes.wasm includes time 0.1.43, which RUSTSEC-2020-0071 reports as a vulnerability: Potential segfault in the time crate; fixed in >= 0.2.23
+```
+
+An informational advisory (unmaintained, unsound) is reported as one, and a
+withdrawn one not at all. The gate does not fetch the database itself.
+
 `hub component-info <file.wasm>` prints what a function file is (`component`
 or `module`), its imports and its exported functions, each with its parameters
 and result as WIT writes them. Here it runs in a bundle whose
@@ -1186,7 +1223,7 @@ none of them reads a bundle or writes a file. An unknown command fails with
 | --- | --- |
 | `hub publisher-prepare/attach/verify/pack/unpack/entry` | Prepare a canonical GitHub subject, attach its proof, verify, deliver or build a review candidate; see [GitHub publisher provenance](#github-publisher-provenance) and `hub --help` for exact flags. No command publishes the catalog. |
 | `hub stamp <bundle>` | Parses `manifest.json` with the gate's parser, then writes the bundle's digest into `integrity.bundle_blake3` and prints it. Refuses a manifest the gate cannot read or an already GitHub-attested release. |
-| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app]` | The gate. Prints `PASSED` or `REFUSED`, every finding and what the app will be granted. Exits 1 on a refusal. `--json` prints the report as JSON (`schema`, `stage`, `passed`, `app_id`, `version`, `digest`, `findings` and `resources`). `--publisher-key` checks a legacy key-signed bundle; publishing never needs it. |
+| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app] [--advisory-db <dir>]` | The gate. Prints `PASSED` or `REFUSED`, every finding and what the app will be granted. Exits 1 on a refusal. `--json` prints the report as JSON (`schema`, `stage`, `passed`, `app_id`, `version`, `digest`, `findings` and `resources`). `--publisher-key` checks a legacy key-signed bundle; publishing never needs it. `--advisory-db` checks the crates its components list against a RustSec checkout ([The crates a component lists](#the-crates-a-component-lists)). |
 | `hub scan <bundle> [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--packet <out.json>] [--reviewer <cmd>] [--system-app]` | Runs the gate, then writes the review packet and optionally hands it to a reviewer command. A bundle the gate refuses gets no scan. |
 | `hub component-info <file.wasm>` | Prints what a function file is (`component` or `module`), its imports and its exported functions with their parameters and results, as JSON ([WebAssembly components](#webassembly-components)). It reads only that file. A file that is neither a core module nor a valid component fails with `hub: <file>: not a WebAssembly core module or component` or the validator's error. |
 | `hub verify <catalog> --anchor <hex>` | Verifies a catalog against a trust anchor. |
