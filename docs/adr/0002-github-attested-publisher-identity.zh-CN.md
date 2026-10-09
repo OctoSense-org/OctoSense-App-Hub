@@ -12,6 +12,8 @@
 
 应用的代码就是 OctoScript：Splash 脚本和 L0 卡片，以可读文本的形式随应用包交付。应用包唯一能携带的编译代码是 `fns/` 中的 WebAssembly。OctoSense 只在启用 `wasm-lab` 特性的构建中运行它，而目前没有任何 OctoSense 发行版启用这一特性。App Hub 在公开的 `artifacts/` 中保存每个已准入应用包的原样副本。因此，OctoScript 应用默认开放：任何人都能阅读已准入应用的源码。
 
+注（2026 年 10 月 8 日）：自 [OctoSense #400](https://github.com/OctoSense-org/OctoSense/pull/400) 起，OctoSense `main` 的标准桌面版和 Home 构建在 macOS、Linux 和 Android 上运行 `fns/` 中的 WebAssembly。目前还没有任何 OctoSense 发行版包含它。
+
 ## 决定
 
 应用不使用 Ed25519 发布者密钥，而是用 GitHub 来源证明（即 GitHub Actions 运行生成的证明）来证实发布者身份。无论是新应用还是更新，App Hub 都只接受带 GitHub 证明的 Release。

@@ -21,9 +21,9 @@ withdrawing the six key-signed `org.octosense.samples.*` entries, and
 published sequence 15 at commit `18cd41d91b326db199fbed4129484a9ba1a8c63d`,
 adding GitHub Notes 0.2.2.
 This source selects the GitHub channel by default for new compatible hosts.
-[OctoSense desktop 0.1.0-rc.1](../README.md#download-a-compatible-host),
-released on 2026-10-08, is a compatible host release and reads
-`catalog-v2.json` by default. Old installed hosts and reference-app bundle
+OctoSense desktop 0.1.0-rc.1 (2026-10-08) and
+[0.1.0-rc.2](../README.md#download-a-compatible-host) (2026-10-09) are
+compatible host releases and read `catalog-v2.json` by default. Old installed hosts and reference-app bundle
 bytes are unchanged. [Validation](#validation) records the sequence 11 proof
 and its native consumer checks.
 

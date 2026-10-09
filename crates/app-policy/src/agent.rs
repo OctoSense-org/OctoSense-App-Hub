@@ -447,6 +447,14 @@ pub const SHARED_HOST_METHODS: &[(&str, Risk)] = &[
     ("microphone.permission.status", Risk::Read),
     ("location.permission.status", Risk::Read),
     ("location.get", Risk::Read),
+    ("device_calendar.permission.status", Risk::Read),
+    ("device_calendar.calendars.list", Risk::Read),
+    ("device_calendar.events.list", Risk::Read),
+    ("device_calendar.events.get", Risk::Read),
+    // Local, app/account-bound draft preparation only. The foreground host
+    // review and physical approval remain separate from agent execution.
+    ("mail.compose", Risk::Act),
+    ("mail.compose_status", Risk::Read),
     ("github.repositories", Risk::Read),
     ("github.files", Risk::Read),
     ("github.read", Risk::Read),

@@ -3,10 +3,42 @@
 `octosense-app-contract` follows the rules in [README.md](README.md#stability):
 within `1.x` it only grows.
 
-crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0, 1.7.0, 1.7.1 and 1.8.0; 1.3.0 and 1.4.0
-are unpublished, and 1.5.0 includes their changes.
+crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0, 1.7.0, 1.7.1, 1.8.0 and 1.10.0.
+Versions 1.3.0, 1.4.0 and 1.9.0 are unpublished: 1.5.0 includes the first two
+versions' changes, and 1.10.0 includes 1.9.0's changes.
 [README.md](README.md#versions-on-cratesio) shows how to update a lock file
 that holds 1.2.0.
+
+## 1.10.0 — 2026-10-09
+
+Published through the [release workflow](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37901486707);
+the [publication receipt](../../reviews/public-os-api-v1/contract-1.10.0-publication.json)
+records the source commit, registry checksum and downloaded archive checksum.
+This release includes the selected-file capability from the unpublished 1.9.0 work.
+
+- Add separate `audio` playback capability. It implies no microphone, storage,
+  network or background authority. Recording uses the existing `microphone`
+  grant. Foreground-only recording, playback, photo selection and sharing
+  methods have no agent aliases.
+
+- Add the distinct `device_calendar` capability for host-mediated, selected
+  native calendars. This is not the system Calendar app's `calendar` service
+  or the Google Calendar `gcalendar` connector.
+- The companion app policy admits read-only native-calendar aliases and
+  app/account-bound `mail.compose` / `mail.compose_status` aliases. Draft
+  preparation is not sending; external writes remain foreground host reviews.
+- Existing capability grants, schema versions and signed manifest bytes do
+  not change. Required host API declarations still fail on a host without the
+  declared method versions. Adapter implementation and OS consent belong to
+  the host; a contract release alone supplies neither.
+
+
+## 1.9.0 — unpublished
+
+- Adds the `files` capability for host-owned file selection and export dialogs.
+  It grants neither arbitrary filesystem access nor the separate `storage`
+  capability. Applications must discover or require the specific file methods
+  their host implements; the contract alone supplies no OS adapter.
 
 ## 1.8.0 — 2026-10-08
 

@@ -36,6 +36,11 @@ feature, and no OctoSense release enables that feature. App Hub keeps an
 exact copy of every admitted bundle in its public `artifacts/`. OctoScript
 apps are therefore open by default: anyone can read an admitted app's source.
 
+Note, 8 October 2026: since
+[OctoSense #400](https://github.com/OctoSense-org/OctoSense/pull/400),
+standard desktop and Home builds of OctoSense `main` run the WebAssembly in
+`fns/` on macOS, Linux and Android. No OctoSense release includes it yet.
+
 ## Decision
 
 Apps prove their publisher with GitHub provenance, an attestation from a
