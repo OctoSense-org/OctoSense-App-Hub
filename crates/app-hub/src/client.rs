@@ -5,6 +5,7 @@
 //! catalog. An entry that is withdrawn is not installable, and if it is
 //! already installed it is not runnable. A bundle whose bytes do not match
 //! the entry never reaches a jail.
+use crate::components::{ComponentEntry, Resolved};
 use crate::index::{Catalog, Entry};
 use crate::signing::{verify_catalog, PublisherKeys};
 use octosense_app_policy::{digest_dir, AppPolicy, HostLimits, SignatureVerifier};
@@ -116,6 +117,10 @@ pub struct Store {
     anchor_public_hex: String,
     /// Where installed apps live: one directory per app id.
     app_data_root: PathBuf,
+    /// The apps root whose shared component store (`.components`) this
+    /// host keeps (App Hub ADR 0003). A staged install
+    /// ([`Store::for_install_root`]) moves `app_data_root`, never this.
+    components_root: PathBuf,
     limits: HostLimits,
     catalog: Option<Catalog>,
     host_api_versions: BTreeMap<String, u32>,
@@ -181,6 +186,7 @@ impl Store {
         Store {
             anchor_public_hex: anchor_public_hex.to_string(),
             app_data_root: app_data_root.to_path_buf(),
+            components_root: app_data_root.to_path_buf(),
             limits,
             catalog: None,
             host_api_versions: BTreeMap::new(),
@@ -206,6 +212,7 @@ impl Store {
 
     /// Reuse this host's authenticated state for a staging install directory.
     /// This does not accept a catalog or change its trust mode or permissions.
+    /// The shared component store stays the host's own.
     pub fn for_install_root(&self, app_data_root: &Path) -> Self {
         let mut staged = self.clone();
         staged.app_data_root = app_data_root.to_path_buf();
@@ -458,6 +465,10 @@ impl Store {
         // And against the key the catalog records, whatever the caller passed.
         let staged_json = serde_json::to_string(&staged_manifest).map_err(|e| e.to_string())?;
         let policy = octosense_app_policy::admit_and_resolve_dir(&staged_json, &digest, &self.limits, &self.publisher_keys())?;
+        // Its shared components resolve from this catalog and are already
+        // in the store, verified: the installer keeps them first
+        // ([`Store::install_components`]), so an app never lands without them.
+        self.verified_components(&entry.manifest)?;
 
         let target = self.install_dir(app_id);
         entry.manifest.check_host_apis(&self.host_api_versions)?;
@@ -473,14 +484,112 @@ impl Store {
 
     /// Remove an app and everything it stored. The jail goes with it: an
     /// uninstall that leaves data behind is not an uninstall. So does its
-    /// installation, kept apart from the jail.
+    /// installation, kept apart from the jail, and every shared component
+    /// no installed app pins any more ([`Store::collect_components`]). A
+    /// collection that cannot run leaves the store as it was; the app is
+    /// still removed.
     pub fn remove(&self, app_id: &str) -> Result<(), String> {
         for dir in [self.app_data_root.join(app_id), install_root(&self.app_data_root, app_id)] {
             if dir.exists() {
                 std::fs::remove_dir_all(&dir).map_err(|e| format!("cannot remove {app_id}: {e}"))?;
             }
         }
+        let _ = self.collect_components();
         Ok(())
+    }
+
+    // ---- shared components (App Hub ADR 0003) ------------------------------
+
+    /// The shared component store: `<apps root>/.components`, one
+    /// read-only `<blake3>.wasm` per digest.
+    pub fn components_dir(&self) -> PathBuf {
+        crate::components::store_dir(&self.components_root)
+    }
+
+    /// The verified catalog's entry for exactly this component version.
+    pub fn component(&self, id: &str, version: &str) -> Option<&ComponentEntry> {
+        self.catalog.as_ref()?.component(id, version)
+    }
+
+    /// Resolve `manifest`'s components against the verified catalog: each
+    /// must be there at its exact version, offered, with the pinned digest,
+    /// and the app must grant what it imports.
+    pub fn resolve_components(&self, manifest: &octosense_app_policy::AppManifest) -> Result<Vec<&ComponentEntry>, String> {
+        if manifest.components.is_empty() {
+            return Ok(Vec::new());
+        }
+        let catalog = self.catalog.as_ref().ok_or("no catalog has been accepted")?;
+        manifest
+            .components
+            .iter()
+            .map(|dependency| {
+                let entry = crate::components::resolve(catalog, dependency)?;
+                if let Some(missing) = crate::components::missing_grant(manifest, &crate::components::info_of(&entry.component)) {
+                    return Err(format!("component {} {missing}", dependency.describe()));
+                }
+                Ok(entry)
+            })
+            .collect()
+    }
+
+    /// Keep every component `manifest` pins in the shared store, fetching
+    /// those it lacks with `fetch` (given the catalog entry, it returns the
+    /// bytes of the entry's `artifact`, as an app's bundle is fetched). Each
+    /// download must be an admissible component of the catalog's size and
+    /// digest before it is written; each is kept once per digest. Run it
+    /// before [`Store::install_staged`] for an install or an update.
+    pub fn install_components(
+        &self,
+        manifest: &octosense_app_policy::AppManifest,
+        fetch: &mut dyn FnMut(&ComponentEntry) -> Result<Vec<u8>, String>,
+    ) -> Result<Vec<Resolved>, String> {
+        for entry in self.resolve_components(manifest)? {
+            let digest = &entry.component.wasm_blake3;
+            if crate::components::verify_file(&crate::components::stored_path(&self.components_root, digest), digest).is_ok() {
+                continue;
+            }
+            let what = format!("component {} {}", entry.id(), entry.version());
+            if entry.artifact != crate::components::artifact_path(entry.id(), entry.version()) {
+                return Err(format!("{what}: the catalog's artifact path is not canonical"));
+            }
+            let bytes = fetch(entry).map_err(|e| format!("{what}: {e}"))?;
+            if bytes.len() as u64 != entry.component.bytes {
+                return Err(format!("{what}: the download is {} bytes, the catalog says {}", bytes.len(), entry.component.bytes));
+            }
+            // The catalog's digest is the reviewed file's, so a download that
+            // hashes to it is that file; validate it again before keeping it.
+            if blake3::hash(&bytes).to_hex().as_str() == digest.as_str() {
+                crate::functions::admissible_component(&bytes).map_err(|e| format!("{what}: {e}"))?;
+            }
+            crate::components::keep(&self.components_root, digest, &bytes).map_err(|e| format!("{what}: {e}"))?;
+        }
+        crate::components::stored(&self.components_root, manifest)
+    }
+
+    /// An installed app's components as its host loads them: the installed
+    /// release must still run ([`Store::may_run`]), and each component it
+    /// pins must resolve from the verified catalog (not withdrawn) to a
+    /// store file that hashes to the pinned digest. Hashes every file on
+    /// every call.
+    pub fn resolved_components(&self, app_id: &str) -> Result<Vec<Resolved>, String> {
+        let entry = self.installed_release(app_id)?;
+        let bundle = self.install_dir(app_id);
+        crate::launch::check_bounds(&bundle)?;
+        self.verify_release(entry, &bundle).map(|(_, components)| components)
+    }
+
+    /// Remove every stored component no installed app pins, and return
+    /// their digests ([`crate::components::collect`]).
+    pub fn collect_components(&self) -> Result<Vec<String>, String> {
+        crate::components::collect(&self.components_root)
+    }
+
+    fn verified_components(&self, manifest: &octosense_app_policy::AppManifest) -> Result<Vec<Resolved>, String> {
+        if manifest.components.is_empty() {
+            return Ok(Vec::new());
+        }
+        self.resolve_components(manifest)?;
+        crate::components::stored(&self.components_root, manifest)
     }
 
     /// May this installed app run right now? The installed version must be
@@ -529,6 +638,13 @@ impl Store {
     }
 
     fn verify_release_bundle(&self, entry: &Entry, bundle: &Path) -> Result<AppPolicy, String> {
+        self.verify_release(entry, bundle).map(|(policy, _)| policy)
+    }
+
+    /// The release's own checks, then its shared components': an app's code
+    /// is its bundle and the components it pins, so a withdrawn, missing or
+    /// changed component stops it as a changed bundle does.
+    fn verify_release(&self, entry: &Entry, bundle: &Path) -> Result<(AppPolicy, Vec<Resolved>), String> {
         entry.manifest.check_host_apis(&self.host_api_versions)?;
         if let crate::index::Status::Withdrawn(reason) = &entry.status {
             return Err(format!("{} {} was withdrawn: {reason}", entry.app_id(), entry.version()));
@@ -538,8 +654,10 @@ impl Store {
             return Err("the installed manifest is not the reviewed one; reinstall this app".into());
         }
         let digest = digest_dir(bundle)?;
-        octosense_app_policy::admit_and_resolve_dir(&text, &digest, &self.limits, &self.publisher_keys())
-            .map_err(|e| format!("{e}; reinstall this app"))
+        let policy = octosense_app_policy::admit_and_resolve_dir(&text, &digest, &self.limits, &self.publisher_keys())
+            .map_err(|e| format!("{e}; reinstall this app"))?;
+        let components = self.verified_components(&entry.manifest)?;
+        Ok((policy, components))
     }
 }
 
@@ -547,6 +665,7 @@ impl Store {
 /// rewrite it to reset a locally recorded publisher identity. Legacy remove
 /// behavior is deliberately unchanged.
 fn verify_history_extension(held:&Catalog,next:&Catalog)->Result<(),String>{
+    verify_component_history(held,next)?;
     let mut cursor=0;
     for previous in &held.entries {
         let Some((offset,entry))=next.entries[cursor..].iter().enumerate()
@@ -560,6 +679,30 @@ fn verify_history_extension(held:&Catalog,next:&Catalog)->Result<(),String>{
         }
         if serde_json::to_value(&allowed).map_err(|e|e.to_string())?!=serde_json::to_value(entry).map_err(|e|e.to_string())? {
             return Err("v2 catalog rewrites recorded publisher history".into());
+        }
+    }
+    Ok(())
+}
+
+/// The same rule for shared components (App Hub ADR 0003): every component
+/// version held stays, in order, unchanged but for a withdrawal with a reason.
+fn verify_component_history(held: &Catalog, next: &Catalog) -> Result<(), String> {
+    let mut cursor = 0;
+    for previous in &held.components {
+        let Some((offset, entry)) = next.components[cursor..]
+            .iter()
+            .enumerate()
+            .find(|(_, e)| e.id() == previous.id() && e.version() == previous.version())
+        else {
+            return Err("v2 catalog removes or reorders recorded component history".into());
+        };
+        cursor += offset + 1;
+        let mut allowed = previous.clone();
+        if matches!((&previous.status, &entry.status), (crate::Status::Offered, crate::Status::Withdrawn(reason)) if !reason.trim().is_empty() && reason.len() <= 4096) {
+            allowed.status = entry.status.clone();
+        }
+        if &allowed != entry {
+            return Err("v2 catalog rewrites recorded component history".into());
         }
     }
     Ok(())
@@ -665,6 +808,52 @@ mod catalog_cache_tests {
         let mut legacy=Store::new(&anchor.public_hex(),&root,HostLimits::default());
         legacy.accept_authenticated_catalog(next).unwrap();
         legacy.accept_authenticated_catalog(removed).unwrap();
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn v2_component_history_cannot_be_removed_rewritten_reordered_or_reoffered() {
+        const NOTES: &[u8] = include_bytes!("../tests/fixtures/notes.component.wasm");
+        let (root, anchor, _) = fixture();
+        let entry = |id: &str| {
+            let draft: crate::components::ComponentDraft = serde_json::from_value(serde_json::json!({
+                "component": {"schema": 1, "id": id, "version": "1.0.0", "name": "Markdown",
+                    "publisher": {"name": "Example", "support": "https://example.test/s", "privacy_policy_url": "https://example.test/p"},
+                    "license": "MIT"},
+                "listing": {"description": "Renders Markdown."}
+            }))
+            .unwrap();
+            let release = crate::components::ComponentRelease::from_draft(draft, NOTES).unwrap();
+            let report = crate::gate::check_component(&release, NOTES, false, None).unwrap();
+            crate::gate::component_entry_for(&release, NOTES, &report, "dev:example", "", "", "2026-10-09").unwrap()
+        };
+        let mut base = Catalog::new(5, "2026-10-08", vec![]);
+        base.components = vec![entry("org.example.markdown"), entry("org.example.other")];
+        let mut store = Store::new(&anchor.public_hex(), &root, HostLimits::default()).with_github_catalog();
+        // The post-verification state gate only, as in the tests above.
+        store.accept_authenticated_catalog(base.clone()).unwrap();
+        let mut next = base.clone();
+        next.sequence += 1;
+        let mut removed = next.clone();
+        removed.components.remove(0);
+        assert_eq!(store.accept_authenticated_catalog(removed).unwrap_err(), "v2 catalog removes or reorders recorded component history");
+        let mut swapped = next.clone();
+        swapped.components.swap(0, 1);
+        assert!(store.accept_authenticated_catalog(swapped).is_err());
+        let mut rewritten = next.clone();
+        rewritten.components[0].component.wasm_blake3 = "0".repeat(64);
+        assert_eq!(store.accept_authenticated_catalog(rewritten).unwrap_err(), "v2 catalog rewrites recorded component history");
+        next.components[0].status = crate::Status::Withdrawn("Renders scripts it should escape".into());
+        store.accept_authenticated_catalog(next.clone()).unwrap();
+        let mut reoffered = next.clone();
+        reoffered.sequence += 1;
+        reoffered.components[0].status = crate::Status::Offered;
+        assert!(store.accept_authenticated_catalog(reoffered).is_err());
+        // Appending a version is an extension.
+        let mut grown = next.clone();
+        grown.sequence += 1;
+        grown.components.push(entry("org.example.third"));
+        store.accept_authenticated_catalog(grown).unwrap();
         std::fs::remove_dir_all(root).unwrap();
     }
 

@@ -119,6 +119,9 @@ fn admit_directory(dir:&Path,app:&SystemApp,limits:&HostLimits)->Result<AppPolic
     if policy.app_id != app.id {
         return Err(format!("the pack registered as {} holds {}", app.id, policy.app_id));
     }
+    // A system app ships the shared components its manifest pins in its
+    // bundle (App Hub ADR 0003): each must be there and hash to its digest.
+    octosense_app_hub::components::bundled(dir)?;
     Ok(policy)
 }
 

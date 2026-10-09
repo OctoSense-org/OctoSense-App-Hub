@@ -16,7 +16,7 @@ hub — the OctoSense app hub command (ADR 0003)
   hub check <bundle> [--catalog <f> [--anchor <hex>]] [--allow-unsigned] [--publisher-key id=hex] [--json] [--system-app]
   hub publish <bundle> --catalog <f> --key <f> --anchor-cert <hex>
               --publisher <id> [--repo <url>] [--commit <sha>] [--out <dir>]
-  hub withdraw <app> --version <v> --reason <text> --catalog <f> --key <f> --anchor-cert <hex>
+  hub withdraw <app or component> --version <v> --reason <text> --catalog <f> --key <f> --anchor-cert <hex>
   hub remove <app> [--version <v>] --catalog <f> --key <f> --anchor-cert <hex> [--out <dir>]
               (drops the entry, its index file and its artifacts; for a
               publish that should never have been offered — withdraw otherwise)
@@ -25,6 +25,21 @@ hub — the OctoSense app hub command (ADR 0003)
   hub verify <catalog> --anchor <hex>
   hub component-info <file.wasm>        print a function file's kind, imports and exports
               (with WIT parameter and result types) as JSON
+  hub component-prepare <file.wasm> --draft <component.json> --out <file>
+              [--repository <owner/repo> --repository-id <id> --owner-id <id>
+               --workflow <.github/workflows/x.yml> --tag <vVERSION> --commit <sha>]
+              describe a shared component from its file: an unsigned development
+              release, or with the GitHub identity the subject to attest
+              (--out .../octosense-component.json)
+  hub component-pack <release.json> --wasm <file.wasm> [--attestation <bundle.json>]
+              [--allow-unsigned] --out <new directory>
+  hub component-check <release.json> --wasm <file.wasm> [--catalog <f> [--anchor <hex>]]
+              [--allow-unsigned] [--json]
+  hub component-entry <release.json> --wasm <file.wasm> --catalog <authenticated catalog>
+              --out <index.json>
+  hub component-publish <release.json> --wasm <file.wasm> --catalog <f> --key <f>
+              --anchor-cert <hex> --publisher <id> [--repo <url>] [--commit <sha>]
+              [--out <dir>] [--allow-unsigned]
   hub catalog-prepare --base <authenticated-catalog> --candidate <catalog.json>
               --artifact-root <reviewed-tree> --out <catalog-v2.payload.json>
   hub catalog-envelope --catalog <catalog-v2.payload.json> --attestation <bundle.json>
@@ -47,6 +62,11 @@ publish, human-review stops it until --reviewed) and writes
 check is the gate: a publisher runs it before submitting, the hub runs the
 same code after. publish re-runs it, copies the bundle into the artifact
 store and signs the catalog.
+
+Shared components (App Hub ADR 0003) are published like apps: the release's
+GitHub workflow runs component-prepare, attests the subject and runs
+component-pack; reviewers run component-check, admins component-entry for a
+catalog candidate. component-publish signs a legacy development catalog only.
 
 GitHub publisher commands require public GitHub-hosted tag-push provenance.
 prepare refuses sealed manifests; attach and pack never restamp. Candidate

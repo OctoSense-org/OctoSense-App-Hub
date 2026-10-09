@@ -74,6 +74,32 @@ class CandidateTests(unittest.TestCase):
             with self.assertRaises(m.Refused):m.extract_candidate(repo,commit,'fixture',root/'refused')
 
 
+class ReceiptTests(unittest.TestCase):
+    def test_app_and_component_receipts_list_exactly_their_files(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            (root/'artifacts/app-1.bundle').mkdir(parents=True)
+            (root/'artifacts/app-1.bundle/main.splash').write_text('View{}')
+            (root/'artifacts/app-1.bundle.pack.json').write_text('{}')
+            (root/'index/components').mkdir(parents=True)
+            (root/'index/app-1.json').write_text('{}')
+            (root/'artifacts/org.example.markdown-1.0.0.wasm').write_bytes(b'\0asm\r\0\x01\0')
+            (root/'index/components/org.example.markdown-1.0.0.json').write_text('{}')
+            native={'added_artifacts':[
+                {'bundle':'artifacts/app-1.bundle','pack':'artifacts/app-1.bundle.pack.json','index':'index/app-1.json'},
+                {'component':'artifacts/org.example.markdown-1.0.0.wasm','index':'index/components/org.example.markdown-1.0.0.json'}]}
+            self.assertEqual(m.listed_files(root,native),sorted([
+                'artifacts/app-1.bundle/main.splash','artifacts/app-1.bundle.pack.json','index/app-1.json',
+                'artifacts/org.example.markdown-1.0.0.wasm','index/components/org.example.markdown-1.0.0.json']))
+            for bad in [{'component':'artifacts/org.example.markdown-1.0.0.wasm'},
+                        {'component':'index/org.example.markdown-1.0.0.wasm','index':'index/components/org.example.markdown-1.0.0.json'},
+                        {'component':'artifacts/app-1.bundle.pack.json','index':'index/app-1.json'},
+                        {'component':'artifacts/org.example.markdown-1.0.0.wasm','index':'artifacts/org.example.markdown-1.0.0.wasm'},
+                        {'component':'artifacts/missing-1.0.0.wasm','index':'index/app-1.json'},
+                        {'component':'artifacts/org.example.markdown-1.0.0.wasm','index':'index/app-1.json','pack':'artifacts/app-1.bundle.pack.json'}]:
+                with self.subTest(bad=bad),self.assertRaises(m.Refused):m.listed_files(root,{'added_artifacts':[bad]})
+
+
 class PacketTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
