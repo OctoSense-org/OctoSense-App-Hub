@@ -46,22 +46,25 @@ app declares the host APIs it needs and checks which ones a host implements.
 
 ## Download a compatible host
 
-[**Desktop 0.1.0-rc.1 is available**](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.1), built from source
-`933abbcf`, for GitHub-proven apps, the public v2 catalog and Host API v1.
+[**Desktop 0.1.0-rc.2 is available**](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.2), built from source
+`4ccf8e06` and published on 2026-10-09, for GitHub-proven apps, the public v2
+catalog and Host API v1, now with document, device-calendar, Mail-draft and
+audio APIs on their supported platforms ([what hosts serve today](#what-hosts-serve-today)).
 
 | Platform | Download |
 | --- | --- |
-| macOS Apple silicon | [DMG](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/OctoSense_0.1.0-rc.1_aarch64.dmg) or [app ZIP](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/OctoSense_0.1.0-rc.1_macos_aarch64.app.zip) |
-| Windows x64 | [Installer](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_x64-setup.exe) |
-| Linux x86_64 | [Debian package](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_amd64.deb) or [AppImage](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/octosense_0.1.0-rc.1_x86_64.AppImage) |
+| macOS Apple silicon | [DMG](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/OctoSense_0.1.0-rc.2_aarch64.dmg) or [app ZIP](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/OctoSense_0.1.0-rc.2_macos_aarch64.app.zip) |
+| Windows x64 | [Installer](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/octosense_0.1.0-rc.2_x64-setup.exe) |
+| Linux x86_64 | [Debian package](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/octosense_0.1.0-rc.2_amd64.deb) or [AppImage](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/octosense_0.1.0-rc.2_x86_64.AppImage) |
 
-Check downloads against [SHA256SUMS](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/SHA256SUMS) and read the release's
-platform instructions. These prerelease packages have **no Apple Developer ID
+Check downloads against [SHA256SUMS](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/SHA256SUMS) and read the [release notes](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/RELEASE-NOTES.md)
+for platform limits. These prerelease packages have **no Apple Developer ID
 signature or notarization, and no Windows publisher signature**. The macOS
-package was built and validated locally; Windows/Linux packages came from the
-tagged CI package jobs. [Release provenance](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.1/RELEASE-PROVENANCE.json)
+packages were built and sealed locally with an ad-hoc signature; Windows and
+Linux packages came from the tagged CI jobs, with the Linux packaging
+corrections that the provenance records. [Release provenance](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/RELEASE-PROVENANCE.json)
 records the exact files and signing status. To build yourself, follow the
-[pinned setup guide](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/README.md#set-up).
+[pinned setup guide](https://github.com/OctoSense-org/OctoSense/blob/4ccf8e068399b1da139771a9ed94cef05fa6ae60/README.md#set-up).
 
 For the four samples below, use **macOS on Apple silicon**. Open **App Hub →
 Search**, enter the exact app ID, choose **Get**, review its permissions and
@@ -72,18 +75,20 @@ cloud account is needed. An older beta.2 host cannot read the new publisher
 proof or public v2 channel: install a compatible host instead of changing the
 app's proof or catalog settings.
 
-The RC does **not** ship public GitHub/Google OAuth client registrations.
+RC2 does **not** ship public GitHub/Google OAuth client registrations.
 Local drafts and no-account screens work; provider sign-in needs registration
-supplied by the host distributor/operator ([configuration](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/crates/oauth-service/README.md#configure-a-release-maintainers)).
+supplied by the host distributor/operator ([configuration](https://github.com/OctoSense-org/OctoSense/blob/4ccf8e068399b1da139771a9ed94cef05fa6ae60/crates/oauth-service/README.md#configure-a-release-maintainers)).
 Ordinary users should not need to register a Google developer project.
 Installing an app does not prove login, email delivery, a GitHub commit or a
 Calendar write. The connected samples declare macOS only. Linux/Windows
-implement external-browser backend login and declared backend reads, but live
-sign-in on those platforms is not validated here. Embedded backend login and
+implement external-browser backend login and declared backend reads; RC2 adds
+the native link openers that login needs, and a Windows fixture built from
+RC2's source completed a browser sign-in against a synthetic backend, while
+Linux sign-in is not validated. Embedded backend login and
 protected writes remain unsupported and fail closed. Android Google
 authorization remains unavailable. Ordinary WebReader is separate from login;
 Linux needs GTK 3/WebKitGTK and X11/XWayland, and Windows needs WebView2. Those
-engines are not bundled; see the [browser requirements](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/docs/desktop-embedded-browser.md).
+engines are not bundled; see the [browser requirements](https://github.com/OctoSense-org/OctoSense/blob/4ccf8e068399b1da139771a9ed94cef05fa6ae60/docs/desktop-embedded-browser.md).
 
 ## Repository layout
 
@@ -165,29 +170,46 @@ are in [AGENTS.md](AGENTS.md).
 
 The gate admits capability names; the host must implement and grant each call.
 [Capabilities](docs/PUBLISHING.md#capabilities) is the reference. The
-[RC1 release](#download-a-compatible-host) includes:
+[RC2 release](#download-a-compatible-host) includes everything RC1 had, plus
+the items marked RC2:
 
-- Public GitHub v2 catalog and `publisher-github-v1` verification, with contract 1.8.0.
+- Public GitHub v2 catalog and `publisher-github-v1` verification, with contract 1.10.0 (RC1: 1.8.0).
 - `runtime` discovery and `script-tools-v1`: an admitted `implemented_by: "app"`
   tool calls the open full app's Splash handler; a closed app returns `app_not_running`.
 - Connected-account services (`auth`, `github`, `gmail`, `gcalendar`), subject
   to provider registration and platform limits. Tokens remain with the host.
 - Declared backend reads on macOS, Android, Linux and Windows; protected
   writes require a supported native approval path. Per-app camera, microphone
-  and location consent covers macOS/Android; `location.get` is Android-only.
+  and location consent covers macOS/Android; `location.get` is Android-only,
+  and RC2's `location.sample` reads a fresh fix on macOS and Android.
 - Physical confirmation for protected GitHub/Calendar saves and Gmail sends
   on supported platforms; agent Glance publication refuses executable Splash
   `script`; Calendar synchronization uses a bounded date window.
 - `model` media methods as well as text, only with a configured, entitled
   provider. A registered method does not prove live provider execution.
+- RC2: document import, export and photo selection (`files.*`) on macOS,
+  Windows and Android, and on Linux with a dialog helper; text sharing on
+  Android; binary writes to app storage (`fs.write_bytes`). 1 MiB per file.
+- RC2: device calendars (`device_calendar.*`) through EventKit on macOS and
+  the Android Home adapter, with physically reviewed writes; the OS-calendar
+  interaction itself is pending acceptance.
+- RC2: Mail drafts (`mail.compose`, `mail.compose_status`) for any app granted
+  `mail`, and the native send review (`mail.review_send`), which approves only
+  on macOS and Android.
+- RC2: foreground audio playback and recording (`audio.*`,
+  `microphone.record_*`) on macOS and Android, over files in the app's storage;
+  hardware acceptance pending.
+- RC2: `Video` widget playback controls, and native link openers for
+  `LinkLabel` on Windows and Linux (browser launch unverified).
 
 `card-host` serves only `runtime` discovery, runs no agent, and refuses sealed
 releases or the host-only requirement markers. `calendar`, `llm` and `news`
 remain system-app services; `photos`/`youtube` notifications serve only their
-system apps. Wasm is **off in RC1 and every other release**; OctoSense `main`
-runs it in standard desktop and Home builds on macOS, Linux and Android, with
-limited support. Declaring a capability cannot add native code or enable a
-build feature. See [Host API compatibility](docs/HOST-API.md).
+system apps. Wasm is **on in RC2 on macOS and Linux**: standard builds run the app's own
+`fns/*.wasm`, with limited support; Windows, iOS and OpenHarmony builds leave
+it out, and RC1 and every earlier release left it off. Supported Android Home
+source builds run it too. Declaring a capability cannot add native code or
+enable a build feature. See [Host API compatibility](docs/HOST-API.md).
 
 ## Trust anchor
 
@@ -219,7 +241,7 @@ with any v2 cache refuses a legacy downgrade, even if that cache is malformed.
 An old legacy cache is not converted offline: the first v2 fetch needs network
 access (or an explicitly supplied mirror containing a verified v2 envelope).
 Fetch/proof failure never falls back to legacy. Older beta hosts continue to use `catalog.json`; use the
-[RC1 release](#download-a-compatible-host) for the public v2 catalog.
+[RC2 release](#download-a-compatible-host) for the public v2 catalog.
 
 ## How the Hub publishes an app
 
@@ -230,7 +252,7 @@ Hub admin then approves the submission; the Hub publishes nothing without
 that approval. The admin publishes the approved entry with
 [GitHub admin publication](docs/GITHUB-PUBLISHING.md): GitHub Actions signs
 the new `catalog-v2.json` with Sigstore, so no admin keeps a separate Hub
-private key. The RC1 release reads `catalog-v2.json`; desktop beta.2 reads only the
+private key. The RC1 and RC2 releases read `catalog-v2.json`; desktop beta.2 reads only the
 legacy anchor-signed `catalog.json`, which `hub publish` produces.
 
 For v2, publish a reviewed withdrawal candidate through the same protected
@@ -244,8 +266,8 @@ The authenticated public **catalog sequence 14** offers the GitHub publisher
 identities below. The three historical `org.octosense.samples.*` apps are
 withdrawn, including their 0.1.0 and 0.1.1 releases. Their installed data is
 retained; the new IDs do not migrate it. RC1 still displays withdrawn apps as
-unavailable. The discovery fix in [App Hub #170](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/170)
-hides them from browsing and search when included in a newer host.
+unavailable; RC2 includes the discovery fix in [App Hub #170](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/170)
+and hides them from browsing and search.
 
 | App | Exact app ID | Latest version | Runs on |
 | --- | --- | --- | --- |

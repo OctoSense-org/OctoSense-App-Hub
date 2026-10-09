@@ -4,12 +4,11 @@
 
 契约 1.6 让应用可以声明自己需要的宿主 API，并查询宿主实现了哪些 API。它增加的是声明和发现机制，而不是访问权限：应用只能调用宿主中已编译的 Rust 服务，每次调用仍要经过应用自己的授权。同一版契约还让应用包可以声明自己的后端（[登录自己的后端](PUBLISHING.zh-CN.md#登录自己的后端)），并运行自己的 Agent 工具（[脚本工具执行](PUBLISHING.zh-CN.md#脚本工具执行script-tools-v1)）。
 
-这些发现机制的声明已随契约 1.8.0 发布。[RC1 发行版](../README.zh-CN.md#下载兼容宿主)（源码 `933abbcf`）按下文的平台限制实现这些 API；下载状态以该指南为准。旧宿主（例如 OctoSense 桌面版 0.1.0-beta.2）不提供这些 API，并会拒绝要求这些 API 的应用。
+这些发现机制的声明已随契约 1.8.0 发布。[RC2 发行版](../README.zh-CN.md#下载兼容宿主)（源码 `4ccf8e06`）和 RC1 一样按下文的平台限制实现这些 API；下载状态以该指南为准。旧宿主（例如 OctoSense 桌面版 0.1.0-beta.2）不提供这些 API，并会拒绝要求这些 API 的应用。
 
 已发布的契约 **1.10.0** 还支持 `files`、`device_calendar` 和 `audio`
 （[版本与发布凭据](../crates/app-contract/README.md#versions-on-cratesio)，英文）。
-文件能力包含未单独发布的 1.9.0 工作。下文的新原生适配器属于独立的宿主改动，
-发布契约包不会将这些实现加入 RC1。
+文件能力包含未单独发布的 1.9.0 工作。桌面 RC2 锁定这版契约，并在下文各节注明的平台上实现这些原生适配器；RC1 一个都没有，仅发布契约包也不会给已安装的宿主增加任何实现。
 
 ## 声明应用需要什么
 
@@ -42,11 +41,11 @@
 
 新增 `device_calendar` 能力与 `calendar`（系统日历应用自己的存储）和 `gcalendar`（Google 连接器）互相独立，不会隐含授予它们或操作系统权限。需要原生日程的应用应声明 `device_calendar`、`host-api-v1`，并设置 `host_api.required: {"device_calendar.events.list": 1}`，以及完整流程需要的其他方法。缺少这些方法的宿主会拒绝安装。
 
-已发布的契约允许声明该能力，App Hub 的策略允许声明只读工具别名；这不会给桌面 RC1 或 Home beta.1 安装原生适配器。适配器还必须实施应用及账户隔离、操作系统权限、日历选择和修改操作的可信确认。新适配器的运行时与设备验收独立于这些契约测试；支持平台与 Agent 访问范围以服务的方法描述为准。
+已发布的契约允许声明该能力，App Hub 的策略允许声明只读工具别名。桌面 RC2 自带 macOS 适配器（EventKit）和 Android Home 适配器；RC1、Home beta.1、Windows 和 Linux 都没有。适配器实施应用及账户隔离、操作系统权限、日历选择和修改操作的可信确认（亲手点按）。与系统日历的实际交互仍待设备验收，重复日程和参与者为只读；支持平台与 Agent 访问范围以服务的方法描述为准。
 
-### 邮件草稿与发送审阅（尚未发布）
+### 邮件草稿与发送审阅（桌面 RC2）
 
-兼容宿主在既有的 `mail` 能力下提供 `mail.compose`，用于修改与应用及账户绑定的本地草稿，并通过 `mail.compose_status` 查询状态。两者的 Agent 别名最低风险分别是 `act` 和 `read`，都须声明 `private_data: true`，且不会发送邮件。前台应用调用 `mail.review_send`（或同样需要审阅的兼容入口 `mail.send`），宿主显示确切草稿，只有用户亲手批准后才发送。请声明所需方法版本。桌面 RC1 不提供这套公共草稿流程，原有的系统邮件草稿方法仍仅限系统应用。
+兼容宿主在既有的 `mail` 能力下提供 `mail.compose`，用于修改与应用及账户绑定的本地草稿，并通过 `mail.compose_status` 查询状态。两者的 Agent 别名最低风险分别是 `act` 和 `read`，都须声明 `private_data: true`，且不会发送邮件。前台应用调用 `mail.review_send`（或同样需要审阅的兼容入口 `mail.send`），宿主显示确切草稿，只有用户亲手批准后才发送。请声明所需方法版本；如果商店信息列出 Windows 或 Linux，请把 `mail.review_send` 放在 `host_api.optional` 下。桌面 RC2 向任何获得 `mail` 授权的应用提供这套流程：撰写草稿和查询状态在所有桌面平台可用，发送审阅只在 macOS 和 Android 上可用（在 Windows 和 Linux 上会以 `Physical Mail send approval is unavailable on this platform` 失败）。RC1 完全不提供，原有的系统邮件草稿方法仍仅限系统应用，真实的 SMTP 投递也尚未验证。
 
 ### 运行时清单
 
@@ -64,7 +63,7 @@ API 可用不等于已经配置，也不等于已经授权。`configured: null` 
 `files` 能力允许应用使用宿主的文件选择窗口，不允许访问任意宿主路径。
 导入和导出还需要 `storage`，两种授权互不隐含。通过 `host_api.required`
 要求 `files.import@1` 或 `files.export@1`，也可以将其声明为可选并检查
-`runtime.list`。仅支持新 contract 不代表发布版宿主已实现这些 API；
+`runtime.list`。桌面 RC2 实现了这些 API，RC1 没有，仅支持新契约从来不代表宿主已实现；
 `files.status` 返回当前平台适配器是否可用。
 
 配套的 OctoSense 实现将用户选中的单个文件导入应用内的新路径，或将现有
@@ -78,7 +77,7 @@ Android 文档提供方 URI。传输仅限前台，agent 和后台任务不能�
 及安装了原生文件对话框辅助程序的 Linux；暂不支持 iOS、OpenHarmony、web
 和直接使用 framebuffer 的 Linux。编译与真机验证状态以宿主状态和发布说明为准。
 
-### 选择照片与分享文本（尚未发布的宿主扩展）
+### 选择照片与分享文本（桌面 RC2）
 
 配套宿主新增 `files.pick_photo({"path":"photos/chosen.jpg"})`，同时需要
 `files` 和 `storage`。它打开图片选择窗口，验证 PNG、JPEG 或 WebP 文件签名后，
@@ -90,13 +89,12 @@ Android 文档提供方 URI。传输仅限前台，agent 和后台任务不能�
 文本须为 1–8192 个 UTF-8 字节。前台调用打开原生分享选择器；只有成功交给
 选择器后，才返回 `{"handoff":"chooser_opened","delivery":"unknown"}`。
 这不证明对方已收到内容，也不支持附件。两种方法都没有 Agent 别名。请声明
-所需方法版本并检查宿主状态；桌面 RC1 不含这些源码 API。新适配器的设备
+所需方法版本并检查宿主状态；桌面 RC2 包含这些 API，RC1 不含。新适配器的设备
 验收仍待完成。
 
 ## 前台音频会话（契约 1.10）
 
-配套 macOS 或 Android 宿主提供以下方法；请声明方法版本，不要仅凭能力名称
-推断支持情况：
+桌面 RC2 的 macOS 构建和兼容的 Android 宿主提供以下方法，RC1、Windows 和 Linux 不提供；请声明方法版本，不要仅凭能力名称推断支持情况，商店信息列出没有这些方法的平台时请把它们放在 `host_api.optional` 下：
 
 | 方法 | 所需能力 | 行为 |
 | --- | --- | --- |
@@ -122,10 +120,10 @@ Android 文档提供方 URI。传输仅限前台，agent 和后台任务不能�
 - **Agent 工具。** `host-service` 工具可以用 `host_method` 映射到 `auth.backend.me`、`auth.backend.request`、`runtime.list`、`runtime.describe`、三个 `*.permission.status` 方法或 `location.get`，最低风险为 `read`，并且需要该方法所属的能力和 `private_data: true`（[把工具映射到共享服务](PUBLISHING.zh-CN.md#把工具映射到共享服务host_method)）。Agent 的调用从不弹出提示，所以 `auth.backend.request` 只执行已声明的 `GET` 操作，宿主会在发出任何 HTTP 请求之前拒绝写操作；写操作仍须在前台应用中发起，并在宿主的原生审阅界面上确认。权限申请和撤销、账户管理和面板控制都没有 `host_method`。准入不能代替宿主对账户、授权和平台的检查。
 - **后端。** 宿主只从已准入的签名应用包读取 `backend` 块。它返回不透明的连接句柄，拒绝重定向和任何含有令牌的后端应答，并在原生审阅界面上让用户批准每一次写操作。后台调用和 Agent 调用都无法批准写操作。修改端点、更新应用或撤回应用，都会结束应用的后端会话。
 - **脚本工具。** 签名的 `app_tool(name, call_id)` 处理函数运行在已打开的完整应用中，使用该应用自己的 VM 和存储文件夹。它不加载任何原生库或 Wasm；应用关闭时返回 `app_not_running`。
-- **平台。** 设备权限方法支持 Android 和 macOS，`location.get` 只支持 Android，返回上次已知的位置，时效未知。RC 还在 Windows（WebView2）和 Linux X11/XWayland（WebKitGTK）中嵌入普通 `WebReader` 网页；原生 Wayland 不支持。Linux/Windows 声明 `auth.backend.request@1`，用于清单声明的读取，并实现外部浏览器后端登录；这里未验证真实登录。嵌入式后端登录和受保护的写操作仍不支持，会拒绝执行。
-- **权限申请。** 只有在前台的应用才能申请权限。来自 Agent 或后台卡片的申请会失败，返回 `<method> is unavailable to agents/background surfaces`。宿主转入后台时仍在等待的申请会失败，返回 `authorization_required`；在用户授予应用位置权限之前，`location.get` 也返回 `authorization_required`。
+- **平台。** 设备权限方法支持 Android 和 macOS；`location.get` 只支持 Android，返回上次已知的位置，时效未知，而 RC2 的 `location.sample` 在 macOS 和 Android 上返回新鲜位置。两个 RC 都在 Windows（WebView2）和 Linux X11/XWayland（WebKitGTK）中嵌入普通 `WebReader` 网页；原生 Wayland 不支持。Linux/Windows 声明 `auth.backend.request@1`，用于清单声明的读取，并实现外部浏览器后端登录；RC2 补上了登录所需的原生链接打开方式，用 RC2 源码构建的 Windows 测试程序已对一个模拟后端完成浏览器登录，Linux 上的登录未验证。嵌入式后端登录和受保护的写操作仍不支持，会拒绝执行。
+- **权限申请。** 只有在前台的应用才能申请权限。来自 Agent 或后台卡片的申请会失败，返回 `<method> is unavailable to agents/background surfaces`。宿主转入后台时仍在等待的申请会失败，返回 `authorization_required`；在用户授予应用位置权限之前，`location.get` 和 `location.sample` 也返回 `authorization_required`。
 - **设备控件。** 在声明了 `host-api-v1` 的应用中，`CameraPreview`、`sys.request_location`、`sys.gps` 和地图的 GPS 读取同样需要该应用的设备授权。宿主每次启动后，这些功能都保持关闭，直到应用调用对应能力的权限方法，载入为该能力保存的授权：启动 `CameraPreview` 之前调用 `camera.permission.status`，读取 GPS 之前调用 `location.permission.status`。请在应用打开时调用这些方法。
 - **`card-host`。** 三个标记所需的 API，它一个也没有实现，因此会拒绝要求这些标记的应用（[在本地运行应用包](DEVELOPMENT.zh-CN.md#在本地运行应用包card-host)）。
-- **未验证：** 亲手点按批准权限、相机拍摄、真实提供商、真实模型，以及宿主 API 在 Linux、Windows 和手机上的验收。
+- **未验证：** 亲手点按批准权限、相机拍摄、真实提供商、真实模型、设备日历的读写、SMTP 投递、音频录制和播放、原生文件和照片选择器，以及宿主 API 在 Linux、Windows 和手机上的验收。
 
 具体调用方法见 OctoSense App Flow（原 Design Flow）的[发现并使用宿主 API](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-V1.zh-CN.md)。

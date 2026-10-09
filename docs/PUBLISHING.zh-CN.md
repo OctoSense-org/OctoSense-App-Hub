@@ -86,8 +86,8 @@ my-app/
 
 | 检查项 | 拒绝条件 | 警告条件 |
 | --- | --- | --- |
-| `digest` | `integrity.bundle_blake3` 与应用包不符。每次改动之后都要运行 `hub stamp`。 | |
-| `publisher-signature` | 声明的 GitHub 证明验证失败（即使加了 `--allow-unsigned`）；或用 `--publisher-key` 给出的密钥或签名目录中记录的密钥验证历史签名失败；清单已签名，却没有提供密钥（`publisher key "<id>" is not registered with this hub`）；清单未签名，且没有加 `--allow-unsigned`。 | 清单未签名，且加了 `--allow-unsigned`。 |
+| `digest` | `integrity.bundle_blake3` 与应用包不符。修改后为可编辑源码重新写入摘要；已封存的 GitHub Release 需要新的证明。 | |
+| `publisher-signature` | 声明的 GitHub 证明验证失败（即使加了 `--allow-unsigned`）；清单未签名，且没有加 `--allow-unsigned`；或者旧格式的 Ed25519 签名验证失败，或指向未知的密钥（`publisher key "<id>" is not registered with this hub`）。 | 清单未签名，且加了 `--allow-unsigned`。 |
 | `identity` | ID 以 `os.` 开头；ID 本身或其最后一段是保留名称（[ID 与保留名称](#id-与保留名称)）。 | |
 | `contents` | 文件的扩展名不是 `.card`、`.json`、`.l0`、`.octoscript`、`.splash`、`.svg`、`.png`、`.jpg`、`.jpeg`、`.webp`、`.ttf`、`.otf`、`.txt` 或 `.md` 之一，也不是函数模块（`.wasm`，见 `functions`）。准入检查同样拒绝没有扩展名的文件（例如 `.DS_Store` 和 `LICENSE`）。 | |
 | `functions` | 应用包带了 `.wasm` 文件却没有 `wasm` 能力，或带了 8 个以上。不在 `fns/<name>.wasm`（名称为 `[a-z0-9_-]`，最多 64 个字符），或既不是 WebAssembly 核心模块（版本 1 的 8 字节文件头）也不是有效组件的文件，以 `contents-invalid` 拒绝；导入了 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:http`、`wasi:io`、`wasi:random` 和 `octosense:host` 以外任何内容的组件也是如此。清单没有在 `requires` 中声明 `wasm-components-v1`，组件导入了 `wasi:filesystem` 而应用没有 `storage` 能力，或组件导入了 `wasi:http` 而应用没有 `net` 能力、`network.hosts` 中也没有至少一个主机时，组件在这一项被拒绝（[WebAssembly 组件](#webassembly-组件)）。除此之外，准入检查不检查核心模块内部；宿主在加载模块时检查它的导入和导出。 | 应用声明了 `wasm`，却没有带 `fns/*.wasm`。清单声明了 `wasm-components-v1`，`fns/` 中却没有组件。每个准入的组件都有一行说明它能访问什么。 |
@@ -102,7 +102,7 @@ my-app/
 | `tools`、`agent`、`skills` | `tools.json`、`AGENT.md` 或某个技能不符合 [Agent 文件的规则](#agent-文件的规则)。 | 某个工具是破坏性工具（风险为 `destructive`）或对外工具（带有 `outward`），每次调用都要等待批准；某个工具写了 `confirm: "app"`；应用声明了工具，但 `agent.model.needs` 中没有 `tool_calling`；后台 Agent 带有破坏性工具。 |
 | `policy` | 某项能力未知；ID 违反了 [ID 与保留名称](#id-与保留名称)中的规则；版本为空；某个主机不是纯主机名，或者列出了主机却没有请求 `net`（[网络主机](#网络主机)）；`research` 范围或某个 `agent` 字段违反了相应规则；`storage.cache_max_bytes` 为 0。 | |
 | `version`（使用 `--catalog` 时） | 签名目录中已有该应用的这个版本。 | |
-| `continuity`（使用 `--catalog` 时） | 违反了[签名](#签名)中的发布者规则，或签名目录的历史记录自相矛盾。 | |
+| `continuity`（使用 `--catalog` 时） | 违反了[发布者连续性](#发布者连续性)中的规则，或签名目录的历史记录自相矛盾。 | |
 
 ### 字体
 
@@ -118,7 +118,7 @@ makepad_widgets:resources/LXGWWenKaiBold.ttf
 
 在原生 kit 中，`font_src` 也可以是一个 token 引用 `{"$token": "<name>"}`，只要 kit 的 `tokens` 中这个 token 的 `value` 是这样的路径。准入检查核对的是 token 解析后的路径；其他对象或数组一律拒绝，报 `font_src must be a bundled font path, a supported built-in font, or one token resolving to a string`。
 
-其他内置名称和 crate 路径仍会被拒绝。如果需要上述资源以外的字体，请在许可允许的范围内随包提供字体子集。
+准入检查会拒绝其他内置名称和 crate 路径。如果需要上述资源以外的字体，请在许可允许的范围内随包提供字体子集。
 
 请随包保留字体所要求的许可证和来源说明。普通 `.txt` 和 `.md` 文档中的链接不属于素材加载，也不会授予网络权限。Agent 指令和技能仍受声明主机检查约束；卡片数据、脚本代码和 SVG 素材继续执行各自的资源检查。
 
@@ -236,7 +236,7 @@ $ hub component-info fns/notes.wasm
 | `name` | 用户看到的名称。 | |
 | `integrity.bundle_blake3` | 应用包摘要。 | 由 `hub stamp` 写入。不要手工修改。 |
 | `integrity.github` | GitHub 仓库/所有者 ID、工作流、标签、commit 和附加的 Sigstore 证明。 | 需要 `publisher-github-v1`，由 `publisher-prepare` 和 `publisher-attach` 生成。 |
-| `integrity.signature` | `{key_id, value}`，即发布者对清单的签名。 | 由 `hub sign-manifest` 写入（[签名](#签名)）。 |
+| `integrity.signature` | `{key_id, value}`，即旧格式的 Ed25519 清单签名。 | 省略此字段：App Hub 只接受带 GitHub 证明的 Release（[签名](#签名)）。在 [App Hub #168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168) 落地之前，准入检查仍会让用密钥签名的清单通过；审核人员会拒绝它。 |
 | `capabilities` | 应用可以使用的能力。 | 封闭列表中的名称（[能力](#能力)）。 |
 | `network.hosts` | 应用可以访问的主机。 | 纯主机名，且必须同时请求 `net`（[网络主机](#网络主机)）。 |
 | `storage` | `max_bytes`、`accounts`、`agent_workspace`、`cache_max_bytes`。 | 见[存储与配额](#存储与配额)。 |
@@ -248,7 +248,7 @@ $ hub component-info fns/notes.wasm
 | `backend` | 应用自己的后端：公开的登录端点，以及应用可以调用的操作。 | 可选；须在 `requires` 中声明 `backend-api-v1`，并请求 `auth` 能力、设置 `storage.accounts: true`。不含任何凭据（[登录自己的后端](#登录自己的后端)）。 |
 | `schema_minor` | 清单用到了 schema 1 的哪些新增内容。 | 省略此字段。 |
 
-其他字段一律拒绝。运行 `hub sign-manifest` 之后，你省略的可选字段也会出现在清单中，值为 `null`，例如 `"agent": null`。这些字段不改变任何行为。
+其他字段一律拒绝。运行 `hub publisher-prepare` 之后，你省略的可选字段也会出现在清单中，值为 `null`，例如 `"agent": null`。这些字段不改变任何行为。
 
 只请求应用所需的最小权限。清单没有请求的，宿主一律不授予；安装前，商店会用通俗的话向用户展示每一项请求。
 
@@ -260,54 +260,54 @@ $ hub component-info fns/notes.wasm
 [refused] policy: app com.example.forecast requests unknown capability "model.image"
 ```
 
-能力让应用可以发出请求，但并不提供响应这些请求的服务。响应请求的是**宿主服务**：OctoSense Shell 中的代码，负责完成应用自己无权做的事。**目前由谁提供**一列说明[桌面 RC1](../README.zh-CN.md#下载兼容宿主)在其平台和提供商限制内由谁响应；历史 beta 的区别会明确注明。
+能力让应用可以发出请求，但并不提供响应这些请求的服务。响应请求的是**宿主服务**：OctoSense Shell 中的代码，负责完成应用自己无权做的事。**目前由谁提供**一列说明[桌面 RC2](../README.zh-CN.md#下载兼容宿主)在其平台和提供商限制内由谁响应；RC1 和历史 beta 的区别会明确注明。
 
 | 能力 | 授予的权限 | 商店显示的文字 | 目前由谁提供 |
 | --- | --- | --- | --- |
 | `storage` | 应用自己的存储文件夹：`fs.*`、相机拍摄的内容，以及控件读取的本地文件。没有它，所有 `fs.*` 调用都会失败。 | Keep its own data on this device | 运行时，所有宿主都提供 |
-| `files` | 导入或导出用户在宿主原生对话框中选择的文件。导入和导出还需要 `storage`；应用得到的是自身存储内的相对路径，不是任意文件系统访问权限。应用应声明所需的具体 `files.*` 方法。 | Import and export files you choose in the system file dialog | 已随契约 1.10.0 发布；需要兼容宿主的实际实现，桌面 RC1 不提供 |
+| `files` | 导入或导出用户在宿主原生对话框中选择的文件。导入和导出还需要 `storage`；应用得到的是自身存储内的相对路径，不是任意文件系统访问权限。应用应声明所需的具体 `files.*` 方法。 | Import and export files you choose in the system file dialog | 桌面 RC2 在 macOS、Windows 以及安装了对话框辅助程序（zenity、qarma、matedialog 或 kdialog）的 Linux 上提供，兼容的 Android 构建也提供；RC1 不提供。单文件上限 1 MiB；`files.share` 仅限 Android，且只确认已交给系统分享选择器 |
 | `net` | 向 `network.hosts` 中的主机发出请求，不能访问其他主机。 | Reach only: *主机列表* | 运行时，所有宿主都提供 |
 | `images` | 显示任何公开 https 主机上的图片，不限于 `network.hosts`。 | Show pictures from any website | 运行时 |
-| `web` | 在系统网页视图中打开任何公开 https 页面；网页视图没有任何回到应用的通道。 | Open web pages in a browser view | 运行时在支持的平台上提供，包括 RC1 Windows/WebView2 和 Linux X11/XWayland/WebKitGTK；原生 Wayland 内嵌仍不支持（[运行条件](../README.zh-CN.md#下载兼容宿主)）。 |
-| `location` | 设备的位置。在桌面 RC1 的 macOS 构建及兼容 Android 源码构建中：声明了 `host-api-v1` 的应用须先用 `location.permission.request` 请求权限，之后仅在 Android 上可以用 `location.get` 读取上次已知的位置（[宿主 API 兼容性](HOST-API.zh-CN.md)）。 | Use your location | 运行时，限具备该功能的设备 |
-| `camera` | 相机。拍摄的内容保存在应用的存储中，所以应用还需要 `storage`。在桌面 RC1 的 macOS 构建及兼容 Android 源码构建中：声明了 `host-api-v1` 的应用须先用 `camera.permission.request` 请求权限。 | Use the camera | 运行时，限具备该功能的设备 |
-| `microphone` | 获得应用及系统授权后录音。前台 `microphone.record_*` 会话属于尚未发布的宿主扩展；较早的宿主可能只有权限查询方法，没有录音方法。请声明确切所需的方法，先调用 `microphone.permission.request`。 | 使用麦克风 | 运行时，取决于设备是否支持 |
-| `audio` | 应用活跃时播放应用内音频，不隐含麦克风、存储或后台权限。 | 应用活跃时播放自己的音频文件 | 契约 1.10.0 已发布；需要配套原生宿主，桌面 RC1 不提供。 |
+| `web` | 在系统网页视图中打开任何公开 https 页面；网页视图没有任何回到应用的通道。 | Open web pages in a browser view | 运行时在支持的平台上提供，自 RC1 起包括 Windows/WebView2 和 Linux X11/XWayland/WebKitGTK；原生 Wayland 内嵌仍不支持（[运行条件](../README.zh-CN.md#下载兼容宿主)）。 |
+| `location` | 设备的位置。自桌面 RC1 起的 macOS 构建及兼容 Android 源码构建中：声明了 `host-api-v1` 的应用须先用 `location.permission.request` 请求权限，之后可以在 macOS 和 Android 上用 `location.sample` 读取新鲜位置（RC2），或仅在 Android 上用 `location.get` 读取上次已知的位置（[宿主 API 兼容性](HOST-API.zh-CN.md)）。 | Use your location | 运行时，限具备该功能的设备 |
+| `camera` | 相机。拍摄的内容保存在应用的存储中，所以应用还需要 `storage`。自桌面 RC1 起的 macOS 构建及兼容 Android 源码构建中：声明了 `host-api-v1` 的应用须先用 `camera.permission.request` 请求权限。 | Use the camera | 运行时，限具备该功能的设备 |
+| `microphone` | 获得应用及系统授权后录音。前台 `microphone.record_*` 会话随桌面 RC2 在 macOS 和兼容的 Android 构建上提供（30 秒以内的录音写入应用存储；硬件验收待完成）；较早的宿主以及 Windows 和 Linux 只有权限方法，没有录音方法。请声明确切所需的方法，先调用 `microphone.permission.request`。 | 使用麦克风 | 运行时，取决于设备是否支持 |
+| `audio` | 应用活跃时播放应用内音频，不隐含麦克风、存储或后台权限。 | 应用活跃时播放自己的音频文件 | 桌面 RC2 在 macOS 和兼容的 Android 构建上提供，还需要 `storage`（文件最大 1 MiB、最长 60 秒）；Windows、Linux 和 RC1 不提供；硬件验收待完成。 |
 | `library` | 把拍摄的内容提供给系统相册，其他应用也能看到。 | Save to your photo library, where other apps can see it | 运行时，限具备该功能的设备 |
 | `clipboard` | 剪贴板。 | Use the clipboard | 尚不支持：没有 API 使用它 |
 | `prompt` | 应用向用户提出的问题。 | Ask you questions | 尚不支持：没有宿主读取它。应用 Agent 用 `ask_user_question` 提问。 |
 | `ledger.read` | 读取共享账本。 | Read your shared data | 尚不支持：没有 `ledger` 服务 |
-| `mail` | 通过宿主的 `mail` 服务收发邮件，使用用户在宿主[面板](#面板应用从不收集机密信息)上登录的账户。 | Read and send mail from accounts you sign in to on the device | OctoSense |
-| `auth` | 连接应用自己的 GitHub 或 Google 账户。在 OctoSense 桌面 RC1 中，还能登录应用自己的后端，并调用清单声明的操作（[登录自己的后端](#登录自己的后端)）。 | Connect its own GitHub or Google accounts, or sign in to its developer’s backend, through the host | OctoSense，需要宿主上有 OAuth 客户端注册信息（[已连接账户](#已连接账户)） |
+| `mail` | 通过宿主的 `mail` 服务收发邮件，使用用户在宿主[面板](#面板应用从不收集机密信息)上登录的账户。 | Read and send mail from accounts you sign in to on the device | OctoSense。自桌面 RC2 起，商店应用还可以保存草稿（`mail.compose`）并请求原生发送审阅（`mail.review_send`），审阅只在 macOS 和 Android 上可以批准（[宿主 API 兼容性](HOST-API.zh-CN.md#邮件草稿与发送审阅桌面-rc2)） |
+| `auth` | 连接应用自己的 GitHub 或 Google 账户。自 OctoSense 桌面 RC1 起，还能登录应用自己的后端，并调用清单声明的操作（[登录自己的后端](#登录自己的后端)）。 | Connect its own GitHub or Google accounts, or sign in to its developer’s backend, through the host | OctoSense，需要宿主上有 OAuth 客户端注册信息（[已连接账户](#已连接账户)） |
 | `github` | 读取仓库；每次 Markdown commit 都要等用户确认。 | Read authorized repositories and ask you to review Markdown commits | 同 `auth` |
 | `gcalendar` | 读取 Google 日历；每次修改日程都要等用户确认。 | Read authorized Google calendars and ask you to review event changes | 同 `auth` |
 | `gmail` | 读取 Gmail 并保存回复草稿；每次发送都要等用户确认。与 `mail` 相互独立。 | Read authorized Gmail messages, keep reply drafts and request native send review | 同 `auth` |
 | `calendar` | 日历应用的本地日程存储和界面。不是 Google 日历。 | Read and manage local events through the device's Calendar service | 仅系统应用 `os.calendar`；商店应用请用 `gcalendar` |
-| `device_calendar` | 读取用户选定的原生日历，并请求确认日程修改。需要分别获得应用授权、操作系统权限和日历选择授权。 | Read device calendars you choose and ask you to review event changes | 契约 1.10.0 已发布。需要兼容的宿主适配器；桌面 RC1 和 Home beta.1 不提供。请声明所需方法的确切版本。 |
+| `device_calendar` | 读取用户选定的原生日历，并请求确认日程修改。需要分别获得应用授权、操作系统权限和日历选择授权。 | Read device calendars you choose and ask you to review event changes | 桌面 RC2 在 macOS（EventKit）和带适配器的 Android Home 构建上提供；Windows、Linux、RC1 和 Home beta.1 不提供。写入须亲手点按确认；与系统日历的实际交互待验收。请声明所需方法的确切版本。 |
 | `llm` | 通过 `llm` 服务管理设备的 AI 提供商。 | Manage the assistant's AI providers, whose keys stay with the device | 仅系统应用 |
 | `news` | 设备从订阅源和主题订阅源收集的条目。 | Read news the device collects from its feeds and topics | 仅系统应用 |
 | `photos` | 相册应用自己的图库和合集。 | Read Photos's own library and publish collections | 仅系统应用：OctoSense 只向 `os.photos` 提供 `photos.notify` |
 | `youtube` | YouTube 搜索和音乐推荐。 | Search YouTube and manage music recommendations | 仅系统应用：OctoSense 只向 `os.youtube` 提供 `youtube.notify` |
 | `glance` | 向速览栏发布速览卡片（`glance.publish`、`glance.withdraw`、`glance.list`）。宿主会检查卡片，为卡片设置上限和有效期；卡片只能打开它自己的应用。 | Show cards on your glance screen | OctoSense |
-| `model` | `model.complete` 和 `model.budget`，受每个应用的每日预算限制。`model.complete` 接受一个模型类别（`fast` 或 `strong`）和一个 JSON Schema。图片、音频、视频和向量方法在 [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368) 中实现，已包含在桌面 RC1 中。 | Send what you give it to the AI provider you configured, within a daily budget | OctoSense；媒体方法需要新实现及已配置的兼容供应商 |
+| `model` | `model.complete` 和 `model.budget`，受每个应用的每日预算限制。`model.complete` 接受一个模型类别（`fast` 或 `strong`）和一个 JSON Schema。图片、音频、视频和向量方法在 [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368) 中实现，自桌面 RC1 起已包含。 | Send what you give it to the AI provider you configured, within a daily budget | OctoSense；媒体方法需要新实现及已配置的兼容供应商 |
 | `research` | 通过系统工具箱搜索，不超出清单的 research 范围（[research 范围](#research-范围)）。每次搜索都由宿主执行。 | Search *范围允许的内容* | 仅系统应用，且只在手机版构建中 |
 | `crawl` | 通过系统工具箱抓取网站，深度和页数不超过范围中的 `max_depth` 和 `max_pages`，并遵守其中的域名列表。覆盖面比 `research` 更广。 | Crawl websites, *范围的限制*, which reaches more than searching | 同 `research` |
 | `runtime` | 用 `runtime.list` 和 `runtime.describe` 查询宿主实现了哪些 API（[宿主 API 兼容性](HOST-API.zh-CN.md)）。它不授予所列的任何 API。 | Inspect available host APIs without gaining access to their data or permissions | OctoSense 桌面版 0.1.0-beta.2 不提供，它的商店会拒绝这个名称。在基于 App Hub `main` 构建的每个宿主中（包括 `card-host`），由 App Hub 的请求分派器响应。 |
-| `wasm` | 应用自带的函数：应用包 `fns/` 中的 WebAssembly 核心模块或组件（最多 8 个），由宿主的 `wasm` 服务在沙盒中运行，有截止时间和内存上限。核心模块的函数只拿到自己的输入，接触不到文件、网络、时钟或其他应用。组件还可以读取时钟和随机数，有 `storage` 时还能访问应用自己的文件，但接触不到网络或其他应用（[WebAssembly 组件](#webassembly-组件)）。Agent 工具可以用 `host_method: "wasm.<function>"` 运行它。函数的编写、构建和调用方法见 App Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.zh-CN.md)。 | Run its own sandboxed functions on this device; they reach no network or other apps | 尚无任何发布版提供：标准桌面 RC1 包默认关闭。OctoSense `main` 的每个标准桌面版和 Home 构建在 macOS、Linux 和 Android 上提供它，属于有限支持（[服务及其限制](https://github.com/OctoSense-org/OctoSense/blob/main/docs/wasm.zh-CN.md#服务)）。Windows、iOS 和 OpenHarmony 的构建不包含它：在那里调用会得到 `no service answers "wasm" on this device`。目前还没有任何构建加载组件。 |
-| `sheet` | 通过 `sheet` 引擎（gridcraft）处理电子表格：工作簿、公式、重算和 xlsx，均在应用自己的文件内。 | Use the device's spreadsheet engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面和 Home 构建中提供。 |
-| `photo` | 通过 `photo` 引擎（photocraft）处理图像和照片文档：检查、转换、编辑命令和预览，均在应用自己的文件内。 | Use the device's image-editing engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面和 Home 构建中提供。 |
-| `word` | 通过 `word` 引擎（wordcraft）处理文档：创建、读取、检查，并在 docx、Markdown、HTML、RTF、ODT 和 PDF 之间转换，均在应用自己的文件内。 | Use the device's document engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
-| `deck` | 通过 `deck` 引擎（deckcraft）处理幻灯片：按大纲创建、渲染幻灯片，并转换为 PPTX 或 PDF，均在应用自己的文件内。 | Use the device's presentation engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
-| `cad` | 通过 `cad` 引擎（cadcraft）处理图纸：检查、查询、测量、渲染，并转换 DXF 和 DWG，均在应用自己的文件内。 | Use the device's CAD engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
-| `light` | 通过 `light` 引擎（lightcraft）处理 RAW 照片：元数据、显影控件，以及单张或批量显影，均在应用自己的文件内。 | Use the device's raw-photo engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
-| `sound` | 通过 `sound` 引擎（soundcraft）离线处理音频文件：信息、波形峰值、转换、裁剪和混音；它从不打开音频设备，均在应用自己的文件内。 | Use the device's audio-editing engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
-| `design` | 通过 `design` 引擎（designcraft）处理页面排版：文档信息、页面渲染，以及 PDF、IDML 或 EPUB 导出，均在应用自己的文件内。 | Use the device's page-layout engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
-| `film` | 通过 `film` 引擎（filmcraft）处理视频：容器信息、导出 PNG 帧，以及用其自带编解码器的有界导出，均在应用自己的文件内。 | Use the device's video-editing engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
-| `effect` | 通过 `effect` 引擎（effectcraft）处理动态图形：工程信息、帧渲染，以及 Lottie 导入和导出，均在应用自己的文件内。 | Use the device's motion-graphics engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
-| `vector` | 通过 `vector` 引擎（vectorcraft）处理矢量图：检查、转换，并渲染 SVG、PDF、EPS 和 DXF，均在应用自己的文件内。 | Use the device's vector-drawing engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
-| `pdf` | 通过 `pdf` 引擎（pdfcraft）处理 PDF：信息、文本、页面渲染、合并和拆分，均在应用自己的文件内。 | Use the device's PDF engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `wasm` | 应用自带的函数：应用包 `fns/` 中的 WebAssembly 核心模块或组件（最多 8 个），由宿主的 `wasm` 服务在沙盒中运行，有截止时间和内存上限。核心模块的函数只拿到自己的输入，接触不到文件、网络、时钟或其他应用。组件还可以读取时钟和随机数，有 `storage` 时还能访问应用自己的文件，但接触不到网络或其他应用（[WebAssembly 组件](#webassembly-组件)）。Agent 工具可以用 `host_method: "wasm.<function>"` 运行它。函数的编写、构建和调用方法见 App Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.zh-CN.md)。 | Run its own sandboxed functions on this device; they reach no network or other apps | 桌面 RC2 的标准构建在 macOS 和 Linux 上提供它，属于有限支持（[服务及其限制](https://github.com/OctoSense-org/OctoSense/blob/main/docs/wasm.zh-CN.md#服务)）；RC1 默认关闭。受支持的 Android Home 源码构建也提供它。Windows、iOS 和 OpenHarmony 的构建不包含它：在那里调用会得到 `no service answers "wasm" on this device`。目前还没有任何构建加载组件。 |
+| `sheet` | 通过 `sheet` 引擎（gridcraft）处理电子表格：工作簿、公式、重算和 xlsx，均在应用自己的文件内。 | Use the device's spreadsheet engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面和 Home 构建中提供。 |
+| `photo` | 通过 `photo` 引擎（photocraft）处理图像和照片文档：检查、转换、编辑命令和预览，均在应用自己的文件内。 | Use the device's image-editing engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面和 Home 构建中提供。 |
+| `word` | 通过 `word` 引擎（wordcraft）处理文档：创建、读取、检查，并在 docx、Markdown、HTML、RTF、ODT 和 PDF 之间转换，均在应用自己的文件内。 | Use the device's document engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `deck` | 通过 `deck` 引擎（deckcraft）处理幻灯片：按大纲创建、渲染幻灯片，并转换为 PPTX 或 PDF，均在应用自己的文件内。 | Use the device's presentation engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `cad` | 通过 `cad` 引擎（cadcraft）处理图纸：检查、查询、测量、渲染，并转换 DXF 和 DWG，均在应用自己的文件内。 | Use the device's CAD engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `light` | 通过 `light` 引擎（lightcraft）处理 RAW 照片：元数据、显影控件，以及单张或批量显影，均在应用自己的文件内。 | Use the device's raw-photo engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `sound` | 通过 `sound` 引擎（soundcraft）离线处理音频文件：信息、波形峰值、转换、裁剪和混音；它从不打开音频设备，均在应用自己的文件内。 | Use the device's audio-editing engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `design` | 通过 `design` 引擎（designcraft）处理页面排版：文档信息、页面渲染，以及 PDF、IDML 或 EPUB 导出，均在应用自己的文件内。 | Use the device's page-layout engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `film` | 通过 `film` 引擎（filmcraft）处理视频：容器信息、导出 PNG 帧，以及用其自带编解码器的有界导出，均在应用自己的文件内。 | Use the device's video-editing engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `effect` | 通过 `effect` 引擎（effectcraft）处理动态图形：工程信息、帧渲染，以及 Lottie 导入和导出，均在应用自己的文件内。 | Use the device's motion-graphics engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `vector` | 通过 `vector` 引擎（vectorcraft）处理矢量图：检查、转换，并渲染 SVG、PDF、EPS 和 DXF，均在应用自己的文件内。 | Use the device's vector-drawing engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `pdf` | 通过 `pdf` 引擎（pdfcraft）处理 PDF：信息、文本、页面渲染、合并和拆分，均在应用自己的文件内。 | Use the device's PDF engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
 
-任何能力都不隐含其他能力。尚不支持：面向商店应用的 `photos` 和 `youtube` 服务。脚本如何调用各项能力，见 App Flow 的[能力](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.zh-CN.md)文档。
+任何能力都不隐含其他能力。尚不支持：面向商店应用的 `photos` 和 `youtube` 服务。脚本如何调用各项能力，见 App Flow 的[能力](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.zh-CN.md)文档；哪些能力会真正响应商店应用、支持哪些平台、从哪个版本开始，见其[宿主 API 能力族](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-FAMILIES.zh-CN.md)。
 
 源码：`crates/app-contract/src/manifest.rs` 中的 `KNOWN_CAPABILITIES`。
 
@@ -318,7 +318,7 @@ $ hub component-info fns/notes.wasm
 | 组 | 名称 | 授予的权限 | 目前由谁提供 |
 | --- | --- | --- | --- |
 | `octos.*` | 4 个：`octos.session.open`、`octos.session.history`、`octos.turn.start`、`octos.turn.interrupt` | 与应用自己的 Agent 对话，对话由 OctoSense 运行的 Agent 内核 octos 承载：打开对话、读取对话历史、开始一轮、停止应用发起的那一轮。应用从不指定提供商、模型或密钥。 | OctoSense，前提是用户允许了该应用的 Agent。在此之前，调用会得到 `Waiting for the person to allow this app's agent (OctoSense asks the first time)`。 |
-| `matrix.*` | 45 个，例如 `matrix.read_messages`、`matrix.room_members`、`matrix.send_message` | 每个名称对应一项 Matrix 操作，使用用户当前的账户，限于用户允许的房间。 | 没有任何 OctoSense 宿主服务提供它们。未验证：OctoSense 随附的原生应用 Rinx 会向导入其中的应用包提供这些名称。 |
+| `matrix.*` | 45 个，例如 `matrix.read_messages`、`matrix.room_members`、`matrix.send_message` | 每个名称对应一项 Matrix 操作，使用用户当前的账户，限于用户允许的房间。 | 没有任何 OctoSense 宿主服务提供它们。OctoSense 随附的原生应用 Rinx 通过自己的宿主，向用户导入其中的迷你应用提供这些名称；这不属于 App Hub 的安装途径。 |
 | `palpo.*` | 29 个，例如 `palpo.projects.list`、`palpo.inbox.decide` | 每个名称对应一项 Palpo 管理操作。 | 尚不支持：OctoSense 中没有任何组件提供它们。 |
 
 源码：商店为每个名称显示的文字位于 `crates/app-policy/src/services.rs` 和 `crates/app-contract/src/palpo.rs`。
@@ -560,27 +560,21 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | `microphone` | `microphone.permission.status` | |
 | `location` | `location.permission.status`、`location.get` | |
 
-App Hub 已允许声明 `device_calendar` 工具别名和 `mail.compose` / `mail.compose_status`；桌面 RC1 尚不包含对应的宿主实现。它们均需要 `private_data: true` 和对应能力。日历权限申请、日历选择和事件修改仅限前台，`mail.review_send` 和 `mail.send` 也一样。准备草稿不会发送邮件；兼容宿主仍须重新核验授权，并在用户批准对外写操作前显示宿主自己的不可变审阅内容。
+App Hub 已允许声明 `device_calendar` 工具别名和 `mail.compose` / `mail.compose_status`；桌面 RC2 在 macOS 和兼容的 Android 构建上实现了它们，RC1 没有，Windows 和 Linux 可以撰写草稿和读取状态，但不能批准发送。它们均需要 `private_data: true` 和对应能力。日历权限申请、日历选择和事件修改仅限前台，`mail.review_send` 和 `mail.send` 也一样。准备草稿不会发送邮件；兼容宿主仍须重新核验授权，并在用户批准对外写操作前显示宿主自己的不可变审阅内容。
 
-`wasm.<function>` 运行应用自带的函数之一（`fns/*.wasm`，`wasm` 能力）。它只在提供 `wasm` 的宿主上可用（见[能力](#能力)），标准桌面 RC1 包默认关闭。RC1 在[平台限制](HOST-API.zh-CN.md#限制)内实现上表中的 `auth`、`runtime`、`camera`、`microphone` 和 `location` 方法。上面的规则同样适用于这些方法，`runtime.list` 和 `runtime.describe` 也不例外。通过准入不等于已经配置账户、取得权限或补上缺少的 API：请用 `runtime.describe` 查询宿主实现了什么。映射到 `auth.backend.request` 的工具只能执行后端声明的 `GET` 操作；写操作仍须应用在前台，并由用户在宿主的原生审阅界面上批准。权限的 `request` 和 `revoke`、账户管理，以及 `app_tools.dispatch@1` 等运行时 ABI，都没有 `host_method`。
+`wasm.<function>` 运行应用自带的函数之一（`fns/*.wasm`，`wasm` 能力）。它只在提供 `wasm` 的宿主上可用（见[能力](#能力)）：桌面 RC2 的 macOS 和 Linux 构建提供，RC1 默认关闭。RC2 在[平台限制](HOST-API.zh-CN.md#限制)内实现上表中的 `auth`、`runtime`、`camera`、`microphone`、`location`、`device_calendar` 和 `mail` 方法。上面的规则同样适用于这些方法，`runtime.list` 和 `runtime.describe` 也不例外。通过准入不等于已经配置账户、取得权限或补上缺少的 API：请用 `runtime.describe` 查询宿主实现了什么。映射到 `auth.backend.request` 的工具只能执行后端声明的 `GET` 操作；写操作仍须应用在前台，并由用户在宿主的原生审阅界面上批准。权限的 `request` 和 `revoke`、账户管理，以及 `app_tools.dispatch@1` 等运行时 ABI，都没有 `host_method`。
 
-上述七个媒体别名需要 [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368)，
-桌面 RC1 已包含这些方法。它们仍要求 `model` 能力和 `private_data: true`。
-生成与向量请求可能计费，因此它们和视频取消至少需要 `act` 风险，并使用有资源上限的
-模型服务。发现 API 不代表供应商账户已有权益；远端视频任务已运行时，取消可能失败。
-额度和进程内任务生命周期见双语[媒体契约](https://github.com/OctoSense-org/OctoSense/blob/main/apps/ai-providers/host-service/MEDIA.zh-CN.md)。
-这些策略别名不构成真实供应商或设备验证。
+上述七个媒体别名需要 [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368)，桌面 RC1 和 RC2 已包含这些方法。它们仍要求 `model` 能力和 `private_data: true`。生成与向量请求可能计费，因此它们和视频取消至少需要 `act` 风险，并使用有资源上限的模型服务。发现 API 不代表供应商账户已有权益；远端视频任务已运行时，取消可能失败。额度和进程内任务生命周期见双语[媒体契约](https://github.com/OctoSense-org/OctoSense/blob/main/apps/ai-providers/host-service/MEDIA.zh-CN.md)。这些策略别名不构成真实供应商或设备验证。
 
-账户/业务写入、登录、确认和批准都没有 `host_method`：这些操作由用户在应用自己的
-界面上发起。上述有上限的模型任务是模型供应商提交的明确例外。
+账户/业务写入、登录、确认和批准都没有 `host_method`：这些操作由用户在应用自己的界面上发起。上述有上限的模型任务是模型供应商提交的明确例外。
 
-对于映射到 `glance.publish` 的工具，让 `input_schema` 只接受 `template` 加 `initial`，或 L0 `source` 加 `data`。绝不要接受 `script`。OctoSense 桌面版 0.1.0-beta.2 按应用自身的策略发布 Agent 提交的脚本卡片，因此模型写出的 `script` 会作为你的应用运行。OctoSense 桌面 RC1 会拒绝这类卡片，报错 `Agents cannot publish executable Splash; choose an admitted template with initial data, or L0 source`；它也拒绝 L1 的 `source`。
+对于映射到 `glance.publish` 的工具，让 `input_schema` 只接受 `template` 加 `initial`，或 L0 `source` 加 `data`。绝不要接受 `script`。OctoSense 桌面版 0.1.0-beta.2 按应用自身的策略发布 Agent 提交的脚本卡片，因此模型写出的 `script` 会作为你的应用运行。自 OctoSense 桌面 RC1 起，宿主会拒绝这类卡片，报错 `Agents cannot publish executable Splash; choose an admitted template with initial data, or L0 source`；它也拒绝 L1 的 `source`。
 
 源码：`crates/app-policy/src/agent.rs` 中的 `SHARED_HOST_METHODS`。
 
 ### 脚本工具执行（`script-tools-v1`）
 
-脚本工具是 `"implemented_by": "app"` 的工具：由应用自己的 Splash 代码在已打开的应用中运行。它需要提供 `app_tools.dispatch@1` 的宿主，例如[桌面 RC1](../README.zh-CN.md#下载兼容宿主)。OctoSense 桌面版 0.1.0-beta.2 拒绝这类工具，返回 `app_tool_unavailable`。
+脚本工具是 `"implemented_by": "app"` 的工具：由应用自己的 Splash 代码在已打开的应用中运行。它需要提供 `app_tools.dispatch@1` 的宿主，例如[桌面 RC2](../README.zh-CN.md#下载兼容宿主)。OctoSense 桌面版 0.1.0-beta.2 拒绝这类工具，返回 `app_tool_unavailable`。
 
 添加脚本工具：
 
@@ -690,7 +684,7 @@ OctoSense 桌面版 0.1.0-beta.2 的商店用一行说明代替前三行：“Ru
 | `agent.model` | 尚不支持：OctoSense 会忽略它。 |
 | Agent 发布的速览卡片 | 应用可以发布的任何卡片，包括 `script` 卡片。 |
 
-OctoSense 桌面 RC1 改变了四点：
+OctoSense 桌面 RC1 改变了四点，RC2 沿用这些改动：
 
 - `implemented_by: "app"` 的工具在已打开的应用中运行（[脚本工具执行](#脚本工具执行script-tools-v1)）。
 - 发布速览卡片的工具调用（直接调用 `glance.publish`，或经由 `host_method`）只接受带 `initial` 对象的模板，或 L0 `source`。它拒绝 `script` 和 L1 源码，返回的错误类型为 `unsafe_card_source`。
@@ -732,7 +726,7 @@ host.request("mail.list", {…}, fn(r){ … })
 
 除非应用的策略授予了相应的服务族（`mail.*` 对应 `mail`）或确切的服务名，否则隔离环境会拒绝调用。获准的调用会交给宿主为该服务族注册的服务。服务完成工作后返回数据，绝不返回凭据；它返回的连接句柄不透明，并与该应用绑定。如果某个服务族没有任何服务响应，对它的调用会立即失败，返回 `no service answers "<family>" on this device`；`card-host` 不注册任何服务，在那里只有 App Hub 用于发现宿主 API 的 `runtime` 会响应。哪个 Shell 提供哪个服务族，见 App Flow 的[宿主服务](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。
 
-`card-host` 也没有实现 `host-api-v1`、`backend-api-v1` 和 `script-tools-v1` 所需的任何 API，因此会拒绝清单要求其中任何一项的应用：这类应用请在基于 `main` 构建的 OctoSense Shell 中测试。
+`card-host` 也没有实现 `host-api-v1`、`backend-api-v1` 和 `script-tools-v1` 所需的任何 API，因此会拒绝清单要求其中任何一项的应用。这类应用请在[桌面 RC1](../README.zh-CN.md#下载兼容宿主) 中测试，它在自身的[平台限制](HOST-API.zh-CN.md#限制)内实现了这些 API。
 
 ### 面板：应用从不收集机密信息
 
@@ -748,7 +742,7 @@ host.request("mail.list", {…}, fn(r){ … })
 
 宿主强制执行哪些规则，取决于构建版本和平台。Windows/Linux 的受保护写操作仍不支持，会拒绝执行，见[平台限制](../README.zh-CN.md#下载兼容宿主)：
 
-| | OctoSense 桌面版 0.1.0-beta.2 | OctoSense 桌面 RC1 |
+| | OctoSense 桌面版 0.1.0-beta.2 | OctoSense 桌面 RC1 和 RC2 |
 | --- | --- | --- |
 | 批准 Gmail 发送 | 在原生的 Approve & Send 控件上亲手点按 | 相同 |
 | 批准 GitHub 或 Google 日历的保存 | 在宿主的确认面板上批准，不检查是否为亲手点按 | 在原生的 Approve & Save 控件上亲手点按；脚本和 Agent 的请求无法批准 |
@@ -761,11 +755,11 @@ host.request("mail.list", {…}, fn(r){ … })
 | 宿主 | 注册信息来源 | 没有注册信息时 `auth.connect` 的报错 |
 | --- | --- | --- |
 | OctoSense 桌面版 0.1.0-beta.2 | 宿主的 `oauth/clients.json`，该发布版不附带这个文件 | `OAuth is not configured. Add provider registrations in the host's oauth/clients.json` |
-| OctoSense 桌面 RC1 | 发行方构建设置，或宿主 `oauth/clients.json` 覆盖配置；公开 RC1 包不附带注册信息 | `GitHub sign-in is unavailable in this build. Check for an OctoSense update or contact its distributor.`，或 Google 的同类消息 |
+| OctoSense 桌面 RC1 和 RC2 | 发行方构建设置，或宿主 `oauth/clients.json` 覆盖配置；公开的 RC1 和 RC2 包都不附带注册信息 | `GitHub sign-in is unavailable in this build. Check for an OctoSense update or contact its distributor.`，或 Google 的同类消息 |
 
 ### 登录自己的后端
 
-OctoSense 桌面 RC1 可以在[平台限制](../README.zh-CN.md#下载兼容宿主)内让应用登录其开发者的后端，并调用应用声明的后端操作。在清单中声明这个后端。声明是公开的，不含任何凭据：
+自 OctoSense 桌面 RC1 起，宿主可以在[平台限制](../README.zh-CN.md#下载兼容宿主)内让应用登录其开发者的后端，并调用应用声明的后端操作。在清单中声明这个后端。声明是公开的，不含任何凭据：
 
 ```json
 {
@@ -808,9 +802,9 @@ OctoSense 桌面 RC1 可以在[平台限制](../README.zh-CN.md#下载兼容宿�
 
 适用范围：
 
-- 只有实现了 `auth.backend.request@1` 的宿主才会安装这个应用：桌面 RC1 在 macOS、Windows 和 Linux 上声明该方法；兼容 Android 源码构建也实现它。Windows/Linux 使用外部浏览器登录及清单声明的读取，嵌入式登录和受保护的写操作不支持。缺少该方法的宿主会报 `app <id> needs a host implementing auth.backend.request@1`。iOS 不支持后端登录。
-- 没有 `backend` 块的应用，只能在运维人员已把其后端登记到宿主 `oauth/backends.json` 的设备上登录。Windows 和 Linux 上的这类登录使用浏览器（未经验证）。
-- 未验证：在设备上实际登录，以及实际批准一次写操作。
+- 只有实现了 `auth.backend.request@1` 的宿主才会安装这个应用：桌面 RC1 和 RC2 在 macOS、Windows 和 Linux 上声明该方法；兼容 Android 源码构建也实现它。Windows/Linux 使用外部浏览器登录（RC2 补上了所需的原生链接打开方式）及清单声明的读取，嵌入式登录和受保护的写操作不支持。缺少该方法的宿主会报 `app <id> needs a host implementing auth.backend.request@1`。iOS 不支持后端登录。
+- 没有 `backend` 块的应用，只能在运维人员已把其后端登记到宿主 `oauth/backends.json` 的设备上登录。Windows 和 Linux 上的这类登录使用浏览器。
+- 已在 Windows 上用 RC2 源码验证：测试程序对一个模拟后端完成了浏览器登录。未验证：对真实后端的登录、Linux 上的登录，以及在设备上实际批准一次写操作。
 
 应用不能做的事：
 
@@ -844,18 +838,16 @@ OctoSense 桌面 RC1 可以在[平台限制](../README.zh-CN.md#下载兼容宿�
 | 命令 | 作用 |
 | --- | --- |
 | `hub publisher-prepare/attach/verify/pack/unpack/entry` | 准备 GitHub 规范化主题、附加证明、验证、交付或生成审核候选；详见 [GitHub 发布者来源证明](#github-发布者来源证明)及 `hub --help` 的完整参数。均不会发布目录。 |
-| `hub stamp <bundle>` | 用准入检查的解析器解析 `manifest.json`，然后把应用包摘要写入 `integrity.bundle_blake3` 并输出。准入检查无法读取的清单，它会拒绝处理。 |
-| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app]` | 准入检查本身。输出 `PASSED` 或 `REFUSED`、每个检查结果，以及应用将获得的授权。有拒绝时退出码为 1。`--json` 以 JSON 输出报告（`schema`、`stage`、`passed`、`app_id`、`version`、`digest`、`findings` 和 `resources`）。 |
+| `hub stamp <bundle>` | 用准入检查的解析器解析 `manifest.json`，然后把应用包摘要写入 `integrity.bundle_blake3` 并输出。准入检查无法读取的清单，或已带 GitHub 证明的 Release，它都会拒绝处理。 |
+| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app]` | 准入检查本身。输出 `PASSED` 或 `REFUSED`、每个检查结果，以及应用将获得的授权。有拒绝时退出码为 1。`--json` 以 JSON 输出报告（`schema`、`stage`、`passed`、`app_id`、`version`、`digest`、`findings` 和 `resources`）。`--publisher-key` 用于检查旧格式的密钥签名应用包，发布时从不需要它。 |
 | `hub scan <bundle> [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--packet <out.json>] [--reviewer <cmd>] [--system-app]` | 先运行准入检查，再写出审核包，还可以把审核包交给一条审核命令。准入检查拒绝的应用包不会进入扫描。 |
 | `hub component-info <file.wasm>` | 以 JSON 输出函数文件的类型（`component` 或 `module`）、它的导入，以及它导出的函数及其参数和结果（[WebAssembly 组件](#webassembly-组件)）。它只读取这一个文件。既不是核心模块也不是有效组件的文件会失败，输出 `hub: <file>: not a WebAssembly core module or component` 或验证器的错误。 |
-| `hub keygen <key-file>` | 新建一个密钥文件，以十六进制写入签名密钥，并输出公钥。如果路径已存在（包括符号链接），则拒绝执行。在 macOS 和 Linux 上，该文件只有你自己能读取（权限模式 `0600`）。 |
-| `hub pubkey <key-file>` | 输出密钥的公钥。 |
-| `hub sign-manifest <bundle> --key <key-file> --key-id <publisher-id>` | 为清单签名，签名覆盖其中的摘要。 |
 | `hub verify <catalog> --anchor <hex>` | 用信任锚验证签名目录。 |
+| `hub keygen`、`hub pubkey`、`hub sign-manifest` | 旧格式 Ed25519 密钥工具。维护者用它们管理旧格式签名目录；本地演练用 `hub keygen` 生成一次性签名目录密钥。绝不要用它们为应用签名：App Hub 只接受带 GitHub 证明的 Release。它们是否保留，由 [issue #168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168) 决定。 |
 
-`--catalog <file>` 会对照一份已发布的签名目录（例如本仓库的 `catalog.json`），增加 `version` 和 `continuity` 两项检查，并使用签名目录中记录的发布者密钥。文件不存在时会拒绝。v2 目录必须通过内置 GitHub 工作流策略验证；历史目录必须能用 Hub 的信任锚验证通过（[信任锚](../README.zh-CN.md#信任锚)）；开发用的 Hub 则用 `--anchor <hex>` 验证。否则 `hub check` 会停止，并输出 `hub: could not authenticate base catalog: …`。
+`--catalog <file>` 会对照一份已发布的签名目录（例如本仓库的 `catalog-v2.json`），增加 `version` 和 `continuity` 两项检查，并使用签名目录中记录的发布者身份。文件不存在时会拒绝。v2 目录必须通过内置 GitHub 工作流策略验证；历史目录必须能用 Hub 的信任锚验证通过（[信任锚](../README.zh-CN.md#信任锚)）；开发用的 Hub 则用 `--anchor <hex>` 验证。否则 `hub check` 会停止，并输出 `hub: could not authenticate base catalog: …`。
 
-`hub publish`、`hub withdraw`、`hub remove` 和 `hub certify` 需要 Hub 自己的密钥，只有 Hub 的维护者会运行它们。
+`hub publish`、`hub withdraw`、`hub remove` 和 `hub certify` 需要 Hub 自己的密钥，所以只有维护者会对 App Hub 的签名目录运行它们；本地演练则用一次性密钥运行 `hub certify` 和 `hub publish`。
 
 ### 读懂 `hub check` 报告
 
@@ -892,7 +884,7 @@ my-notes 0.1.0 — PASSED
 
 ## 签名
 
-新应用可以使用 GitHub 管理的发布者来源证明，无需开发者创建、保存或轮换发布者私钥。本源码实现使用已发布的契约 **1.10.0**，保留了 1.8.0 引入的 `publisher-github-v1`。[桌面 RC1](../README.zh-CN.md#下载兼容宿主)是兼容的宿主发行版。两个真实标签推送发布已通过下文记录的工作流与原生 Store 验收。下文保留历史包的 Ed25519 路径。
+App Hub 只接受带 GitHub 证明的 Release（[ADR 0002](adr/0002-github-attested-publisher-identity.zh-CN.md)）。应用的 GitHub 工作流为每个 Release 生成证明，所以你无需创建、保存或轮换发布者密钥。带证明的 Release 使用 `publisher-github-v1`，它随应用契约 **1.8.0** 引入并保留在 **1.10.0** 中；[桌面 RC2](../README.zh-CN.md#下载兼容宿主) 是兼容的宿主发行版，RC1 也是。两个由标签推送生成的真实 Release 已通过下文记录的工作流和原生商店验收。
 
 ### GitHub 发布者来源证明
 
@@ -914,45 +906,36 @@ hub publisher-verify bundle
 hub publisher-pack bundle --out build/app.bundle.pack.json
 ```
 
-`build/` 必须预先存在且位于 `bundle/` 外。`publisher-prepare` 添加 `requires: ["publisher-github-v1"]`，在 `integrity.github` 中记录身份，并为最终应用包写入摘要。规范化签名字节包含身份和应用包摘要，但不包含 `integrity.github.attestation`。随后附加证明；应用包摘要不包含清单，因此不存在哈希循环。证明最多 48 KiB，完整清单最多 64 KiB。Prepare 拒绝已经封存的发布包；Attach 和 Pack 验证最终字节且不会重新写入摘要，修改后需要生成新的发布证明。此流程无需 `keygen`、`sign-manifest` 或 `--publisher-key`。
+`build/` 必须预先存在且位于 `bundle/` 外。`publisher-prepare` 添加 `requires: ["publisher-github-v1"]`，在 `integrity.github` 中记录身份，并为最终应用包写入摘要。规范化签名字节包含身份和应用包摘要，但不包含 `integrity.github.attestation`。随后附加证明；应用包摘要不包含清单，因此不存在哈希循环。证明最多 48 KiB，完整清单最多 64 KiB。Prepare 拒绝已经封存的 Release；Attach 和 Pack 验证最终字节，且不会重新写入摘要；修改后需要生成新的 Release 证明。工作流不使用发布者密钥，也不使用仓库 Secret。
 
-验证使用公开的合成测试应用的 [v0.1.0 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736273522)与 [v0.1.1 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736765473)，没有使用仓库 Secrets。两个工作流均生成并验证了真实 GitHub 证明。[原生验收示例](../crates/app-hub/examples/publisher_acceptance.rs)随后安装两个发布包，准备并验证启动、保留完整证明，并拒绝内容/证明/身份篡改、回滚、未签名的归属替换和已撤回版本。[验收记录](../reviews/github-publisher-v1/acceptance.json)绑定输入摘要与原生源码版本。Store 使用的是临时的本地测试签名目录；该测试应用没有 App Hub 提交 issue，也没有签名目录条目。这既不能证明应用界面可以运行，也不能证明手机可以安装 GitHub 发布者应用。
+验证使用公开的合成测试应用的 [v0.1.0 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736273522)与 [v0.1.1 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736765473)，没有使用仓库 Secret。两个工作流均生成并验证了真实 GitHub 证明。[原生验收示例](../crates/app-hub/examples/publisher_acceptance.rs)随后安装两个 Release pack，准备并验证启动、保留完整证明，并拒绝内容/证明/身份篡改、回滚、未签名的归属替换和已撤回版本。[验收记录](../reviews/github-publisher-v1/acceptance.json)绑定输入摘要与原生源码版本。其中的商店使用临时的本地测试签名目录；该测试应用没有 App Hub 提交 issue，也没有签名目录条目。这既不能证明应用界面可以运行，也不能证明手机可以安装 GitHub 发布者应用。
 
-在 macOS 上，[OctoSense 桌面 RC1](../README.zh-CN.md#下载兼容宿主) 可以安装签名目录第 13 版中带 GitHub 证明的示例应用，并在安装和更新时检查这些应用的证明和发布者连续性。iOS、Windows 和 Linux 上的商店安装仍未验证，目前也没有任何已发行的手机版本支持 `publisher-github-v1`。
+在 macOS 上，OctoSense 桌面 RC1 安装了签名目录第 13 版中带 GitHub 证明的示例应用，并在安装和更新时检查了这些应用的证明和发布者连续性；[RC2](../README.zh-CN.md#下载兼容宿主) 以同样的方式读取签名目录。iOS、Windows 和 Linux 上的商店安装仍未验证，目前也没有任何已发行的手机版本支持 `publisher-github-v1`。
 
 请下载含有生成后证明清单的 **Release pack**；单独检出源码并不包含这些最终字节。审核人员可运行 `hub publisher-unpack app.bundle.pack.json --out review-bundle`，再运行 `hub publisher-verify review-bundle --catalog <authenticated-catalog>`。Unpack 要求新目录，拒绝路径穿越，失败时仅清理自己创建的输出。`hub publisher-entry review-bundle --catalog <authenticated-catalog> --out build/index.json` 生成审核候选条目，不会发布。
 
-请创建 **App Hub submission issue** 发起发布请求，可以先开 issue、后生成 release；准备好后补充仓库、不可变标签/commit、发布 pack 链接和验证证据。创建标签或 GitHub Release 不等于提交、批准或上架。管理员目录审核仍走[独立的受保护发布流程](GITHUB-PUBLISHING.zh-CN.md)。
+开一个 **App Hub 提交 issue** 来请求发布，issue 可以先于 Release；准备好后，补充仓库、不可变的标签和 commit、Release pack 链接和验证证据。创建标签或 GitHub Release 既不构成提交或批准，也不会把应用列入签名目录。管理员对签名目录的审核仍走[独立的受保护发布流程](GITHUB-PUBLISHING.zh-CN.md)。
 
-目录发布者身份为 `github:<repository_id>`。更新须保持仓库、不可变仓库/所有者 ID 和工作流路径不变，并提高语义版本优先级。已撤回版本仍保留在所有权历史中。未签名更新、替换身份、重放版本或接管历史 Ed25519 应用 ID 都会被拒绝。本变更不提供迁移或恢复流程，也不修改任何已准入产物。
+旧宿主拒绝新标记；没有来源证明验证器的宿主即使开启未签名开发模式也会拒绝证明。独立 `card-host` 没有发布者验证器：预览时使用可编辑源码，已封存的应用请在兼容的商店宿主中测试。准入不等于应用体验或设备验收；仅推出契约 1.8.0，并不等于有了兼容宿主。
 
-旧宿主拒绝新标记；没有来源证明验证器的宿主即使开启未签名开发模式也会拒绝证明。独立 `card-host` 没有发布者验证器：预览时使用未签名开发副本，封存后的应用使用兼容 Store 宿主。准入不等于应用 UX 或设备验收；仅发布契约 1.8.0 不会交付兼容宿主。
+### 发布者连续性
 
-### 历史 Ed25519 发布者签名
-
-目录管理员可使用 [GitHub 管理的目录签名](GITHUB-PUBLISHING.zh-CN.md)，无需额外的 Hub 私钥。已有 Ed25519 发布者历史及其签名字节保持不变：
-
-`hub stamp` 和 `card-host --stamp` 遇到已有签名元数据时会拒绝，且不会改写清单。编辑已签名发布包前，先创建未签名的开发副本；保留原发布包，再为最终新版本写入摘要并签名。缺失或为 null 的 `integrity.signature` 仍表示未签名。
-
-发布者 ID 就是你签名所用的密钥 ID。已登记的密钥以已发布签名目录中的记录为准，提交时附带的密钥一律不算：
+使用 `--catalog` 时，准入检查会对照经过认证的签名目录中登记的发布者检查每个 Release，绝不采用提交时附带的身份或密钥。签名目录把 GitHub 发布者记录为 `github:<repository_id>`，已撤回的 Release 也保留在这段历史中。
 
 | 情形 | 规则 | 拒绝消息 |
 | --- | --- | --- |
-| 首次提交 | 可以不签名。 | |
-| 已发布应用的更新 | 必须以已登记的发布者 ID 签名。 | 未签名：`continuity: <app id> is already published by "<publisher-id>"; an update must carry that key`。用其他 ID 签名：`continuity: <app id> was published by "<publisher-id>"; this version is signed by "<other-id>". Re-keying is a reviewed change.` |
-| 以某个发布者 ID 签名、且该 ID 已有登记密钥的任何清单 | 必须用这把密钥签名。 | `continuity: not signed by the key on record for "<publisher-id>": …`；`--publisher-key` 中给出另一把密钥时：`publisher-signature: conflicting public keys for publisher key "<publisher-id>"` |
-| 以未签名方式发布的应用，其第一个签名更新 | 它所用的密钥随之登记在案。 | |
+| 任何 GitHub Release | `version` 是 `major.minor.patch` 形式的语义版本。 | `continuity: GitHub publisher version must be semantic version major.minor.patch` |
+| ID 已登记为未签名或密钥签名的应用，其首个 GitHub Release | 换用新 ID：GitHub 来源证明不能接管已登记的 ID。 | `continuity: existing legacy app ownership cannot be adopted by GitHub provenance` |
+| 更新 | 来自相同的仓库名、仓库 ID、所有者 ID 和工作流路径。 | `continuity: GitHub publisher repository, owner or workflow changed` |
+| 更新 | 语义版本高于已登记的最新版本。 | `continuity: GitHub publisher version must advance; replay and rollback are refused` |
+| 更新 | 带 GitHub 来源证明。 | 未签名或用密钥签名时：`continuity: GitHub-owned app cannot downgrade to legacy or unsigned authentication` |
 
-没有用于替换密钥的参数。密钥丢失或轮换，或者历史记录自相矛盾，都需要维护者处理：请在 issue 中提出。
+没有任何命令能把应用转到另一个仓库、所有者或工作流。仓库重命名、转移或删除之后，应用只能换用新 ID 继续发布。签名目录的历史记录自相矛盾时，需要维护者处理：请在 issue 中提出。
 
-> **警告：** 密钥文件是发布者密钥的唯一副本。把它放在所有仓库之外，做好备份，不要交给任何人。`hub keygen` 不会覆盖已有文件；在 macOS 和 Linux 上，它创建的密钥文件只有你自己能读取。在 Windows 上，请把密钥放在只有你的用户能读取的文件夹中。
+Release 的证明覆盖清单，包括 `integrity.bundle_blake3`。请遵守以下规则：
 
-签名覆盖清单，包括 `integrity.bundle_blake3`。请遵守以下规则：
-
-- **签名放在最后。** `card-host` 以及任何没有签名验证器的宿主，都会拒绝已签名的应用包：`no signature verifier is installed, so the signature from key "<id>" cannot be checked`。先在未签名的应用包上截图和测试，再写入摘要并签名。
-- **先写入摘要，再签名。** 为尚未写入摘要的清单签名，签下的是错误的摘要。
-- **修改后准备新的未签名副本。** 修改应用包字节会使摘要失效，修改已签名清单字段会使签名失效。保留原发布包。在开发副本中移除旧的 `integrity.signature`，然后为最终新版本依次运行 `hub stamp`、`hub sign-manifest` 和 `hub check --publisher-key`。`hub stamp` 会拒绝旧签名，而不是静默使其失效。
-- **用密钥检查签名后的字节。** 除非 `--catalog` 指定的签名目录已经记录了你的密钥，否则不带 `--publisher-key <id>=<hex>` 时，`hub check` 会拒绝已签名的应用包，即使加了 `--allow-unsigned` 也一样。`hub scan` 没有 `--allow-unsigned` 参数：它直接接受未签名的应用包，而已签名的应用包同样需要提供密钥。
+- **测试可编辑源码。** `card-host` 会拒绝已封存的 Release：`this host has no GitHub publisher verifier`；旧宿主则会拒绝它的 `publisher-github-v1` 要求。用可编辑源码截图和测试；Release 由工作流封存。
+- **绝不修改已封存的 Release。** 修改应用包字节会使摘要失效，修改清单字段会使证明失效。`hub stamp` 不会悄悄让已封存的清单失效，而是拒绝它：`publisher signing metadata cannot be restamped; prepare a new unsigned version`；`card-host --stamp` 同样会拒绝。请修改可编辑源码，再用新版本和新标签生成 Release。
 - **保持字节原样。** 摘要覆盖除 `manifest.json` 以外的每个文件：文件的路径、长度和字节；在所有平台上，路径各段之间都用 `/` 分隔。换行符转换会改变摘要，所以不要让 Git 转换应用包（[安排仓库结构](SUBMITTING.zh-CN.md#1-安排仓库结构)）。
 
 ## 提交
@@ -962,5 +945,5 @@ hub publisher-pack bundle --out build/app.bundle.pack.json
 ## 发布之后
 
 - **版本。** 已安装的应用运行的是已安装的那个版本，并沿用该版本的授权。较新的版本是用户可以选择安装的更新；在用户安装之前，打开的仍是已安装的版本。
-- **完整性。** 宿主把已安装的应用包存放在应用的存储之外，因此应用无法写入它。每次启动时，宿主都会对照签名目录检查应用包：清单、摘要和发布者签名。应用包一旦不再一致，宿主就会拒绝运行它，直到用户重新安装该应用。
+- **完整性。** 宿主把已安装的应用包存放在应用的存储之外，因此应用无法写入它。每次启动时，宿主都会对照签名目录检查应用包：清单、摘要和发布者的证明。应用包一旦不再一致，宿主就会拒绝运行它，直到用户重新安装该应用。
 - **撤回。** 每台设备下次拉取签名目录时，已撤回的版本就会停止运行，其他版本照常运行（[提交之后](SUBMITTING.zh-CN.md#9-提交之后)）。

@@ -11,17 +11,18 @@ run its own agent tools
 ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)).
 
 These discovery declarations shipped in contract 1.8.0. The
-[RC1 release](../README.md#download-a-compatible-host), source `933abbcf`,
-implements them within the platform limits below; its download status is
-tracked in that guide.
+[RC2 release](../README.md#download-a-compatible-host), source `4ccf8e06`,
+implements them within the platform limits below, as RC1 did; its download
+status is tracked in that guide.
 An older host, such as OctoSense desktop 0.1.0-beta.2, serves none of these
 APIs and refuses an app that requires them.
 
 Published contract **1.10.0** also admits `files`, `device_calendar` and
 `audio` ([version and publication receipt](../crates/app-contract/README.md#versions-on-cratesio)).
-Its file declarations include the unpublished 1.9.0 work. The new native
-adapters described below are separate host changes; the contract package
-does not add them to RC1.
+Its file declarations include the unpublished 1.9.0 work. Desktop RC2 pins this
+contract and implements the native adapters described below on the platforms
+each section names; RC1 has none of them, and the contract package alone adds
+nothing to an installed host.
 
 ## Declare what the app needs
 
@@ -66,14 +67,15 @@ declares `device_calendar` and `host-api-v1`, with
 its workflow requires. A host without those methods refuses installation.
 
 The published contract admits the capability; App Hub's policy admits the
-read tool aliases. This does not install a native adapter into desktop RC1 or
-Home beta.1. The adapter must
-also enforce app/account scope, OS permission, selected calendars and trusted
-review of mutations. Runtime and device acceptance of the new adapter are
-separate from these contract tests. The service's method descriptions remain
-the authority for supported platforms and agent access.
+read tool aliases. Desktop RC2 ships the macOS adapter (EventKit) and the
+Android Home adapter; RC1, Home beta.1, Windows and Linux have none. The
+adapter enforces app/account scope, OS permission, selected calendars and
+trusted review of mutations with a physical press. Actual OS-calendar
+interaction is still pending device acceptance, and recurring events and
+attendees are read-only. The service's method descriptions remain the
+authority for supported platforms and agent access.
 
-### Reviewed Mail drafts (unreleased)
+### Reviewed Mail drafts (desktop RC2)
 
 With the existing `mail` capability, a compatible host exposes `mail.compose`
 for app/account-bound local draft changes and `mail.compose_status` for their
@@ -81,8 +83,13 @@ status. Agent aliases require minimum risk `act` and `read`, respectively,
 with `private_data: true`. They do not send mail. The foreground app requests
 `mail.review_send` (or the reviewed `mail.send` compatibility entry point);
 the host shows the exact draft and sends only after physical user approval.
-Declare required method versions. Desktop RC1 does not implement this public
-compose flow; the older system Mail draft methods remain system-app-only.
+Declare the method versions, and put `mail.review_send` under
+`host_api.optional` when the listing names Windows or Linux. Desktop RC2 serves
+this flow to any app granted `mail`: compose and status on every desktop
+platform, the send review on macOS and Android only (on Windows and Linux it
+fails with `Physical Mail send approval is unavailable on this platform`).
+RC1 has none of it, the older system Mail draft methods remain
+system-app-only, and SMTP acceptance on hardware is unverified.
 
 ### Runtime inventory
 
@@ -110,8 +117,9 @@ registration.
 The `files` capability grants access to host-owned file dialogs, not arbitrary
 host paths. Import/export also need `storage`; neither grant implies the other.
 Require `files.import@1` or `files.export@1` through `host_api.required`, or declare
-them optional and inspect `runtime.list`. Contract support alone does not mean a
-released host implements these APIs. `files.status` reports adapter availability.
+them optional and inspect `runtime.list`. Desktop RC2 implements these APIs;
+RC1 does not, and contract support alone never does. `files.status` reports
+adapter availability.
 
 The matching OctoSense implementation imports one selected file into a new
 app-relative destination, and exports a snapshot of an existing app file. It
@@ -126,7 +134,7 @@ adapters cover macOS, Windows, Android and Linux with a native dialog helper;
 iOS, OpenHarmony, web and direct-framebuffer Linux are unsupported. Check the
 host's status and release notes for build and device validation.
 
-### Photo selection and text sharing (unreleased host extension)
+### Photo selection and text sharing (desktop RC2)
 
 A matching host adds `files.pick_photo({"path":"photos/chosen.jpg"})`, using
 `files` plus `storage`. It opens an image chooser and validates PNG, JPEG or
@@ -140,13 +148,15 @@ the native chooser and returns
 `{"handoff":"chooser_opened","delivery":"unknown"}` only when that handoff
 succeeds. It does not prove delivery or support attachments. Neither method
 has an agent alias. Declare each method version and check the host's status;
-these source APIs are not included in desktop RC1. Device validation of the
+desktop RC2 includes these APIs and RC1 does not. Device validation of the
 new adapters remains pending.
 
 ## Foreground audio sessions (contract 1.10)
 
-A compatible macOS or Android host exposes these methods; declare the method
-versions rather than inferring support from the capability name:
+Desktop RC2 on macOS, and compatible Android hosts, expose these methods;
+RC1, Windows and Linux do not. Declare the method versions rather than
+inferring support from the capability name, and put them under
+`host_api.optional` when the listing names a platform without them:
 
 | Methods | Required capabilities | Behavior |
 | --- | --- | --- |
@@ -193,19 +203,23 @@ Source and synthetic tests do not establish real microphone/speaker acceptance.
 - **Script tools.** The signed `app_tool(name, call_id)` handler runs in the
   open full app's own VM and storage folder. No native library or Wasm loads,
   and a closed app answers `app_not_running`.
-- **Platforms.** The device-permission methods cover Android and macOS, and
-  `location.get` covers Android only. It returns the last-known fix, of
-  unknown age. The RC also embeds ordinary `WebReader` pages on Windows
-  (WebView2) and Linux X11/XWayland (WebKitGTK); native Wayland is unsupported.
+- **Platforms.** The device-permission methods cover Android and macOS;
+  `location.get` covers Android only and returns the last-known fix, of
+  unknown age, while RC2's `location.sample` returns a fresh fix on macOS and
+  Android. The RCs also embed ordinary `WebReader` pages on Windows (WebView2)
+  and Linux X11/XWayland (WebKitGTK); native Wayland is unsupported.
   Linux/Windows advertise `auth.backend.request@1` for declared reads and
-  implement external-browser backend login; live sign-in is not validated here.
-  Embedded backend login and protected writes remain unsupported and fail closed.
+  implement external-browser backend login; RC2 adds the native link openers
+  that login needs, and a Windows fixture built from RC2's source completed a
+  browser sign-in against a synthetic backend, while Linux sign-in is not
+  validated. Embedded backend login and protected writes remain unsupported
+  and fail closed.
 - **Permission requests.** Only an app in the foreground can request a
   permission. A request from an agent or a background card fails with
   `<method> is unavailable to agents/background surfaces`. A request still
   waiting when the host goes to the background fails with
-  `authorization_required`, as does `location.get` until the person grants
-  the app location access.
+  `authorization_required`, as do `location.get` and `location.sample` until
+  the person grants the app location access.
 - **Device widgets.** With `host-api-v1`, `CameraPreview`,
   `sys.request_location`, `sys.gps` and map GPS reads need the app's device
   consent too. After the host starts, each stays closed until the app calls
@@ -217,7 +231,9 @@ Source and synthetic tests do not establish real microphone/speaker acceptance.
   so it refuses apps that require them
   ([Run a bundle locally](DEVELOPMENT.md#run-a-bundle-locally-card-host)).
 - **Unverified:** a physical permission approval, camera capture, live
-  providers, real models, and host API acceptance on Linux, Windows and phones.
+  providers, real models, device-calendar reads and writes, SMTP delivery,
+  audio capture and playback, the native file and photo choosers, and host API
+  acceptance on Linux, Windows and phones.
 
 For the calls, see
 [Discover and use host APIs](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-V1.md)
