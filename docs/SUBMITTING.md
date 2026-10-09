@@ -15,17 +15,20 @@ rights on this repository. Publishing an app on the App Hub has four stages:
 Pushing a tag or creating a GitHub release does not submit your app or
 approve it.
 
-For a new app's first version and every update, your app's GitHub workflow
-prepares, attests and packs the release, so you need no publisher private key
-or repository signing secret. Installing such an app takes a host that
-supports `publisher-github-v1`; use the
+App Hub accepts only GitHub-attested releases
+([ADR 0002](adr/0002-github-attested-publisher-identity.md)). For an app's
+first version and every update, your app's GitHub workflow prepares, attests
+and packs the release, so you need no publisher key or repository signing
+secret. Installing such an app takes a host that supports
+`publisher-github-v1`; use the
 [RC1 release and download guide](../README.md#download-a-compatible-host).
 
-Public catalog 13 offers new GitHub-proven `io.github.ymote.*` sample IDs
-([current apps](../README.md#apps)). The earlier catalog-10 Ed25519 identities
-and signed-source layout are historical compatibility examples, not steps
-required for a GitHub publisher app. The gate,
-capability, manifest and signing rules are in [PUBLISHING.md](PUBLISHING.md).
+Public catalog 15 offers the GitHub-attested `io.github.ymote.*` reference apps
+([current apps](../README.md#apps)). App Hub withdrew the older key-signed
+`org.octosense.samples.*` entries in catalog sequence 14; later steps still cite
+them as examples ([The three reference apps](#the-three-reference-apps)). The
+gate, capability, manifest and signing rules are in
+[PUBLISHING.md](PUBLISHING.md).
 
 ```text
 issue request (may come first) → build hub and card-host → tools/octo doctor
@@ -48,7 +51,7 @@ A host runs your bundle: `card-host` while you develop, and an OctoSense shell
 | `hub` | App Hub `main` | Stamp editable source, check and scan it, then prepare, verify and pack GitHub-attested releases. Reviewers run the same code. |
 | `card-host` | App Hub `main` | Run the unsigned bundle, drive it and capture screenshots. |
 | `tools/octo` | [OctoSense App Flow](https://github.com/OctoSense-org/OctoSense-App-Flow) (formerly Design Flow) | Create, run and capture an app. It wraps `card-host` and `hub`. |
-| OctoSense desktop | [RC1 release, source `933abbcf`](../README.md#download-a-compatible-host); platform downloads and prerequisites in that guide | Install GitHub-proven releases and run compatible host services. Use macOS for the connected samples; OAuth registrations are not included. |
+| OctoSense desktop | [RC1 release, source `933abbcf`](../README.md#download-a-compatible-host); platform downloads and prerequisites in that guide | Install GitHub-attested releases and run compatible host services. Use macOS for the connected samples; OAuth registrations are not included. |
 
 Set up the workspace as described in
 [QUICKSTART §1](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.md#1-prerequisites),
@@ -108,8 +111,8 @@ lists. The table shows who runs each command and in which step.
 | `hub publisher-verify` | The workflow, you and a reviewer | 6, 8 | Verify the release proof and run the gate. |
 | `hub publisher-entry` | A reviewer | 8 | Build a candidate catalog entry; it publishes nothing. |
 | `hub catalog-prepare`, `hub catalog-envelope`, `hub catalog-verify` | An admin, through the protected catalog workflow | 9 | Prepare, wrap and verify the signed `catalog-v2.json` ([GITHUB-PUBLISHING.md](GITHUB-PUBLISHING.md)). |
-| `hub keygen`, `hub pubkey`, `hub sign-manifest` | You, for a legacy Ed25519 app only | 5 | Create a publisher key and sign the manifest ([Signing](PUBLISHING.md#signing)). |
-| `hub publish`, `hub withdraw`, `hub remove`, `hub certify`, `hub verify` | A maintainer, for the legacy catalog | 9 | Publish, withdraw or remove versions in `catalog.json`, certify its working key, or verify it. |
+| `hub publish`, `hub withdraw`, `hub remove`, `hub certify`, `hub verify` | A maintainer, for the legacy catalog; you run `hub certify`, `hub publish` and `hub verify` only on a rehearsal catalog | 9 | Publish, withdraw or remove versions in `catalog.json`, certify its working key, or verify it. |
+| `hub keygen`, `hub pubkey`, `hub sign-manifest` | A maintainer, for the legacy catalog; you run only `hub keygen`, for a rehearsal catalog's throwaway keys | — | Create an Ed25519 key, print its public half, or sign a legacy manifest. Never use them to sign or publish an app: App Hub accepts only GitHub-attested releases. [Issue #168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168) decides whether they stay. |
 
 App Flow's `tools/octo` runs some of these for you; its
 [`tools/octo` table](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/README.md#toolsocto)
@@ -118,20 +121,21 @@ lists the flags.
 | `tools/octo` command | Runs |
 | --- | --- |
 | `new` | `hub stamp` |
-| `check` | `hub stamp`, then `hub check --allow-unsigned`, passing `--catalog` and `--publisher-key` on |
+| `check` | `hub stamp`, then `hub check --allow-unsigned`, passing `--catalog` and any other `hub check` flags on |
 | `doctor` | `hub help`, to confirm that it found this `hub` |
 | `publish-github` | Nothing itself: it installs the release workflow, which runs `hub publisher-prepare`, `hub publisher-attach`, `hub publisher-verify` and `hub publisher-pack` on the tag push |
 
 In a local
 [store rehearsal](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally),
-you also run `hub keygen`, `hub certify`, `hub publish` and `hub verify`
-yourself, with throwaway keys and a legacy test catalog.
+you also run `hub keygen`, `hub certify`, `hub publish` and `hub verify` on a
+throwaway test catalog. The keys you create there sign only that catalog,
+never your app, and the rehearsal publishes nothing to App Hub.
 
 ### Know where your app runs
 
 | Host | Runs | Does not |
 | --- | --- | --- |
-| `card-host` | One unsigned bundle, with a remote bridge to drive and capture it | Serve any host service except `runtime` discovery: every other `host.request` fails with `no service answers "<family>" on this device`. It also refuses signed bundles and apps that require `host-api-v1`, `backend-api-v1` or `script-tools-v1`. |
+| `card-host` | One unsigned bundle, with a remote bridge to drive and capture it | Serve any host service except `runtime` discovery: every other `host.request` fails with `no service answers "<family>" on this device`. It also refuses sealed releases and apps that require `host-api-v1`, `backend-api-v1` or `script-tools-v1`. |
 | RC1 release `933abbcf` | Public v2 catalog, `publisher-github-v1`, discovery and open-app Splash tools; services within their platform limits | Ship OAuth registrations, enable `wasm-lab` by default, or run macOS-only listings on other OSes. Linux/Windows embedded backend login and protected writes remain unsupported; external-browser backend login and reads are implemented separately. |
 | Historical desktop-v0.1.0-beta.2 (macOS, Apple silicon) | Installed apps, including apps that use `auth`, `github`, `gmail` and `gcalendar` | Sign in to GitHub or Google until the host has an OAuth registration in `oauth/clients.json` ([setup](https://github.com/OctoSense-org/OctoSense/blob/desktop-v0.1.0-beta.2/crates/oauth-service/README.md)); the release ships none. Sign an app in to its own backend. Install an app that requests `wasm`: its store refuses it with `unknown capability "wasm"`. Unverified on this release: live provider sign-in. |
 | desktop-v0.1.0-beta.1 and home-v0.1.0-beta.1 (the only released phone build) | Store apps that use only capabilities their older app contract knows | Install an app that requests `auth`, `github`, `gmail`, `gcalendar`, `calendar`, `photos`, `youtube`, `wasm` or `palpo.*`. Their stores refuse it, for example with `unknown capability "auth"`. |
@@ -155,9 +159,11 @@ The RC1 release differs from historical desktop beta.2 in these ways.
 - The host keeps Google Calendar events from 30 days back to 366 days ahead,
   not the calendar's whole history.
 
-To try your app in a shell before you submit, publish it to a local catalog
+To try a release of your app before App Hub publishes it, install it from a
+local test catalog in a shell built from source
 ([rehearsal](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally)).
-The rehearsal is verified only with a shell built from source.
+Unverified: the rehearsal with a GitHub-attested release; the recorded run
+used a key-signed test app.
 
 ### Check your platform
 
@@ -177,41 +183,20 @@ The rehearsal is verified only with a shell built from source.
   without live sign-in acceptance here. Embedded backend login and protected
   writes remain unsupported and fail closed. See the [browser requirements](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/docs/desktop-embedded-browser.md).
 
-### Protect your publisher key
-
-**Optional legacy compatibility only.** First submissions and updates using
-GitHub publishing skip this section; they create no developer signing key.
-
-This section applies only to historical Ed25519 publishing. New GitHub
-publisher apps require no developer signing key; follow the new route in
-[step 5](#5-produce-the-final-bytes). Contract 1.8.0 is published;
-[the RC1 release](../README.md#download-a-compatible-host) consumes the new
-proof. Historical beta hosts cannot.
-
-Your publisher id names you in the catalog; your publisher key signs every
-version you publish. Once a version signed by the key is in the catalog, the
-Hub refuses your later versions unless the same key signs them. No command
-replaces a lost key: if you lose it, ask a reviewer in an issue.
-
-> **Warning:** The key file is the only copy of your publisher key. Keep it
-> outside every repository, back it up and never share it. `hub keygen`
-> refuses to overwrite an existing file, and on macOS and Linux it creates the
-> key readable only by you. On Windows, keep the key in a folder that only
-> your user can read.
-
 ## The three reference apps
 
-For current downloads, use the GitHub-proven 0.2.1 releases and fresh IDs in
-[the public catalog table](../README.md#apps). Their 0.2.0 → 0.2.1 update
+For current downloads, use the GitHub-attested releases (GitHub Notes 0.2.2, the
+others 0.2.1) and new ids in [the public catalog table](../README.md#apps). Their 0.2.0 → 0.2.1 update
 retains the same GitHub publisher identity. None needs a developer signing key.
 
 ### Historical 0.1.x examples
 
 Catalog sequence 10 holds three macOS developer previews from the publisher
 `ymote`, each in two versions: 0.1.0, the first, and 0.1.1, which addresses the
-three problems in [Lessons from 0.1.0](#lessons-from-010). Each app lives in
-its own public repository, tagged `v0.1.0` and `v0.1.1`. The table describes
-0.1.1:
+three problems in [Lessons from 0.1.0](#lessons-from-010). These six entries
+are signed with a publisher key; their GitHub-attested successors are the
+0.2.x releases above. Each app lives in its own public repository, tagged
+`v0.1.0` and `v0.1.1`. The table describes 0.1.1:
 
 | | [GitHub Notes](https://github.com/ymote/octosense-github-notes) | [Inbox Assistant](https://github.com/ymote/octosense-inbox-assistant) | [Google Calendar](https://github.com/ymote/octosense-google-calendar) |
 | --- | --- | --- | --- |
@@ -273,22 +258,26 @@ to reads and to writes the person approves.
 ## 1. Lay out the repository
 
 The Hub admits only `bundle/`. The gate reads nothing else in the repository,
-but reviewers load your privacy policy and support pages. For GitHub publishing,
-commit `.github/workflows/publish-app.yml` alongside editable `bundle/`;
-`publisher.json` is not required. The historical reference apps
-also carry the files below, which reviewers used. GitHub Notes at `v0.1.0`:
+but reviewers load your privacy policy and support pages. Commit the release
+workflow, `.github/workflows/publish-app.yml`, beside the editable `bundle/`.
+An app repository holds these files:
 
 ```text
-octosense-github-notes/
-  bundle/          the submission: manifest, listing, code, tools, assets, screenshots
-  PRIVACY.md       the page privacy_policy_url points to
-  SUPPORT.md       how to report problems
-  README.md        what the app does and how to verify a release
-  publisher.json   legacy Ed25519 publisher id, algorithm and public key
-  review/          gate output for the signed bundle (GATE.txt) and scan answers (ANSWERS.md)
+my-app/
+  bundle/                             the submission: manifest, listing, code, tools, assets, screenshots
+  .github/workflows/publish-app.yml   the release workflow
+  .gitattributes                      keeps Git from converting the bundle's bytes
+  PRIVACY.md                          the page privacy_policy_url points to
+  SUPPORT.md                          how to report problems
+  README.md                           what the app does and how to verify a release
+  review/                             gate output (GATE.txt) and scan answers (ANSWERS.md)
   LICENSE, NOTICE
-  .gitignore       keeps keys, build/ and .local-state/ out of Git
+  .gitignore                          keeps build/ and .local-state/ out of Git
 ```
+
+[GitHub Notes 0.2.1](https://github.com/ymote/octosense-github-notes/tree/v0.2.1)
+follows this layout. Its `publisher.json` is left over from 0.1.x; you need
+none.
 
 Keep development READMEs, keys, review packets and `.local-state/` outside
 `bundle/`. Keep required asset licenses and attribution inside as `.txt` or
@@ -298,7 +287,7 @@ creates a `.gitignore` that already excludes `build/`, `.local-state/` and
 `*.key`.
 
 Add a `.gitattributes` file so that Git stores and checks out the bundle's
-bytes unchanged. The reference apps lack one, so a checkout with
+bytes unchanged. The reference apps' 0.1.x tags lack one, so a checkout with
 `core.autocrlf=true`, common on Windows, converts their text files to CRLF,
 and their digests no longer match.
 
@@ -322,8 +311,7 @@ still convert its files.
 
 ## 2. Get the manifest right
 
-Edit `bundle/manifest.json`. GitHub Notes' 0.1.0 manifest before stamping and
-signing:
+Edit `bundle/manifest.json`. GitHub Notes' 0.1.0 manifest before stamping:
 
 ```json
 {
@@ -364,9 +352,9 @@ not judge capabilities or the listing. `hub check` does, in step 5.
 
 ## 3. Write the listing
 
-`bundle/listing.json` is what the store shows before install. The publisher
-signature covers it through the bundle digest, so changing one word later
-takes a new version. Write nothing that will go stale.
+`bundle/listing.json` is what the store shows before install. The release's
+GitHub attestation covers it through the bundle digest, so changing one word
+later takes a new version. Write nothing that will go stale.
 
 | Field | Rule | Reference apps |
 | --- | --- | --- |
@@ -390,7 +378,7 @@ person's model provider, Glance cards and whether the app has an app agent.
 GitHub Notes corrected its policy after publishing 0.1.0, because its
 `tools.json` gave it an app agent the policy did not mention.
 
-Check the listing's links before you sign: after you push the tag, a wrong URL
+Check the listing's links before you push the tag: after that, a wrong URL
 takes a new version to fix. Publish the privacy page first, then request every
 URL in the listing's `publisher` block:
 
@@ -455,8 +443,9 @@ and in your issue.
 
 ## 5. Produce the final bytes
 
-For a new app's first submission and all its updates, use GitHub publisher
-provenance from a public repository. OctoScript apps are open by default:
+For an app's first release and every update, use GitHub publisher provenance
+from a public repository; it is the only route App Hub accepts. OctoScript
+apps are open by default:
 each bundle already ships the app's source as readable text, so a public
 repository reveals little more
 ([ADR 0002](adr/0002-github-attested-publisher-identity.md)). This route
@@ -468,15 +457,15 @@ catalog, use the [RC1 release](../README.md#download-a-compatible-host).
 
 1. Open the submission issue if you have not already done so. Missing release
    evidence can be added later; mark it pending rather than inventing a pass.
-2. Test the unsigned development copy and capture its real UI. Run the gate
+2. Test the editable source and capture its real UI. Run the gate
    and `hub scan bundle --packet build/review.json`, with
    `build/` outside the bundle. Answer every question in that packet: seven,
    or eight when the bundle ships `tools.json`, `AGENT.md` or skills. Include
    the file supporting each answer and name untested behavior.
 3. Install and review `.github/workflows/publish-app.yml` using App Flow's
    `tools/octo publish-github <app-directory>` (also included by `tools/octo new`).
-   No `keygen`, `sign-manifest`, `--publisher-key` or repository signing secret
-   is part of this path. The native steps are documented in
+   The workflow needs no publisher key and no repository signing secret. The
+   native steps are documented in
    [GitHub publisher provenance](PUBLISHING.md#github-publisher-provenance).
 4. Commit the tested editable source, screenshots, listing, privacy/support
    pages, `.gitattributes` and workflow. Use a new semantic version for each
@@ -484,25 +473,13 @@ catalog, use the [RC1 release](../README.md#download-a-compatible-host).
    attested manifest and final release pack; do not commit those generated
    bytes over your editable source.
 
-Routine updates keep the same repository name, immutable repository/owner
-IDs and workflow identity, with a higher semantic version. They need no
-publisher private key. Historical Ed25519 app identities remain on their
-existing protocol; this is not an ownership-transfer procedure.
-
-### Optional historical Ed25519 route
-
-Only choose this route deliberately for an existing legacy package or an
-older protocol. Its key handling and commands are in
-[Signing](PUBLISHING.md#signing). The dated [0.1.0 admission
-record](../reviews/connected-apps-0.1.0/admission.json) and
-[0.1.1 records](admissions/connected-apps-0.1.1/README.md) remain unchanged.
-They are historical evidence, not instructions requiring new developers to
-create keys. Do not restamp a sealed release; work from an unsigned
-development copy and publish a new version.
+Routine updates keep the same repository name, repository ID, owner ID and
+workflow, with a higher semantic version. Never restamp a sealed
+release: change the editable source and release a new version.
 
 ## 6. Freeze and verify the release
 
-The tag identifies the tested development source and workflow. The Release
+The tag identifies the tested editable source and workflow. The Release
 pack contains the final attested manifest; checking a source clone alone
 does not verify that pack.
 
@@ -532,22 +509,23 @@ does not verify that pack.
    issue. Reviewers verify both the source commit and the downloaded pack.
    A successful release workflow does not install, submit or approve the app.
 
-For optional legacy packages only, a fresh clone of the signed source tag
-is checked with its recorded public key, following
-[Signing](PUBLISHING.md#signing). This key-based check is not required for a
-GitHub-attested release.
-
 ## 7. Open the submission issue
 
-Use the [Submit an app form](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/new?template=submit-app.yml),
-one issue per planned version, titled `Submit <app id> <version>`. Opening the
-issue is your request to publish that version. **You can open it before
-steps 1–6 are complete.** Add the release evidence to this same issue when
-ready; pending fields do not mean approval.
+Open an issue with the [Submit an app form](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/new?template=submit-app.yml)
+and title it `Submit <app id> <version>`. Opening the issue is your request to
+publish the app. **You can open it before steps 1–6 are complete.** Add the
+release evidence to this issue once the release is ready; pending fields do
+not mean approval.
+
+Until App Hub first publishes your app, keep this one issue: post each new
+release as a comment with its tag, full commit SHA and workflow-run link, and
+update the issue title and the Version field in the issue body to the new
+version. After the first publication, each new version needs a new issue
+([step 9](#9-after-you-submit)).
 
 | Form field | When and what to provide |
 | --- | --- |
-| Release status | Now: request with evidence pending, GitHub release ready, or optional legacy package |
+| Release status | Now: request with evidence pending, or GitHub release ready |
 | App id / Version / Repository URL | Now: manifest id, planned version and public GitHub repository |
 | Requested capabilities and app behavior | Now: purpose and reason for each capability |
 | What is not verified | Now and after every update: incomplete checks, host/platform/provider limits |
@@ -559,7 +537,6 @@ ready; pending fields do not mean approval.
 | Platforms tested / App Hub revision the gate ran on | Before approval: exact host/tool revisions and exercised behavior |
 | Gate and publisher verification output | Before approval: complete development gate and downloaded-pack verification output |
 | Scan answers / Screenshots | Before approval: all packet answers with source evidence and real native captures |
-| Optional legacy authentication | Only for an intentionally chosen historical Ed25519 package; leave blank for GitHub releases and updates |
 | Confirmations | No secrets, immutable pushed tags, and honest pending evidence |
 
 Do not open a PR editing `catalog.json`, `catalog-v2.json`, `index/` or
@@ -583,7 +560,7 @@ lists what was confirmed for each one:
 | The tag resolves to the stated commit | `tag_verified` | `git ls-remote` (step 6) |
 | The privacy and support URLs return HTTP 200 | `public_privacy_and_support_http` | The link check in step 3 |
 | Release downloads match their hashes | `release_download_hashes_match` | `shasum -a 256 -c SHA256SUMS`, if you create a release |
-| The publisher signature verifies on the downloaded bundle | `downloaded_publisher_signature_verified` | Historical Ed25519 fresh-clone check; GitHub releases use downloaded-pack verification in step 6 |
+| The publisher's proof verifies on the downloaded release | `downloaded_publisher_signature_verified` | `hub publisher-unpack`, then `hub publisher-verify`, on the downloaded pack (step 6) |
 | The gate passes on the downloaded bundle | `downloaded_gate_output` | The same check |
 | The bundle digest matches your issue | `bundle_digest` | `integrity.bundle_blake3` |
 
@@ -615,18 +592,18 @@ and supports `publisher-github-v1`, such as the
 desktop-v0.1.0-beta.2 reads only the legacy `catalog.json` that
 `hub publish` produces.
 
-- A reviewer closes the issue with the catalog sequence your app appears
-  in, or with findings to fix. Answer questions in the issue, and change
-  nothing at your tag.
-- **An update is a new version and a new issue.** To fix a finding or ship a
-  change, raise `version` and open a new issue linking the old one; it can
-  precede the release. Repeat steps 4 to 6 (step 4 only if the UI changed)
-  and add that release evidence to the new issue. Never post a new
-  version as a comment. The Hub never replaces a published version.
-- For GitHub updates, retain the recorded repository/owner/workflow identity,
-  raise the semantic version and run the same tag workflow. No separate
-  developer private key is required. Only historical Ed25519 packages keep
-  their recorded key ([optional legacy guidance](#protect-your-publisher-key)).
+- A reviewer posts any findings in the issue and, once your app is published,
+  closes the issue with the catalog sequence it appears in. Answer questions
+  in the issue, and change nothing at your tag.
+- **Before the first publication, post each new release on the same issue.**
+  To fix a finding, raise `version` and repeat steps 4 to 6 (step 4 only if
+  the UI changed). Then comment on your submission issue with the new tag,
+  full commit SHA and workflow-run link, and update the issue title and
+  Version field ([step 7](#7-open-the-submission-issue)).
+- **After publication, each new version needs a new issue.** Raise
+  `version`, open a new issue that links the previous one (it can precede the
+  release), repeat steps 4 to 6 and add that release's evidence to the new
+  issue. The Hub never replaces a published version.
 - An App Hub admin can publish a catalog withdrawal with a reason, through
   the same protected workflow, after a maintainer commits the reviewed
   withdrawal candidate. Stores stop running installed copies of that version
@@ -645,9 +622,8 @@ cannot read gets no report, only one `hub: …` line. The full rules are in
 | Check or message | Cause | Fix |
 | --- | --- | --- |
 | `digest: the bundle hashes to …, the manifest claims …` | The bytes changed after `hub stamp`: an edit, a stamp after the commit (`tools/octo check` restamps), CRLF line endings from a Git checkout or a Windows `hub` older than `main`, which hashed paths with `\`. | Build `hub` from `main`, add the `.gitattributes` from [step 1](#1-lay-out-the-repository), then restamp editable source and create a new GitHub-attested version; verify the downloaded pack. Never restamp sealed releases. |
-| `publisher-signature: publisher key "<id>" is not registered with this hub` | Optional legacy Ed25519 only: a signed bundle checked or scanned without its key, even with `--allow-unsigned` or through `tools/octo check`. | Pass `--publisher-key <publisher-id>=<hex public key>`. |
-| `publisher-signature: the signature from key "<id>" does not match the manifest` | Optional legacy Ed25519 only: signed bytes changed. | Rebuild from unsigned development source and sign a new version with the recorded key. |
-| `continuity: not signed by the key on record for "<id>"`, or `continuity: … is already published by "<id>"; an update must carry that key` | Optional legacy Ed25519 only: the publisher id is on record with another key (someone else's id or your old key), or an update is unsigned. | Use an unused id for your first app. Sign every update with the key on record. |
+| `continuity: existing legacy app ownership cannot be adopted by GitHub provenance` | The id is on record for an unsigned or key-signed app, such as a copied `org.octosense.samples.*` id. | Choose a new id. |
+| `continuity: GitHub publisher repository, owner or workflow changed` | An update came from another repository, owner or workflow file, or the repository was renamed or transferred. | Release from the recorded repository and workflow. A renamed or transferred repository cannot update the app; publish it under a new id. |
 | `version: version … is already published; publish a new version` | That version is in the catalog. | Raise `version`, use a new tag and verify the workflow's new release pack (steps 5 and 6). |
 | `policy: app … requests unknown capability "<name>"` | The name is not in the contract (`contacts`, `model.image`, a prefix such as `octos.`), or `hub` is older than the capability. | Use exact names from [PUBLISHING.md](PUBLISHING.md#the-manifest), and rebuild `hub` from `main`. |
 | `hub: manifest is not valid: unknown field …`, with no report | `hub stamp` and `hub check` cannot parse the manifest. | Remove or rename the field. The message lists the valid ones. |
@@ -662,7 +638,7 @@ cannot read gets no report, only one `hub: …` line. The full rules are in
 | `entry (main.splash): the bundle has no entry: …` | No `main.splash` or `page.card` at the bundle root. | Put the entry file at the root of `bundle/`. |
 | `secrets: <file> declares is_password:true: …` | A password or one-time-code field. | Remove it. Sign-in belongs to a host service. |
 | `agent: AGENT.md is in the bundle but agent.instructions does not name it` | Agent files without a matching `agent` block. | Declare `"instructions": "AGENT.md"` in `agent`, or remove the file. |
-| `card-host: refused: no signature verifier is installed, so the signature from key "<id>" cannot be checked` | `card-host` runs only unsigned bundles. | Run and capture an unsigned copy, and sign last ([step 5](#5-produce-the-final-bytes)). |
+| `card-host: refused: this host has no GitHub publisher verifier` | `card-host` runs only unsigned bundles, never a sealed release. | Run and capture the editable source; your release workflow seals the release ([step 5](#5-produce-the-final-bytes)). |
 
 ## What the Hub cannot do yet
 

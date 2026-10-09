@@ -230,9 +230,9 @@ listing must match the exported file.
 
 ## 4. Run the unsigned development bundle and capture it
 
-Keep the bundle unsigned until the submission's last step. `card-host`
-verifies no publisher keys, so it refuses a signed manifest even with
-`--allow-unsigned`.
+Your editable bundle stays unsigned; the release workflow seals a copy when
+you push a tag. `card-host` has no publisher verifier, so it refuses a sealed
+release even with `--allow-unsigned`.
 
 1. Stamp the bundle: `hub stamp` writes the bundle's digest into
    `manifest.json`. Do this after every change to the bundle.
@@ -359,20 +359,22 @@ Two rules hold throughout:
 - **Test the editable source, and never edit a sealed release.** The workflow
   seals the bytes it releases; any change needs a new version and tag
   ([GitHub publisher provenance](PUBLISHING.md#github-publisher-provenance)).
-- **You need no publisher key.** Your app's GitHub workflow attests each
-  release. Only an app already published with an Ed25519 key keeps signing
-  with that key ([Signing](PUBLISHING.md#signing)).
+- **You need no publisher key.** App Hub accepts only GitHub-attested
+  releases, and your app's GitHub workflow attests each one
+  ([Signing](PUBLISHING.md#signing)).
 
-To try the app in OctoSense desktop before you submit, publish it to a local
-catalog with a throwaway anchor
+To try a release before App Hub publishes it, install it from a local test
+catalog in an OctoSense desktop shell built from source
 ([Rehearse the store path locally](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.md#4-rehearse-the-store-path-locally)).
+Unverified: the rehearsal with a GitHub-attested release; the recorded run
+used a key-signed test app.
 
 ## Troubleshooting
 
 | Symptom | Cause and fix |
 | --- | --- |
 | `cargo build` stops with `no variant … TextInputStateQuery` | See [`card-host` fails to build](DEVELOPMENT.md#card-host-fails-to-build). |
-| `card-host: refused: no signature verifier is installed, so the signature from key "<id>" cannot be checked` | The bundle is signed. Run an unsigned copy. |
+| `card-host: refused: this host has no GitHub publisher verifier` | The bundle is a sealed release. Run the editable source. |
 | `no service answers "<family>" on this device` | `card-host` serves no host service except `runtime` discovery. Test the screen in the [compatible RC2 release](../README.md#download-a-compatible-host). |
 | `curl: (22) The requested URL returned error: 404` from `/g?raw=1` | No frame is drawn yet. Wait a few seconds and capture again. |
 | `[refused] identity: app id "…" ends in "…", which is reserved` | The id's last segment is a [reserved name](PUBLISHING.md#ids-and-reserved-names). Choose another before your first release. |

@@ -40,8 +40,8 @@ vision critique as a request for you to send.
 5. Publish, with `glance.publish`, only a card whose last render passed, and
    write it at L0. The shell admits it only when the app holds the `glance`
    capability and `check_ui_l0` finds the card valid. OctoSense desktop
-   0.1.0-beta.2 also admits a card valid at L1; OctoSense `main` (in no
-   release yet) refuses an agent's L1 card and any `script` card.
+   0.1.0-beta.2 also admits a card valid at L1; OctoSense desktop 0.1.0-rc.1
+   refuses an agent's L1 card and any `script` card.
 
 ## Install
 

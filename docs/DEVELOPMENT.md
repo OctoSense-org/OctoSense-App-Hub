@@ -98,7 +98,7 @@ the problem and the usage, and exits 2. Neither opens a window.
 | --- | --- |
 | `--bundle <dir>` | The bundle to run. Default: the current directory. |
 | `--app-data <dir>` | Where the app's storage jail is made, at `<dir>/<app id>/`. Host services keep their state in `<dir>/.host/`. Default: `$TMPDIR/octosense-card-apps`. |
-| `--allow-unsigned` | Admit a manifest with no signature. `card-host` verifies no publisher keys, so it refuses a **signed** manifest even with this flag: `no signature verifier is installed, so the signature from key "<id>" cannot be checked`. Run and capture the unsigned bundle, and sign last. |
+| `--allow-unsigned` | Admit a manifest with no signature. `card-host` has no publisher verifier, so it refuses a **sealed** (GitHub-attested) release even with this flag: `this host has no GitHub publisher verifier`. Run and capture the unsigned development bundle. |
 | `--stamp` | Rewrite the manifest's `integrity.bundle_blake3` to match the directory before admitting. Without it, `card-host` refuses a bundle whose bytes changed since the last `hub stamp`. |
 | `--system` | Admit the bundle as a system app: by digest only, under the system ceilings. An empty digest is filled in memory. Use it to develop a system app. |
 | `--static <prefix>=<dir>` | Serve `<dir>`'s files at `<prefix>/...` from memory, as a shell serves a system app's compiled-in artwork. Photos uses `--static photos=<dir>`. Repeatable. |
@@ -137,8 +137,9 @@ desktop-v0.1.0-beta.2 or later.
 `card-host` also refuses an app whose manifest requires `host-api-v1`,
 `backend-api-v1` or `script-tools-v1`, because it implements none of the APIs
 they need. The window shows "card-host refused this bundle" and
-`app <id> needs a host implementing <method>@1`. Test such an app in an
-OctoSense shell built from `main`.
+`app <id> needs a host implementing <method>@1`. Test such an app in
+[OctoSense desktop 0.1.0-rc.1](../README.md#download-a-compatible-host), which
+implements those APIs within its [platform limits](HOST-API.md#limits).
 
 ### Drive it over HTTP: `MAKEPAD_REMOTE`
 

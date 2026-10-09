@@ -145,7 +145,7 @@ my-app/
 
 ## 4. 运行未签名的开发版应用包并截图
 
-在提交流程的最后一步之前，应用包始终保持未签名。`card-host` 不验证任何发布者密钥，所以即使加了 `--allow-unsigned`，它也会拒绝已签名的清单。
+可编辑的应用包始终保持未签名；推送标签时，Release 工作流会封存它的一份副本。`card-host` 没有发布者验证器，所以即使加了 `--allow-unsigned`，它也会拒绝已封存的 Release。
 
 1. 为应用包写入摘要：`hub stamp` 计算应用包的摘要，并写进 `manifest.json`。应用包每次改动之后都要做这一步。
 
@@ -246,17 +246,17 @@ hub: the bundle was refused
 
 整个过程都要遵守两条规则：
 
-- **测试开发源码，绝不修改已封存的 Release。** 工作流会封存它放进 Release 的字节；任何改动都需要新版本和新标签（[GitHub 发布者来源证明](PUBLISHING.zh-CN.md#github-发布者来源证明)）。
-- **你不需要发布者密钥。** 应用的 GitHub 工作流为每个 Release 生成证明。只有已经用 Ed25519 密钥发布过的应用，才继续用那把密钥签名（[签名](PUBLISHING.zh-CN.md#签名)）。
+- **测试可编辑源码，绝不修改已封存的 Release。** 工作流会封存它放进 Release 的字节；任何改动都需要新版本和新标签（[GitHub 发布者来源证明](PUBLISHING.zh-CN.md#github-发布者来源证明)）。
+- **你不需要发布者密钥。** App Hub 只接受带 GitHub 证明的 Release，而应用的 GitHub 工作流会为每个 Release 生成证明（[签名](PUBLISHING.zh-CN.md#签名)）。
 
-要在提交前用 OctoSense 桌面版试用应用，请用一个临时信任锚把它发布到本地签名目录（[在本地演练商店流程](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)）。
+要在 App Hub 发布之前用 OctoSense 桌面版试用某个 Release，请用从源码构建的 Shell，从本地测试签名目录安装它（[在本地演练商店流程](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/PUBLISHING.zh-CN.md#4-在本地演练商店流程)）。未验证：用带 GitHub 证明的 Release 进行演练；已记录的结果来自一个用密钥签名的测试应用。
 
 ## 故障排查
 
 | 现象 | 原因与修复 |
 | --- | --- |
 | `cargo build` 停止并报 `no variant … TextInputStateQuery` | 见 [`card-host` 构建失败](DEVELOPMENT.zh-CN.md#card-host-构建失败)。 |
-| `card-host: refused: no signature verifier is installed, so the signature from key "<id>" cannot be checked` | 应用包已签名。运行未签名的副本。 |
+| `card-host: refused: this host has no GitHub publisher verifier` | 应用包是已封存的 Release。请运行可编辑源码。 |
 | `no service answers "<family>" on this device` | 除了用于发现宿主 API 的 `runtime`，`card-host` 不提供任何宿主服务。在 [兼容的 RC2 发行版](../README.zh-CN.md#下载兼容宿主) 中测试这个界面。 |
 | 请求 `/g?raw=1` 时报 `curl: (22) The requested URL returned error: 404` | 还没有绘制出任何一帧。等几秒再截取一次。 |
 | `[refused] identity: app id "…" ends in "…", which is reserved` | ID 的最后一段是[保留名称](PUBLISHING.zh-CN.md#id-与保留名称)。在首次发布之前换一个 ID。 |
