@@ -184,9 +184,10 @@ The gate admits capability names; the host must implement and grant each call.
 `card-host` serves only `runtime` discovery, runs no agent, and refuses sealed
 releases or the host-only requirement markers. `calendar`, `llm` and `news`
 remain system-app services; `photos`/`youtube` notifications serve only their
-system apps. Wasm remains opt-in via `wasm-lab`, **off in standard desktop
-packages**. Declaring a capability cannot add native code or enable a build
-feature. See [Host API compatibility](docs/HOST-API.md).
+system apps. Wasm is **off in RC1 and every other release**; OctoSense `main`
+runs it in standard desktop and Home builds on macOS, Linux and Android, with
+limited support. Declaring a capability cannot add native code or enable a
+build feature. See [Host API compatibility](docs/HOST-API.md).
 
 ## Trust anchor
 

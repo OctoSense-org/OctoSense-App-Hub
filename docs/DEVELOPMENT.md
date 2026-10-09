@@ -57,9 +57,9 @@ Script apps continue to manage their own responsive layout and scrolling.
 A store bundle carries no native code. New native Rust or JNI code, Python
 services and browser controllers do not install as a card app or a script app.
 Rust code compiled to a WebAssembly module can ship in a store app under the
-`wasm` capability, in a sandbox with no files, network or clock. Only
-OctoSense builds with the `wasm-lab` feature run it, and no release enables
-that feature yet (App Flow's
+`wasm` capability, in a sandbox with no files, network or clock. Standard
+desktop and Home builds of OctoSense `main` run it on macOS, Linux and
+Android, and no release includes it yet (App Flow's
 [Run your own Rust code](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.md)).
 
 Some App Flow examples include a native service or a website integration.
