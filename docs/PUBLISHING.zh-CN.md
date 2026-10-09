@@ -184,7 +184,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 
 ### 能力
 
-准入检查能识别 105 个能力名称：下表中的 27 个，以及[精确的服务名](#精确的服务名octosmatrixpalpo)一节中的 78 个。其他名称一律拒绝：
+准入检查能识别 108 个能力名称：下表中的 30 个，以及[精确的服务名](#精确的服务名octosmatrixpalpo)一节中的 78 个。其他名称一律拒绝：
 
 ```text
 [refused] policy: app com.example.forecast requests unknown capability "model.image"
@@ -195,14 +195,14 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | 能力 | 授予的权限 | 商店显示的文字 | 目前由谁提供 |
 | --- | --- | --- | --- |
 | `storage` | 应用自己的存储文件夹：`fs.*`、相机拍摄的内容，以及控件读取的本地文件。没有它，所有 `fs.*` 调用都会失败。 | Keep its own data on this device | 运行时，所有宿主都提供 |
-| `files` | 导入或导出用户在宿主原生对话框中选择的文件。导入和导出还需要 `storage`；应用得到的是自身存储内的相对路径，不是任意文件系统访问权限。应用应声明所需的具体 `files.*` 方法。 | Import and export files you choose in the system file dialog | 契约 1.9，尚未发布；需要兼容宿主的实际实现 |
+| `files` | 导入或导出用户在宿主原生对话框中选择的文件。导入和导出还需要 `storage`；应用得到的是自身存储内的相对路径，不是任意文件系统访问权限。应用应声明所需的具体 `files.*` 方法。 | Import and export files you choose in the system file dialog | 已随契约 1.10.0 发布；需要兼容宿主的实际实现，桌面 RC1 不提供 |
 | `net` | 向 `network.hosts` 中的主机发出请求，不能访问其他主机。 | Reach only: *主机列表* | 运行时，所有宿主都提供 |
 | `images` | 显示任何公开 https 主机上的图片，不限于 `network.hosts`。 | Show pictures from any website | 运行时 |
 | `web` | 在系统网页视图中打开任何公开 https 页面；网页视图没有任何回到应用的通道。 | Open web pages in a browser view | 运行时在支持的平台上提供，包括 RC1 Windows/WebView2 和 Linux X11/XWayland/WebKitGTK；原生 Wayland 内嵌仍不支持（[运行条件](../README.zh-CN.md#下载兼容宿主)）。 |
 | `location` | 设备的位置。在桌面 RC1 的 macOS 构建及兼容 Android 源码构建中：声明了 `host-api-v1` 的应用须先用 `location.permission.request` 请求权限，之后仅在 Android 上可以用 `location.get` 读取上次已知的位置（[宿主 API 兼容性](HOST-API.zh-CN.md)）。 | Use your location | 运行时，限具备该功能的设备 |
 | `camera` | 相机。拍摄的内容保存在应用的存储中，所以应用还需要 `storage`。在桌面 RC1 的 macOS 构建及兼容 Android 源码构建中：声明了 `host-api-v1` 的应用须先用 `camera.permission.request` 请求权限。 | Use the camera | 运行时，限具备该功能的设备 |
 | `microphone` | 获得应用及系统授权后录音。前台 `microphone.record_*` 会话属于尚未发布的宿主扩展；较早的宿主可能只有权限查询方法，没有录音方法。请声明确切所需的方法，先调用 `microphone.permission.request`。 | 使用麦克风 | 运行时，取决于设备是否支持 |
-| `audio` | 应用活跃时播放应用内音频，不隐含麦克风、存储或后台权限。 | 应用活跃时播放自己的音频文件 | 契约 1.10.0 源码，尚未发布；需要配套原生宿主。 |
+| `audio` | 应用活跃时播放应用内音频，不隐含麦克风、存储或后台权限。 | 应用活跃时播放自己的音频文件 | 契约 1.10.0 已发布；需要配套原生宿主，桌面 RC1 不提供。 |
 | `library` | 把拍摄的内容提供给系统相册，其他应用也能看到。 | Save to your photo library, where other apps can see it | 运行时，限具备该功能的设备 |
 | `clipboard` | 剪贴板。 | Use the clipboard | 尚不支持：没有 API 使用它 |
 | `prompt` | 应用向用户提出的问题。 | Ask you questions | 尚不支持：没有宿主读取它。应用 Agent 用 `ask_user_question` 提问。 |
@@ -213,7 +213,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | `gcalendar` | 读取 Google 日历；每次修改日程都要等用户确认。 | Read authorized Google calendars and ask you to review event changes | 同 `auth` |
 | `gmail` | 读取 Gmail 并保存回复草稿；每次发送都要等用户确认。与 `mail` 相互独立。 | Read authorized Gmail messages, keep reply drafts and request native send review | 同 `auth` |
 | `calendar` | 日历应用的本地日程存储和界面。不是 Google 日历。 | Read and manage local events through the device's Calendar service | 仅系统应用 `os.calendar`；商店应用请用 `gcalendar` |
-| `device_calendar` | 读取用户选定的原生日历，并请求确认日程修改。需要分别获得应用授权、操作系统权限和日历选择授权。 | Read device calendars you choose and ask you to review event changes | 契约 1.10.0 源码，尚未发布。需要兼容的宿主适配器；桌面 RC1 和 Home beta.1 不提供。请声明所需方法的确切版本。 |
+| `device_calendar` | 读取用户选定的原生日历，并请求确认日程修改。需要分别获得应用授权、操作系统权限和日历选择授权。 | Read device calendars you choose and ask you to review event changes | 契约 1.10.0 已发布。需要兼容的宿主适配器；桌面 RC1 和 Home beta.1 不提供。请声明所需方法的确切版本。 |
 | `llm` | 通过 `llm` 服务管理设备的 AI 提供商。 | Manage the assistant's AI providers, whose keys stay with the device | 仅系统应用 |
 | `news` | 设备从订阅源和主题订阅源收集的条目。 | Read news the device collects from its feeds and topics | 仅系统应用 |
 | `photos` | 相册应用自己的图库和合集。 | Read Photos's own library and publish collections | 仅系统应用：OctoSense 只向 `os.photos` 提供 `photos.notify` |
@@ -478,7 +478,7 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | `microphone` | `microphone.permission.status` | |
 | `location` | `location.permission.status`、`location.get` | |
 
-`device_calendar` 工具别名和 `mail.compose` / `mail.compose_status` 尚未发布，均需要 `private_data: true` 和对应能力。日历权限申请、日历选择和事件修改仅限前台，`mail.review_send` 和 `mail.send` 也一样。准备草稿不会发送邮件；兼容宿主仍须重新核验授权，并在用户批准对外写操作前显示宿主自己的不可变审阅内容。
+App Hub 已允许声明 `device_calendar` 工具别名和 `mail.compose` / `mail.compose_status`；桌面 RC1 尚不包含对应的宿主实现。它们均需要 `private_data: true` 和对应能力。日历权限申请、日历选择和事件修改仅限前台，`mail.review_send` 和 `mail.send` 也一样。准备草稿不会发送邮件；兼容宿主仍须重新核验授权，并在用户批准对外写操作前显示宿主自己的不可变审阅内容。
 
 `wasm.<function>` 运行应用自带的函数之一（`fns/*.wasm`，`wasm` 能力）。它只在提供 `wasm` 的宿主上可用（见[能力](#能力)），标准桌面 RC1 包默认关闭。RC1 在[平台限制](HOST-API.zh-CN.md#限制)内实现上表中的 `auth`、`runtime`、`camera`、`microphone` 和 `location` 方法。上面的规则同样适用于这些方法，`runtime.list` 和 `runtime.describe` 也不例外。通过准入不等于已经配置账户、取得权限或补上缺少的 API：请用 `runtime.describe` 查询宿主实现了什么。映射到 `auth.backend.request` 的工具只能执行后端声明的 `GET` 操作；写操作仍须应用在前台，并由用户在宿主的原生审阅界面上批准。权限的 `request` 和 `revoke`、账户管理，以及 `app_tools.dispatch@1` 等运行时 ABI，都没有 `host_method`。
 
@@ -809,7 +809,7 @@ my-notes 0.1.0 — PASSED
 
 ## 签名
 
-新应用可以使用 GitHub 管理的发布者来源证明，无需开发者创建、保存或轮换发布者私钥。本源码实现使用已发布的契约 **1.8.0** 和 `publisher-github-v1`；[桌面 RC1](../README.zh-CN.md#下载兼容宿主)是兼容的宿主发行版。两个真实标签推送发布已通过下文记录的工作流与原生 Store 验收。下文保留历史包的 Ed25519 路径。
+新应用可以使用 GitHub 管理的发布者来源证明，无需开发者创建、保存或轮换发布者私钥。本源码实现使用已发布的契约 **1.10.0**，保留了 1.8.0 引入的 `publisher-github-v1`。[桌面 RC1](../README.zh-CN.md#下载兼容宿主)是兼容的宿主发行版。两个真实标签推送发布已通过下文记录的工作流与原生 Store 验收。下文保留历史包的 Ed25519 路径。
 
 ### GitHub 发布者来源证明
 

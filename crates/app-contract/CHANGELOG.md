@@ -3,12 +3,18 @@
 `octosense-app-contract` follows the rules in [README.md](README.md#stability):
 within `1.x` it only grows.
 
-crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0, 1.7.0, 1.7.1 and 1.8.0; 1.3.0 and 1.4.0
-are unpublished, and 1.5.0 includes their changes.
+crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0, 1.7.0, 1.7.1, 1.8.0 and 1.10.0.
+Versions 1.3.0, 1.4.0 and 1.9.0 are unpublished: 1.5.0 includes the first two
+versions' changes, and 1.10.0 includes 1.9.0's changes.
 [README.md](README.md#versions-on-cratesio) shows how to update a lock file
 that holds 1.2.0.
 
-## 1.10.0 — unreleased
+## 1.10.0 — 2026-10-09
+
+Published through the [release workflow](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37901486707);
+the [publication receipt](../../reviews/public-os-api-v1/contract-1.10.0-publication.json)
+records the source commit, registry checksum and downloaded archive checksum.
+This release includes the selected-file capability from the unpublished 1.9.0 work.
 
 - Add separate `audio` playback capability. It implies no microphone, storage,
   network or background authority. Recording uses the existing `microphone`

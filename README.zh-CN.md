@@ -78,7 +78,7 @@ GTK 3/WebKitGTK 和 X11/XWayland，Windows 需要 WebView2。这些引擎不随�
 | `docs/DEVELOPMENT.md` | 指南导航、交付路径、`card-host` 及其远程控制路由，以及 `card-studio`。 |
 | `docs/adr/` | 架构决策：通过 GitHub 管理员身份认证目录（[ADR 0001](docs/adr/0001-github-attested-catalog.zh-CN.md)），以及通过 GitHub 证明发布者身份（[ADR 0002](docs/adr/0002-github-attested-publisher-identity.zh-CN.md)）。 |
 | `templates/app/` | 卡片应用仓库脚手架，包含元数据、示例图标和链接好的 Agent 指引。 |
-| `crates/app-contract` | 应用契约 `octosense-app-contract`（[OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)）：清单、应用获得的策略、应用包完整性校验与运行应用包所需的内容。在 `1.x` 内只做增量变更（[README](crates/app-contract/README.md)）。契约 1.8.0 已发布到 crates.io（[crates.io 上的版本](crates/app-contract/README.md#versions-on-cratesio)，英文）。 |
+| `crates/app-contract` | 应用契约 `octosense-app-contract`（[OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)）：清单、应用获得的策略、应用包完整性校验与运行应用包所需的内容。在 `1.x` 内只做增量变更（[README](crates/app-contract/README.md)）。契约 1.10.0 已发布到 crates.io（[crates.io 上的版本](crates/app-contract/README.md#versions-on-cratesio)，英文）。 |
 | `crates/app-policy` | 签名清单与商店信息、准入，以及解析为隔离环境设置和 Agent 会话配置（[OctoSense Home ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0002-agentic-app-security-model.md)）；应用自带的 Agent（`tools.json`、`AGENT.md`、技能）加载为 `AgentBundle`；原生模块的工具清单共用同一套 `tools.json` 解析与检查（`ToolManifest::load`）。它还重新导出应用契约。 |
 | `crates/app-hub` | 索引、签名目录、准入检查、Agent 扫描、设备端客户端和 `hub` 命令（[OctoSense Home ADR 0003](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0003-app-hub-and-store.md)）。 |
 | `crates/appstore` | 作为 OctoSense 模块的商店；把已安装应用作为独立客户端运行的 `card` 模块；系统应用（`os.` 前缀 id）；以及宿主服务及其面板。 |
