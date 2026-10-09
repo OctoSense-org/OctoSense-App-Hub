@@ -237,7 +237,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | `vector` | 通过 `vector` 引擎（vectorcraft）处理矢量图：检查、转换，并渲染 SVG、PDF、EPS 和 DXF，均在应用自己的文件内。 | Use the device's vector-drawing engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
 | `pdf` | 通过 `pdf` 引擎（pdfcraft）处理 PDF：信息、文本、页面渲染、合并和拆分，均在应用自己的文件内。 | Use the device's PDF engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
 
-任何能力都不隐含其他能力。尚不支持：面向商店应用的 `photos` 和 `youtube` 服务。脚本如何调用各项能力，见 App Flow 的[能力](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.zh-CN.md)文档。
+任何能力都不隐含其他能力。尚不支持：面向商店应用的 `photos` 和 `youtube` 服务。脚本如何调用各项能力，见 App Flow 的[能力](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.zh-CN.md)文档；哪些能力会真正响应商店应用、支持哪些平台、从哪个版本开始，见其[宿主 API 能力族](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-FAMILIES.zh-CN.md)。
 
 源码：`crates/app-contract/src/manifest.rs` 中的 `KNOWN_CAPABILITIES`。
 
@@ -248,7 +248,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | 组 | 名称 | 授予的权限 | 目前由谁提供 |
 | --- | --- | --- | --- |
 | `octos.*` | 4 个：`octos.session.open`、`octos.session.history`、`octos.turn.start`、`octos.turn.interrupt` | 与应用自己的 Agent 对话，对话由 OctoSense 运行的 Agent 内核 octos 承载：打开对话、读取对话历史、开始一轮、停止应用发起的那一轮。应用从不指定提供商、模型或密钥。 | OctoSense，前提是用户允许了该应用的 Agent。在此之前，调用会得到 `Waiting for the person to allow this app's agent (OctoSense asks the first time)`。 |
-| `matrix.*` | 45 个，例如 `matrix.read_messages`、`matrix.room_members`、`matrix.send_message` | 每个名称对应一项 Matrix 操作，使用用户当前的账户，限于用户允许的房间。 | 没有任何 OctoSense 宿主服务提供它们。未验证：OctoSense 随附的原生应用 Rinx 会向导入其中的应用包提供这些名称。 |
+| `matrix.*` | 45 个，例如 `matrix.read_messages`、`matrix.room_members`、`matrix.send_message` | 每个名称对应一项 Matrix 操作，使用用户当前的账户，限于用户允许的房间。 | 没有任何 OctoSense 宿主服务提供它们。OctoSense 随附的原生应用 Rinx 通过自己的宿主，向用户导入其中的迷你应用提供这些名称；这不属于 App Hub 的安装途径。 |
 | `palpo.*` | 29 个，例如 `palpo.projects.list`、`palpo.inbox.decide` | 每个名称对应一项 Palpo 管理操作。 | 尚不支持：OctoSense 中没有任何组件提供它们。 |
 
 源码：商店为每个名称显示的文字位于 `crates/app-policy/src/services.rs` 和 `crates/app-contract/src/palpo.rs`。

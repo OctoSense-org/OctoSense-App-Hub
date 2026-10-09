@@ -13,7 +13,7 @@
 
 推送标签或创建 GitHub Release 既不会提交应用，也不会批准应用。
 
-App Hub 只接受带 GitHub 证明的 Release（[ADR 0002](adr/0002-github-attested-publisher-identity.zh-CN.md)）。应用的首个版本和每次更新，都由应用仓库的 GitHub 工作流准备 Release、生成证明并打包，因此你不需要发布者密钥，也不需要仓库签名 Secret。安装这类应用需要支持 `publisher-github-v1` 的宿主；请使用 [RC1 发行版及下载指南](../README.zh-CN.md#下载兼容宿主)。
+App Hub 只接受带 GitHub 证明的 Release（[ADR 0002](adr/0002-github-attested-publisher-identity.zh-CN.md)）。应用的首个版本和每次更新，都由应用仓库的 GitHub 工作流准备 Release、生成证明并打包，因此你不需要发布者密钥，也不需要仓库签名 Secret。安装这类应用需要支持 `publisher-github-v1` 的宿主；请使用 [RC2 发行版及下载指南](../README.zh-CN.md#下载兼容宿主)。
 
 公开签名目录第 15 版提供带 GitHub 证明的 `io.github.ymote.*` 参考应用（[当前应用](../README.zh-CN.md#应用)）。App Hub 已在签名目录第 14 版撤回较早那批用密钥签名的 `org.octosense.samples.*` 条目；后面的步骤仍以它们为例（见[三个参考应用](#三个参考应用)）。准入、能力、清单和签名规则见[发布参考](PUBLISHING.zh-CN.md)。
 
@@ -36,7 +36,7 @@ App Hub 只接受带 GitHub 证明的 Release（[ADR 0002](adr/0002-github-attes
 | `hub` | App Hub `main` | 为可编辑源码写入摘要并检查、扫描，再准备、验证和打包带 GitHub 证明的 Release。审核人员运行的是同一份代码。 |
 | `card-host` | App Hub `main` | 运行未签名的应用包，驱动它并截图。 |
 | `tools/octo` | [OctoSense App Flow](https://github.com/OctoSense-org/OctoSense-App-Flow)（原 Design Flow） | 创建、运行应用并截图。它封装了 `card-host` 和 `hub`。 |
-| OctoSense 桌面版 | [RC1 发行版，源码 `933abbcf`](../README.zh-CN.md#下载兼容宿主)；各平台下载及运行条件见该指南 | 安装带 GitHub 证明的 Release 并运行兼容宿主服务。连接账户示例使用 macOS；不附带 OAuth 注册信息。 |
+| OctoSense 桌面版 | [RC2 发行版，源码 `4ccf8e06`](../README.zh-CN.md#下载兼容宿主)；各平台下载及运行条件见该指南 | 安装带 GitHub 证明的 Release 并运行兼容宿主服务，包括 RC2 在各自支持的平台上新增的文档、设备日历、邮件草稿和音频 API。连接账户示例使用 macOS；不附带 OAuth 注册信息。 |
 
 按 [QUICKSTART §1](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.zh-CN.md#1-前置条件) 准备好工作区，然后从最新的 `main` 构建 `hub` 和 `card-host`：
 
@@ -97,15 +97,15 @@ App Flow 的 `tools/octo` 会替你运行其中几个命令，参数见其 [`too
 | 宿主 | 能运行 | 不能 |
 | --- | --- | --- |
 | `card-host` | 单个未签名的应用包，并提供远程控制接口，用于驱动和截图 | 提供用于发现宿主 API 的 `runtime` 以外的任何宿主服务：其他每个 `host.request` 都会失败，返回 `no service answers "<family>" on this device`。它也拒绝已封存的 Release，以及要求 `host-api-v1`、`backend-api-v1` 或 `script-tools-v1` 的应用。 |
-| RC1 发行版 `933abbcf` | 公开 v2 目录、`publisher-github-v1`、发现及已打开应用的 Splash 工具；宿主服务受平台限制 | 附带 OAuth 注册信息、默认启用 `wasm-lab`，或在其他系统上运行仅声明 macOS 的应用。Linux/Windows 的嵌入式后端登录及受保护写操作仍不支持；外部浏览器后端登录和读取另有实现。 |
+| RC2 发行版 `4ccf8e06`（RC1 `933abbcf` 的签名目录和发现机制相同，但没有 RC2 的 API） | 公开 v2 目录、`publisher-github-v1`、发现及已打开应用的 Splash 工具；macOS 和 Linux 上应用自带的 Wasm 函数；文件、设备日历、邮件草稿和音频服务，受平台限制（[宿主目前提供什么](../README.zh-CN.md#宿主目前提供什么)） | 附带 OAuth 注册信息、在 Windows 上运行 Wasm、在 Windows 或 Linux 上批准邮件发送或提供设备日历、音频会话和新鲜位置采样，或在其他系统上运行仅声明 macOS 的应用。Linux/Windows 的嵌入式后端登录及受保护写操作仍不支持；外部浏览器后端登录和读取已实现，用 RC2 源码构建的 Windows 测试程序已对一个模拟后端完成登录。 |
 | 历史 desktop-v0.1.0-beta.2（macOS，Apple 芯片） | 已安装的应用，包括使用 `auth`、`github`、`gmail` 和 `gcalendar` 的应用 | 在宿主的 `oauth/clients.json` 中配好 OAuth 注册之前，登录 GitHub 或 Google（[配置方法](https://github.com/OctoSense-org/OctoSense/blob/desktop-v0.1.0-beta.2/crates/oauth-service/README.md)）；该发布版不附带任何注册信息。让应用登录它自己的后端。安装请求 `wasm` 的应用：它的商店会以 `unknown capability "wasm"` 拒绝。未在该发布版上验证：真实的提供商登录。 |
 | desktop-v0.1.0-beta.1 和 home-v0.1.0-beta.1（目前唯一发布的手机版本） | 所用能力都在旧版应用契约之内的商店应用 | 安装请求 `auth`、`github`、`gmail`、`gcalendar`、`calendar`、`photos`、`youtube`、`wasm` 或 `palpo.*` 的应用。它们的商店会拒绝这类应用，例如报 `unknown capability "auth"`。 |
 
-RC1 发行版与历史 desktop beta.2 有以下不同。[下载发行文件并确认运行条件](../README.zh-CN.md#下载兼容宿主)。
+RC1 和 RC2 发行版与历史 desktop beta.2 有以下不同；RC2 还新增了[宿主目前提供什么](../README.zh-CN.md#宿主目前提供什么)中列出的 API。[下载发行文件并确认运行条件](../README.zh-CN.md#下载兼容宿主)。
 
 - 发行方可以在构建时编入 GitHub 和 Google 注册信息。你自己从源码构建的版本不带注册信息，需要自行添加，例如写入 `oauth/clients.json`（见发布参考的[已连接账户](PUBLISHING.zh-CN.md#已连接账户)一节）。
 - 应用可以登录清单声明的后端，并在[下文的平台限制](#确认你的平台)内调用清单列出的后端操作（见发布参考的[登录自己的后端](PUBLISHING.zh-CN.md#登录自己的后端)一节）。
-- 声明了 `host-api-v1` 的应用可以在 macOS 和 Android 上使用设备权限方法（见[宿主 API 兼容性](HOST-API.zh-CN.md)）。
+- 声明了 `host-api-v1` 的应用可以在 macOS 和 Android 上使用设备权限方法；在 RC2 上，还能在具备相应功能的平台上使用新鲜位置采样、设备日历、邮件草稿和音频会话（见[宿主 API 兼容性](HOST-API.zh-CN.md)）。
 - 批准 GitHub 或 Google 日历的保存时，须在宿主的确认面板上亲手点按；批准 Gmail 发送在两个版本上都有这个要求。
 - 应用 Agent 调用 `glance.publish` 时，宿主拒绝可执行的 Splash（`script`）和 L1 卡片源码。
 - 宿主只保留从 30 天前到 366 天后的 Google 日历日程，而不是日历的全部历史。
@@ -114,10 +114,11 @@ RC1 发行版与历史 desktop beta.2 有以下不同。[下载发行文件并�
 
 ### 确认你的平台
 
-- **macOS（Apple 芯片）**：当前公开示例使用兼容 RC1 发行版。安装、本地草稿和更新与真实提供商效果是不同的验收范围，见[下载与账户限制](../README.zh-CN.md#下载兼容宿主)。
-- **Windows x64 / Linux x86_64**：RC1 安装包不会改变应用的 `listing.platforms`。当前四个示例只声明 macOS。原生浏览器和宿主测试不是你的应用验收；每个声称支持的平台都要验证依赖和缺少服务时的状态。
+- **macOS（Apple 芯片）**：当前公开示例使用兼容 RC2 发行版。安装、本地草稿和更新与真实提供商效果是不同的验收范围，见[下载与账户限制](../README.zh-CN.md#下载兼容宿主)。
+- **Windows x64 / Linux x86_64**：RC2 安装包不会改变应用的 `listing.platforms`。当前四个示例只声明 macOS。原生浏览器和宿主测试不是你的应用验收；每个声称支持的平台都要验证依赖和缺少服务时的状态。
+- RC2 的邮件发送审阅、设备日历、音频会话和新鲜位置采样只在 macOS（和 Android）上有，Windows 和 Linux 没有。商店信息列出 Windows 或 Linux 时，请把这些方法放在 `host_api.optional` 下，否则应用无法在那里安装（见[宿主 API 兼容性](HOST-API.zh-CN.md)）。
 - Windows 使用 `python tools/octo`，它能找到 `.exe`。用[第 1 步的 `.gitattributes`](#1-安排仓库结构) 保留应用包字节，再验证全新检出（[第 6 步](#6-冻结并验证发布)）。
-- Linux WebReader 需要 GTK 3/WebKitGTK 和 X11/XWayland，不支持原生 Wayland。Windows 使用 WebView2；这些引擎不随包附带。Linux/Windows 已实现外部浏览器后端登录和清单声明的读取，这里未验收真实登录。嵌入式后端登录和受保护的写操作仍不支持，会拒绝执行。见[浏览器要求](https://github.com/OctoSense-org/OctoSense/blob/933abbcf2737e652acd9cae2a4c9ffc16bfdaec6/docs/desktop-embedded-browser.zh-CN.md)。
+- Linux WebReader 需要 GTK 3/WebKitGTK 和 X11/XWayland，不支持原生 Wayland。Windows 使用 WebView2；这些引擎不随包附带。Linux/Windows 已实现外部浏览器后端登录和清单声明的读取；RC2 补上了登录所需的原生链接打开方式，用 RC2 源码构建的 Windows 测试程序已对一个模拟后端完成浏览器登录，Linux 上的登录仍未验证。嵌入式后端登录和受保护的写操作仍不支持，会拒绝执行。见[浏览器要求](https://github.com/OctoSense-org/OctoSense/blob/4ccf8e068399b1da139771a9ed94cef05fa6ae60/docs/desktop-embedded-browser.zh-CN.md)。
 
 ## 三个参考应用
 
@@ -144,9 +145,9 @@ App Flow 的[连接账户参考应用 README](https://github.com/OctoSense-org/O
 
 每个应用的 0.1.0 版都通过了审核，但各有一个问题，0.1.1 版对此做了改进。你的应用应从一开始就避开这些问题：
 
-- **卡片工具绝不接受 `script`。** Inbox 0.1.0 的后台工具 `inbox.notify` 映射到 `glance.publish`，除了 `template`，还接受最大 16 KiB 的 `script` 卡片。OctoSense 桌面版 0.1.0-beta.2 会按应用自身的策略运行 Agent 发布的 `script` 卡片，因此一轮遭到提示注入的后台对话就可能发布任意 Splash 代码。Inbox 0.1.1 只接受已准入的模板加 `initial` 数据；RC1 发行版会拒绝 Agent 发布的 `script` 卡片。只接受 `template` 加 `initial`，或 L0 `source` 加 `data`。
+- **卡片工具绝不接受 `script`。** Inbox 0.1.0 的后台工具 `inbox.notify` 映射到 `glance.publish`，除了 `template`，还接受最大 16 KiB 的 `script` 卡片。OctoSense 桌面版 0.1.0-beta.2 会按应用自身的策略运行 Agent 发布的 `script` 卡片，因此一轮遭到提示注入的后台对话就可能发布任意 Splash 代码。Inbox 0.1.1 只接受已准入的模板加 `initial` 数据；RC1 和 RC2 发行版都会拒绝 Agent 发布的 `script` 卡片。只接受 `template` 加 `initial`，或 L0 `source` 加 `data`。
 - **带了工具，就声明 `agent`。** GitHub Notes 0.1.0 在 `tools.json` 中带了三个工具，却写着 `"agent": null`。Hub 照样把这些工具作为应用 Agent 准入，OctoSense 也照样提供这个应用 Agent，但准入检查的 `grants:` 行输出的是 `agent none`，OctoSense 桌面版 0.1.0-beta.2 的商店显示的也是“Runs no assistant.”。GitHub Notes 0.1.1 声明了 `read-only` 的 `agent` 字段并附带 `AGENT.md`，于是准入检查输出 `agent read-only`，每个商店都会显示这个应用 Agent（见发布参考的[带 `tools.json` 的应用都有 Agent](PUBLISHING.zh-CN.md#带-toolsjson-的应用都有-agent)一节）。在隐私政策中说明应用 Agent。如果应用不应有 Agent，就不要带 `tools.json`。
-- **显示日期范围。** Google Calendar 0.1.0 列出日历的全部历史，最早的日程排在最前面：OctoSense 桌面版 0.1.0-beta.2 会同步所有日程，Agent 的 `cached` 工具也会把它们全部返回。Google Calendar 0.1.1 在宿主报告日期范围时显示“past 30 days / next 366 days”，没有报告时显示“date range unavailable”，也不再把范围之外的日程说成已删除。RC1 发行版只同步这个范围。显示一段日期范围，并只把选中的日程交给 Agent，而不是整个缓存。
+- **显示日期范围。** Google Calendar 0.1.0 列出日历的全部历史，最早的日程排在最前面：OctoSense 桌面版 0.1.0-beta.2 会同步所有日程，Agent 的 `cached` 工具也会把它们全部返回。Google Calendar 0.1.1 在宿主报告日期范围时显示“past 30 days / next 366 days”，没有报告时显示“date range unavailable”，也不再把范围之外的日程说成已删除。RC1 和 RC2 发行版只同步这个范围。显示一段日期范围，并只把选中的日程交给 Agent，而不是整个缓存。
 
 0.1.1 中还留着一个问题：Inbox 的后台工具可以改写回复草稿，包括 `to` 地址；改了收件人的回复，只有宿主的审阅界面（发送须亲手点按）能拦住。让后台工具只做读取，以及需要用户确认的写操作。
 
@@ -276,7 +277,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 
 ## 5. 生成最终字节
 
-应用的首个 Release 和每次更新，都要使用公开仓库的 GitHub 发布者来源证明；这是 App Hub 接受的唯一路径。OctoScript 应用默认开放：每个应用包本来就以可读文本的形式附带应用源码，所以公开仓库也不会多暴露多少内容（[ADR 0002](adr/0002-github-attested-publisher-identity.zh-CN.md)）。这条路径需要应用契约 1.8.0，以及支持 `publisher-github-v1` 的宿主。一个测试应用的两个 Release 均由标签推送生成，并通过了原生商店的安装、更新和启动检查（[证据与限制](PUBLISHING.zh-CN.md#github-发布者来源证明)）。如需当前的公开签名目录，请使用 [RC1 发行版](../README.zh-CN.md#下载兼容宿主)。
+应用的首个 Release 和每次更新，都要使用公开仓库的 GitHub 发布者来源证明；这是 App Hub 接受的唯一路径。OctoScript 应用默认开放：每个应用包本来就以可读文本的形式附带应用源码，所以公开仓库也不会多暴露多少内容（[ADR 0002](adr/0002-github-attested-publisher-identity.zh-CN.md)）。这条路径需要应用契约 1.8.0，以及支持 `publisher-github-v1` 的宿主。一个测试应用的两个 Release 均由标签推送生成，并通过了原生商店的安装、更新和启动检查（[证据与限制](PUBLISHING.zh-CN.md#github-发布者来源证明)）。如需当前的公开签名目录，请使用 [RC2 发行版](../README.zh-CN.md#下载兼容宿主)。
 
 1. 如果尚未开提交 issue，现在就可以开。Release 证据可以稍后补充；未完成的检查标为待完成，不要编造通过结果。
 2. 测试可编辑源码并截取真实界面。运行准入检查和 `hub scan bundle --packet build/review.json`，其中 `build/` 位于应用包外。逐题回答审核包中的问题：共七题，带 `tools.json`、`AGENT.md` 或技能时为八题。注明每个回答依据的文件及未测试的行为。
@@ -338,6 +339,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 | 下载的 Release 上，发布者的证明验证通过 | `downloaded_publisher_signature_verified` | 对下载的 pack 先运行 `hub publisher-unpack`，再运行 `hub publisher-verify`（第 6 步） |
 | 下载的应用包通过准入检查 | `downloaded_gate_output` | 同上 |
 | 应用包摘要与 issue 中的一致 | `bundle_digest` | `integrity.bundle_blake3` |
+| 每项申请的能力所属的服务族会在商店信息所列的平台上响应商店应用 | 0.1.0 记录中没有；从签名目录第 14 版起检查 | App Flow 的 [HOST-API-FAMILIES](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-FAMILIES.zh-CN.md) |
 
 历史版本 0.1.1 的记录见 [`docs/admissions/connected-apps-0.1.1`](../docs/admissions/connected-apps-0.1.1/README.zh-CN.md)。这份记录还保存了每个应用签名后的准入检查输出和源码审核结论，并记录了一项测试：用商店的代码安装每个应用，并从 0.1.0 升级。
 
@@ -347,7 +349,7 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 
 ## 9. 提交之后
 
-检查通过后，由 App Hub 管理员审核这次提交并批准；未经批准，Hub 不会发布任何内容。随后，管理员运行受保护的[签名目录工作流](GITHUB-PUBLISHING.zh-CN.md)：工作流准入审核过的原样字节，让 GitHub Actions 用 Sigstore 为新的 `catalog-v2.json` 签名，再把它 commit 到 `main`。之后，用户就能在读取 `catalog-v2.json` 并支持 `publisher-github-v1` 的 OctoSense 构建中搜索、安装和运行这个应用。例如 [RC1 发行版](../README.zh-CN.md#下载兼容宿主)。历史 desktop-v0.1.0-beta.2 只读取 `hub publish` 生成的旧格式 `catalog.json`。
+检查通过后，由 App Hub 管理员审核这次提交并批准；未经批准，Hub 不会发布任何内容。随后，管理员运行受保护的[签名目录工作流](GITHUB-PUBLISHING.zh-CN.md)：工作流准入审核过的原样字节，让 GitHub Actions 用 Sigstore 为新的 `catalog-v2.json` 签名，再把它 commit 到 `main`。之后，用户就能在读取 `catalog-v2.json` 并支持 `publisher-github-v1` 的 OctoSense 构建中搜索、安装和运行这个应用。例如 [RC2 发行版](../README.zh-CN.md#下载兼容宿主)。历史 desktop-v0.1.0-beta.2 只读取 `hub publish` 生成的旧格式 `catalog.json`。
 
 - 审核人员会在 issue 中列出需要修复的问题；应用进入签名目录后，审核人员关闭 issue，并注明应用所在的签名目录版本号。在 issue 中回答提问，但不要改动标签所指的内容。
 - **首次发布之前，每个新 Release 都发在同一个 issue 中。** 要修复问题，就提高 `version` 并重做第 4 到 6 步（界面有变化时才需要第 4 步），然后在提交 issue 中发评论，写明新的标签、完整的 commit SHA 和工作流运行链接，并更新 issue 标题和 Version 字段（见[第 7 步](#7-开提交-issue)）。
@@ -383,14 +385,15 @@ wrote …/bundle/screenshots/01-main.png (824x1784, 32539 bytes). Look at it bef
 
 | 需求 | 现状 | 替代做法 |
 | --- | --- | --- |
-| 登录你自己的后端 | RC 在[平台限制](#确认你的平台)内提供宿主运行的后端登录和清单声明的读取；兼容 Android 源码构建另有嵌入式流程。每次写操作都需要受支持的原生审阅流程（见发布参考的[登录自己的后端](PUBLISHING.zh-CN.md#登录自己的后端)一节）。 | 只需提供商身份时，用仅验证身份的登录来识别用户：`auth` 搭配 GitHub 的 `read:user`，或 Google 的 `openid`、`email` 和 `profile`。需要提供商数据时，再加上 `github`、`gmail` 或 `gcalendar`。 |
+| 登录你自己的后端 | RC1 和 RC2 在[平台限制](#确认你的平台)内提供宿主运行的后端登录和清单声明的读取；兼容 Android 源码构建另有嵌入式流程。每次写操作都需要受支持的原生审阅流程（见发布参考的[登录自己的后端](PUBLISHING.zh-CN.md#登录自己的后端)一节）。 | 只需提供商身份时，用仅验证身份的登录来识别用户：`auth` 搭配 GitHub 的 `read:user`，或 Google 的 `openid`、`email` 和 `profile`。需要提供商数据时，再加上 `github`、`gmail` 或 `gcalendar`。 |
 | 在应用中保存 API 密钥或令牌 | 不支持。准入检查只拒绝密码和一次性验证码字段，因此发现不了输入到普通字段或存放在存储中的密钥。 | 不要附带任何密钥。生成文本请用 `model`，它调用的是用户自己的 AI 提供商。 |
-| 生成图片、音频、视频或向量嵌入 | RC 在 `model` 能力下提供相应方法；媒体方法名不是独立能力。仍受提供商配置、权益和平台限制约束。 | 运行时发现方法，并处理提供商不可用的状态；见[媒体指南](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/AI-SERVICES.zh-CN.md#媒体与嵌入向量model)。 |
-| 使用 `llm`、`news`、`calendar`、`prompt`、`ledger.read`、`clipboard` 或 `palpo.*` | 准入检查接受它们，但没有宿主向商店应用提供这些服务。`llm` 和 `news` 只响应 `os.*` 应用，`calendar` 只响应 `os.calendar`，其余的没有任何宿主处理。 | 不要请求它们。访问 Google 日历请用 `gcalendar`。 |
-| 用 Agent 工具运行应用自身的逻辑 | RC1 发行版会在完整应用打开期间运行 `implemented_by: "app"` 的工具；应用关闭时返回 `app_not_running`。OctoSense 桌面版 0.1.0-beta.2 拒绝这类工具，返回 `app_tool_unavailable`。没有 `host_method` 的 `host-service` 工具会调用以应用的命名空间命名的服务，而命名空间不是能力，所以调用失败，返回 `not_granted`。 | 要调用共享服务，用 `host_method` 把工具映射到 `github`、`gcalendar`、`gmail` 或 `glance` 的某个方法（见发布参考的[把工具映射到共享服务](PUBLISHING.zh-CN.md#把工具映射到共享服务host_method)一节）。要运行应用自身的逻辑，在清单中声明 `requires: ["script-tools-v1"]`，并实现 `app_tool` 钩子（见发布参考的[脚本工具执行](PUBLISHING.zh-CN.md#脚本工具执行script-tools-v1)一节）。请在[兼容 RC1 发行版](../README.zh-CN.md#下载兼容宿主)中测试。 |
-| 在应用中附带原生 Rust 代码 | 商店应用包不能携带原生代码。准入检查会拒绝原生库，原生代码需要随 Shell 新版本发布（[交付路径](DEVELOPMENT.zh-CN.md#选择合适的交付路径)）。 | 要做纯计算，把 Rust 代码编译成 `fns/` 中的 WebAssembly 模块，并请求 `wasm` 能力（见发布参考的[能力](PUBLISHING.zh-CN.md#能力)一节）。OctoSense `main` 的标准桌面版和 Home 构建在 macOS、Linux 和 Android 上运行它，目前还没有任何发布版包含它。具体做法，以及设备 API、网络和文件各走哪条路，见 App Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.zh-CN.md)。 |
+| 生成图片、音频、视频或向量嵌入 | RC1 和 RC2 在 `model` 能力下提供相应方法；媒体方法名不是独立能力。仍受提供商配置、权益和平台限制约束。 | 运行时发现方法，并处理提供商不可用的状态；见[媒体指南](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/AI-SERVICES.zh-CN.md#媒体与嵌入向量model)。 |
+| 使用 `llm`、`news`、`calendar`、`matrix.*`、`prompt`、`ledger.read`、`clipboard`、`palpo.*` 或某个引擎服务 | 准入检查接受它们，但没有宿主向商店应用提供这些服务。`llm` 和 `news` 只响应 `os.*` 应用，`calendar` 只响应 `os.calendar`，`matrix.*` 只在 Rinx 内部由 Rinx 自己的宿主提供；引擎服务（`sheet`、`photo`、`word`、`deck`、`cad`、`light`、`sound`、`design`、`film`、`effect`、`vector`、`pdf`）可以在 App Hub `main` 上声明，但只向系统助手提供，rc.2 的准入检查也不认识它们。其余的没有任何宿主处理。 | 不要请求它们。访问 Google 日历请用 `gcalendar`。哪些服务族会响应商店应用、支持哪些平台、从哪个版本开始，见 App Flow 的 [HOST-API-FAMILIES](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-FAMILIES.zh-CN.md)。 |
+| 在应用中发送邮件 | RC2 上，用户先用 `mail.add_account` 登录账户，然后 `mail.review_send`（或 `mail.send`，它打开同一个审阅界面）显示宿主的原生审阅界面，由用户亲手点按批准；`mail.compose` 和 `mail.compose_status` 用于保存草稿和查看状态。审阅界面只在 macOS 和 Android 上有；在 Windows 和 Linux 上会以 `Physical Mail send approval is unavailable on this platform` 失败。RC1 没有发送路径，真实的 SMTP 投递也尚未验证（[OctoSense #409](https://github.com/OctoSense-org/OctoSense/issues/409) 记录了错误提示的问题）。 | 商店信息列出 Windows 或 Linux 时，把 `mail.review_send` 放在 `host_api.optional` 下；在这两个系统上，读取已授权的账户（`mail.accounts`、`mail.folders`、`mail.list`、`mail.message`）并发出通知，发送由用户在 Mail 应用中完成。 |
+| 用 Agent 工具运行应用自身的逻辑 | RC1 和 RC2 发行版会在完整应用打开期间运行 `implemented_by: "app"` 的工具；应用关闭时返回 `app_not_running`。OctoSense 桌面版 0.1.0-beta.2 拒绝这类工具，返回 `app_tool_unavailable`。没有 `host_method` 的 `host-service` 工具会调用以应用的命名空间命名的服务，而命名空间不是能力，所以调用失败，返回 `not_granted`。 | 要调用共享服务，用 `host_method` 把工具映射到 `github`、`gcalendar`、`gmail` 或 `glance` 的某个方法（见发布参考的[把工具映射到共享服务](PUBLISHING.zh-CN.md#把工具映射到共享服务host_method)一节）。要运行应用自身的逻辑，在清单中声明 `requires: ["script-tools-v1"]`，并实现 `app_tool` 钩子（见发布参考的[脚本工具执行](PUBLISHING.zh-CN.md#脚本工具执行script-tools-v1)一节）。请在[兼容 RC2 发行版](../README.zh-CN.md#下载兼容宿主)中测试。 |
+| 在应用中附带原生 Rust 代码 | 商店应用包不能携带原生代码。准入检查会拒绝原生库，原生代码需要随 Shell 新版本发布（[交付路径](DEVELOPMENT.zh-CN.md#选择合适的交付路径)）。 | 要做纯计算，把 Rust 代码编译成 `fns/` 中的 WebAssembly 模块，并请求 `wasm` 能力（见发布参考的[能力](PUBLISHING.zh-CN.md#能力)一节）。桌面 RC2 的标准构建在 macOS 和 Linux 上运行它；Windows、iOS 和 OpenHarmony 的构建不包含 `wasm` 服务，RC1 在所有平台上都默认关闭。具体做法，以及设备 API、网络和文件各走哪条路，见 App Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.zh-CN.md)。 |
 | 提交系统应用（`os.*`）或原生应用 | 这里没有提交途径。系统应用随 Shell 一起发布，原生代码需要随 Shell 新版本发布（[交付路径](DEVELOPMENT.zh-CN.md#选择合适的交付路径)）。 | 用自己的 ID 做一个商店应用。 |
-| 在手机上安装 `auth` 应用 | 目前没有任何已发布的手机版本能做到。 | 这些只声明 macOS 的示例使用 Mac 上的兼容 RC；Android Google 授权不可用。 |
+| 在手机上安装 `auth` 应用 | 目前没有任何已发布的手机版本能做到。 | 这些只声明 macOS 的示例使用 Mac 上的 RC2；Android Google 授权不可用。 |
 | 在卡片 kit 中引用 Makepad 内置的 CJK 字体 | 当前 Hub 和锁定运行时支持 Regular 与 Bold 的准确资源名。 | 名称、打包字体及旧版宿主限制见[字体](PUBLISHING.zh-CN.md#字体)。Mac 上已验证 `card-host` 原生显示；尚未在每种 Shell 和平台上验证。 |
 
-哪个 Shell 提供哪项宿主服务，见 App Flow 的 [HOST-SERVICES.zh-CN.md](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。
+每个宿主 API 服务族由哪些 Shell 向谁提供、支持哪些平台、从哪个版本开始，见 App Flow 的 [HOST-API-FAMILIES.zh-CN.md](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-FAMILIES.zh-CN.md)；各项服务的说明见 [HOST-SERVICES.zh-CN.md](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。
