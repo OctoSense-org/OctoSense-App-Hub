@@ -90,7 +90,7 @@ my-app/
 | `publisher-signature` | 声明的 GitHub 证明验证失败（即使加了 `--allow-unsigned`）；或用 `--publisher-key` 给出的密钥或签名目录中记录的密钥验证历史签名失败；清单已签名，却没有提供密钥（`publisher key "<id>" is not registered with this hub`）；清单未签名，且没有加 `--allow-unsigned`。 | 清单未签名，且加了 `--allow-unsigned`。 |
 | `identity` | ID 以 `os.` 开头；ID 本身或其最后一段是保留名称（[ID 与保留名称](#id-与保留名称)）。 | |
 | `contents` | 文件的扩展名不是 `.card`、`.json`、`.l0`、`.octoscript`、`.splash`、`.svg`、`.png`、`.jpg`、`.jpeg`、`.webp`、`.ttf`、`.otf`、`.txt` 或 `.md` 之一，也不是函数模块（`.wasm`，见 `functions`）。准入检查同样拒绝没有扩展名的文件（例如 `.DS_Store` 和 `LICENSE`）。 | |
-| `functions` | 应用包带了 `.wasm` 文件却没有 `wasm` 能力，或带了 8 个以上。不在 `fns/<name>.wasm`（名称为 `[a-z0-9_-]`，最多 64 个字符），或既不是 WebAssembly 核心模块（版本 1 的 8 字节文件头）也不是有效组件的文件，以 `contents-invalid` 拒绝；导入了 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:io` 和 `wasi:random` 以外任何内容的组件也是如此。清单没有在 `requires` 中声明 `wasm-components-v1`，或组件导入了 `wasi:filesystem` 而应用没有 `storage` 能力时，组件在这一项被拒绝（[WebAssembly 组件](#webassembly-组件)）。除此之外，准入检查不检查核心模块内部；宿主在加载模块时检查它的导入和导出。 | 应用声明了 `wasm`，却没有带 `fns/*.wasm`。清单声明了 `wasm-components-v1`，`fns/` 中却没有组件。每个准入的组件都有一行说明它能访问什么。 |
+| `functions` | 应用包带了 `.wasm` 文件却没有 `wasm` 能力，或带了 8 个以上。不在 `fns/<name>.wasm`（名称为 `[a-z0-9_-]`，最多 64 个字符），或既不是 WebAssembly 核心模块（版本 1 的 8 字节文件头）也不是有效组件的文件，以 `contents-invalid` 拒绝；导入了 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:http`、`wasi:io` 和 `wasi:random` 以外任何内容的组件也是如此。清单没有在 `requires` 中声明 `wasm-components-v1`，组件导入了 `wasi:filesystem` 而应用没有 `storage` 能力，或组件导入了 `wasi:http` 而应用没有 `net` 能力、`network.hosts` 中也没有至少一个主机时，组件在这一项被拒绝（[WebAssembly 组件](#webassembly-组件)）。除此之外，准入检查不检查核心模块内部；宿主在加载模块时检查它的导入和导出。 | 应用声明了 `wasm`，却没有带 `fns/*.wasm`。清单声明了 `wasm-components-v1`，`fns/` 中却没有组件。每个准入的组件都有一行说明它能访问什么。 |
 | `contents-invalid`（文本和图片） | 文本文件（`.splash`、`.card`、`.json`、`.l0`、`.octoscript`、`.txt` 或 `.md`）超过 1 MiB 或不是 UTF-8；JSON 无法解析；PNG、JPEG 或 WebP 无法解码，或单边超过 4096 像素；商店信息中的图标不是正方形，或者是超过 1 MiB 或单边超过 1024 像素的位图。 | |
 | `contents-invalid`（SVG） | SVG 无法解析；既没有数值形式的 `width` 和 `height`，也没有 `viewBox`；单边超过 4096 像素；或含有脚本、`foreignObject` 或 `on…` 事件属性。SVG 的样式（`style` 属性或 `<style>` 块）导入样式表、使用转义或注释，或让 `url()` 指向同一文件内 `#fragment` 以外的任何位置。 | |
 | `entry` | 应用包中既没有 `main.splash` 也没有 `page.card`；`page.card` 不是有效的 L0；`page.data.json` 不是 JSON；应用包中既没有 `kit/native/<theme>/kit.json`，卡片所需的 OctoScript kit 模块也不齐全。 | |
@@ -149,13 +149,27 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 准入检查在以下条件都满足时接受组件：
 
 - 清单在 `requires` 中声明了 `wasm-components-v1`，这需要 `wasm` 能力。`wasm` 服务只能加载核心模块的宿主不认识这个特性，因此会拒绝这个应用，而不是等到第一次调用时才失败；
-- 组件能通过验证，且只从 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:io` 和 `wasi:random` 导入接口。组件自己定义的类型（例如某个函数返回的记录）不算导入。`wasi:sockets`、`wasi:http` 及其他任何导入都以 `contents-invalid` 拒绝；
-- 只有应用有 `storage` 能力时，组件才可以导入 `wasi:filesystem`。按 ADR 0014，宿主只给它应用自己的存储文件夹。
+- 组件能通过验证，且只从 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:http`、`wasi:io` 和 `wasi:random` 导入接口。组件自己定义的类型（例如某个函数返回的记录）不算导入。`wasi:sockets` 及其他任何导入都以 `contents-invalid` 拒绝；
+- 只有应用有 `storage` 能力时，组件才可以导入 `wasi:filesystem`。按 ADR 0014，宿主只给它应用自己的存储文件夹；
+- 只有应用有 `net` 能力、且 `network.hosts` 中至少有一个主机时，组件才可以导入 `wasi:http`。按 ADR 0014 第 3 阶段，宿主只让它访问这些主机，规则与脚本的请求相同，并且使用 HTTPS（只有访问设备本身时才允许普通 HTTP）。
 
 组件遵守与模块相同的名称和大小规则，并计入 8 个函数文件的上限。每个准入的组件都有一条警告，告诉审核人员它能访问什么：
 
 ```text
 [warning] functions (fns/notes.wasm): fns/notes.wasm is a component that reaches the clock, random numbers and files in its app folder, but no network or other app
+```
+
+导入 `wasi:http` 的组件（这里是 App Hub 的 `fetch` 测试组件，所在应用有 `net` 能力，主机为
+`"hosts": ["api.example.com"]`）会得到：
+
+```text
+[warning] functions (fns/fetch.wasm): fns/fetch.wasm is a component that reaches the clock and HTTPS to api.example.com, but no files or other app
+```
+
+没有 `net` 能力或没有主机时，准入检查拒绝它：
+
+```text
+[refused] functions: fns/fetch.wasm imports wasi:http, which needs the net capability and the hosts it reaches in network.hosts
 ```
 
 `hub component-info <file.wasm>` 输出函数文件的类型（`component` 或 `module`）、它的导入，以及它导出的函数，每个函数都附上 WIT 写法的参数和结果。下面在一个应用包中运行它，包中的 `fns/notes.wasm` 就是 App Hub 测试中的 notes 组件（`crates/app-hub/tests/fixtures/notes.component.wasm`），省略处以 `…` 标出：

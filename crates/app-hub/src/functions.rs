@@ -5,9 +5,10 @@
 //! and exports when it loads it. A component is validated here, and its
 //! imports must all come from the WASI packages a host scopes to the app
 //! ([`ALLOWED_COMPONENT_IMPORTS`]). Whether the manifest may carry one
-//! (`requires: ["wasm-components-v1"]`, `storage` for files) is the gate's
-//! check ([`crate::gate`]), which also tells reviewers what each component
-//! reaches ([`ComponentInfo::reach`]).
+//! (`requires: ["wasm-components-v1"]`, `storage` for files, `net` and
+//! `network.hosts` for HTTP) is the gate's check ([`crate::gate`]), which
+//! also tells reviewers what each component reaches
+//! ([`ComponentInfo::reach`]).
 //!
 //! [`describe`] is `hub component-info`: a file's kind, imports and exports,
 //! with each function's parameters and result written as WIT writes them
@@ -19,10 +20,11 @@ use wasmparser::types::TypesRef;
 use wasmparser::{ComponentTypeRef, Parser, Payload, PrimitiveValType, TypeBounds, Validator, WasmFeatures};
 
 /// The WASI packages a component may import: every interface of these, each
-/// scoped to its app by the host. Nothing else (`wasi:sockets`, `wasi:http`,
-/// non-WASI imports) is admitted.
+/// scoped to its app by the host. `wasi:http` reaches only the app's
+/// `network.hosts`, over HTTPS (OctoSense ADR 0014 phase 3). Nothing else
+/// (`wasi:sockets`, non-WASI imports) is admitted.
 pub const ALLOWED_COMPONENT_IMPORTS: &[&str] =
-    &["wasi:cli/", "wasi:clocks/", "wasi:filesystem/", "wasi:io/", "wasi:random/"];
+    &["wasi:cli/", "wasi:clocks/", "wasi:filesystem/", "wasi:http/", "wasi:io/", "wasi:random/"];
 
 /// The feature a manifest requires when its `fns/` holds a component.
 pub const COMPONENTS_FEATURE: &str = "wasm-components-v1";
@@ -75,21 +77,37 @@ impl ComponentInfo {
         self.imports.iter().any(|name| name.starts_with("wasi:filesystem/"))
     }
 
-    /// What it reaches, for a reviewer: "the clock, random numbers and
-    /// files in its app folder, but no network or other app".
-    pub fn reach(&self) -> String {
+    /// Whether it imports `wasi:http`: requests to the app's own
+    /// `network.hosts`, which the host allows only with the `net` capability.
+    pub fn uses_http(&self) -> bool {
+        self.imports.iter().any(|name| name.starts_with("wasi:http/"))
+    }
+
+    /// What it reaches, for a reviewer, with the app's network `hosts`: "the
+    /// clock, files in its app folder and HTTPS to api.example.com, but no
+    /// other app".
+    pub fn reach(&self, hosts: &[String]) -> String {
         let imports = |prefix: &str| self.imports.iter().any(|n| n.starts_with(prefix));
         let mut reaches = Vec::new();
         if imports("wasi:clocks/") {
-            reaches.push("the clock");
+            reaches.push("the clock".to_string());
         }
         if imports("wasi:random/") {
-            reaches.push("random numbers");
+            reaches.push("random numbers".to_string());
         }
         if self.uses_files() {
-            reaches.push("files in its app folder");
+            reaches.push("files in its app folder".to_string());
         }
-        let not = if self.uses_files() { "no network or other app" } else { "no files, network or other app" };
+        let network = self.uses_http() && !hosts.is_empty();
+        if network {
+            reaches.push(format!("HTTPS to {}", hosts.join(", ")));
+        }
+        let not = match (self.uses_files(), network) {
+            (true, true) => "no other app",
+            (true, false) => "no network or other app",
+            (false, true) => "no files or other app",
+            (false, false) => "no files, network or other app",
+        };
         match reaches.as_slice() {
             [] => "nothing but its input".into(),
             [one] => format!("{one}, but {not}"),
@@ -327,21 +345,35 @@ mod tests {
 
     #[test]
     fn the_reach_line_names_what_a_component_imports() {
-        assert_eq!(info(&["wasi:cli/stdout@0.2.9"]).reach(), "nothing but its input");
+        assert_eq!(info(&["wasi:cli/stdout@0.2.9"]).reach(&[]), "nothing but its input");
         assert_eq!(
-            info(&["wasi:clocks/wall-clock@0.2.9", "wasi:random/random@0.2.9"]).reach(),
+            info(&["wasi:clocks/wall-clock@0.2.9", "wasi:random/random@0.2.9"]).reach(&[]),
             "the clock and random numbers, but no files, network or other app"
         );
         assert_eq!(
-            info(&["wasi:filesystem/types@0.2.9"]).reach(),
+            info(&["wasi:filesystem/types@0.2.9"]).reach(&[]),
             "files in its app folder, but no network or other app"
         );
+        let hosts = ["api.example.com".to_string(), "cdn.example.com".to_string()];
+        assert_eq!(
+            info(&["wasi:http/outgoing-handler@0.2.4", "wasi:clocks/wall-clock@0.2.9"]).reach(&hosts),
+            "the clock and HTTPS to api.example.com, cdn.example.com, but no files or other app"
+        );
+        assert_eq!(
+            info(&["wasi:http/outgoing-handler@0.2.4", "wasi:filesystem/types@0.2.9"]).reach(&hosts[..1]),
+            "files in its app folder and HTTPS to api.example.com, but no other app"
+        );
+        // Hosts reach nothing without the import, and the import nothing
+        // without hosts.
+        assert_eq!(info(&["wasi:clocks/wall-clock@0.2.9"]).reach(&hosts), "the clock, but no files, network or other app");
+        assert_eq!(info(&["wasi:http/types@0.2.4"]).reach(&[]), "nothing but its input");
     }
 
     #[test]
     fn only_the_scoped_wasi_packages_are_allowed() {
         let component = info(&["wasi:io/poll@0.2.9", "wasi:sockets/network@0.2.9", "wasi:http/types@0.2.9", "my:pkg/host"]);
-        assert_eq!(component.refused_imports(), ["wasi:sockets/network@0.2.9", "wasi:http/types@0.2.9", "my:pkg/host"]);
+        assert_eq!(component.refused_imports(), ["wasi:sockets/network@0.2.9", "my:pkg/host"]);
+        assert!(component.uses_http());
         // A package name is matched whole: wasi:clocksmith is not wasi:clocks.
         assert_eq!(info(&["wasi:clocksmith/x"]).refused_imports(), ["wasi:clocksmith/x"]);
     }
