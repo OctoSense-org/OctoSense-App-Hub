@@ -106,6 +106,24 @@ fn media_services_require_exact_separate_grants() {
 }
 
 #[test]
+fn native_calendar_grant_is_separate_and_required_methods_must_exist() {
+    let manifest = parse(&manifest_with(r#""capabilities":["device_calendar"],"requires":["host-api-v1"],"host_api":{"required":{"device_calendar.events.list":1}}"#)).unwrap();
+    let policy = resolve(&manifest, &HostLimits::system()).unwrap();
+    assert!(policy.allows("device_calendar"));
+    for unrelated in ["calendar", "gcalendar", "auth", "mail", "location", "device_calendar.*"] {
+        assert!(!policy.allows(unrelated), "native calendar must not imply {unrelated}");
+    }
+    let mut versions = std::collections::BTreeMap::from([("app_policy.device_consent".into(), 1)]);
+    assert!(manifest.check_host_apis(&versions).unwrap_err().contains("device_calendar.events.list"));
+    versions.insert("device_calendar.events.list".into(), 2);
+    assert!(manifest.check_host_apis(&versions).is_err(), "ABI 2 does not silently satisfy ABI 1");
+    versions.insert("device_calendar.events.list".into(), 1);
+    manifest.check_host_apis(&versions).unwrap();
+    let old = resolve(&parse(&manifest_with(r#""capabilities":["calendar","gcalendar"]"#)).unwrap(), &HostLimits::system()).unwrap();
+    assert!(!old.allows("device_calendar"));
+}
+
+#[test]
 fn an_apps_own_functions_are_a_grant_of_their_own() {
     let limits = HostLimits::system();
     let manifest = parse(&manifest_with(r#""capabilities":["wasm"]"#)).unwrap();

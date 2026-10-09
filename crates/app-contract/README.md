@@ -48,12 +48,15 @@ limits.
 
 ## Versions on crates.io
 
-This checkout develops **1.9.0, not yet published**. It adds `files` for
-host-owned import/export dialogs. The grant is separate from `storage` and
-does not provide arbitrary filesystem access. Consumers of this checkout's
-App Policy need the matching contract; until publication, use the git patch
-described below. Existing released hosts do not gain file APIs by parsing
-the new capability.
+This checkout prepares **1.10.0 (unpublished)**, including 1.9.0's `files`
+capability and the distinct `device_calendar` capability. `files` provides
+host-owned import/export dialogs, separate from `storage`; it grants no
+arbitrary filesystem access. `device_calendar` is separate from `calendar`
+and `gcalendar`. Neither declaration installs a host adapter or grants OS
+access: declare required method versions and check the actual host. Until
+publication, consumers of this App Policy need the matching git-patched
+contract described below. Released hosts do not gain these APIs by parsing
+new capabilities.
 
 crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0, 1.7.0, 1.7.1 and 1.8.0. Versions 1.3.0 and
 1.4.0 exist only in this repository ([CHANGELOG.md](CHANGELOG.md)); 1.5.0

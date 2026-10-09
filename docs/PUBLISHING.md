@@ -281,6 +281,7 @@ platform and provider limits; historical beta differences are explicit.
 | `gcalendar` | Reading Google calendars; each event change waits for the person's review. | Read authorized Google calendars and ask you to review event changes | As `auth` |
 | `gmail` | Reading Gmail and keeping reply drafts; each send waits for the person's review. Separate from `mail`. | Read authorized Gmail messages, keep reply drafts and request native send review | As `auth` |
 | `calendar` | Calendar's local event store and UI. Not Google Calendar. | Read and manage local events through the device's Calendar service | System app `os.calendar` only; store apps use `gcalendar` |
+| `device_calendar` | Read selected native device calendars and request review of event changes. Separate app consent, OS permission and calendar selection are required. | Read device calendars you choose and ask you to review event changes | Contract 1.10.0 source, unpublished. Requires a compatible host adapter; not in desktop RC1 or Home beta.1. Declare exact required methods. |
 | `llm` | Managing the device's AI providers through the `llm` service. | Manage the assistant's AI providers, whose keys stay with the device | System apps only |
 | `news` | Items the device collects from its feeds and topic feeds. | Read news the device collects from its feeds and topics | System apps only |
 | `photos` | Photos' own library and collections. | Read Photos's own library and publish collections | System apps only: OctoSense serves just `photos.notify`, to `os.photos` |
@@ -589,6 +590,8 @@ The gate refuses a `host_method` unless every rule holds:
 | --- | --- | --- |
 | `github` | `github.repositories`, `github.files`, `github.read` | |
 | `gcalendar` | `gcalendar.calendars`, `gcalendar.sync`, `gcalendar.refresh`, `gcalendar.cached`, `gcalendar.get`, `gcalendar.prepare` | |
+| `device_calendar` | `device_calendar.permission.status`, `device_calendar.calendars.list`, `device_calendar.events.list`, `device_calendar.events.get` | |
+| `mail` | `mail.compose_status` | `mail.compose` (local draft only) |
 | `gmail` | `gmail.labels`, `gmail.messages`, `gmail.message`, `gmail.draft.get`, `gmail.event.status` | `gmail.draft.open`, `gmail.draft.edit`, `gmail.event.decide` |
 | `glance` | `glance.list` | `glance.publish`, `glance.withdraw` |
 | `auth` | `auth.backend.me`, `auth.backend.request` (declared `GET` operations only) | |
@@ -597,6 +600,13 @@ The gate refuses a `host_method` unless every rule holds:
 | `camera` | `camera.permission.status` | |
 | `microphone` | `microphone.permission.status` | |
 | `location` | `location.permission.status`, `location.get` | |
+
+The `device_calendar` aliases and `mail.compose` / `mail.compose_status` are
+unreleased additions. All require `private_data: true` and the corresponding
+capability. Calendar permission prompts, calendar selection and event writes
+are foreground-only; so are `mail.review_send` and `mail.send`. Preparing a
+draft does not send it. The compatible host must check authorization again
+and show its own immutable review before a person approves an external write.
 
 `wasm.<function>` runs one of the app's own functions (`fns/*.wasm`, the
 `wasm` capability), only on hosts that serve `wasm`

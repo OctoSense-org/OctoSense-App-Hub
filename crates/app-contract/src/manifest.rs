@@ -83,6 +83,10 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // Calendar's local event store and UI. The service additionally checks
     // owning app identity; this is not Google/Android calendar access.
     "calendar",
+    // Public native calendar access, scoped to calendars the person selects.
+    // Distinct from os.calendar's store and the Google Calendar connector.
+    // The host must implement the declared methods and enforce native consent.
+    "device_calendar",
     // See and arrange the assistant's LLM providers through the host's llm
     // service. Keys are typed, shown as a QR and scanned only on the host's
     // own sheets; the app sees masked status, never a key.

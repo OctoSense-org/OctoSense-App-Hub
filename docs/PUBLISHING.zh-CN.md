@@ -212,6 +212,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | `gcalendar` | 读取 Google 日历；每次修改日程都要等用户确认。 | Read authorized Google calendars and ask you to review event changes | 同 `auth` |
 | `gmail` | 读取 Gmail 并保存回复草稿；每次发送都要等用户确认。与 `mail` 相互独立。 | Read authorized Gmail messages, keep reply drafts and request native send review | 同 `auth` |
 | `calendar` | 日历应用的本地日程存储和界面。不是 Google 日历。 | Read and manage local events through the device's Calendar service | 仅系统应用 `os.calendar`；商店应用请用 `gcalendar` |
+| `device_calendar` | 读取用户选定的原生日历，并请求确认日程修改。需要分别获得应用授权、操作系统权限和日历选择授权。 | Read device calendars you choose and ask you to review event changes | 契约 1.10.0 源码，尚未发布。需要兼容的宿主适配器；桌面 RC1 和 Home beta.1 不提供。请声明所需方法的确切版本。 |
 | `llm` | 通过 `llm` 服务管理设备的 AI 提供商。 | Manage the assistant's AI providers, whose keys stay with the device | 仅系统应用 |
 | `news` | 设备从订阅源和主题订阅源收集的条目。 | Read news the device collects from its feeds and topics | 仅系统应用 |
 | `photos` | 相册应用自己的图库和合集。 | Read Photos's own library and publish collections | 仅系统应用：OctoSense 只向 `os.photos` 提供 `photos.notify` |
@@ -465,6 +466,8 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | --- | --- | --- |
 | `github` | `github.repositories`、`github.files`、`github.read` | |
 | `gcalendar` | `gcalendar.calendars`、`gcalendar.sync`、`gcalendar.refresh`、`gcalendar.cached`、`gcalendar.get`、`gcalendar.prepare` | |
+| `device_calendar` | `device_calendar.permission.status`、`device_calendar.calendars.list`、`device_calendar.events.list`、`device_calendar.events.get` | |
+| `mail` | `mail.compose_status` | `mail.compose`（仅操作本地草稿） |
 | `gmail` | `gmail.labels`、`gmail.messages`、`gmail.message`、`gmail.draft.get`、`gmail.event.status` | `gmail.draft.open`、`gmail.draft.edit`、`gmail.event.decide` |
 | `glance` | `glance.list` | `glance.publish`、`glance.withdraw` |
 | `auth` | `auth.backend.me`、`auth.backend.request`（仅声明的 `GET` 操作） | |
@@ -473,6 +476,8 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | `camera` | `camera.permission.status` | |
 | `microphone` | `microphone.permission.status` | |
 | `location` | `location.permission.status`、`location.get` | |
+
+`device_calendar` 工具别名和 `mail.compose` / `mail.compose_status` 尚未发布，均需要 `private_data: true` 和对应能力。日历权限申请、日历选择和事件修改仅限前台，`mail.review_send` 和 `mail.send` 也一样。准备草稿不会发送邮件；兼容宿主仍须重新核验授权，并在用户批准对外写操作前显示宿主自己的不可变审阅内容。
 
 `wasm.<function>` 运行应用自带的函数之一（`fns/*.wasm`，`wasm` 能力）。它只在提供 `wasm` 的宿主上可用（见[能力](#能力)），标准桌面 RC1 包默认关闭。RC1 在[平台限制](HOST-API.zh-CN.md#限制)内实现上表中的 `auth`、`runtime`、`camera`、`microphone` 和 `location` 方法。上面的规则同样适用于这些方法，`runtime.list` 和 `runtime.describe` 也不例外。通过准入不等于已经配置账户、取得权限或补上缺少的 API：请用 `runtime.describe` 查询宿主实现了什么。映射到 `auth.backend.request` 的工具只能执行后端声明的 `GET` 操作；写操作仍须应用在前台，并由用户在宿主的原生审阅界面上批准。权限的 `request` 和 `revoke`、账户管理，以及 `app_tools.dispatch@1` 等运行时 ABI，都没有 `host_method`。
 

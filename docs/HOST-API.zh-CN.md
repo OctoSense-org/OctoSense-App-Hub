@@ -52,6 +52,18 @@ Android 文档提供方 URI。传输仅限前台，agent 和后台任务不能�
 
 ## 查询宿主实现了什么
 
+### 原生日历（尚未发布的契约 1.10）
+
+新增 `device_calendar` 能力与 `calendar`（系统日历应用自己的存储）和 `gcalendar`（Google 连接器）互相独立，不会隐含授予它们或操作系统权限。需要原生日程的应用应声明 `device_calendar`、`host-api-v1`，并设置 `host_api.required: {"device_calendar.events.list": 1}`，以及完整流程需要的其他方法。缺少这些方法的宿主会拒绝安装。
+
+本源码变更允许声明该能力和只读工具别名，不会给桌面 RC1 或 Home beta.1 安装原生适配器。适配器还必须实施应用及账户隔离、操作系统权限、日历选择和修改操作的可信确认。新适配器的运行时与设备验收独立于这些契约测试；支持平台与 Agent 访问范围以服务的方法描述为准。
+
+### 邮件草稿与发送审阅（尚未发布）
+
+兼容宿主在既有的 `mail` 能力下提供 `mail.compose`，用于修改与应用及账户绑定的本地草稿，并通过 `mail.compose_status` 查询状态。两者的 Agent 别名最低风险分别是 `act` 和 `read`，都须声明 `private_data: true`，且不会发送邮件。前台应用调用 `mail.review_send`（或同样需要审阅的兼容入口 `mail.send`），宿主显示确切草稿，只有用户亲手批准后才发送。请声明所需方法版本。桌面 RC1 不提供这套公共草稿流程，原有的系统邮件草稿方法仍仅限系统应用。
+
+### 运行时清单
+
 应用声明 `runtime` 能力后，可以用 `{}` 调用 `runtime.list` 列出所有已描述的方法，或用 `{"method":"location.get"}` 调用 `runtime.describe` 查询单个方法：
 
 - 方法描述包含输入和输出 schema、ABI 版本、所需能力、支持的平台，以及 Agent 能否调用它。

@@ -8,6 +8,20 @@ are unpublished, and 1.5.0 includes their changes.
 [README.md](README.md#versions-on-cratesio) shows how to update a lock file
 that holds 1.2.0.
 
+## 1.10.0 — unreleased
+
+- Add the distinct `device_calendar` capability for host-mediated, selected
+  native calendars. This is not the system Calendar app's `calendar` service
+  or the Google Calendar `gcalendar` connector.
+- The companion app policy admits read-only native-calendar aliases and
+  app/account-bound `mail.compose` / `mail.compose_status` aliases. Draft
+  preparation is not sending; external writes remain foreground host reviews.
+- Existing capability grants, schema versions and signed manifest bytes do
+  not change. Required host API declarations still fail on a host without the
+  declared method versions. Adapter implementation and OS consent belong to
+  the host; a contract release alone supplies neither.
+
+
 ## 1.9.0 — unpublished
 
 - Adds the `files` capability for host-owned file selection and export dialogs.

@@ -50,6 +50,35 @@ host still serves.
 
 ## Discover what the host implements
 
+### Native device calendars (unreleased contract 1.10)
+
+The new `device_calendar` capability is separate from `calendar` (the system
+Calendar app's own store) and `gcalendar` (Google's connector). It does not
+grant either of them, or an OS permission. An app that needs native events
+declares `device_calendar` and `host-api-v1`, with
+`host_api.required: {"device_calendar.events.list": 1}` and any other methods
+its workflow requires. A host without those methods refuses installation.
+
+This source change admits the capability and read tool aliases. It does not
+install a native adapter into desktop RC1 or Home beta.1. The adapter must
+also enforce app/account scope, OS permission, selected calendars and trusted
+review of mutations. Runtime and device acceptance of the new adapter are
+separate from these contract tests. The service's method descriptions remain
+the authority for supported platforms and agent access.
+
+### Reviewed Mail drafts (unreleased)
+
+With the existing `mail` capability, a compatible host exposes `mail.compose`
+for app/account-bound local draft changes and `mail.compose_status` for their
+status. Agent aliases require minimum risk `act` and `read`, respectively,
+with `private_data: true`. They do not send mail. The foreground app requests
+`mail.review_send` (or the reviewed `mail.send` compatibility entry point);
+the host shows the exact draft and sends only after physical user approval.
+Declare required method versions. Desktop RC1 does not implement this public
+compose flow; the older system Mail draft methods remain system-app-only.
+
+### Runtime inventory
+
 With the `runtime` capability, call `runtime.list` with `{}` for every
 described method, or `runtime.describe` with `{"method":"location.get"}` for
 one:

@@ -168,7 +168,7 @@ pub fn privacy_summary_with_tools(manifest: &AppManifest, tools: &[ToolSpec]) ->
         lines.push("No direct network access is granted.".to_string());
     }
     let provider_services = manifest.capabilities.iter().any(|cap| {
-        matches!(cap.as_str(), "auth" | "github" | "gmail" | "gcalendar" | "mail" | "images" | "web"
+        matches!(cap.as_str(), "auth" | "github" | "gmail" | "gcalendar" | "device_calendar" | "mail" | "images" | "web"
             | "news" | "youtube" | "model" | "research" | "crawl" | "octos.turn.start")
             || cap.starts_with("matrix.")
             || octosense_app_contract::palpo::SERVICES.contains(&cap.as_str())
@@ -197,6 +197,7 @@ pub fn privacy_summary_with_tools(manifest: &AppManifest, tools: &[ToolSpec]) ->
         ("github", "Reads authorized GitHub repositories and requests your review before committing Markdown through the host."),
         ("gmail", "Reads authorized Gmail messages, keeps reply drafts and requests native host review before sending."),
         ("gcalendar", "Reads authorized Google calendars and requests your review before saving event changes through the host."),
+        ("device_calendar", "Reads selected device calendars after your permission and requests your review before changing events. The OS calendar account may synchronize those changes with its provider."),
         ("calendar", "Reads and manages local calendar events through the device's Calendar service."),
         ("llm", "Manages the assistant's AI providers; it never sees your API keys."),
         ("news", "Reads news the device collects from its feeds and topics."),
