@@ -15,7 +15,7 @@
 
 App Hub 只接受带 GitHub 证明的 Release（[ADR 0002](adr/0002-github-attested-publisher-identity.zh-CN.md)）。应用的首个版本和每次更新，都由应用仓库的 GitHub 工作流准备 Release、生成证明并打包，因此你不需要发布者密钥，也不需要仓库签名 Secret。安装这类应用需要支持 `publisher-github-v1` 的宿主；请使用 [RC1 发行版及下载指南](../README.zh-CN.md#下载兼容宿主)。
 
-公开签名目录第 14 版提供带 GitHub 证明的 `io.github.ymote.*` 参考应用（[当前应用](../README.zh-CN.md#应用)）。App Hub 已在签名目录第 14 版撤回较早那批用密钥签名的 `org.octosense.samples.*` 条目；后面的步骤仍以它们为例（见[三个参考应用](#三个参考应用)）。准入、能力、清单和签名规则见[发布参考](PUBLISHING.zh-CN.md)。
+公开签名目录第 15 版提供带 GitHub 证明的 `io.github.ymote.*` 参考应用（[当前应用](../README.zh-CN.md#应用)）。App Hub 已在签名目录第 14 版撤回较早那批用密钥签名的 `org.octosense.samples.*` 条目；后面的步骤仍以它们为例（见[三个参考应用](#三个参考应用)）。准入、能力、清单和签名规则见[发布参考](PUBLISHING.zh-CN.md)。
 
 ```text
 提交 issue（可以先开）→ 构建 hub 和 card-host → tools/octo doctor
@@ -121,7 +121,7 @@ RC1 发行版与历史 desktop beta.2 有以下不同。[下载发行文件并�
 
 ## 三个参考应用
 
-要下载当前版本，请使用[公开签名目录表](../README.zh-CN.md#应用)中带 GitHub 证明的 0.2.1 版本及新 ID。0.2.0 → 0.2.1 更新保持同一 GitHub 发布者身份，不需要开发者签名密钥。
+要下载当前版本，请使用[公开签名目录表](../README.zh-CN.md#应用)中带 GitHub 证明的版本（GitHub Notes 为 0.2.2，其余为 0.2.1）及新 ID。0.2.0 → 0.2.1 更新保持同一 GitHub 发布者身份，不需要开发者签名密钥。
 
 ### 历史 0.1.x 示例
 

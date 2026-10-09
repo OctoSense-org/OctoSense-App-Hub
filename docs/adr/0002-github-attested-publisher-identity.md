@@ -7,8 +7,8 @@ this decision in app contract 1.8.0, which adds the `publisher-github-v1`
 host requirement. Two tag-push releases of a test app passed native Store
 install, update and launch checks
 ([evidence and limits](../PUBLISHING.md#github-publisher-provenance)). Public
-catalog sequence 14 offers the three reference apps at 0.2.1 and Camera Card
-Demo at 1.1.1, all published with GitHub provenance; each app kept the same
+catalog sequence 15 offers the three reference apps (GitHub Notes at 0.2.2, the
+others at 0.2.1) and Camera Card Demo at 1.1.1, all published with GitHub provenance; each app kept the same
 GitHub identity across its update. OctoSense desktop 0.1.0-rc.1 (RC1)
 installs them on macOS and checks their attestations and publisher
 continuity at install and update.

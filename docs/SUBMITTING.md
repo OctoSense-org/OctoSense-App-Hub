@@ -23,7 +23,7 @@ secret. Installing such an app takes a host that supports
 `publisher-github-v1`; use the
 [RC1 release and download guide](../README.md#download-a-compatible-host).
 
-Public catalog 14 offers the GitHub-attested `io.github.ymote.*` reference apps
+Public catalog 15 offers the GitHub-attested `io.github.ymote.*` reference apps
 ([current apps](../README.md#apps)). App Hub withdrew the older key-signed
 `org.octosense.samples.*` entries in catalog sequence 14; later steps still cite
 them as examples ([The three reference apps](#the-three-reference-apps)). The
@@ -185,8 +185,8 @@ used a key-signed test app.
 
 ## The three reference apps
 
-For current downloads, use the GitHub-attested 0.2.1 releases and new ids in
-[the public catalog table](../README.md#apps). Their 0.2.0 → 0.2.1 update
+For current downloads, use the GitHub-attested releases (GitHub Notes 0.2.2, the
+others 0.2.1) and new ids in [the public catalog table](../README.md#apps). Their 0.2.0 → 0.2.1 update
 retains the same GitHub publisher identity. None needs a developer signing key.
 
 ### Historical 0.1.x examples

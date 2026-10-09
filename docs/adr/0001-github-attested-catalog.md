@@ -5,7 +5,7 @@ English | [简体中文](0001-github-attested-catalog.zh-CN.md)
 Status: accepted, implemented and in production. App Hub #150 implemented
 this decision. The protected workflow published catalog sequence 11
 ([run 37736098082](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37736098082))
-and every later catalog through sequence 14. OctoSense desktop 0.1.0-rc.1
+and every later catalog through sequence 15. OctoSense desktop 0.1.0-rc.1
 is a compatible host release and selects the `catalog-v2.json` channel by
 default.
 

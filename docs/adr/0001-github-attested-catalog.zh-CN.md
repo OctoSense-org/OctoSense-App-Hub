@@ -2,7 +2,7 @@
 
 [English](0001-github-attested-catalog.md) | 简体中文
 
-状态：已接受、已实现，并已投入生产。App Hub #150 实现了这项决定。受保护工作流发布了签名目录第 11 版（[运行 37736098082](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37736098082)）至第 14 版。OctoSense 桌面版 0.1.0-rc.1 是兼容的宿主发行版，默认选用 `catalog-v2.json` 通道。
+状态：已接受、已实现，并已投入生产。App Hub #150 实现了这项决定。受保护工作流发布了签名目录第 11 版（[运行 37736098082](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/37736098082)）至第 15 版。OctoSense 桌面版 0.1.0-rc.1 是兼容的宿主发行版，默认选用 `catalog-v2.json` 通道。
 
 ## 背景
 
