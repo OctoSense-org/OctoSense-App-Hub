@@ -184,7 +184,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 
 ### 能力
 
-准入检查能识别 108 个能力名称：下表中的 30 个，以及[精确的服务名](#精确的服务名octosmatrixpalpo)一节中的 78 个。其他名称一律拒绝：
+准入检查能识别 120 个能力名称：下表中的 42 个，以及[精确的服务名](#精确的服务名octosmatrixpalpo)一节中的 78 个。其他名称一律拒绝：
 
 ```text
 [refused] policy: app com.example.forecast requests unknown capability "model.image"
@@ -224,6 +224,18 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | `crawl` | 通过系统工具箱抓取网站，深度和页数不超过范围中的 `max_depth` 和 `max_pages`，并遵守其中的域名列表。覆盖面比 `research` 更广。 | Crawl websites, *范围的限制*, which reaches more than searching | 同 `research` |
 | `runtime` | 用 `runtime.list` 和 `runtime.describe` 查询宿主实现了哪些 API（[宿主 API 兼容性](HOST-API.zh-CN.md)）。它不授予所列的任何 API。 | Inspect available host APIs without gaining access to their data or permissions | OctoSense 桌面版 0.1.0-beta.2 不提供，它的商店会拒绝这个名称。在基于 App Hub `main` 构建的每个宿主中（包括 `card-host`），由 App Hub 的请求分派器响应。 |
 | `wasm` | 应用自带的函数：应用包 `fns/` 中的 WebAssembly 模块（最多 8 个），由宿主的 `wasm` 服务在沙盒中运行，有截止时间和内存上限。函数只拿到自己的输入，接触不到文件、网络、时钟或其他应用。Agent 工具可以用 `host_method: "wasm.<function>"` 运行它。函数的编写、构建和调用方法见 App Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.zh-CN.md)。 | Run its own sandboxed functions on this device | 尚无任何发布版提供：标准桌面 RC1 包默认关闭。OctoSense `main` 的每个标准桌面版和 Home 构建在 macOS、Linux 和 Android 上提供它，属于有限支持（[服务及其限制](https://github.com/OctoSense-org/OctoSense/blob/main/docs/wasm.zh-CN.md#服务)）。Windows、iOS 和 OpenHarmony 的构建不包含它：在那里调用会得到 `no service answers "wasm" on this device`。 |
+| `sheet` | 通过 `sheet` 引擎（gridcraft）处理电子表格：工作簿、公式、重算和 xlsx，均在应用自己的文件内。 | Use the device's spreadsheet engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面和 Home 构建中提供。 |
+| `photo` | 通过 `photo` 引擎（photocraft）处理图像和照片文档：检查、转换、编辑命令和预览，均在应用自己的文件内。 | Use the device's image-editing engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面和 Home 构建中提供。 |
+| `word` | 通过 `word` 引擎（wordcraft）处理文档：创建、读取、检查，并在 docx、Markdown、HTML、RTF、ODT 和 PDF 之间转换，均在应用自己的文件内。 | Use the device's document engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `deck` | 通过 `deck` 引擎（deckcraft）处理幻灯片：按大纲创建、渲染幻灯片，并转换为 PPTX 或 PDF，均在应用自己的文件内。 | Use the device's presentation engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `cad` | 通过 `cad` 引擎（cadcraft）处理图纸：检查、查询、测量、渲染，并转换 DXF 和 DWG，均在应用自己的文件内。 | Use the device's CAD engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `light` | 通过 `light` 引擎（lightcraft）处理 RAW 照片：元数据、显影控件，以及单张或批量显影，均在应用自己的文件内。 | Use the device's raw-photo engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `sound` | 通过 `sound` 引擎（soundcraft）离线处理音频文件：信息、波形峰值、转换、裁剪和混音；它从不打开音频设备，均在应用自己的文件内。 | Use the device's audio-editing engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `design` | 通过 `design` 引擎（designcraft）处理页面排版：文档信息、页面渲染，以及 PDF、IDML 或 EPUB 导出，均在应用自己的文件内。 | Use the device's page-layout engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `film` | 通过 `film` 引擎（filmcraft）处理视频：容器信息、导出 PNG 帧，以及用其自带编解码器的有界导出，均在应用自己的文件内。 | Use the device's video-editing engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `effect` | 通过 `effect` 引擎（effectcraft）处理动态图形：工程信息、帧渲染，以及 Lottie 导入和导出，均在应用自己的文件内。 | Use the device's motion-graphics engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `vector` | 通过 `vector` 引擎（vectorcraft）处理矢量图：检查、转换，并渲染 SVG、PDF、EPS 和 DXF，均在应用自己的文件内。 | Use the device's vector-drawing engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
+| `pdf` | 通过 `pdf` 引擎（pdfcraft）处理 PDF：信息、文本、页面渲染、合并和拆分，均在应用自己的文件内。 | Use the device's PDF engine on its own files | 仅系统应用。尚无任何发布版提供：OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
 
 任何能力都不隐含其他能力。尚不支持：面向商店应用的 `photos` 和 `youtube` 服务。脚本如何调用各项能力，见 App Flow 的[能力](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.zh-CN.md)文档。
 
