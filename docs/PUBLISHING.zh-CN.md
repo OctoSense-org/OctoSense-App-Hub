@@ -90,7 +90,8 @@ my-app/
 | `publisher-signature` | 声明的 GitHub 证明验证失败（即使加了 `--allow-unsigned`）；清单未签名，且没有加 `--allow-unsigned`；或者旧格式的 Ed25519 签名验证失败，或指向未知的密钥（`publisher key "<id>" is not registered with this hub`）。 | 清单未签名，且加了 `--allow-unsigned`。 |
 | `identity` | ID 以 `os.` 开头；ID 本身或其最后一段是保留名称（[ID 与保留名称](#id-与保留名称)）。 | |
 | `contents` | 文件的扩展名不是 `.card`、`.json`、`.l0`、`.octoscript`、`.splash`、`.svg`、`.png`、`.jpg`、`.jpeg`、`.webp`、`.ttf`、`.otf`、`.txt` 或 `.md` 之一，也不是函数模块（`.wasm`，见 `functions`）。准入检查同样拒绝没有扩展名的文件（例如 `.DS_Store` 和 `LICENSE`）。 | |
-| `functions` | 应用包带了 `.wasm` 文件却没有 `wasm` 能力，或带了 8 个以上。不在 `fns/<name>.wasm`（名称为 `[a-z0-9_-]`，最多 64 个字符），或既不是 WebAssembly 核心模块（版本 1 的 8 字节文件头）也不是有效组件的文件，以 `contents-invalid` 拒绝；导入了 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:http`、`wasi:io`、`wasi:random` 和 `octosense:host` 以外任何内容的组件也是如此。清单没有在 `requires` 中声明 `wasm-components-v1`，组件导入了 `wasi:filesystem` 而应用没有 `storage` 能力，或组件导入了 `wasi:http` 而应用没有 `net` 能力、`network.hosts` 中也没有至少一个主机时，组件在这一项被拒绝（[WebAssembly 组件](#webassembly-组件)）。除此之外，准入检查不检查核心模块内部；宿主在加载模块时检查它的导入和导出。 | 应用声明了 `wasm`，却没有带 `fns/*.wasm`。清单声明了 `wasm-components-v1`，`fns/` 中却没有组件。每个准入的组件都有一行说明它能访问什么。 |
+| `functions` | 应用包的 `fns/` 中带了 `.wasm` 文件却没有 `wasm` 能力，或其中带了 8 个以上。既不在 `fns/<name>.wasm`（名称为 `[a-z0-9_-]`，最多 64 个字符），也不在 `components/<blake3>.wasm`（以自己的摘要命名，见 `components`）的 `.wasm` 文件，或既不是 WebAssembly 核心模块（版本 1 的 8 字节文件头）也不是有效组件的文件，以 `contents-invalid` 拒绝；导入了 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:http`、`wasi:io`、`wasi:random` 和 `octosense:host` 以外任何内容的组件也是如此。清单没有在 `requires` 中声明 `wasm-components-v1`，组件导入了 `wasi:filesystem` 而应用没有 `storage` 能力，或组件导入了 `wasi:http` 而应用没有 `net` 能力、`network.hosts` 中也没有至少一个主机时，组件在这一项被拒绝（[WebAssembly 组件](#webassembly-组件)）。除此之外，准入检查不检查核心模块内部；宿主在加载模块时检查它的导入和导出。 | 应用声明了 `wasm`，却没有带 `fns/*.wasm`，也没有指定共享组件。清单声明了 `wasm-components-v1`，`fns/` 中却没有组件。每个准入的组件都有一行说明它能访问什么。 |
+| `components` | 清单指定的某个共享组件不在 `--catalog` 给出的签名目录中、已在其中被撤回或摘要不同，或应用没有授予它所导入内容需要的权限。商店应用的应用包在 `components/` 中带有 `.wasm` 文件。系统应用的应用包（`--system-app`）缺少它固定的某个组件的 `components/<blake3>.wasm`，或带有它没有固定的组件（[共享组件](#共享组件)）。 | 每个解析成功的组件都有一行说明它能访问什么。不使用 `--catalog` 时，每个组件都会被报告为未解析。清单声明了 `wasm-shared-components-v1`，却没有指定任何组件。 |
 | `contents-invalid`（文本和图片） | 文本文件（`.splash`、`.card`、`.json`、`.l0`、`.octoscript`、`.txt` 或 `.md`）超过 1 MiB 或不是 UTF-8；JSON 无法解析；PNG、JPEG 或 WebP 无法解码，或单边超过 4096 像素；商店信息中的图标不是正方形，或者是超过 1 MiB 或单边超过 1024 像素的位图。 | |
 | `contents-invalid`（SVG） | SVG 无法解析；既没有数值形式的 `width` 和 `height`，也没有 `viewBox`；单边超过 4096 像素；或含有脚本、`foreignObject` 或 `on…` 事件属性。SVG 的样式（`style` 属性或 `<style>` 块）导入样式表、使用转义或注释，或让 `url()` 指向同一文件内 `#fragment` 以外的任何位置。 | |
 | `entry` | 应用包中既没有 `main.splash` 也没有 `page.card`；`page.card` 不是有效的 L0；`page.data.json` 不是 JSON；应用包中既没有 `kit/native/<theme>/kit.json`，卡片所需的 OctoScript kit 模块也不齐全。 | |
@@ -212,6 +213,208 @@ $ hub component-info fns/notes.wasm
 
 `wasm.<function>` 工具的 [`host_method` 规则](#把工具映射到共享服务host_method)是为核心模块制定的，核心模块的函数只看得到自己的输入。目前这些规则原样适用于组件，尽管有 `storage` 的组件可以读取应用的文件。
 
+## 共享组件
+
+**共享组件**是 App Hub 在签名目录中单独发布的 WebAssembly 组件，可供多个应用使用，就像共享 npm 包一样。与 npm 依赖不同的是，它被精确固定：应用指定一个确切版本和文件的 BLAKE3 摘要，所以已安装应用的代码只会随应用更新而改变（[ADR 0003](adr/0003-shared-components.zh-CN.md)，即 [OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436) 的第 4 阶段）。App Hub 像审核应用一样审核共享组件，并像验证应用自己的组件一样验证它（[WebAssembly 组件](#webassembly-组件)）。它能访问的，只有使用它的应用可以访问的内容：每个应用都以自己的授权运行自己的实例。
+
+目前还没有任何 OctoSense 构建加载共享组件，签名目录中也还没有组件。在支持共享组件之前构建的宿主（包括 OctoSense 桌面版 RC1 和 RC2）会拒绝含有组件、或含有固定了组件的应用的整个签名目录，所以在兼容的宿主发行版发布之前，App Hub 不会发布这两种内容。
+
+### 使用共享组件
+
+在清单的 `components` 中列出每个组件，并在 `requires` 中声明 `wasm-shared-components-v1`，它需要 `wasm` 能力：
+
+```json
+"capabilities": ["wasm", "storage"],
+"requires": ["wasm-shared-components-v1"],
+"components": [
+  {
+    "as": "markdown",
+    "id": "org.example.markdown",
+    "version": "1.0.0",
+    "blake3": "c30d6e3125ff31676cad3c06735186d82cd0c017802afd344e3d2db876ff976c"
+  }
+]
+```
+
+| 字段 | 规则 |
+| --- | --- |
+| `as` | 应用给组件起的名字：`[a-z][a-z0-9_]{0,31}`，在清单中不能重复。 |
+| `id` | 组件在签名目录中的 ID。 |
+| `version` | 单个确切的语义版本，例如 `1.0.0` 或 `1.0.0-rc.1`。`^1.0.0` 这样的版本范围会被拒绝。 |
+| `blake3` | 组件文件的 BLAKE3 摘要，64 个小写十六进制字符，即签名目录条目中的 `wasm_blake3`。 |
+
+一个应用最多指定 8 个组件。没有该特性却写了 `components`（`components requires wasm-shared-components-v1`）、有该特性却没有 `wasm`（`wasm-shared-components-v1 requires the wasm capability`），或某个条目违反上述规则，清单解析器都会拒绝。不认识该特性的宿主会拒绝这个应用。只使用共享组件的应用不需要 `fns/`。
+
+使用 `--catalog` 时，准入检查在该签名目录中解析每个组件。组件缺失（`is not in the catalog`）、已被撤回（`was withdrawn: <reason>`）或摘要不同（`pins blake3 …, but the catalog's file hashes to …`）时，`components` 检查项会拒绝这个应用。应用没有授予组件所导入内容需要的权限时，它也会拒绝：`wasi:filesystem` 需要 `storage`，`wasi:http` 需要 `net` 且 `network.hosts` 中至少有一个主机。`octosense:host` 不需要单独的授权。随后，每个组件都有一行说明它在这个应用中能访问什么。不使用 `--catalog` 时，准入检查会警告它无法解析这些组件。
+
+下面的演练在本地开发 Hub 上运行（见[用开发 Hub 演练](#用开发-hub-演练)）。它的签名目录提供 `org.example.markdown` 1.0.0，即 App Hub 测试中的 notes 组件（`crates/app-hub/tests/fixtures/notes.component.wasm`）。应用 `writer` 固定了它，并获得 `wasm` 和 `storage` 能力：
+
+```console
+$ hub check writer --allow-unsigned --catalog dev-catalog.json --anchor "$(cat anchor.pub)"
+org.example.writer 1.0.0 — PASSED
+  [warning] publisher-signature: unsigned: accountability rests on the hub alone
+  [warning] components: component markdown (org.example.markdown 1.0.0) reaches the clock, random numbers and files in its app folder, but no network or other app
+  grants: capabilities {"storage", "wasm"}, hosts {}, storage 16777216 bytes, agent none
+```
+
+没有 `storage` 时，同一个应用会被拒绝：
+
+```text
+  [refused] components: component markdown (org.example.markdown 1.0.0) imports wasi:filesystem, the app's own files, which needs the storage capability
+```
+
+不使用 `--catalog` 时：
+
+```text
+  [warning] components: component markdown (org.example.markdown 1.0.0) is not resolved: check with --catalog to see that it is offered, matches its digest and what it reaches
+```
+
+商店应用的应用包绝不携带组件：准入检查拒绝 `components/` 中的 `.wasm` 文件，因为商店会从签名目录获取组件。随构建发布的系统应用没有签名目录，它把固定的每个组件放在应用包的 `components/<blake3>.wasm`。`hub check --system-app` 检查其中每个文件：它必须是有效组件、只有允许的导入、以自己的摘要命名，并且应用授予了它所导入内容需要的权限。清单没有固定的文件会被拒绝。
+
+对于这样的应用，商店的权限说明会多一行：`Runs shared components App Hub reviewed, with only this app's permissions: org.example.markdown 1.0.0`。
+
+### 发布共享组件
+
+组件 Release 由两个文件组成：用 `cargo build --target wasm32-wasip2` 构建的组件，以及描述它的 `<id>-<version>.component.json`。你只需写一份草稿，填写下面第一个表中的字段；其余字段由 `hub component-prepare` 从文件中得出：
+
+```json
+{
+  "component": {
+    "schema": 1,
+    "id": "org.example.markdown",
+    "version": "1.0.0",
+    "name": "Markdown",
+    "publisher": {
+      "name": "Example Org",
+      "support": "https://example.org/support",
+      "privacy_policy_url": "https://example.org/privacy"
+    },
+    "license": "MIT OR Apache-2.0"
+  },
+  "listing": {
+    "subtitle": "Markdown to HTML, with word counts",
+    "description": "Renders CommonMark to HTML with pulldown-cmark and reports words, lines and headings.",
+    "keywords": ["markdown", "html"]
+  }
+}
+```
+
+| 由你填写 | 规则 |
+| --- | --- |
+| `component.schema` | `1`。 |
+| `component.id` | 应用 ID 的规则（[ID 与保留名称](#id-与保留名称)）；绝不以 `os.` 开头，也不能是签名目录中某个应用的 ID。 |
+| `component.version` | 单个确切的语义版本。每个 Release 都是一个新版本，并且高于上一个已发布的版本。 |
+| `component.name` | 1 到 64 个字符。 |
+| `component.publisher` | 与商店信息中的 `publisher` 相同（[商店信息](#商店信息)）。 |
+| `component.license` | SPDX 许可证表达式，例如 `MIT OR Apache-2.0`。 |
+| `listing` | `subtitle`（最多 80 个字符）、`description`（必填，最多 4000 个字符）和 `keywords`（最多 10 个）。 |
+
+| `hub component-prepare` 写入 | 来源 |
+| --- | --- |
+| `component.wasm_blake3`、`component.bytes` | 文件的 BLAKE3 摘要和大小。 |
+| `component.imports`、`component.exports` | 文件本身，与 `hub component-info` 列出的相同。 |
+| `component.integrity.github` | GitHub 身份参数，与应用相同（[GitHub 发布者来源证明](#github-发布者来源证明)）。不提供这些参数时，得到的是未签名的开发 Release。 |
+
+```console
+$ hub component-prepare markdown.wasm --draft component.json --out markdown.component.json
+{"bytes":310601,"id":"org.example.markdown","schema":1,"status":"unsigned-development-release","version":"1.0.0","wasm_blake3":"c30d6e3125ff31676cad3c06735186d82cd0c017802afd344e3d2db876ff976c"}
+```
+
+与应用一样，Release 的 GitHub 工作流在公开仓库中、由推送 `v<version>` 标签触发，并运行：
+
+```sh
+hub component-prepare target/wasm32-wasip2/release/markdown.wasm --draft component.json \
+  --repository OWNER/REPO --repository-id REPOSITORY_ID --owner-id OWNER_ID \
+  --workflow .github/workflows/publish-component.yml \
+  --tag v1.0.0 --commit IMMUTABLE_GIT_SHA \
+  --out build/octosense-component.json
+# actions/attest 只为 build/octosense-component.json 生成证明。
+hub component-pack build/octosense-component.json \
+  --wasm target/wasm32-wasip2/release/markdown.wasm \
+  --attestation build/component-attestation.sigstore.json --out build/release
+```
+
+`build/octosense-component.json` 是不含证明的规范化 JSON 形式的 Release，也就是证明所覆盖的字节。它带有文件的摘要，所以证明绑定了文件。用示例身份准备时：
+
+```console
+$ hub component-prepare markdown.wasm --draft component.json --repository example-org/markdown --repository-id 123456789 --owner-id 987654321 --workflow .github/workflows/publish-component.yml --tag v1.0.0 --commit 0123456789abcdef0123456789abcdef01234567 --out build/octosense-component.json
+{"bytes":310601,"id":"org.example.markdown","schema":1,"sha256":"ae2ff83c70842a4f8e2aa20de538a1ba94f3de76a85a5152e1bf7e716c0c5c34","status":"awaiting-github-attestation","subject":"octosense-component.json","version":"1.0.0","wasm_blake3":"c30d6e3125ff31676cad3c06735186d82cd0c017802afd344e3d2db876ff976c"}
+```
+
+`hub component-pack` 附加证明、运行准入检查，并在一个新目录中写出 `<id>-<version>.component.json` 和 `<id>-<version>.wasm`。没有能通过验证的证明时，它什么也不写：
+
+```console
+$ hub component-pack build/octosense-component.json --wasm markdown.wasm --out release
+org.example.markdown 1.0.0 (component c30d6e3125ff31676cad3c06735186d82cd0c017802afd344e3d2db876ff976c) — REFUSED
+  [refused] publisher-signature: publisher attestation is missing
+  [warning] functions (org.example.markdown-1.0.0.wasm): org.example.markdown 1.0.0 is a component that reaches the clock, random numbers and files in its app folder, but no network or other app
+hub: the component was refused
+```
+
+**未验证**：目前还没有任何工作流为组件 Release 生成过证明，App Flow 也没有相应的工作流模板。
+
+像提交应用一样提交组件（[向 App Hub 提交应用](SUBMITTING.zh-CN.md)）：开一个 issue，写明仓库、标签、commit，并附上两个 Release 文件。审核人员运行 `hub component-check`，即针对 Release 及其文件的准入检查：
+
+```console
+$ hub component-check markdown.component.json --wasm markdown.wasm
+org.example.markdown 1.0.0 (component c30d6e3125ff31676cad3c06735186d82cd0c017802afd344e3d2db876ff976c) — REFUSED
+  [refused] publisher-signature: App Hub accepts only GitHub-attested component releases
+  [warning] functions (org.example.markdown-1.0.0.wasm): org.example.markdown 1.0.0 is a component that reaches the clock, random numbers and files in its app folder, but no network or other app
+hub: the component was refused
+```
+
+| 检查项 | 拒绝的情况 |
+| --- | --- |
+| `component` | 上面两个表中的某个字段违反了规则，或 Release 的导入或导出与文件不一致。 |
+| `digest` | 文件的 BLAKE3 摘要或大小与 Release 不一致。 |
+| `size` | 文件超过 8 MiB。 |
+| `contents-invalid` | 文件不是有效组件，或导入了 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:http`、`wasi:io`、`wasi:random` 和 `octosense:host` 以外的任何内容。 |
+| `publisher-signature` | Release 没有 GitHub 来源证明（使用 `--allow-unsigned` 时为警告），或证明验证失败。 |
+| `identity`（使用 `--catalog` 时） | 签名目录中有应用使用了这个组件的 ID。 |
+| `version`（使用 `--catalog` 时） | 签名目录中已有这个版本。 |
+| `continuity`（使用 `--catalog` 时） | 仓库、所有者或工作流与早期版本不同，版本不高于最新版本，或历史记录自相矛盾。 |
+
+`functions` 警告告诉审核人员，这个组件在固定它的任何应用中能访问什么；随后，每个应用自己的检查会按该应用的授权检查组件。
+
+App Hub 管理员用 `hub component-entry <release.json> --wasm <file.wasm> --catalog <authenticated catalog> --out <index.json>` 把已批准的 Release 变成签名目录候选内容，这需要 GitHub 来源证明。候选内容新增 `artifacts/<id>-<version>.wasm` 和 `index/components/<id>-<version>.json`（[通过 GitHub 发布目录](GITHUB-PUBLISHING.zh-CN.md#准备待审核候选)）。撤回时，与应用一样，把条目标记为已撤回并写明原因。
+
+### 用开发 Hub 演练
+
+`hub component-publish` 把组件加入一个用旧版密钥签名的签名目录，供用一次性密钥进行的本地演练使用。App Hub 自己的签名目录只通过 GitHub 管理员流程发布：
+
+```console
+$ hub keygen anchor.key > anchor.pub
+$ hub keygen working.key > working.pub
+$ hub certify --anchor anchor.key --working working.key > working.cert
+$ hub component-publish markdown.component.json --wasm markdown.wasm --catalog dev-catalog.json --key working.key --anchor-cert "$(cat working.cert)" --publisher dev:example-org --out dev-hub --allow-unsigned
+org.example.markdown 1.0.0 (component c30d6e3125ff31676cad3c06735186d82cd0c017802afd344e3d2db876ff976c) — PASSED
+  [warning] publisher-signature: unsigned: accountability rests on the hub alone
+  [warning] functions (org.example.markdown-1.0.0.wasm): org.example.markdown 1.0.0 is a component that reaches the clock, random numbers and files in its app folder, but no network or other app
+published component org.example.markdown 1.0.0 (catalog sequence 1)
+```
+
+`hub withdraw` 撤回组件的方式与撤回应用相同；之后，固定了它的应用会被拒绝：
+
+```console
+$ hub withdraw org.example.markdown --version 1.0.0 --reason "Renders raw HTML it should escape" --catalog dev-catalog.json --key working.key --anchor-cert "$(cat working.cert)"
+withdrew org.example.markdown 1.0.0: Renders raw HTML it should escape (catalog sequence 2)
+$ hub check writer --allow-unsigned --catalog dev-catalog.json --anchor "$(cat anchor.pub)"
+org.example.writer 1.0.0 — REFUSED
+  [warning] publisher-signature: unsigned: accountability rests on the hub alone
+  [refused] components: component markdown (org.example.markdown 1.0.0) was withdrawn: Renders raw HTML it should escape
+  grants: capabilities {"storage", "wasm"}, hosts {}, storage 16777216 bytes, agent none
+hub: the bundle was refused
+```
+
+### 在设备上
+
+- **安装与更新**：安装或更新应用之前，商店从同一份已验证的签名目录中解析每个组件。它像获取应用包一样从 Hub 获取组件的 `artifacts/<id>-<version>.wasm`，并检查大小、摘要和有效性。每个摘要只保存一份、只读，放在 `<apps root>/.components/<blake3>.wasm`；应用绝不会在缺少组件的情况下被安装。
+- **启动**：每次启动都会把应用的组件与应用包一起检查。组件缺失、被改动或被撤回，应用就不能运行，直到用户更新或重新安装它。
+- **卸载**：通过商店删除应用（`Store::remove`），以及每次通过商店安装或更新，都会删除已没有任何已安装应用固定的组件。
+- **宿主**：宿主的 `wasm` 服务用 `octosense_appstore::components::resolved(app_id)` 加载应用的组件，它返回每个组件的名字、ID、版本、摘要和已验证的文件。每次调用都会验证每个文件。系统应用的组件来自它自己的应用包。
+
+**未验证**：目前还没有任何 OctoSense 构建加载共享组件，也还没有任何手机或桌面宿主安装过固定了组件的应用。
+
 ## 清单
 
 ```json
@@ -243,7 +446,8 @@ $ hub component-info fns/notes.wasm
 | `compute` | `instruction_budget`、`memory_bytes`。 | 会限制在宿主的上限以内。 |
 | `agent` | 应用自己的 Agent。 | 可选（[清单中的 `agent`](#清单中的-agent)）。 |
 | `research` | `research` 和 `crawl` 的范围。 | 请求了 `research` 或 `crawl` 时必需；两者都没请求时，出现此字段即拒绝（[research 范围](#research-范围)）。 |
-| `requires` | 应用需要的宿主特性。 | 每一项都必须是宿主已知的特性：`palpo-admin-v1`、`host-api-v1`、`backend-api-v1`、`script-tools-v1`、`publisher-github-v1` 或 `wasm-components-v1`。GitHub 发布需要真实来源证明验证器；三个 API 标记还需要宿主实现它们对应的 API（[宿主 API 兼容性](HOST-API.zh-CN.md)）。`wasm-components-v1` 需要 `wasm` 能力（[WebAssembly 组件](#webassembly-组件)）。 |
+| `requires` | 应用需要的宿主特性。 | 每一项都必须是宿主已知的特性：`palpo-admin-v1`、`host-api-v1`、`backend-api-v1`、`script-tools-v1`、`publisher-github-v1`、`wasm-components-v1` 或 `wasm-shared-components-v1`。GitHub 发布需要真实来源证明验证器；三个 API 标记还需要宿主实现它们对应的 API（[宿主 API 兼容性](HOST-API.zh-CN.md)）。`wasm-components-v1` 和 `wasm-shared-components-v1` 需要 `wasm` 能力（[WebAssembly 组件](#webassembly-组件)、[共享组件](#共享组件)）。 |
+| `components` | 应用的函数所用的共享组件，每个都固定到一个确切版本和摘要。 | 可选；需要 `wasm-shared-components-v1`；最多 8 个（[共享组件](#共享组件)）。 |
 | `host_api` | 应用需要（`required`）或可以使用（`optional`）的宿主 API 方法，每个方法都写明 ABI 主版本。 | 可选；须在 `requires` 中声明 `host-api-v1`。商店在安装时和每次启动时检查 `required` 中的方法（[声明应用需要什么](HOST-API.zh-CN.md#声明应用需要什么)）。 |
 | `backend` | 应用自己的后端：公开的登录端点，以及应用可以调用的操作。 | 可选；须在 `requires` 中声明 `backend-api-v1`，并请求 `auth` 能力、设置 `storage.accounts: true`。不含任何凭据（[登录自己的后端](#登录自己的后端)）。 |
 | `schema_minor` | 清单用到了 schema 1 的哪些新增内容。 | 省略此字段。 |
@@ -842,12 +1046,17 @@ host.request("mail.list", {…}, fn(r){ … })
 | `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app]` | 准入检查本身。输出 `PASSED` 或 `REFUSED`、每个检查结果，以及应用将获得的授权。有拒绝时退出码为 1。`--json` 以 JSON 输出报告（`schema`、`stage`、`passed`、`app_id`、`version`、`digest`、`findings` 和 `resources`）。`--publisher-key` 用于检查旧格式的密钥签名应用包，发布时从不需要它。 |
 | `hub scan <bundle> [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--packet <out.json>] [--reviewer <cmd>] [--system-app]` | 先运行准入检查，再写出审核包，还可以把审核包交给一条审核命令。准入检查拒绝的应用包不会进入扫描。 |
 | `hub component-info <file.wasm>` | 以 JSON 输出函数文件的类型（`component` 或 `module`）、它的导入，以及它导出的函数及其参数和结果（[WebAssembly 组件](#webassembly-组件)）。它只读取这一个文件。既不是核心模块也不是有效组件的文件会失败，输出 `hub: <file>: not a WebAssembly core module or component` 或验证器的错误。 |
+| `hub component-prepare <file.wasm> --draft <component.json> --out <file>` | 把共享组件文件描述成一个 Release：它的摘要、大小、导入和导出，加上草稿中的字段。提供 `--repository`、`--repository-id`、`--owner-id`、`--workflow`、`--tag` 和 `--commit` 时，它写出要证明的规范化对象，文件名必须是 `octosense-component.json`；不提供时，写出未签名的开发 Release。从不覆盖已有文件（[发布共享组件](#发布共享组件)）。 |
+| `hub component-pack <release.json> --wasm <file.wasm> [--attestation <bundle.json>] [--allow-unsigned] --out <new directory>` | 附加证明、运行组件的准入检查，并写出 `<id>-<version>.component.json` 和 `<id>-<version>.wasm`。准入检查拒绝时什么也不写。 |
+| `hub component-check <release.json> --wasm <file.wasm> [--catalog <file> [--anchor <hex>]] [--allow-unsigned] [--json]` | 针对组件 Release 及其文件的准入检查。输出 `PASSED` 或 `REFUSED` 和每条检查结果；被拒绝时以状态 1 退出。 |
+| `hub component-entry <release.json> --wasm <file.wasm> --catalog <authenticated catalog> --out <index.json>` | 为带 GitHub 证明的 Release 生成签名目录候选内容的 index 条目，不发布。 |
+| `hub component-publish <release.json> --wasm <file.wasm> --catalog <file> --key <file> --anchor-cert <hex> --publisher <id> [--out <dir>] [--allow-unsigned]` | 把组件加入用旧版密钥签名的签名目录，用于本地演练（[用开发 Hub 演练](#用开发-hub-演练)）。 |
 | `hub verify <catalog> --anchor <hex>` | 用信任锚验证签名目录。 |
 | `hub keygen`、`hub pubkey`、`hub sign-manifest` | 旧格式 Ed25519 密钥工具。维护者用它们管理旧格式签名目录；本地演练用 `hub keygen` 生成一次性签名目录密钥。绝不要用它们为应用签名：App Hub 只接受带 GitHub 证明的 Release。它们是否保留，由 [issue #168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168) 决定。 |
 
 `--catalog <file>` 会对照一份已发布的签名目录（例如本仓库的 `catalog-v2.json`），增加 `version` 和 `continuity` 两项检查，并使用签名目录中记录的发布者身份。文件不存在时会拒绝。v2 目录必须通过内置 GitHub 工作流策略验证；历史目录必须能用 Hub 的信任锚验证通过（[信任锚](../README.zh-CN.md#信任锚)）；开发用的 Hub 则用 `--anchor <hex>` 验证。否则 `hub check` 会停止，并输出 `hub: could not authenticate base catalog: …`。
 
-`hub publish`、`hub withdraw`、`hub remove` 和 `hub certify` 需要 Hub 自己的密钥，所以只有维护者会对 App Hub 的签名目录运行它们；本地演练则用一次性密钥运行 `hub certify` 和 `hub publish`。
+`hub publish`、`hub component-publish`、`hub withdraw`、`hub remove` 和 `hub certify` 需要 Hub 自己的密钥，所以只有维护者会对 App Hub 的签名目录运行它们；本地演练则用一次性密钥运行 `hub certify`、`hub publish` 和 `hub component-publish`。`hub withdraw` 可以撤回应用版本，也可以撤回共享组件版本。
 
 ### 读懂 `hub check` 报告
 
