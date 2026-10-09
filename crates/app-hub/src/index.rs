@@ -106,7 +106,7 @@ impl Entry {
                 "news" => "Read news the device collects from its feeds and topics".to_string(),
                 "photos" => "Read Photos's own library and publish collections".to_string(),
                 "youtube" => "Search YouTube and manage music recommendations".to_string(),
-                "wasm" => "Run its own sandboxed functions on this device; they reach no network or other apps".to_string(),
+                "wasm" => "Run its own sandboxed functions on this device; they reach only what the app itself may".to_string(),
                 "sheet" => "Use the device's spreadsheet engine on its own files".to_string(),
                 "photo" => "Use the device's image-editing engine on its own files".to_string(),
                 "word" => "Use the device's document engine on its own files".to_string(),
