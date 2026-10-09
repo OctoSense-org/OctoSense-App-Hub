@@ -49,7 +49,8 @@ limits.
 ## Versions on crates.io
 
 This checkout prepares **1.10.0 (unpublished)**, including 1.9.0's `files`
-capability and the distinct `device_calendar` capability. `files` provides
+capability, the distinct `device_calendar` capability and separate `audio`
+playback grant. Audio implies no recording, storage or background authority. `files` provides
 host-owned import/export dialogs, separate from `storage`; it grants no
 arbitrary filesystem access. `device_calendar` is separate from `calendar`
 and `gcalendar`. Neither declaration installs a host adapter or grants OS

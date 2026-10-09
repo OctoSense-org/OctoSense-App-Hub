@@ -10,6 +10,11 @@ that holds 1.2.0.
 
 ## 1.10.0 — unreleased
 
+- Add separate `audio` playback capability. It implies no microphone, storage,
+  network or background authority. Recording uses the existing `microphone`
+  grant. Foreground-only recording, playback, photo selection and sharing
+  methods have no agent aliases.
+
 - Add the distinct `device_calendar` capability for host-mediated, selected
   native calendars. This is not the system Calendar app's `calendar` service
   or the Google Calendar `gcalendar` connector.

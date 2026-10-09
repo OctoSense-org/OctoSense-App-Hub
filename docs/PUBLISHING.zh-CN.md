@@ -201,7 +201,8 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 | `web` | 在系统网页视图中打开任何公开 https 页面；网页视图没有任何回到应用的通道。 | Open web pages in a browser view | 运行时在支持的平台上提供，包括 RC1 Windows/WebView2 和 Linux X11/XWayland/WebKitGTK；原生 Wayland 内嵌仍不支持（[运行条件](../README.zh-CN.md#下载兼容宿主)）。 |
 | `location` | 设备的位置。在桌面 RC1 的 macOS 构建及兼容 Android 源码构建中：声明了 `host-api-v1` 的应用须先用 `location.permission.request` 请求权限，之后仅在 Android 上可以用 `location.get` 读取上次已知的位置（[宿主 API 兼容性](HOST-API.zh-CN.md)）。 | Use your location | 运行时，限具备该功能的设备 |
 | `camera` | 相机。拍摄的内容保存在应用的存储中，所以应用还需要 `storage`。在桌面 RC1 的 macOS 构建及兼容 Android 源码构建中：声明了 `host-api-v1` 的应用须先用 `camera.permission.request` 请求权限。 | Use the camera | 运行时，限具备该功能的设备 |
-| `microphone` | 相机录像时的声音。在桌面 RC1 的 macOS 构建及兼容 Android 源码构建中：声明了 `host-api-v1` 的应用须先用 `microphone.permission.request` 请求权限。 | Use the microphone | 运行时，限具备该功能的设备 |
+| `microphone` | 获得应用及系统授权后录音。前台 `microphone.record_*` 会话属于尚未发布的宿主扩展；桌面 RC1 仅含原有摄像录音路径。请声明所需方法，先调用 `microphone.permission.request`。 | 使用麦克风 | 运行时，取决于设备是否支持 |
+| `audio` | 应用活跃时播放应用内音频，不隐含麦克风、存储或后台权限。 | 应用活跃时播放自己的音频文件 | 契约 1.10.0 源码，尚未发布；需要配套原生宿主。 |
 | `library` | 把拍摄的内容提供给系统相册，其他应用也能看到。 | Save to your photo library, where other apps can see it | 运行时，限具备该功能的设备 |
 | `clipboard` | 剪贴板。 | Use the clipboard | 尚不支持：没有 API 使用它 |
 | `prompt` | 应用向用户提出的问题。 | Ask you questions | 尚不支持：没有宿主读取它。应用 Agent 用 `ask_user_question` 提问。 |

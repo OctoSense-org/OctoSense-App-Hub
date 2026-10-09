@@ -124,6 +124,22 @@ fn native_calendar_grant_is_separate_and_required_methods_must_exist() {
 }
 
 #[test]
+fn playback_never_grants_recording_storage_or_background_authority() {
+    let manifest = parse(&manifest_with(r#""capabilities":["audio"],"requires":["host-api-v1"],"host_api":{"required":{"audio.play":1}}"#)).unwrap();
+    let policy = resolve(&manifest, &HostLimits::system()).unwrap();
+    assert!(policy.allows("audio"));
+    for unrelated in ["microphone", "storage", "camera", "net", "audio.*"] {
+        assert!(!policy.allows(unrelated));
+    }
+    let mut versions = std::collections::BTreeMap::from([("app_policy.device_consent".into(), 1)]);
+    assert!(manifest.check_host_apis(&versions).is_err());
+    versions.insert("audio.play".into(), 1);
+    manifest.check_host_apis(&versions).unwrap();
+    let capture = resolve(&parse(&manifest_with(r#""capabilities":["microphone","storage"]"#)).unwrap(), &HostLimits::system()).unwrap();
+    assert!(!capture.allows("audio"));
+}
+
+#[test]
 fn an_apps_own_functions_are_a_grant_of_their_own() {
     let limits = HostLimits::system();
     let manifest = parse(&manifest_with(r#""capabilities":["wasm"]"#)).unwrap();

@@ -119,6 +119,51 @@ adapters cover macOS, Windows, Android and Linux with a native dialog helper;
 iOS, OpenHarmony, web and direct-framebuffer Linux are unsupported. Check the
 host's status and release notes for build and device validation.
 
+### Photo selection and text sharing (unreleased host extension)
+
+A matching host adds `files.pick_photo({"path":"photos/chosen.jpg"})`, using
+`files` plus `storage`. It opens an image chooser and validates PNG, JPEG or
+WebP signatures before importing into a new app-relative path. It returns
+`path`, `bytes` and `mime`, or `{"cancelled":true}`. The 1 MiB limit still
+applies: larger originals fail explicitly; no image is silently resized.
+
+`files.share({"text":"A short note"})` uses `files` only and is Android-only
+in this batch. Text must contain 1–8192 UTF-8 bytes. The foreground call opens
+the native chooser and returns
+`{"handoff":"chooser_opened","delivery":"unknown"}` only when that handoff
+succeeds. It does not prove delivery or support attachments. Neither method
+has an agent alias. Declare each method version and check the host's status;
+these source APIs are not included in desktop RC1. Device validation of the
+new adapters remains pending.
+
+## Foreground audio sessions (contract 1.10, unreleased)
+
+A compatible macOS or Android host exposes these methods; declare the method
+versions rather than inferring support from the capability name:
+
+| Methods | Required capabilities | Behavior |
+| --- | --- | --- |
+| `microphone.record_start({path,max_duration_ms})` | `microphone`, `storage` | After app and OS consent, record at most 30 seconds of mono 16 kHz PCM WAV into a new app file. |
+| `microphone.record_status/record_stop/record_cancel({session})` | `microphone` | Inspect, stop and save, or discard this live app's recording. |
+| `audio.play({path})` | `audio`, `storage` | Play a bounded local WAV, MP3, FLAC or Ogg file. |
+| `audio.status/audio.stop({session})` | `audio` | Inspect or stop this live app's playback. |
+
+Each response contains an opaque `session`, `status`, `path`, `error`, `frames`
+and `format`. A start response means `starting`, not successful recording or
+playback. Poll status until the first native callback reports `recording` or
+`playing`, and observe terminal failures. Stopping a recording initially
+returns `stopping`; use its path only after `saved`. Device frame counts do not
+prove audibility. File input/output remains within the current 1 MiB limit;
+decoded playback also has separate duration/memory limits.
+
+These APIs are foreground-only with no agent aliases. Playback does not grant
+microphone access; recording still needs `microphone.permission.request` and
+OS approval. Sessions bind to the live app isolate, stop when it loses its
+foreground surface or permission, and never resume automatically. Hosts must
+arbitrate microphone ownership with dictation. Embedded store previews without
+a dedicated active app identity refuse recording; open the installed app.
+Source and synthetic tests do not establish real microphone/speaker acceptance.
+
 ## Limits
 
 - **Agent tools.** A `host-service` tool can map with `host_method` to
