@@ -278,7 +278,7 @@ impl Backend {
                 });
             }
         }
-        let entries: Vec<_> = self
+        let mut entries: Vec<_> = self
             .store
             .listings()
             .into_iter()
@@ -297,6 +297,11 @@ impl Backend {
                 status: EntryStatus::Unavailable("Not offered by the current catalog".into()), can_open: false, consent: None,
             })
         }).collect();
+        // Keep retired installations in Library with their verified refusal
+        // reason, but do not advertise withdrawn releases as downloadable apps.
+        // Publisher history remains in the authenticated catalog for continuity.
+        entries.retain(|entry| self.store.entry(&entry.id)
+            .is_some_and(|entry| entry.status.is_offered()));
         CatalogSnapshot {
             entries,
             library,
@@ -1062,12 +1067,52 @@ mod tests {
         f.publish_today(2, vec![entry]);
         assert!(backend.install(&consent).is_err());
         let snapshot = backend.snapshot();
-        assert!(matches!(
-            snapshot.entries[0].status,
-            EntryStatus::Unavailable(_)
-        ));
-        assert!(snapshot.entries[0].consent.is_none());
+        assert!(snapshot.entries.is_empty());
+        assert!(snapshot.library.is_empty());
         assert!(backend.may_open("test-app").is_err());
+    }
+
+    #[test]
+    fn retired_app_is_hidden_from_discovery_but_retains_library_and_data() {
+        let f = Fixture::new();
+        let mut backend = f.install_first_version();
+        let mut retired = f.entry();
+        retired.status = Status::Withdrawn("Retired; install the replacement app".into());
+        f.publish_today(2, vec![retired]);
+
+        let snapshot = backend.refresh();
+        assert!(snapshot.entries.is_empty());
+        assert!(filter_entries(&snapshot.entries, "Test App", None).is_empty());
+        assert_eq!(snapshot.library.len(), 1);
+        assert!(matches!(&snapshot.library[0].status,
+            EntryStatus::Unavailable(reason) if reason.contains("Retired")));
+        assert!(snapshot.library[0].consent.is_none());
+        assert_eq!(snapshot.library[0].open_target(), None);
+        assert!(backend.may_open("test-app").is_err());
+        assert_eq!(std::fs::read_to_string(f.root().join("test-app/data/notes")).unwrap(),
+            "keep my notes");
+        assert!(octosense_app_hub::installed_bundle_dir(&f.root(), "test-app")
+            .join(MANIFEST_FILE).is_file());
+        assert!(f.backend().refresh().entries.is_empty(), "retirement survives restart");
+    }
+
+    #[test]
+    fn same_name_replacement_is_the_only_discoverable_app_after_retirement() {
+        let f = Fixture::new();
+        let mut retired = f.entry();
+        retired.status = Status::Withdrawn("Replaced by a new publisher identity".into());
+        let mut replacement = f.update();
+        replacement.manifest.id = "replacement-app".into();
+        octosense_app_hub::sign_manifest(&f.publisher, &mut replacement.manifest,
+            "test-publisher").unwrap();
+        f.publish_today(1, vec![retired, replacement]);
+
+        let snapshot = f.backend().refresh();
+        let results = filter_entries(&snapshot.entries, "Test App", None);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "replacement-app");
+        assert_eq!(results[0].status, EntryStatus::Available);
+        assert!(snapshot.library.is_empty());
     }
 
     #[test]

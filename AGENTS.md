@@ -97,14 +97,15 @@ owns those.
   [`card-host` fails to build](docs/DEVELOPMENT.md#card-host-fails-to-build)
   lists the builds that need the patches.
 - [Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)
-  lists the `octosense-app-contract` releases; 1.8.0 is published on
-  crates.io and satisfies App Policy's minimum version. Do
-  not take a published contract as proof that a released host implements its
-  APIs. This workspace's `[patch.crates-io]` points the crate at
+  lists the `octosense-app-contract` releases. Published 1.10.0 includes
+  `files`, `device_calendar` and `audio`, and satisfies this tree's App Policy
+  minimum version. Version 1.9.0 remains source-only; its changes shipped in
+  1.10.0. Do not take a published contract as proof that a released host
+  implements its APIs. This workspace's `[patch.crates-io]` points the crate at
   `crates/app-contract`. Never tell readers that a lock file holding 1.2.0 or
   older admits `calendar`, `auth`, `github`, `gcalendar`, `gmail`, `photos`
   or `youtube`; `cargo update -p octosense-app-contract` moves an
-  unconstrained 1.x consumer to 1.8.0. When the tree gets ahead of crates.io
+  unconstrained 1.x consumer to 1.10.0. When the tree gets ahead of crates.io
   again, or a new version is published, update that section.
 - Do not change pins or regenerate `Cargo.lock` in a documentation edit.
 - Match validation to the change:

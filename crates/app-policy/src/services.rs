@@ -57,6 +57,7 @@ pub fn service_words(capability: &str) -> Option<&'static str> {
         "auth" => "Connect its own GitHub or Google accounts, or sign in to its developer’s backend, through the host",
         "github" => "Read authorized repositories and ask you to review Markdown commits",
         "gcalendar" => "Read authorized Google calendars and ask you to review event changes",
+        "device_calendar" => "Read device calendars you choose and ask you to review event changes",
         "gmail" => "Read authorized Gmail messages, keep reply drafts and request native send review",
         "matrix.account_info" => "See which Matrix account you are using",
         "matrix.device" => "See this device's Matrix session details",
@@ -156,7 +157,7 @@ mod tests {
 
     #[test]
     fn connected_services_have_consent_words_without_implied_grants() {
-        for name in ["auth", "github", "gcalendar", "gmail"] {
+        for name in ["auth", "github", "gcalendar", "gmail", "device_calendar"] {
             assert!(KNOWN_CAPABILITIES.contains(&name));
             assert!(service_words(name).is_some());
             assert!(!is_host_service(&format!("{name}.*")));

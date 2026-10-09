@@ -43,6 +43,9 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     "runtime",
     // Read and write inside the app's own storage jail.
     "storage",
+    // Import or export a file the person chooses in the host's native dialog.
+    // This grants no arbitrary path access and does not imply storage.
+    "files",
     // Make requests, but only to the hosts in `network.hosts`.
     "net",
     // Raise a prompt the person answers (a permission ask, a confirmation).
@@ -60,8 +63,10 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // Open any public https page in the system WebView, which gets no way
     // back into the app: a reader for the stories it lists.
     "web",
-    // Record sound with a camera video.
+    // Record bounded sound in the foreground, including camera videos.
     "microphone",
+    // Play local app audio in the foreground; no recording or storage grant.
+    "audio",
     // Offer what it captures to the system photo library, where other apps
     // can see it; without this, captures stay in the app's own storage.
     "library",
@@ -80,6 +85,10 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // Calendar's local event store and UI. The service additionally checks
     // owning app identity; this is not Google/Android calendar access.
     "calendar",
+    // Public native calendar access, scoped to calendars the person selects.
+    // Distinct from os.calendar's store and the Google Calendar connector.
+    // The host must implement the declared methods and enforce native consent.
+    "device_calendar",
     // See and arrange the assistant's LLM providers through the host's llm
     // service. Keys are typed, shown as a QR and scanned only on the host's
     // own sheets; the app sees masked status, never a key.
@@ -119,6 +128,24 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // deadline and a memory cap. A function reaches no file, network, clock
     // or other app; it gets its input and returns its output.
     "wasm",
+    // The craft engines (OctoSense ADR 0013), each behind its host service:
+    // spreadsheets, images, documents, slide decks, drawings, raw photos,
+    // audio, page layouts, video, motion graphics, vector art and PDFs,
+    // processed inside the calling app's own files. The host serves them
+    // to system apps only, so declaring one does not let a store app
+    // reach it.
+    "sheet",
+    "photo",
+    "word",
+    "deck",
+    "cad",
+    "light",
+    "sound",
+    "design",
+    "film",
+    "effect",
+    "vector",
+    "pdf",
     // Host services reached by exact name (App Hub's `services`). Each is
     // a separate consent: a host adapter checks the exact name, the person's
     // per-instance grant and its own ceilings on every request. A prefix is

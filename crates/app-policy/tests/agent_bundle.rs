@@ -282,6 +282,11 @@ fn host_api_read_aliases_load_only_with_the_owning_apps_capability_and_privacy_d
         "microphone.permission.status",
         "location.permission.status",
         "location.get",
+        "device_calendar.permission.status",
+        "device_calendar.calendars.list",
+        "device_calendar.events.list",
+        "device_calendar.events.get",
+        "mail.compose_status",
     ] {
         let family = method.split('.').next().unwrap();
         let dir = scratch(&format!("host-api-read-{method}"));
@@ -338,14 +343,31 @@ fn host_aliases_cannot_target_script_implementations_sheets_or_unreviewed_writes
         "auth.select",
         "auth.backend.sheet.approve",
         "camera.permission.request",
+        "audio.play",
+        "audio.status",
+        "audio.stop",
+        "microphone.record_start",
+        "microphone.record_status",
+        "microphone.record_stop",
+        "microphone.record_cancel",
+        "files.pick_photo",
+        "files.share",
         "microphone.permission.request",
         "location.permission.request",
         "camera.permission.revoke",
         "microphone.permission.revoke",
         "location.permission.revoke",
+        "device_calendar.permission.request",
+        "device_calendar.permission.revoke",
+        "device_calendar.calendars.select",
+        "device_calendar.events.create",
+        "device_calendar.events.update",
+        "device_calendar.events.delete",
         "app_tools.dispatch",
         "app_policy.device_consent",
         "gmail.send",
+        "mail.send",
+        "mail.review_send",
         "gmail.draft.review",
         "gcalendar.review_save",
         "github.review_save",
@@ -379,6 +401,7 @@ fn shared_local_mutations_keep_risk_and_private_data_floors() {
     };
     for method in [
         "gmail.draft.open",
+        "mail.compose",
         "model.image",
         "model.audio",
         "model.embeddings",
@@ -404,6 +427,14 @@ fn shared_local_mutations_keep_risk_and_private_data_floors() {
             false
         )
         .is_ok());
+        assert!(ToolManifest::load(
+            &make(method, "act", false),
+            "inbox",
+            ToolHost::Contained,
+            false
+        )
+        .unwrap_err()
+        .contains("private_data: true"));
     }
     assert!(ToolManifest::load(
         &make("gmail.event.status", "read", true),

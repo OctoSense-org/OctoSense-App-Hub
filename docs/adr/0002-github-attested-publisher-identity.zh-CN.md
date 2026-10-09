@@ -2,7 +2,7 @@
 
 [English](0002-github-attested-publisher-identity.md) | 简体中文
 
-状态：已接受、已实现，并已投入生产。App Hub #153 在应用契约 1.8.0 中实现了这项决定，该版本新增 `publisher-github-v1` 宿主要求。一个测试应用的两个 Release 均由标签推送生成，并通过了原生商店的安装、更新和启动检查（[证据与限制](../PUBLISHING.zh-CN.md#github-发布者来源证明)）。公开签名目录第 14 版提供三个参考应用的 0.2.1 版和 Camera Card Demo 的 1.1.1 版，全部以 GitHub 来源证明发布，每个应用在更新前后都保持同一 GitHub 身份。OctoSense 桌面版 0.1.0-rc.1（下称 RC1）可以在 macOS 上安装这些应用，并在安装和更新时检查它们的证明和发布者连续性。[2026-10-08 修订](#2026-10-08-修订)：App Hub 只接受带 GitHub 证明的 Release；准入检查尚未执行这项规则。
+状态：已接受、已实现，并已投入生产。App Hub #153 在应用契约 1.8.0 中实现了这项决定，该版本新增 `publisher-github-v1` 宿主要求。一个测试应用的两个 Release 均由标签推送生成，并通过了原生商店的安装、更新和启动检查（[证据与限制](../PUBLISHING.zh-CN.md#github-发布者来源证明)）。公开签名目录第 15 版提供三个参考应用（GitHub Notes 为 0.2.2 版，其余为 0.2.1 版）和 Camera Card Demo 的 1.1.1 版，全部以 GitHub 来源证明发布，每个应用在更新前后都保持同一 GitHub 身份。OctoSense 桌面版 0.1.0-rc.1（下称 RC1）可以在 macOS 上安装这些应用，并在安装和更新时检查它们的证明和发布者连续性。[2026-10-08 修订](#2026-10-08-修订)：App Hub 只接受带 GitHub 证明的 Release；准入检查尚未执行这项规则。
 
 ## 背景
 
@@ -11,6 +11,8 @@
 [ADR 0001](0001-github-attested-catalog.zh-CN.md) 引入了签名目录的 GitHub 管理员证明，并把发布者身份（包括密钥签名的应用是否迁移）留待另行决定。
 
 应用的代码就是 OctoScript：Splash 脚本和 L0 卡片，以可读文本的形式随应用包交付。应用包唯一能携带的编译代码是 `fns/` 中的 WebAssembly。OctoSense 只在启用 `wasm-lab` 特性的构建中运行它，而目前没有任何 OctoSense 发行版启用这一特性。App Hub 在公开的 `artifacts/` 中保存每个已准入应用包的原样副本。因此，OctoScript 应用默认开放：任何人都能阅读已准入应用的源码。
+
+注（2026 年 10 月 8 日）：自 [OctoSense #400](https://github.com/OctoSense-org/OctoSense/pull/400) 起，OctoSense `main` 的标准桌面版和 Home 构建在 macOS、Linux 和 Android 上运行 `fns/` 中的 WebAssembly。目前还没有任何 OctoSense 发行版包含它。
 
 ## 决定
 
