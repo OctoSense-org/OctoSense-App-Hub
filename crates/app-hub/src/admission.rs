@@ -457,7 +457,8 @@ fn validate_wasm(path: &Path, name: &str) -> Result<(), String> {
     let info = crate::functions::inspect_component(&bytes)?;
     if let Some(import) = info.refused_imports().first() {
         return Err(format!(
-            "the component imports {import}; a component may import only wasi:cli, wasi:clocks, wasi:filesystem, wasi:io and wasi:random"
+            "the component imports {import}; a component may import only {}",
+            crate::functions::allowed_import_packages()
         ));
     }
     Ok(())
