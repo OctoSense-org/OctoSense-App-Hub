@@ -128,6 +128,24 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // deadline and a memory cap. A function reaches no file, network, clock
     // or other app; it gets its input and returns its output.
     "wasm",
+    // The craft engines (OctoSense ADR 0013), each behind its host service:
+    // spreadsheets, images, documents, slide decks, drawings, raw photos,
+    // audio, page layouts, video, motion graphics, vector art and PDFs,
+    // processed inside the calling app's own files. The host serves them
+    // to system apps only, so declaring one does not let a store app
+    // reach it.
+    "sheet",
+    "photo",
+    "word",
+    "deck",
+    "cad",
+    "light",
+    "sound",
+    "design",
+    "film",
+    "effect",
+    "vector",
+    "pdf",
     // Host services reached by exact name (App Hub's `services`). Each is
     // a separate consent: a host adapter checks the exact name, the person's
     // per-instance grant and its own ceilings on every request. A prefix is
