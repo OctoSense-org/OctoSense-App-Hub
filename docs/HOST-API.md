@@ -50,6 +50,35 @@ host still serves.
 
 ## Discover what the host implements
 
+### Native device calendars (unreleased contract 1.10)
+
+The new `device_calendar` capability is separate from `calendar` (the system
+Calendar app's own store) and `gcalendar` (Google's connector). It does not
+grant either of them, or an OS permission. An app that needs native events
+declares `device_calendar` and `host-api-v1`, with
+`host_api.required: {"device_calendar.events.list": 1}` and any other methods
+its workflow requires. A host without those methods refuses installation.
+
+This source change admits the capability and read tool aliases. It does not
+install a native adapter into desktop RC1 or Home beta.1. The adapter must
+also enforce app/account scope, OS permission, selected calendars and trusted
+review of mutations. Runtime and device acceptance of the new adapter are
+separate from these contract tests. The service's method descriptions remain
+the authority for supported platforms and agent access.
+
+### Reviewed Mail drafts (unreleased)
+
+With the existing `mail` capability, a compatible host exposes `mail.compose`
+for app/account-bound local draft changes and `mail.compose_status` for their
+status. Agent aliases require minimum risk `act` and `read`, respectively,
+with `private_data: true`. They do not send mail. The foreground app requests
+`mail.review_send` (or the reviewed `mail.send` compatibility entry point);
+the host shows the exact draft and sends only after physical user approval.
+Declare required method versions. Desktop RC1 does not implement this public
+compose flow; the older system Mail draft methods remain system-app-only.
+
+### Runtime inventory
+
 With the `runtime` capability, call `runtime.list` with `{}` for every
 described method, or `runtime.describe` with `{"method":"location.get"}` for
 one:
@@ -68,6 +97,72 @@ checks the app's grants on every call. To learn whether a service is
 configured and authorized, call its status or account methods. Declaring a
 requirement neither turns on an OS permission nor adds a provider
 registration.
+
+## Selected-file transfer (contract 1.9, unreleased)
+
+The `files` capability grants access to host-owned file dialogs, not arbitrary
+host paths. Import/export also need `storage`; neither grant implies the other.
+Require `files.import@1` or `files.export@1` through `host_api.required`, or declare
+them optional and inspect `runtime.list`. Contract support alone does not mean a
+released host implements these APIs. `files.status` reports adapter availability.
+
+The matching OctoSense implementation imports one selected file into a new
+app-relative destination, and exports a snapshot of an existing app file. It
+returns a relative path and byte count, never an OS path or Android provider URI.
+Transfers are foreground-only and cannot be initiated by an agent/background
+turn. Native `fs.write_bytes` is identified by the `storage.binary_write@1`
+runtime ABI, not a callable `host.request` method.
+
+Imports keep the current 1 MiB file limit and app storage quota; they refuse
+existing destinations. A cancelled dialog returns `{"cancelled":true}`. Current
+adapters cover macOS, Windows, Android and Linux with a native dialog helper;
+iOS, OpenHarmony, web and direct-framebuffer Linux are unsupported. Check the
+host's status and release notes for build and device validation.
+
+### Photo selection and text sharing (unreleased host extension)
+
+A matching host adds `files.pick_photo({"path":"photos/chosen.jpg"})`, using
+`files` plus `storage`. It opens an image chooser and validates PNG, JPEG or
+WebP signatures before importing into a new app-relative path. It returns
+`path`, `bytes` and `mime`, or `{"cancelled":true}`. The 1 MiB limit still
+applies: larger originals fail explicitly; no image is silently resized.
+
+`files.share({"text":"A short note"})` uses `files` only and is Android-only
+in this batch. Text must contain 1–8192 UTF-8 bytes. The foreground call opens
+the native chooser and returns
+`{"handoff":"chooser_opened","delivery":"unknown"}` only when that handoff
+succeeds. It does not prove delivery or support attachments. Neither method
+has an agent alias. Declare each method version and check the host's status;
+these source APIs are not included in desktop RC1. Device validation of the
+new adapters remains pending.
+
+## Foreground audio sessions (contract 1.10, unreleased)
+
+A compatible macOS or Android host exposes these methods; declare the method
+versions rather than inferring support from the capability name:
+
+| Methods | Required capabilities | Behavior |
+| --- | --- | --- |
+| `microphone.record_start({path,max_duration_ms})` | `microphone`, `storage` | After app and OS consent, record at most 30 seconds of mono 16 kHz PCM WAV into a new app file. |
+| `microphone.record_status/record_stop/record_cancel({session})` | `microphone` | Inspect, stop and save, or discard this live app's recording. |
+| `audio.play({path})` | `audio`, `storage` | Play a bounded local WAV, MP3, FLAC or Ogg file. |
+| `audio.status/audio.stop({session})` | `audio` | Inspect or stop this live app's playback. |
+
+Each response contains an opaque `session`, `status`, `path`, `error`, `frames`
+and `format`. A start response means `starting`, not successful recording or
+playback. Poll status until the first native callback reports `recording` or
+`playing`, and observe terminal failures. Stopping a recording initially
+returns `stopping`; use its path only after `saved`. Device frame counts do not
+prove audibility. File input/output remains within the current 1 MiB limit;
+decoded playback also has separate duration/memory limits.
+
+These APIs are foreground-only with no agent aliases. Playback does not grant
+microphone access; recording still needs `microphone.permission.request` and
+OS approval. Sessions bind to the live app isolate, stop when it loses its
+foreground surface or permission, and never resume automatically. Hosts must
+arbitrate microphone ownership with dictation. Embedded store previews without
+a dedicated active app identity refuse recording; open the installed app.
+Source and synthetic tests do not establish real microphone/speaker acceptance.
 
 ## Limits
 

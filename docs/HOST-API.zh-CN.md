@@ -33,6 +33,18 @@
 
 ## 查询宿主实现了什么
 
+### 原生日历（尚未发布的契约 1.10）
+
+新增 `device_calendar` 能力与 `calendar`（系统日历应用自己的存储）和 `gcalendar`（Google 连接器）互相独立，不会隐含授予它们或操作系统权限。需要原生日程的应用应声明 `device_calendar`、`host-api-v1`，并设置 `host_api.required: {"device_calendar.events.list": 1}`，以及完整流程需要的其他方法。缺少这些方法的宿主会拒绝安装。
+
+本源码变更允许声明该能力和只读工具别名，不会给桌面 RC1 或 Home beta.1 安装原生适配器。适配器还必须实施应用及账户隔离、操作系统权限、日历选择和修改操作的可信确认。新适配器的运行时与设备验收独立于这些契约测试；支持平台与 Agent 访问范围以服务的方法描述为准。
+
+### 邮件草稿与发送审阅（尚未发布）
+
+兼容宿主在既有的 `mail` 能力下提供 `mail.compose`，用于修改与应用及账户绑定的本地草稿，并通过 `mail.compose_status` 查询状态。两者的 Agent 别名最低风险分别是 `act` 和 `read`，都须声明 `private_data: true`，且不会发送邮件。前台应用调用 `mail.review_send`（或同样需要审阅的兼容入口 `mail.send`），宿主显示确切草稿，只有用户亲手批准后才发送。请声明所需方法版本。桌面 RC1 不提供这套公共草稿流程，原有的系统邮件草稿方法仍仅限系统应用。
+
+### 运行时清单
+
 应用声明 `runtime` 能力后，可以用 `{}` 调用 `runtime.list` 列出所有已描述的方法，或用 `{"method":"location.get"}` 调用 `runtime.describe` 查询单个方法：
 
 - 方法描述包含输入和输出 schema、ABI 版本、所需能力、支持的平台，以及 Agent 能否调用它。
@@ -41,6 +53,64 @@
 - 结果不含账户数据或凭据。
 
 API 可用不等于已经配置，也不等于已经授权。`configured: null` 表示宿主并不知道配置情况，`authorization: "checked-on-call"` 表示每次调用时，宿主都会检查应用的授权。要了解某项服务是否已配置、已授权，请调用它的状态或账户方法。声明依赖既不会开启操作系统权限，也不会添加提供商注册信息。
+
+## 用户选择的文件传输（contract 1.9，尚未发布）
+
+`files` 能力允许应用使用宿主的文件选择窗口，不允许访问任意宿主路径。
+导入和导出还需要 `storage`，两种授权互不隐含。通过 `host_api.required`
+要求 `files.import@1` 或 `files.export@1`，也可以将其声明为可选并检查
+`runtime.list`。仅支持新 contract 不代表发布版宿主已实现这些 API；
+`files.status` 返回当前平台适配器是否可用。
+
+配套的 OctoSense 实现将用户选中的单个文件导入应用内的新路径，或将现有
+应用文件的快照导出。应用只收到应用内路径和字节数，不会收到系统路径或
+Android 文档提供方 URI。传输仅限前台，agent 和后台任务不能发起选择窗口。
+原生 `fs.write_bytes` 对应 `storage.binary_write@1` 运行时 ABI，不能通过
+`host.request` 调用。
+
+导入保留现有的单文件 1 MiB 上限和应用存储配额，并拒绝覆盖已有文件。
+取消选择返回 `{"cancelled":true}`。当前适配器覆盖 macOS、Windows、Android
+及安装了原生文件对话框辅助程序的 Linux；暂不支持 iOS、OpenHarmony、web
+和直接使用 framebuffer 的 Linux。编译与真机验证状态以宿主状态和发布说明为准。
+
+### 选择照片与分享文本（尚未发布的宿主扩展）
+
+配套宿主新增 `files.pick_photo({"path":"photos/chosen.jpg"})`，同时需要
+`files` 和 `storage`。它打开图片选择窗口，验证 PNG、JPEG 或 WebP 文件签名后，
+导入应用内的新路径。返回 `path`、`bytes`、`mime`，取消则返回
+`{"cancelled":true}`。单文件 1 MiB 上限仍适用：过大的原图会明确失败，不会
+悄悄缩小图片。
+
+`files.share({"text":"一条简短记录"})` 只需要 `files`，本批次仅支持 Android。
+文本须为 1–8192 个 UTF-8 字节。前台调用打开原生分享选择器；只有成功交给
+选择器后，才返回 `{"handoff":"chooser_opened","delivery":"unknown"}`。
+这不证明对方已收到内容，也不支持附件。两种方法都没有 Agent 别名。请声明
+所需方法版本并检查宿主状态；桌面 RC1 不含这些源码 API。新适配器的设备
+验收仍待完成。
+
+## 前台音频会话（契约 1.10，尚未发布）
+
+配套 macOS 或 Android 宿主提供以下方法；请声明方法版本，不要仅凭能力名称
+推断支持情况：
+
+| 方法 | 所需能力 | 行为 |
+| --- | --- | --- |
+| `microphone.record_start({path,max_duration_ms})` | `microphone`、`storage` | 获得应用和系统授权后，录制最多 30 秒的单声道 16 kHz PCM WAV，写入应用内的新文件。 |
+| `microphone.record_status/record_stop/record_cancel({session})` | `microphone` | 查询、停止并保存，或丢弃本活跃应用的录音。 |
+| `audio.play({path})` | `audio`、`storage` | 播放有大小限制的本地 WAV、MP3、FLAC 或 Ogg 文件。 |
+| `audio.status/audio.stop({session})` | `audio` | 查询或停止本活跃应用的播放。 |
+
+每次返回包含不透明的 `session`、`status`、`path`、`error`、`frames` 和 `format`。
+启动返回 `starting` 不代表已成功录音或播放；轮询状态，直到第一个原生回调
+报告 `recording` 或 `playing`，并处理最终失败。停止录音先返回 `stopping`，
+只有状态变为 `saved` 才能使用其路径。设备帧数不证明实际可听见声音。输入及
+输出文件仍受现有 1 MiB 上限约束，解码后播放另有时长及内存限制。
+
+这些 API 仅限前台，没有 Agent 别名。播放不会授予麦克风权限；录音仍需要
+`microphone.permission.request` 和系统授权。会话绑定活跃应用隔离环境，应用
+失去前台界面或权限时停止，且不自动恢复。宿主必须协调与听写的麦克风占用。
+没有独立活跃应用身份的商店内嵌预览拒绝录音，请打开已安装应用。源码及合成
+测试不能证明真实麦克风与扬声器验收通过。
 
 ## 限制
 

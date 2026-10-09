@@ -264,12 +264,14 @@ platform and provider limits; historical beta differences are explicit.
 | Capability | Grants | The store says | Served today |
 | --- | --- | --- | --- |
 | `storage` | The app's own storage folder: `fs.*`, camera captures and local files a widget reads. Without it every `fs.*` call fails. | Keep its own data on this device | The runtime, in every host |
+| `files` | Import and export files selected in the host's native dialog. Import/export also needs `storage`; the app receives an app-relative file, never general filesystem access. Require the specific `files.*` methods the app uses. | Import and export files you choose in the system file dialog | Contract 1.9, not yet published; requires a compatible host implementation |
 | `net` | Requests to the hosts in `network.hosts`, and no others. | Reach only: *hosts* | The runtime, in every host |
 | `images` | Pictures from any public https host, not only `network.hosts`. | Show pictures from any website | The runtime |
 | `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime on supported platforms, including RC1 Windows/WebView2 and Linux X11/XWayland/WebKitGTK; native Wayland embedding is unsupported ([requirements](../README.md#download-a-compatible-host)). |
 | `location` | The device's location. On macOS in desktop RC1 and in compatible Android source builds, an app that declares `host-api-v1` must first ask with `location.permission.request`; on Android only, it can then read the last-known fix with `location.get` ([Host API compatibility](HOST-API.md)). | Use your location | The runtime, where the device has it |
 | `camera` | The camera. A capture is saved in the app's storage, so the app also needs `storage`. On macOS in desktop RC1 and in compatible Android source builds, an app that declares `host-api-v1` must first ask with `camera.permission.request`. | Use the camera | The runtime, where the device has it |
-| `microphone` | Sound with a camera video. On macOS in desktop RC1 and in compatible Android source builds, an app that declares `host-api-v1` must first ask with `microphone.permission.request`. | Use the microphone | The runtime, where the device has it |
+| `microphone` | Record sound after app and OS consent. Foreground `microphone.record_*` sessions are an unreleased host extension; earlier hosts may expose permission methods without recording. Declare the exact required methods and first request `microphone.permission.request`. | Use the microphone | The runtime, where the device has it |
+| `audio` | Play app-local audio while the app is active. Does not imply microphone, storage or background access. | Play its own audio files while the app is active | Contract 1.10.0 source, unpublished; requires a matching native host. |
 | `library` | Offering captures to the system photo library, where other apps can see them. | Save to your photo library, where other apps can see it | The runtime, where the device has it |
 | `clipboard` | The clipboard. | Use the clipboard | Not yet: no API uses it |
 | `prompt` | Questions the app asks the person. | Ask you questions | Not yet: no host reads it. An app agent asks with `ask_user_question`. |
@@ -280,6 +282,7 @@ platform and provider limits; historical beta differences are explicit.
 | `gcalendar` | Reading Google calendars; each event change waits for the person's review. | Read authorized Google calendars and ask you to review event changes | As `auth` |
 | `gmail` | Reading Gmail and keeping reply drafts; each send waits for the person's review. Separate from `mail`. | Read authorized Gmail messages, keep reply drafts and request native send review | As `auth` |
 | `calendar` | Calendar's local event store and UI. Not Google Calendar. | Read and manage local events through the device's Calendar service | System app `os.calendar` only; store apps use `gcalendar` |
+| `device_calendar` | Read selected native device calendars and request review of event changes. Separate app consent, OS permission and calendar selection are required. | Read device calendars you choose and ask you to review event changes | Contract 1.10.0 source, unpublished. Requires a compatible host adapter; not in desktop RC1 or Home beta.1. Declare exact required methods. |
 | `llm` | Managing the device's AI providers through the `llm` service. | Manage the assistant's AI providers, whose keys stay with the device | System apps only |
 | `news` | Items the device collects from its feeds and topic feeds. | Read news the device collects from its feeds and topics | System apps only |
 | `photos` | Photos' own library and collections. | Read Photos's own library and publish collections | System apps only: OctoSense serves just `photos.notify`, to `os.photos` |
@@ -588,6 +591,8 @@ The gate refuses a `host_method` unless every rule holds:
 | --- | --- | --- |
 | `github` | `github.repositories`, `github.files`, `github.read` | |
 | `gcalendar` | `gcalendar.calendars`, `gcalendar.sync`, `gcalendar.refresh`, `gcalendar.cached`, `gcalendar.get`, `gcalendar.prepare` | |
+| `device_calendar` | `device_calendar.permission.status`, `device_calendar.calendars.list`, `device_calendar.events.list`, `device_calendar.events.get` | |
+| `mail` | `mail.compose_status` | `mail.compose` (local draft only) |
 | `gmail` | `gmail.labels`, `gmail.messages`, `gmail.message`, `gmail.draft.get`, `gmail.event.status` | `gmail.draft.open`, `gmail.draft.edit`, `gmail.event.decide` |
 | `glance` | `glance.list` | `glance.publish`, `glance.withdraw` |
 | `auth` | `auth.backend.me`, `auth.backend.request` (declared `GET` operations only) | |
@@ -596,6 +601,13 @@ The gate refuses a `host_method` unless every rule holds:
 | `camera` | `camera.permission.status` | |
 | `microphone` | `microphone.permission.status` | |
 | `location` | `location.permission.status`, `location.get` | |
+
+The `device_calendar` aliases and `mail.compose` / `mail.compose_status` are
+unreleased additions. All require `private_data: true` and the corresponding
+capability. Calendar permission prompts, calendar selection and event writes
+are foreground-only; so are `mail.review_send` and `mail.send`. Preparing a
+draft does not send it. The compatible host must check authorization again
+and show its own immutable review before a person approves an external write.
 
 `wasm.<function>` runs one of the app's own functions (`fns/*.wasm`, the
 `wasm` capability), only on hosts that serve `wasm`

@@ -7,7 +7,7 @@
 # and no path dependencies. Within 1.x it only grows (see README.md).
 [package]
 name = "octosense-app-contract"
-version = "1.8.0"
+version = "1.10.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "The OctoSense app contract: app manifests, the policy an app gets, package integrity and running a package"

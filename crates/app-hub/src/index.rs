@@ -87,6 +87,7 @@ impl Entry {
         for capability in &self.manifest.capabilities {
             lines.push(match capability.as_str() {
                 "storage" => "Keep its own data on this device".to_string(),
+                "files" => "Import or export files and photos you choose, and open the system sharing chooser".to_string(),
                 "net" if self.manifest.network.hosts.is_empty() => "Reach the network: nothing listed".to_string(),
                 "net" => format!("Reach only: {}", self.manifest.network.hosts.join(", ")),
                 "prompt" => "Ask you questions".to_string(),
@@ -97,6 +98,7 @@ impl Entry {
                 "images" => "Show pictures from any website".to_string(),
                 "web" => "Open web pages in a browser view".to_string(),
                 "microphone" => "Use the microphone".to_string(),
+                "audio" => "Play its own audio files while the app is active".to_string(),
                 "library" => "Save to your photo library, where other apps can see it".to_string(),
                 "mail" => "Read and send mail from accounts you sign in to on the device".to_string(),
                 "calendar" => "Read and manage local events through the device's Calendar service".to_string(),
