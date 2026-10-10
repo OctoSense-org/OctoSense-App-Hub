@@ -476,9 +476,13 @@ pub fn register_policy_runtime_features() {
     crate::host_api::register_runtime_feature("app_policy.device_consent", 1);
 }
 
-/// Apply the host-only device consent marker before untrusted source runs.
+/// Bind an already admitted bundle's identity and device-consent boundary
+/// before untrusted source runs. Callers must supply the verified launch copy
+/// (or a shipped system bundle), never a path or identity from app arguments.
 /// Plain Makepad hosts cannot advertise OctoSense's permission boundary.
+/// Failure clears any previous heap identity instead of retaining another app.
 pub fn apply_device_consent(cx: &mut Cx, bundle: &std::path::Path, splash: &SplashRef) -> Result<(), String> {
+    splash.set_host_tag(cx, None);
     let text = std::fs::read_to_string(bundle.join("manifest.json")).map_err(|error| error.to_string())?;
     let manifest = octosense_app_policy::AppManifest::parse(&text)?;
     #[cfg(not(feature = "text-input-state-query"))]
@@ -495,9 +499,9 @@ pub fn apply_device_consent(cx: &mut Cx, bundle: &std::path::Path, splash: &Spla
     }
     #[cfg(not(feature = "text-input-state-query"))]
     {
-        let _ = (cx, splash);
         if required { return Err("This standalone build does not implement the host-api-v1 device permission broker".into()); }
     }
+    splash.set_host_tag(cx, Some(manifest.id));
     Ok(())
 }
 
