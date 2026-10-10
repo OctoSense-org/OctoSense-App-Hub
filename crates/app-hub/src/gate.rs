@@ -263,7 +263,6 @@ fn check_bundle_for(
     let requires_components = manifest.requires.iter().any(|f| f == crate::functions::COMPONENTS_FEATURE);
     let declares_storage = manifest.capabilities.iter().any(|c| c == "storage");
     let declares_net = manifest.capabilities.iter().any(|c| c == "net");
-    let hosts: Vec<String> = if declares_net { manifest.network.hosts.clone() } else { Vec::new() };
     let mut components = 0usize;
     for file in &function_files {
         let name = octosense_app_policy::portable_path(file).unwrap_or_else(|| file.to_string_lossy().replace('\\', "/"));
@@ -290,13 +289,13 @@ fn check_bundle_for(
                 format!("{name} imports wasi:filesystem, the app's own files, which needs the storage capability"),
             ));
         }
-        if info.uses_http() && hosts.is_empty() {
+        if info.uses_http() && !declares_net {
             findings.push(Finding::refuse(
                 "functions",
-                format!("{name} imports wasi:http, which needs the net capability and the hosts it reaches in network.hosts"),
+                format!("{name} imports wasi:http, the network, which the app must declare with the net capability"),
             ));
         }
-        findings.push(Finding::warn_at("functions", name.clone(), format!("{name} is a component that reaches {}", info.reach(&hosts))));
+        findings.push(Finding::warn_at("functions", name.clone(), format!("{name} is a component that reaches {}", info.reach())));
     }
     if requires_components && components == 0 {
         findings.push(Finding::warn(

@@ -119,7 +119,7 @@ admission. A warning does not.
 | `publisher-signature` | The declared GitHub proof fails verification, even with `--allow-unsigned`; the manifest is unsigned and `--allow-unsigned` is absent; or a legacy Ed25519 signature fails verification or names an unknown key (`publisher key "<id>" is not registered with this hub`). | The manifest is unsigned and `--allow-unsigned` is given. |
 | `identity` | The id starts with `os.`; the id, or its last segment, is a reserved name ([Ids and reserved names](#ids-and-reserved-names)). | |
 | `contents` | A file's extension is not one of `.card`, `.json`, `.l0`, `.octoscript`, `.splash`, `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.ttf`, `.otf`, `.txt` or `.md`, and it is not a function module (`.wasm`, see `functions`). Files with no extension, such as `.DS_Store` and `LICENSE`, are refused too. | |
-| `functions` | The bundle carries a `.wasm` file without the `wasm` capability, or more than 8. A file that is not at `fns/<name>.wasm` (the name `[a-z0-9_-]`, at most 64 characters), or is neither a WebAssembly core module (the 8-byte header of version 1) nor a valid component, is refused as `contents-invalid`, as is a component that imports anything outside `wasi:cli`, `wasi:clocks`, `wasi:filesystem`, `wasi:http`, `wasi:io`, `wasi:random` and `octosense:host`. A component is refused here when the manifest does not require `wasm-components-v1`, when it imports `wasi:filesystem` without the `storage` capability, or when it imports `wasi:http` without the `net` capability and at least one host in `network.hosts` ([WebAssembly components](#webassembly-components)). The gate checks nothing else inside a core module; the host checks its imports and exports when it loads the module. | The app declares `wasm` but carries no `fns/*.wasm`. The manifest requires `wasm-components-v1` but `fns/` holds no component. Each admitted component gets a line saying what it reaches. |
+| `functions` | The bundle carries a `.wasm` file without the `wasm` capability, or more than 8. A file that is not at `fns/<name>.wasm` (the name `[a-z0-9_-]`, at most 64 characters), or is neither a WebAssembly core module (the 8-byte header of version 1) nor a valid component, is refused as `contents-invalid`, as is a component that imports anything outside `wasi:cli`, `wasi:clocks`, `wasi:filesystem`, `wasi:http`, `wasi:io`, `wasi:random` and `octosense:host`. A component is refused here when the manifest does not require `wasm-components-v1`, when it imports `wasi:filesystem` without the `storage` capability, or when it imports `wasi:http` without the `net` capability ([WebAssembly components](#webassembly-components)). The gate checks nothing else inside a core module; the host checks its imports and exports when it loads the module. | The app declares `wasm` but carries no `fns/*.wasm`. The manifest requires `wasm-components-v1` but `fns/` holds no component. Each admitted component gets a line saying what it reaches. |
 | `contents-invalid` (text and images) | A text file (`.splash`, `.card`, `.json`, `.l0`, `.octoscript`, `.txt` or `.md`) is over 1 MiB or not UTF-8; JSON does not parse; a PNG, JPEG or WebP does not decode or is over 4096 px a side; the listing icon is not square, or is a bitmap over 1 MiB or 1024 px a side. | |
 | `contents-invalid` (SVG) | An SVG does not parse; lacks a numeric `width` and `height` or a `viewBox`; is over 4096 px a side; or holds a script, a `foreignObject` or an `on…` handler. Its styling (a `style` attribute or a `<style>` block) imports a stylesheet, uses an escape, uses a comment or points `url()` anywhere but a `#fragment` in the same file. | |
 | `entry` | The bundle has neither `main.splash` nor `page.card`; `page.card` is not valid L0; `page.data.json` is not JSON; neither `kit/native/<theme>/kit.json` nor every OctoScript kit module the card needs is in the bundle. | |
@@ -222,10 +222,11 @@ The gate admits a component when:
   else are refused as `contents-invalid`;
 - it imports `wasi:filesystem` only with the `storage` capability. Under
   ADR 0014 the host gives it only the app's own storage folder;
-- it imports `wasi:http` only with the `net` capability and at least one host
-  in `network.hosts`. Under ADR 0014's phase 3 the host lets it reach only
-  those hosts, by the rule a script's requests follow, over HTTPS (plain HTTP
-  only to the device itself);
+- it imports `wasi:http` only with the `net` capability, so that the app's
+  permissions say it uses the network. `network.hosts` is not required: under
+  OctoSense's ruling of 8 October 2026 an app's network declarations are shown
+  at install and not enforced while it runs, so the component reaches any
+  host;
 - `octosense:host` needs no grant of its own: through it the component calls
   only the host services its app is granted, as the app's script does, and
   never one that opens a sheet or asks the person.
@@ -239,16 +240,16 @@ what it reaches:
 ```
 
 A component that imports `wasi:http` (here App Hub's `fetch` fixture, in an
-app granted `net` with `"hosts": ["api.example.com"]`) gets:
+app with `net` and no `network.hosts`) gets:
 
 ```text
-[warning] functions (fns/fetch.wasm): fns/fetch.wasm is a component that reaches the clock and HTTPS to api.example.com, but no files or other app
+[warning] functions (fns/fetch.wasm): fns/fetch.wasm is a component that reaches the clock and the network, but no files or other app
 ```
 
-Without `net`, or with no hosts, the gate refuses it:
+Without `net`, the gate refuses it:
 
 ```text
-[refused] functions: fns/fetch.wasm imports wasi:http, which needs the net capability and the hosts it reaches in network.hosts
+[refused] functions: fns/fetch.wasm imports wasi:http, the network, which the app must declare with the net capability
 ```
 
 A component that imports `octosense:host` (App Hub's `hostcall` fixture, in
@@ -392,7 +393,7 @@ platform and provider limits; RC1 and historical beta differences are explicit.
 | `research` | Searching through the system toolbox, within the manifest's research scope ([The research scope](#the-research-scope)). The host runs every search. | Search *what the scope allows* | System apps only, in phone builds |
 | `crawl` | Crawling sites through the system toolbox, up to the scope's `max_depth` and `max_pages`, inside its domain lists. More reach than `research`. | Crawl websites, *within the scope*, which reaches more than searching | As `research` |
 | `runtime` | Asking which APIs the host implements, with `runtime.list` and `runtime.describe` ([Host API compatibility](HOST-API.md)). It grants none of the APIs it lists. | Inspect available host APIs without gaining access to their data or permissions | Not on OctoSense desktop 0.1.0-beta.2, whose store refuses the name. App Hub's request dispatcher answers it in every host built from App Hub `main`, `card-host` included. |
-| `wasm` | The app's own functions: WebAssembly core modules or components in the bundle's `fns/` (at most 8), run by the host's `wasm` service in a sandbox with a deadline and a memory cap. A core module's function gets only its input and reaches no file, network, clock or other app. A component may also read the clock and random numbers; with `storage`, the app's own files; with `net`, HTTPS to the app's listed hosts; and the host services the app is granted, as its script does. It reaches no other app ([WebAssembly components](#webassembly-components)). An agent tool can run one with `host_method: "wasm.<function>"`. To write, build and call a function, see App Flow's [Run your own Rust code](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.md). | Run its own sandboxed functions on this device; they reach only what the app itself may | Desktop RC2 serves it in standard builds on macOS and Linux, with limited support ([the service and its limits](https://github.com/OctoSense-org/OctoSense/blob/main/docs/wasm.md#the-service)); RC1 left it disabled. Supported Android Home source builds serve it too. Builds for Windows, iOS and OpenHarmony leave it out: a call there answers `no service answers "wasm" on this device`. No build loads components yet. |
+| `wasm` | The app's own functions: WebAssembly core modules or components in the bundle's `fns/` (at most 8), run by the host's `wasm` service in a sandbox with a deadline and a memory cap. A core module's function gets only its input and reaches no file, network, clock or other app. A component may also read the clock and random numbers; with `storage`, the app's own files; with `net`, the network; and the host services the app is granted, as its script does. It reaches no other app ([WebAssembly components](#webassembly-components)). An agent tool can run one with `host_method: "wasm.<function>"`. To write, build and call a function, see App Flow's [Run your own Rust code](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.md). | Run its own sandboxed functions on this device; they reach only what the app itself may | Desktop RC2 serves it in standard builds on macOS and Linux, with limited support ([the service and its limits](https://github.com/OctoSense-org/OctoSense/blob/main/docs/wasm.md#the-service)); RC1 left it disabled. Supported Android Home source builds serve it too. Builds for Windows, iOS and OpenHarmony leave it out: a call there answers `no service answers "wasm" on this device`. No build loads components yet. |
 | `sheet` | Spreadsheets through the `sheet` engine (gridcraft): workbooks, formulas, recalculation and xlsx, inside the app's own files. | Use the device's spreadsheet engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop and Home builds. |
 | `photo` | Images and photo documents through the `photo` engine (photocraft): inspect, convert, edit commands and previews, inside the app's own files. | Use the device's image-editing engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop and Home builds. |
 | `word` | Documents through the `word` engine (wordcraft): create, read, inspect, and convert between docx, Markdown, HTML, RTF, ODT and PDF, inside the app's own files. | Use the device's document engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
