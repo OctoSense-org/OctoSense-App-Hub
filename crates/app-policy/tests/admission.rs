@@ -97,11 +97,13 @@ fn only_listed_hosts_are_reachable() {
     assert!(!policy.allows_host("evil.example"));
 }
 
+/// The host list is a declaration (makepad#117, OctoSense #450): `net`
+/// alone hands the isolate its network module.
 #[test]
-fn the_net_capability_without_hosts_reaches_nothing_and_gets_no_network_module() {
+fn the_net_capability_without_hosts_gets_the_network_module() {
     let policy = resolve(r#""capabilities":["net"]"#).unwrap();
-    assert!(!policy.allows_host("api.weather.example"));
-    assert!(!policy.isolate_settings(Path::new("/data")).allow_net);
+    assert!(!policy.allows_host("api.weather.example"), "no host is declared");
+    assert!(policy.isolate_settings(Path::new("/data")).allow_net);
 }
 
 #[test]
