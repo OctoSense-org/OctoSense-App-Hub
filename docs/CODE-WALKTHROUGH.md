@@ -257,7 +257,10 @@ Take an admitted app that calls `host.request("mail.list", args, callback)`:
 5. A later `pump` delivers the result to the original isolate's callback. A
    late or duplicate reply is ignored. Closing an app calls `cancel_heap` for
    its isolate and for its host sheet's, so a reply meant for either never
-   reaches a replacement app instance.
+   reaches a replacement app instance. A service that keeps state per
+   isolate registers `services::on_isolate_closed`: `cancel_heap` then calls
+   it with the closed isolate's heap key, after clearing its queues, before a
+   new isolate can reuse the key (a heap key is an address).
 
 A request waits at most 60 seconds by default; a service may set its own
 timeout. Each isolate may have 32 requests pending, and all isolates together

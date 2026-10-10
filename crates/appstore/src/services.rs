@@ -32,8 +32,10 @@
 //! service raised a sheet waits for the person instead, and its clock starts
 //! again when the sheet closes. A host drops an isolate's requests and
 //! answers when the isolate closes ([`cancel_heap`]), so nothing reaches a
-//! replacement. The requests waiting, their arguments and their answers are
-//! bounded, and malformed arguments are refused rather than read as `null`.
+//! replacement, and a service that keeps state per isolate hears of it
+//! ([`on_isolate_closed`]) before the isolate's heap key can be reused. The
+//! requests waiting, their arguments and their answers are bounded, and
+//! malformed arguments are refused rather than read as `null`.
 //!
 //! **The surface decides about sheets.** Every call carries `may_prompt`,
 //! the isolate's surface permission: an app in the foreground may have a
@@ -125,7 +127,10 @@ impl Replier {
     /// Native-only identity of the requesting isolate. A service may use this
     /// to snapshot that isolate's existing storage policy before asynchronous
     /// work. It is not authorization, must never come from script arguments,
-    /// and must not be retained as proof that an isolate is still alive.
+    /// and must not be retained as proof that an isolate is still alive: it
+    /// is an address, which a new isolate can reuse once this one is gone. A
+    /// service that keeps state per isolate drops it when
+    /// [`on_isolate_closed`] tells it the isolate closed.
     pub fn isolate_key(&self) -> usize {
         self.heap_key
     }
@@ -240,9 +245,32 @@ fn start_sweeper() {
 
 /// Forget an isolate that is closing: its waiting requests and its queued
 /// answers. A late answer for it goes nowhere, and never to a replacement.
+/// Then the services' [`on_isolate_closed`] listeners hear its heap key.
 pub fn cancel_heap(heap_key: usize) {
     with_pending(|pending| pending.retain(|(heap, _), _| *heap != heap_key));
     REPLIES.lock().unwrap().retain(|(heap, _, _, _)| *heap != heap_key);
+    // Copied out, so no lock of this module is held while a listener runs.
+    let listeners = CLOSED_LISTENERS.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    for listener in listeners {
+        listener(heap_key);
+    }
+}
+
+/// The services' listeners for closing isolates ([`on_isolate_closed`]).
+/// Not under [`SERVICES`]: `dispatch` holds that lock while a service runs.
+static CLOSED_LISTENERS: Mutex<Vec<fn(usize)>> = Mutex::new(Vec::new());
+
+/// Call `listener` with an isolate's heap key when the isolate closes
+/// ([`cancel_heap`]), on the thread closing it (the UI thread), before any
+/// new isolate can reuse the key. For services that keep state per isolate:
+/// [`Replier::isolate_key`] is an address, reused once the isolate is gone.
+/// A listener must be quick and must not call back into this module.
+/// Registering the same function again changes nothing.
+pub fn on_isolate_closed(listener: fn(usize)) {
+    let mut listeners = CLOSED_LISTENERS.lock().unwrap_or_else(|e| e.into_inner());
+    if !listeners.iter().any(|known| std::ptr::fn_addr_eq(*known, listener)) {
+        listeners.push(listener);
+    }
 }
 
 /// A request's arguments, or why it is refused before any service sees it.
@@ -713,6 +741,43 @@ mod tests {
         held.lock().unwrap().pop().unwrap().send(Ok(Value::Null));
         expire_pending(later(DEFAULT_TIMEOUT + Duration::from_secs(1)), |h| h == 7104);
         assert!(take_replies_for(&[7104]).is_empty(), "nothing reaches a replacement isolate");
+    }
+
+    /// A service that keeps state per isolate hears each closing isolate's
+    /// heap key once, however often it registered.
+    #[test]
+    fn a_closing_isolate_reaches_each_listener_once() {
+        static HEARD: Mutex<Vec<usize>> = Mutex::new(Vec::new());
+        fn listener(heap: usize) {
+            HEARD.lock().unwrap().push(heap);
+        }
+        on_isolate_closed(listener);
+        on_isolate_closed(listener);
+        cancel_heap(7110);
+        // Other tests close isolates of their own meanwhile: count this one.
+        let heard = HEARD.lock().unwrap().iter().filter(|heap| **heap == 7110).count();
+        assert_eq!(heard, 1, "the key, once: a second registration is the same listener");
+    }
+
+    /// A listener runs once the isolate's requests and answers are gone, and
+    /// with none of this module's locks held.
+    #[test]
+    fn a_closed_isolates_listener_runs_after_its_queues_are_cleared() {
+        static LEFT: Mutex<Option<(bool, bool)>> = Mutex::new(None);
+        fn listener(heap: usize) {
+            if heap == 7111 {
+                let waiting = with_pending(|pending| pending.keys().any(|(h, _)| *h == heap));
+                let answered = REPLIES.lock().unwrap().iter().any(|(h, ..)| *h == heap);
+                *LEFT.lock().unwrap() = Some((waiting, answered));
+            }
+        }
+        let held = holds("closing_listener", None, false);
+        dispatch(call("closing_listener.read"), 7111, 1, &mut Host::default());
+        dispatch(call("closing_listener.read"), 7111, 2, &mut Host::default());
+        held.lock().unwrap().pop().unwrap().send(Ok(Value::Null)); // answered, not yet taken
+        on_isolate_closed(listener);
+        cancel_heap(7111);
+        assert_eq!(*LEFT.lock().unwrap(), Some((false, false)), "nothing of the isolate is left when its listeners hear of it");
     }
 
     #[test]
