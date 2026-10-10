@@ -488,7 +488,10 @@ pub fn apply_device_consent(cx: &mut Cx, bundle: &std::path::Path, splash: &Spla
         // Apply to every admitted app, including legacy manifests: otherwise
         // an omitted host-api-v1 could inherit the shell's OS permission.
         splash.set_device_consent(cx, true);
-        splash.set_host_caps(cx, octosense_app_policy::containers::public_runtime_capabilities(&manifest.capabilities, true));
+        let explicit_capture_intent = crate::host_api::available_versions().get("camera.capture_intent") == Some(&1);
+        splash.set_host_caps(cx, octosense_app_policy::containers::public_runtime_capabilities(
+            &manifest.capabilities, true, explicit_capture_intent,
+        ));
     }
     #[cfg(not(feature = "text-input-state-query"))]
     {

@@ -28,7 +28,7 @@ pub fn apply(splash: &SplashRef, cx: &mut Cx, settings: &IsolateSettings) -> App
     let storage_quota = settings.granted_storage_quota();
     splash.set_sandbox_dir(cx, settings.storage_root());
     splash.set_storage_quota(cx, Some(storage_quota));
-    splash.set_host_caps(cx, crate::containers::public_runtime_capabilities(&settings.capabilities, false));
+    splash.set_host_caps(cx, crate::containers::public_runtime_capabilities(&settings.capabilities, false, false));
     splash.set_host_prompts(cx, settings.host_prompts);
     // A policy still marks an app isolate and protects private host APIs.
     // The current runtime treats destinations as declarations, not a gate.

@@ -546,12 +546,26 @@ fn the_default_tools_offer_every_kernel_tool_a_contained_agent_may_keep() {
 fn runtime_flags_cannot_expose_host_private_data_or_bypass_device_consent() {
     use octosense_app_policy::containers::public_runtime_capabilities;
     let declarations = vec!["camera".into(), "profile".into(), "agent".into()];
-    let standalone = public_runtime_capabilities(&declarations, false);
+    let standalone = public_runtime_capabilities(&declarations, false, false);
     for flag in ["net", "web", "storage"] { assert!(standalone.iter().any(|v| v == flag)); }
     for flag in ["location", "camera", "microphone", "library", "profile", "agent"] {
         assert!(!standalone.iter().any(|v| v == flag), "{flag}");
     }
-    let consent_host = public_runtime_capabilities(&[], true);
+    let consent_host = public_runtime_capabilities(&[], true, true);
     for flag in ["location", "camera", "microphone", "library"] { assert!(consent_host.iter().any(|v| v == flag)); }
     for flag in ["profile", "agent", "llm", "ledger.read"] { assert!(!consent_host.iter().any(|v| v == flag)); }
+}
+
+#[test]
+fn old_runtime_or_missing_device_broker_never_activates_capture_side_effects() {
+    use octosense_app_policy::containers::public_runtime_capabilities;
+    let declared = vec!["camera".into(), "microphone".into(), "library".into()];
+    let old_runtime = public_runtime_capabilities(&declared, true, false);
+    assert!(old_runtime.iter().any(|v| v == "camera"));
+    assert!(old_runtime.iter().any(|v| v == "location"));
+    for flag in ["microphone", "library"] { assert!(!old_runtime.iter().any(|v| v == flag)); }
+    let no_broker = public_runtime_capabilities(&declared, false, true);
+    for flag in ["camera", "location", "microphone", "library"] { assert!(!no_broker.iter().any(|v| v == flag)); }
+    // Declaring a capability does not manufacture an implemented host ABI.
+    assert_eq!(old_runtime, public_runtime_capabilities(&[], true, false));
 }

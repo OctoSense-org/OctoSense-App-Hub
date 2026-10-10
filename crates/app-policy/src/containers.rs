@@ -41,17 +41,20 @@ pub struct IsolateSettings {
 /// reads require a host with the per-app consent broker. Internal `profile`
 /// and unowned `agent.notify` are deliberately absent: installed apps use
 /// authenticated host requests and reviewed app tools instead.
-pub fn public_runtime_capabilities(declared: &[String], device_consent: bool) -> Vec<String> {
+pub fn public_runtime_capabilities(declared: &[String], device_consent: bool, explicit_capture_intent: bool) -> Vec<String> {
     let device = ["camera", "microphone", "location", "library"];
     let mut capabilities: std::collections::BTreeSet<String> = declared.iter()
         .filter(|name| !device.contains(&name.as_str()) && !["profile", "agent"].contains(&name.as_str()))
         .cloned().collect();
     capabilities.extend(["storage", "net", "images", "web", "prompt"].map(str::to_string));
     if device_consent {
-        // The compatible shell's CameraPreview uses explicit capture intent:
-        // capture({library:true}), record_start({audio:true,library:true}).
-        // Availability alone must not enable recording or library export.
-        capabilities.extend(device.map(str::to_string));
+        capabilities.extend(["camera", "location"].map(str::to_string));
+        // Read from the host's registered camera.capture_intent@1 ABI, never
+        // from the app's manifest. Older CameraPreview interprets these
+        // flags as automatic recording/export, so mixed builds keep them off.
+        if explicit_capture_intent {
+            capabilities.extend(["microphone", "library"].map(str::to_string));
+        }
     }
     capabilities.into_iter().collect()
 }

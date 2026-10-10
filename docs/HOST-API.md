@@ -52,6 +52,9 @@ The compatible runtime must include explicit camera intent: `capture({library:tr
 and `record_start({audio:true,library:true})`; omitted options are false.
 Enabling public runtime flags must never implicitly record audio or export
 captures. This overlay and the updated Hub adapter ship together.
+The adapter exposes the microphone/library runtime flags only when the host
+provides both its per-app consent broker and registered
+`camera.capture_intent@1` support. A manifest declaration cannot supply either.
 
 ## Declare what the app needs
 
