@@ -94,6 +94,7 @@ pub fn verify_catalog(catalog: &Catalog, anchor_public_hex: &str) -> Result<(), 
     if catalog.entries.iter().any(|e|e.manifest.integrity.github.is_some()) {
         crate::CatalogPublishers::from_catalog(catalog)?;
     }
+    crate::components::check_catalog(catalog)?;
     Ok(())
 }
 

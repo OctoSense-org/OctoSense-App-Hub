@@ -23,6 +23,7 @@ use std::path::PathBuf;
 
 pub mod cardapp;
 pub mod card_assets;
+pub mod components;
 pub mod host_api;
 pub mod services;
 pub mod script_tools;
@@ -336,6 +337,7 @@ impl AppStoreView {
         let (Some(store), Some(origin)) = (self.store.as_ref(), self.origin.as_ref()) else { return };
         let Some(entry) = store.entry(&listing.app_id) else { return };
         let artifact = entry.artifact.clone();
+        let manifest = entry.manifest.clone();
         let staging = self.app_data_root.join(&listing.app_id);
         if let Err(e) = std::fs::create_dir_all(&staging) {
             self.status = format!("Cannot prepare {}: {e}", listing.app_id);
@@ -349,6 +351,9 @@ impl AppStoreView {
                 // store checks their signature itself rather than trusting
                 // that the hub did.
                 let keys = store.publisher_keys();
+                // Its shared components first (App Hub ADR 0003), from the
+                // same verified catalog: the app never lands without them.
+                components::install(store, origin, &manifest)?;
                 store
                     .install_staged(&listing.app_id, &staged, &keys, &octosense_app_hub::today())
                     .map(|policy| (staged, policy))
@@ -356,6 +361,8 @@ impl AppStoreView {
         {
             Ok((staged, policy)) => {
                 let _ = std::fs::remove_dir_all(&staged);
+                // An update may leave a component no installed app pins.
+                let _ = store.collect_components();
                 format!("Installed {} {} — {} capability(ies)", listing.name, listing.version, policy.capabilities.len())
             }
             Err(e) => format!("Not installed: {e}"),

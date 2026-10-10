@@ -201,7 +201,12 @@ signature and rejects a sequence older than the catalog it already holds.
 Installation checks freshness and the bundle bytes before it writes
 `<app-data>/.bundles/<app-id>/bundle`, outside the app's own storage
 (`<app-data>/<app-id>/`); an install from before that layout is moved there
-once (`adopt_legacy_installs`). The 14-day freshness window applies to new
+once (`adopt_legacy_installs`). An app that pins shared components
+([ADR 0003](adr/0003-shared-components.md)) gets them first: each is
+resolved from the same verified catalog, fetched, checked against its BLAKE3
+digest and kept once at `<app-data>/.components/<blake3>.wasm`
+(`Store::install_components`, [`components.rs`](../crates/app-hub/src/components.rs));
+a host loads them through `octosense_appstore::components::resolved`. The 14-day freshness window applies to new
 installs. Installed apps stay subject to `may_run`.
 
 `CardAppView::start` reopens the last verified catalog and calls

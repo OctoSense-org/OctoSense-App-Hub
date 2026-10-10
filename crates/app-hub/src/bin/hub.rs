@@ -10,6 +10,7 @@
 //!             --publisher <id> --repo <url> --commit <sha> [--out <dir>] [--anchor <hex>]
 //! hub verify <catalog> --anchor <hex>
 //! hub component-info <file.wasm>          # a function file's kind, imports and exports
+//! hub component-prepare|pack|check|entry|publish   # shared components (ADR 0003)
 //! ```
 //!
 //! `check` is the gate: a developer runs it before submitting and sees the
@@ -92,8 +93,7 @@ fn run() -> Result<(), String> {
                 return Err("prepared catalog filename must be catalog-v2.payload.json".into());
             }
             let catalog: Catalog = serde_json::from_slice(&payload).map_err(|e| e.to_string())?;
-            let added: Vec<_> = catalog.entries.iter().filter(|entry| !base.entries.iter().any(|old| old.app_id() == entry.app_id() && old.version() == entry.version()))
-                .map(|entry| serde_json::json!({"bundle":entry.artifact,"pack":format!("{}.pack.json",entry.artifact),"index":format!("index/{}-{}.json",entry.app_id(),entry.version())})).collect();
+            let added = github_catalog::added_artifacts(base, &catalog);
             std::fs::write(&output, &payload).map_err(|e| e.to_string())?;
             println!("{}", serde_json::json!({"schema":1,"base_sequence":base.sequence,"sequence":catalog.sequence,
                 "base_sha256":hex::encode(Sha256::digest(&base_bytes)),"candidate_sha256":hex::encode(Sha256::digest(&candidate)),
@@ -143,6 +143,139 @@ fn run() -> Result<(), String> {
             let bytes = admission::read_bounded(Path::new(&path), gate::MAX_BUNDLE_BYTES)?;
             let info = functions::describe(&bytes).map_err(|e| format!("{path}: {e}"))?;
             println!("{}", serde_json::to_string_pretty(&info).map_err(|e| e.to_string())?);
+            Ok(())
+        }
+        // Shared components (App Hub ADR 0003): a release is the component's
+        // manifest and listing (`<id>-<version>.component.json`) beside its
+        // `.wasm` file. prepare describes the file, pack seals and verifies a
+        // release, check is the gate, entry builds a candidate's index entry
+        // and publish adds one to a legacy-signed (development) catalog.
+        "component-prepare" => {
+            let wasm_path = positional.ok_or("usage: hub component-prepare <file.wasm> --draft <component.json> --out <file>")?;
+            let wasm = admission::read_bounded(Path::new(&wasm_path), components::MAX_COMPONENT_BYTES)?;
+            let draft_path = flag("draft").ok_or("--draft <component.json>")?;
+            let draft: components::ComponentDraft = serde_json::from_slice(&admission::read_bounded(Path::new(&draft_path), components::MAX_RELEASE_BYTES)?)
+                .map_err(|e| format!("{draft_path}: {e}"))?;
+            let mut release = components::ComponentRelease::from_draft(draft, &wasm).map_err(|e| format!("{wasm_path}: {e}"))?;
+            let output = PathBuf::from(flag("out").ok_or("--out <file>")?);
+            if std::fs::symlink_metadata(&output).is_ok() {
+                return Err(format!("{} already exists; refusing to overwrite", output.display()));
+            }
+            let names = ["repository", "repository-id", "owner-id", "workflow", "tag", "commit"];
+            let given: Vec<&str> = names.iter().copied().filter(|name| flag(name).is_some()).collect();
+            let c = &release.component;
+            let mut receipt = serde_json::json!({"schema":1,"id":c.id,"version":c.version,"wasm_blake3":c.wasm_blake3,"bytes":c.bytes});
+            if given.is_empty() {
+                write_new(&output, format!("{}\n", serde_json::to_string_pretty(&release).map_err(|e| e.to_string())?).as_bytes())?;
+                receipt["status"] = "unsigned-development-release".into();
+            } else if given.len() == names.len() {
+                if output.file_name().and_then(|n| n.to_str()) != Some(components::COMPONENT_SUBJECT) {
+                    return Err(format!("the attested subject is named {}", components::COMPONENT_SUBJECT));
+                }
+                let identity: octosense_app_policy::manifest::GithubPublisher = serde_json::from_value(serde_json::json!({
+                    "repository":flag("repository"),"repository_id":flag("repository-id"),"owner_id":flag("owner-id"),
+                    "workflow":flag("workflow"),"tag":flag("tag"),"commit":flag("commit")
+                })).map_err(|e| e.to_string())?;
+                identity.validate(&release.component.version)?;
+                release.component.integrity.github = Some(identity);
+                let bytes = release.subject_bytes()?;
+                write_new(&output, &bytes)?;
+                use sha2::{Digest, Sha256};
+                receipt["subject"] = components::COMPONENT_SUBJECT.into();
+                receipt["sha256"] = hex::encode(Sha256::digest(&bytes)).into();
+                receipt["status"] = "awaiting-github-attestation".into();
+            } else {
+                return Err(format!("give all of --{}, or none for an unsigned development release", names.join(", --")));
+            }
+            println!("{receipt}");
+            Ok(())
+        }
+        "component-pack" => {
+            let release_path = positional.ok_or("usage: hub component-pack <release.json> --wasm <file.wasm> [--attestation <bundle.json>] --out <new directory>")?;
+            let mut release = components::ComponentRelease::read(Path::new(&release_path))?;
+            let wasm = admission::read_bounded(Path::new(&flag("wasm").ok_or("--wasm <file.wasm>")?), components::MAX_COMPONENT_BYTES)?;
+            if let Some(proof) = flag("attestation") {
+                let github = release.component.integrity.github.as_mut().ok_or("prepare the release with its GitHub identity before attaching a proof")?;
+                if github.attestation.is_some() {
+                    return Err("the release already carries a proof".into());
+                }
+                let bytes = admission::read_bounded(Path::new(&proof), github_publisher::MAX_PROOF_BYTES as u64)?;
+                github.attestation = Some(serde_json::from_slice(&bytes).map_err(|_| "invalid publisher attestation JSON")?);
+            }
+            let report = check_component(&release, &wasm, !has("allow-unsigned"), None)?;
+            if !report.passed() {
+                print!("{}", report.render());
+                return Err("the component was refused".into());
+            }
+            let output = PathBuf::from(flag("out").ok_or("--out <new directory>")?);
+            std::fs::create_dir(&output).map_err(|e| format!("component-pack needs a new output directory: {e}"))?;
+            let stem = format!("{}-{}", release.component.id, release.component.version);
+            let release_file = output.join(format!("{stem}.component.json"));
+            let wasm_file = output.join(format!("{stem}.wasm"));
+            write_new(&release_file, format!("{}\n", serde_json::to_string_pretty(&release).map_err(|e| e.to_string())?).as_bytes())?;
+            write_new(&wasm_file, &wasm)?;
+            println!("{}", serde_json::json!({"schema":1,"id":report.id,"version":report.version,"wasm_blake3":report.digest,
+                "release":release_file,"wasm":wasm_file,
+                "status":if release.component.integrity.github.is_some() {"verified-release-not-published"} else {"unsigned-development-release"}}));
+            Ok(())
+        }
+        "component-check" | "component-entry" => {
+            let release_path = positional.ok_or_else(|| format!("usage: hub {command} <release.json> --wasm <file.wasm>"))?;
+            let release = components::ComponentRelease::read(Path::new(&release_path))?;
+            let wasm = admission::read_bounded(Path::new(&flag("wasm").ok_or("--wasm <file.wasm>")?), components::MAX_COMPONENT_BYTES)?;
+            let base = flag("catalog").map(|path| {
+                let bytes = admission::read_bounded(Path::new(&path), github_catalog::MAX_DOCUMENT_BYTES as u64)?;
+                github_catalog::authenticated_publication_base(&bytes, &flag("anchor").unwrap_or_else(|| DEFAULT_ANCHOR.into()))
+            }).transpose()?;
+            if command == "component-check" {
+                let report = check_component(&release, &wasm, !has("allow-unsigned"), base.as_ref().map(|b| b.catalog()))?;
+                if has("json") { println!("{}", report.json()); } else { print!("{}", report.render()); }
+                return if report.passed() { Ok(()) } else { Err("the component was refused".into()) };
+            }
+            let base = base.ok_or("--catalog <authenticated catalog> is required")?;
+            let output = PathBuf::from(flag("out").ok_or("--out <index.json>")?);
+            if std::fs::symlink_metadata(&output).is_ok() {
+                return Err(format!("{} already exists; refusing to overwrite", output.display()));
+            }
+            let report = check_component(&release, &wasm, true, Some(base.catalog()))?;
+            if !report.passed() {
+                print!("{}", report.render());
+                return Err("the component was refused".into());
+            }
+            let github = release.component.integrity.github.as_ref().ok_or("entry requires a GitHub publisher")?;
+            let entry = component_entry_for(&release, &wasm, &report, &format!("github:{}", github.repository_id), &github.repository_url(), &github.commit, &today())?;
+            write_new(&output, &serde_json::to_vec_pretty(&entry).map_err(|e| e.to_string())?)?;
+            println!("{}", serde_json::json!({"schema":1,"artifact":entry.artifact,"index":components::index_path(entry.id(), entry.version()),
+                "status":"candidate-only-awaiting-admin-catalog-approval"}));
+            Ok(())
+        }
+        "component-publish" => {
+            let release_path = positional.ok_or("usage: hub component-publish <release.json> --wasm <file.wasm> --catalog <f> --key <f> --anchor-cert <hex> --publisher <id>")?;
+            let release = components::ComponentRelease::read(Path::new(&release_path))?;
+            let wasm = admission::read_bounded(Path::new(&flag("wasm").ok_or("--wasm <file.wasm>")?), components::MAX_COMPONENT_BYTES)?;
+            let catalog_path = PathBuf::from(flag("catalog").ok_or("--catalog <file>")?);
+            let working = load_key(&flag("key").ok_or("--key <working key file>")?)?;
+            let anchor_certificate = flag("anchor-cert").ok_or("--anchor-cert <hex>")?;
+            let publisher = flag("publisher").ok_or("--publisher <id>")?;
+            let out = PathBuf::from(flag("out").unwrap_or_else(|| ".".into()));
+            let mut catalog = if catalog_path.exists() { trusted_catalog(&catalog_path, &argv)? } else { Catalog::new(0, &today(), Vec::new()) };
+            let report = check_component(&release, &wasm, !has("allow-unsigned"), Some(&catalog))?;
+            print!("{}", report.render());
+            if !report.passed() {
+                return Err("refusing to publish a component the gate refused".into());
+            }
+            let entry = component_entry_for(&release, &wasm, &report, &publisher, &flag("repo").unwrap_or_default(), &flag("commit").unwrap_or_default(), &today())?;
+            let artifact = out.join(&entry.artifact);
+            if let Some(parent) = artifact.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            std::fs::write(&artifact, &wasm).map_err(|e| format!("{}: {e}", artifact.display()))?;
+            catalog.components.push(entry);
+            catalog.sequence += 1;
+            catalog.published = today();
+            working.sign_catalog(&mut catalog, &anchor_certificate)?;
+            write_json(&catalog_path, &serde_json::to_value(&catalog).map_err(|e| e.to_string())?)?;
+            println!("published component {} {} (catalog sequence {})", report.id, report.version, catalog.sequence);
             Ok(())
         }
         "certify" => {
@@ -271,12 +404,18 @@ fn run() -> Result<(), String> {
             let working = load_key(&flag("key").ok_or("--key <working key file>")?)?;
             let anchor_certificate = flag("anchor-cert").ok_or("--anchor-cert <hex>")?;
             let mut catalog = read_catalog(&catalog_path)?;
-            let entry = catalog
-                .entries
-                .iter_mut()
-                .find(|e| e.app_id() == app_id && e.version() == version)
-                .ok_or_else(|| format!("{app_id} {version} is not in the catalog"))?;
-            entry.status = Status::Withdrawn(reason.clone());
+            // An app version, or a shared component version (App Hub ADR
+            // 0003): ids are never both.
+            let status = match catalog.entries.iter_mut().find(|e| e.app_id() == app_id && e.version() == version) {
+                Some(entry) => &mut entry.status,
+                None => &mut catalog
+                    .components
+                    .iter_mut()
+                    .find(|c| c.id() == app_id && c.version() == version)
+                    .ok_or_else(|| format!("{app_id} {version} is not in the catalog"))?
+                    .status,
+            };
+            *status = Status::Withdrawn(reason.clone());
             catalog.sequence += 1;
             catalog.published = today();
             working.sign_catalog(&mut catalog, &anchor_certificate)?;
@@ -420,6 +559,17 @@ fn load_key(path: &str) -> Result<HubKey, String> {
 fn read_catalog(path: &Path) -> Result<Catalog, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// Create a new file; never replace one.
+fn write_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    use std::io::Write;
+    std::fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(path)
+        .and_then(|mut file| file.write_all(bytes))
+        .map_err(|e| format!("cannot create {}: {e}", path.display()))
 }
 
 fn write_json(path: &Path, value: &serde_json::Value) -> Result<(), String> {

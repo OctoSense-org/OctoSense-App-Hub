@@ -55,6 +55,8 @@ catalog-candidates/<name>/catalog.json
 catalog-candidates/<name>/artifacts/<app>-<version>.bundle/...
 catalog-candidates/<name>/artifacts/<app>-<version>.bundle.pack.json
 catalog-candidates/<name>/index/<app>-<version>.json
+catalog-candidates/<name>/artifacts/<component>-<version>.wasm
+catalog-candidates/<name>/index/components/<component>-<version>.json
 ```
 
 The candidate `catalog.json` is an unsigned payload: schema 1, no `key` or
@@ -66,7 +68,16 @@ update, no new artifact files are needed.
 
 For new versions, include the exact reviewed bundle, matching pack and index.
 `hub catalog-prepare` re-runs admission and publisher continuity checks and
-compares every derived entry and packed file. The workflow extracts candidate
+compares every derived entry and packed file.
+
+A shared component ([ADR 0003](adr/0003-shared-components.md)) is recorded
+in the catalog's `components` list, under the same history rules. For a new
+component version, include its reviewed `.wasm` file and the index entry
+that `hub component-entry` writes. `hub catalog-prepare` re-runs the
+component gate with GitHub provenance required, compares the rebuilt entry
+with the candidate's entry and index, and lists `{"component", "index"}` for
+each new component version in its receipt. A new app in the same candidate
+may pin a new component of that candidate. The workflow extracts candidate
 files as data; it never executes their scripts or build commands.
 
 After [preparing the native workspace](FIRST-APP.md#1-prepare-the-tools-and-an-app-repository):

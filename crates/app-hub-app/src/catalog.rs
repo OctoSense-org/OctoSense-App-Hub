@@ -331,7 +331,11 @@ impl Backend {
                 _ => EntryStatus::Available,
             },
         };
-        let incompatible = self.store.entry(&listing.app_id).and_then(|entry| octosense_appstore::host_api::check_manifest(&entry.manifest).err());
+        let incompatible = self.store.entry(&listing.app_id).and_then(|entry| {
+            octosense_appstore::host_api::check_manifest(&entry.manifest)
+                .err()
+                .or_else(|| self.store.resolve_components(&entry.manifest).err())
+        });
         let status = if !can_open { incompatible.clone().map(EntryStatus::Unavailable).unwrap_or(status) } else { status };
         let consent = if incompatible.is_none() && can_install
             && matches!(
@@ -417,6 +421,10 @@ impl Backend {
                     "The downloaded manifest differs from the reviewed catalog manifest".into(),
                 );
             }
+            // Its shared components first (App Hub ADR 0003): resolved from
+            // this verified catalog, fetched like the bundle and kept once
+            // per digest in the root's store, never in the staging root.
+            octosense_appstore::components::install(&self.store, &self.origin, &entry.manifest)?;
             // The Hub backend copies into its own root. Give it a staging root
             // so a failed copy cannot remove or expose a partial live bundle.
             let mut prepared_store = self.store.for_install_root(&workspace.join("verified"));
@@ -431,6 +439,8 @@ impl Backend {
                 &prepared_store.install_dir(&consent.app_id),
                 |from, to| std::fs::rename(from, to),
             )?;
+            // An update may leave a component no installed app pins.
+            let _ = self.store.collect_components();
             Ok(self.snapshot())
         })();
         let _ = std::fs::remove_dir_all(&workspace);
@@ -457,6 +467,7 @@ impl Backend {
         }
         octosense_appstore::host_api::check_manifest(&entry.manifest)?;
         octosense_app_policy::policy::resolve(&entry.manifest, &HostLimits::default())?;
+        self.store.resolve_components(&entry.manifest)?;
         Ok(())
     }
 
@@ -813,6 +824,62 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.path);
         }
+    }
+
+    /// App Hub ADR 0003 through the shell's installer: an app that pins a
+    /// shared component gets it from the same verified catalog, and the
+    /// component's withdrawal stops the app.
+    #[test]
+    fn an_app_pinning_a_shared_component_installs_it_from_the_same_catalog() {
+        const NOTES: &[u8] = include_bytes!("../../app-hub/tests/fixtures/notes.component.wasm");
+        let f = Fixture::new();
+        let draft: octosense_app_hub::components::ComponentDraft = serde_json::from_value(serde_json::json!({
+            "component": {"schema": 1, "id": "org.example.markdown", "version": "1.0.0", "name": "Markdown",
+                "publisher": {"name": "Example", "support": "https://example.test/s", "privacy_policy_url": "https://example.test/p"},
+                "license": "MIT"},
+            "listing": {"description": "Renders Markdown."}
+        }))
+        .unwrap();
+        let release = octosense_app_hub::ComponentRelease::from_draft(draft, NOTES).unwrap();
+        let report = octosense_app_hub::check_component(&release, NOTES, false, None).unwrap();
+        let component = octosense_app_hub::component_entry_for(&release, NOTES, &report, "dev:example", "", "", "2026-10-09").unwrap();
+        std::fs::create_dir_all(f.path.join("hub/artifacts")).unwrap();
+        std::fs::write(f.path.join("hub").join(&component.artifact), NOTES).unwrap();
+        let mut app = f.entry();
+        let bundle = f.path.join("hub").join(&app.artifact);
+        let mut value = serde_json::to_value(&app.manifest).unwrap();
+        value["capabilities"] = serde_json::json!(["storage", "wasm"]);
+        value["requires"] = serde_json::json!(["wasm-shared-components-v1"]);
+        value["components"] = serde_json::json!([{"as": "markdown", "id": component.id(), "version": component.version(),
+            "blake3": component.component.wasm_blake3}]);
+        app.manifest = AppManifest::parse(&value.to_string()).unwrap();
+        octosense_app_hub::sign_manifest(&f.publisher, &mut app.manifest, "test-publisher").unwrap();
+        std::fs::write(bundle.join(MANIFEST_FILE), serde_json::to_vec(&app.manifest).unwrap()).unwrap();
+        let publish = |sequence: u64, component: octosense_app_hub::ComponentEntry| {
+            let mut catalog = Catalog::new(sequence, &octosense_app_hub::today(), vec![app.clone()]);
+            catalog.components = vec![component];
+            f.working.sign_catalog(&mut catalog, &f.anchor.certify(&f.working.public_hex()).unwrap()).unwrap();
+            std::fs::write(f.path.join("hub/catalog.json"), serde_json::to_string(&catalog).unwrap()).unwrap();
+        };
+        publish(1, component.clone());
+
+        let mut backend = f.backend();
+        let consent = backend.refresh().entries[0].consent.clone().expect("installable");
+        let snapshot = backend.install(&consent).unwrap();
+        assert_eq!(snapshot.library[0].status, EntryStatus::Installed);
+        let stored = f.root().join(".components").join(format!("{}.wasm", component.component.wasm_blake3));
+        assert_eq!(std::fs::read(&stored).unwrap(), NOTES);
+        backend.may_open("test-app").unwrap();
+        assert!(!f.root().join(".app-hub-install").exists(), "the staging root is gone, the component is kept");
+
+        let mut withdrawn = component;
+        withdrawn.status = Status::Withdrawn("Renders scripts it should escape".into());
+        publish(2, withdrawn);
+        let snapshot = backend.refresh();
+        let reason = "component markdown (org.example.markdown 1.0.0) was withdrawn: Renders scripts it should escape";
+        assert_eq!(snapshot.library[0].status, EntryStatus::Unavailable(reason.into()));
+        assert!(snapshot.library[0].consent.is_none());
+        assert_eq!(backend.may_open("test-app").unwrap_err(), reason);
     }
 
     #[test]

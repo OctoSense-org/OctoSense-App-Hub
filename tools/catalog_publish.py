@@ -163,10 +163,13 @@ def baseline(repo):
 def listed_files(root, native):
     files = []
     for item in native['added_artifacts']:
-        require(set(item) == {'bundle', 'pack', 'index'}, 'Unexpected admission artifact receipt')
+        # A new app version adds its bundle, pack and index; a new shared
+        # component version (App Hub ADR 0003) its .wasm file and index.
+        require(set(item) in ({'bundle', 'pack', 'index'}, {'component', 'index'}), 'Unexpected admission artifact receipt')
         for field, value in item.items():
             path = safe_path(value)
             require(path.parts[0] == ('index' if field == 'index' else 'artifacts'), 'Unexpected artifact destination')
+            require(field != 'component' or path.suffix == '.wasm', 'Unexpected component artifact')
             source = root.joinpath(*path.parts)
             require(not source.is_symlink(), 'Artifact link refused')
             if field == 'bundle':
