@@ -267,7 +267,6 @@ fn check_bundle_for(
     let requires_components = manifest.requires.iter().any(|f| f == crate::functions::COMPONENTS_FEATURE);
     let declares_storage = manifest.capabilities.iter().any(|c| c == "storage");
     let declares_net = manifest.capabilities.iter().any(|c| c == "net");
-    let hosts: Vec<String> = if declares_net { manifest.network.hosts.clone() } else { Vec::new() };
     let mut components = 0usize;
     for file in &function_files {
         let name = octosense_app_policy::portable_path(file).unwrap_or_else(|| file.to_string_lossy().replace('\\', "/"));
@@ -294,13 +293,13 @@ fn check_bundle_for(
                 format!("{name} imports wasi:filesystem, the app's own files, which needs the storage capability"),
             ));
         }
-        if info.uses_http() && hosts.is_empty() {
+        if info.uses_http() && !declares_net {
             findings.push(Finding::refuse(
                 "functions",
-                format!("{name} imports wasi:http, which needs the net capability and the hosts it reaches in network.hosts"),
+                format!("{name} imports wasi:http, the network, which the app must declare with the net capability"),
             ));
         }
-        findings.push(Finding::warn_at("functions", name.clone(), format!("{name} is a component that reaches {}", info.reach(&hosts))));
+        findings.push(Finding::warn_at("functions", name.clone(), format!("{name} is a component that reaches {}", info.reach())));
     }
     if requires_components && components == 0 {
         findings.push(Finding::warn(
@@ -315,7 +314,7 @@ fn check_bundle_for(
     // from the bundle's components/<blake3>.wasm for a system app. The app
     // must grant what each imports, as for its own components, and
     // reviewers see what each reaches.
-    shared_component_findings(bundle, &manifest, &bundled_components, previous, system_development, &hosts, &mut findings);
+    shared_component_findings(bundle, &manifest, &bundled_components, previous, system_development, &mut findings);
 
     // ---- assets are local ----------------------------------------------
     // ADR 0002's prototype found a card with no network grant fetching nine
@@ -452,7 +451,6 @@ fn shared_component_findings(
     bundled: &[std::path::PathBuf],
     previous: Option<&Catalog>,
     system_development: bool,
-    hosts: &[String],
     findings: &mut Vec<Finding>,
 ) {
     use crate::functions::SHARED_COMPONENTS_FEATURE;
@@ -514,7 +512,7 @@ fn shared_component_findings(
         if let Some(missing) = crate::components::missing_grant(manifest, &info) {
             findings.push(Finding::refuse("components", format!("component {} {missing}", dependency.describe())));
         }
-        findings.push(Finding::warn("components", format!("component {} reaches {}", dependency.describe(), info.reach(hosts))));
+        findings.push(Finding::warn("components", format!("component {} reaches {}", dependency.describe(), info.reach())));
     }
 }
 
@@ -638,14 +636,9 @@ pub fn check_component(
         }
     }
     if let Ok(info) = &admissible {
-        // In an app, wasi:http reaches that app's own hosts: the gate checks
-        // each app that names this component against its own grants.
-        let hosts = if info.uses_http() { vec!["its app's network.hosts".to_string()] } else { Vec::new() };
-        findings.push(Finding::warn_at(
-            "functions",
-            file,
-            format!("{} {} is a component that reaches {}", c.id, c.version, info.reach(&hosts)),
-        ));
+        // The gate checks each app that names this component against that
+        // app's own grants (`net` for wasi:http, `storage` for files).
+        findings.push(Finding::warn_at("functions", file, format!("{} {} is a component that reaches {}", c.id, c.version, info.reach())));
     }
     Ok(ComponentReport {
         id: c.id.clone(),

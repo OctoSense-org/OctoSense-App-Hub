@@ -47,11 +47,11 @@ fn a_release_describes_its_file_and_reviewers_see_what_it_reaches() {
     let report = check_component(&notes, NOTES, true, None).unwrap();
     assert_eq!(refusals(&report.findings, "publisher-signature"), ["App Hub accepts only GitHub-attested component releases"]);
 
-    // HTTP reaches its app's hosts; host services need no grant of their own.
+    // HTTP reaches the network; host services need no grant of their own.
     let fetch = check_component(&release("org.example.fetch", "1.0.0", FETCH), FETCH, false, None).unwrap();
     assert!(
         fetch.findings.iter().any(|f| f.detail
-            == "org.example.fetch 1.0.0 is a component that reaches the clock and HTTPS to its app's network.hosts, but no files or other app"),
+            == "org.example.fetch 1.0.0 is a component that reaches the clock and the network, but no files or other app"),
         "{}",
         fetch.render()
     );
@@ -183,20 +183,22 @@ fn an_app_must_grant_what_each_component_imports() {
         ["component markdown (org.example.markdown 1.0.0) imports wasi:filesystem, the app's own files, which needs the storage capability"]
     );
 
-    for (capabilities, hosts) in [(&[][..], &[][..]), (&["net"][..], &[][..])] {
-        f.pin(&[dependency("fetch", &fetch)], capabilities, hosts);
+    f.pin(&[dependency("fetch", &fetch)], &[], &[]);
+    assert_eq!(
+        refusals(&f.report(Some(&catalog)).findings, "components"),
+        ["component fetch (org.example.fetch 1.0.0) imports wasi:http, the network, which the app must declare with the net capability"]
+    );
+    // net is the declaration; network.hosts is not required (OctoSense's
+    // ruling of 8 October 2026).
+    for hosts in [&[][..], &["api.example.com"][..]] {
+        f.pin(&[dependency("fetch", &fetch)], &["net"], hosts);
+        let report = f.report(Some(&catalog));
+        assert!(report.passed(), "{}", report.render());
         assert_eq!(
-            refusals(&f.report(Some(&catalog)).findings, "components"),
-            ["component fetch (org.example.fetch 1.0.0) imports wasi:http, which needs the net capability and the hosts it reaches in network.hosts"]
+            warnings(&report.findings, "components"),
+            ["component fetch (org.example.fetch 1.0.0) reaches the clock and the network, but no files or other app"]
         );
     }
-    f.pin(&[dependency("fetch", &fetch)], &["net"], &["api.example.com"]);
-    let report = f.report(Some(&catalog));
-    assert!(report.passed(), "{}", report.render());
-    assert_eq!(
-        warnings(&report.findings, "components"),
-        ["component fetch (org.example.fetch 1.0.0) reaches the clock and HTTPS to api.example.com, but no files or other app"]
-    );
 
     let mut f = Fixture::new();
     f.pin(&[dependency("host", &hostcall)], &[], &[]);

@@ -145,8 +145,8 @@ refuses the app.
 With a catalog, the gate resolves each component: it must be there at that
 exact version, be offered, and hash to the pinned digest. The app must grant
 what the component imports, as for its own components: `storage` for
-`wasi:filesystem`, and `net` with at least one host in `network.hosts` for
-`wasi:http`. `octosense:host` needs no grant. Each component gets a reviewer
+`wasi:filesystem`, and `net` for `wasi:http` (a declaration: OctoSense does
+not hold the component to `network.hosts`). `octosense:host` needs no grant. Each component gets a reviewer
 line, such as `component markdown (org.example.markdown 1.2.0) reaches the
 clock, but no files, network or other app`.
 

@@ -451,20 +451,10 @@ pub fn missing_grant(manifest: &AppManifest, info: &crate::functions::ComponentI
     if info.uses_files() && !has("storage") {
         return Some("imports wasi:filesystem, the app's own files, which needs the storage capability");
     }
-    if info.uses_http() && (!has("net") || manifest.network.hosts.is_empty()) {
-        return Some("imports wasi:http, which needs the net capability and the hosts it reaches in network.hosts");
+    if info.uses_http() && !has("net") {
+        return Some("imports wasi:http, the network, which the app must declare with the net capability");
     }
     None
-}
-
-/// The hosts a component in this app reaches over `wasi:http`: the app's
-/// `network.hosts` when it is granted `net`.
-pub fn app_hosts(manifest: &AppManifest) -> Vec<String> {
-    if manifest.capabilities.iter().any(|c| c == "net") {
-        manifest.network.hosts.clone()
-    } else {
-        Vec::new()
-    }
 }
 
 // ---- the device's store -----------------------------------------------------

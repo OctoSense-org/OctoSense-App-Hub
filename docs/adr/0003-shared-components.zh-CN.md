@@ -81,7 +81,7 @@ ADR 0014 让应用把普通的 Rust crate 作为 WebAssembly 组件放在应用�
 
 ### 5. 准入固定了组件的应用
 
-提供签名目录时，准入检查会解析每个组件：签名目录中必须有这个确切版本，它必须仍在提供，并且哈希值等于固定的摘要。应用必须授予组件所导入内容需要的权限，与应用自己的组件相同：`wasi:filesystem` 需要 `storage`，`wasi:http` 需要 `net` 且 `network.hosts` 中至少有一个主机。`octosense:host` 不需要授权。每个组件都有一行给审核人员看的说明，例如 `component markdown (org.example.markdown 1.2.0) reaches the clock, but no files, network or other app`。
+提供签名目录时，准入检查会解析每个组件：签名目录中必须有这个确切版本，它必须仍在提供，并且哈希值等于固定的摘要。应用必须授予组件所导入内容需要的权限，与应用自己的组件相同：`wasi:filesystem` 需要 `storage`，`wasi:http` 需要 `net`（这是声明：OctoSense 不把组件限制在 `network.hosts` 内）。`octosense:host` 不需要授权。每个组件都有一行给审核人员看的说明，例如 `component markdown (org.example.markdown 1.2.0) reaches the clock, but no files, network or other app`。
 
 商店应用的应用包绝不携带 `components/`：它的组件来自签名目录。随构建发布的系统应用没有签名目录，它把固定的每个组件放在应用包的 `components/<blake3>.wasm`，系统应用检查会验证每个文件。
 
