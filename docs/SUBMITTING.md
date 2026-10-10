@@ -21,7 +21,7 @@ first version and every update, your app's GitHub workflow prepares, attests
 and packs the release, so you need no publisher key or repository signing
 secret. Installing such an app takes a host that supports
 `publisher-github-v1`; use the
-[RC2 release and download guide](../README.md#download-a-compatible-host).
+[RC4 release and download guide](../README.md#download-a-compatible-host).
 
 Public catalog 15 offers the GitHub-attested `io.github.ymote.*` reference apps
 ([current apps](../README.md#apps)). App Hub withdrew the older key-signed
@@ -51,7 +51,7 @@ A host runs your bundle: `card-host` while you develop, and an OctoSense shell
 | `hub` | App Hub `main` | Stamp editable source, check and scan it, then prepare, verify and pack GitHub-attested releases. Reviewers run the same code. |
 | `card-host` | App Hub `main` | Run the unsigned bundle, drive it and capture screenshots. |
 | `tools/octo` | [OctoSense App Flow](https://github.com/OctoSense-org/OctoSense-App-Flow) (formerly Design Flow) | Create, run and capture an app. It wraps `card-host` and `hub`. |
-| OctoSense desktop | [RC2 release, source `4ccf8e06`](../README.md#download-a-compatible-host); platform downloads and prerequisites in that guide | Install GitHub-attested releases and run compatible host services, including RC2's document, device-calendar, Mail-draft and audio APIs on their supported platforms. Use macOS for the connected samples; OAuth registrations are not included. |
+| OctoSense desktop | [RC4 prerelease, source `9266b008`](../README.md#download-a-compatible-host); platform downloads and prerequisites in that guide | Install GitHub-attested releases and run compatible host services, including components, declaration-only policy and document, device-calendar, Mail-draft and audio APIs on their supported platforms. Use macOS for the connected samples; OAuth registrations are not included. |
 
 Set up the workspace as described in
 [QUICKSTART §1](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/QUICKSTART.md#1-prerequisites),
@@ -136,7 +136,8 @@ never your app, and the rehearsal publishes nothing to App Hub.
 | Host | Runs | Does not |
 | --- | --- | --- |
 | `card-host` | One unsigned bundle, with a remote bridge to drive and capture it | Serve any host service except `runtime` discovery: every other `host.request` fails with `no service answers "<family>" on this device`. It also refuses sealed releases and apps that require `host-api-v1`, `backend-api-v1` or `script-tools-v1`. |
-| RC2 release `4ccf8e06` (RC1 `933abbcf` had the same catalog and discovery, without the RC2 APIs) | Public v2 catalog, `publisher-github-v1`, discovery and open-app Splash tools; the app's own Wasm functions on macOS and Linux; files, device-calendar, Mail-draft and audio services within their platform limits ([what hosts serve today](../README.md#what-hosts-serve-today)) | Ship OAuth registrations, run Wasm on Windows, approve a Mail send on Windows or Linux, serve device calendars, audio sessions or fresh location samples there, or run macOS-only listings on other OSes. Linux/Windows embedded backend login and protected writes remain unsupported; external-browser backend login and reads are implemented, and a Windows fixture built from RC2's source completed a sign-in against a synthetic backend. |
+| [RC4 prerelease](../README.md#download-a-compatible-host), source `9266b008` | Contract 1.11, declaration-only capability/network policy, Wasm core modules and components, and shared-component installation from verified catalogs; existing account, device-consent and trusted-review flows remain | Supply distributor OAuth registrations, automatically publish components to the public catalog, upgrade a phone, or bypass platform and authorization limits. See release provenance for build, archive and device acceptance boundaries. |
+| Historical RC2 release `4ccf8e06` (RC1 `933abbcf` had the same catalog and discovery, without the RC2 APIs) | Public v2 catalog, `publisher-github-v1`, discovery and open-app Splash tools; the app's own Wasm functions on macOS and Linux; files, device-calendar, Mail-draft and audio services within their platform limits ([what hosts serve today](../README.md#what-hosts-serve-today)) | Ship OAuth registrations, run Wasm on Windows, approve a Mail send on Windows or Linux, serve device calendars, audio sessions or fresh location samples there, or run macOS-only listings on other OSes. Linux/Windows embedded backend login and protected writes remain unsupported; external-browser backend login and reads are implemented, and a Windows fixture built from RC2's source completed a sign-in against a synthetic backend. |
 | Historical desktop-v0.1.0-beta.2 (macOS, Apple silicon) | Installed apps, including apps that use `auth`, `github`, `gmail` and `gcalendar` | Sign in to GitHub or Google until the host has an OAuth registration in `oauth/clients.json` ([setup](https://github.com/OctoSense-org/OctoSense/blob/desktop-v0.1.0-beta.2/crates/oauth-service/README.md)); the release ships none. Sign an app in to its own backend. Install an app that requests `wasm`: its store refuses it with `unknown capability "wasm"`. Unverified on this release: live provider sign-in. |
 | desktop-v0.1.0-beta.1 and home-v0.1.0-beta.1 (the only released phone build) | Store apps that use only capabilities their older app contract knows | Install an app that requests `auth`, `github`, `gmail`, `gcalendar`, `calendar`, `photos`, `youtube`, `wasm` or `palpo.*`. Their stores refuse it, for example with `unknown capability "auth"`. |
 
@@ -170,10 +171,10 @@ used a key-signed test app.
 
 ### Check your platform
 
-- **macOS on Apple silicon:** use the compatible RC2 release for the current
+- **macOS on Apple silicon:** use the compatible RC4 release for the current
   public samples. Installation, local drafts and updates are separate from
   authenticated provider effects; see [download and account limits](../README.md#download-a-compatible-host).
-- **Windows x64 / Linux x86_64:** RC2 packages do not change an app's
+- **Windows x64 / Linux x86_64:** RC4 packages do not change an app's
   `listing.platforms`. The four current samples declare macOS only. Native
   browser and host tests are not acceptance of your app; validate every claimed
   platform, including its dependencies and missing-service states.
@@ -462,7 +463,7 @@ needs app contract 1.8.0 and a host that supports `publisher-github-v1`. Two
 tag-push releases of a test app passed native Store install, update and
 launch checks ([evidence and
 limits](PUBLISHING.md#github-publisher-provenance)). For the current public
-catalog, use the [RC2 release](../README.md#download-a-compatible-host).
+catalog, use the [RC4 prerelease](../README.md#download-a-compatible-host).
 
 1. Open the submission issue if you have not already done so. Missing release
    evidence can be added later; mark it pending rather than inventing a pass.
@@ -598,7 +599,7 @@ exact reviewed bytes, has GitHub Actions sign the new `catalog-v2.json` with
 Sigstore, and commits the catalog to `main`. People can then search for,
 install and run the app in an OctoSense build that reads `catalog-v2.json`
 and supports `publisher-github-v1`, such as the
-[RC2 release](../README.md#download-a-compatible-host). Historical
+[RC4 prerelease](../README.md#download-a-compatible-host). Historical
 desktop-v0.1.0-beta.2 reads only the legacy `catalog.json` that
 `hub publish` produces.
 
@@ -659,7 +660,7 @@ cannot read gets no report, only one `hub: …` line. The full rules are in
 | Generate images, audio, video or embeddings | RC1 and RC2 have methods under the `model` capability; media method names are not separate capabilities. Provider configuration, entitlement and platform limits still apply. | Discover methods at runtime and handle unavailable providers; see the [media guide](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/AI-SERVICES.md#media-and-embeddings-model). |
 | Use `llm`, `news`, `calendar`, `matrix.*`, `prompt`, `ledger.read`, `clipboard`, `palpo.*` or an engine service | The gate admits them, but no host serves them to a store app. `llm` and `news` answer only `os.*` apps, `calendar` only `os.calendar`, and `matrix.*` is served only by Rinx's own host inside Rinx; the engine services (`sheet`, `photo`, `word`, `deck`, `cad`, `light`, `sound`, `design`, `film`, `effect`, `vector`, `pdf`) are declarable on App Hub `main` but serve the system assistant only, and rc.2's admission does not know them. Nothing acts on the others. | Do not request them. For Google Calendar, use `gcalendar`. Which families serve store apps, where and since when: App Flow's [HOST-API-FAMILIES](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-FAMILIES.md). |
 | Send mail from your app | On RC2, after the person signs in with `mail.add_account`: `mail.review_send` (or `mail.send`, which opens the same review) shows the host's native review, and the person approves with a physical press; `mail.compose` and `mail.compose_status` keep a draft and its status. The review exists on macOS and Android only; on Windows and Linux it fails with `Physical Mail send approval is unavailable on this platform`. RC1 had no send path, and SMTP acceptance on hardware is unverified ([OctoSense #409](https://github.com/OctoSense-org/OctoSense/issues/409) tracks the error text). | Declare `mail.review_send` under `host_api.optional` when your listing names Windows or Linux; there, read the granted accounts (`mail.accounts`, `mail.folders`, `mail.list`, `mail.message`) and notify the person, who sends from the Mail app. |
-| Run your app's own logic in agent tools | The RC1 and RC2 releases run `implemented_by: "app"` tools while the full app is open; a closed app answers `app_not_running`. OctoSense desktop 0.1.0-beta.2 refuses these tools with `app_tool_unavailable`. A `host-service` tool without `host_method` targets the service named by your app's namespace. Naming it does not install a service: the call needs a real registered implementation. | To reach a shared service, map the tool with `host_method` to a method of `github`, `gcalendar`, `gmail` or `glance` ([Map a tool to a shared service](PUBLISHING.md#map-a-tool-to-a-shared-service-host_method)). For your own logic, declare `requires: ["script-tools-v1"]` and implement the `app_tool` hook ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)). Test it in the [compatible RC2 release](../README.md#download-a-compatible-host). |
+| Run your app's own logic in agent tools | The RC1 and RC2 releases run `implemented_by: "app"` tools while the full app is open; a closed app answers `app_not_running`. OctoSense desktop 0.1.0-beta.2 refuses these tools with `app_tool_unavailable`. A `host-service` tool without `host_method` targets the service named by your app's namespace. Naming it does not install a service: the call needs a real registered implementation. | To reach a shared service, map the tool with `host_method` to a method of `github`, `gcalendar`, `gmail` or `glance` ([Map a tool to a shared service](PUBLISHING.md#map-a-tool-to-a-shared-service-host_method)). For your own logic, declare `requires: ["script-tools-v1"]` and implement the `app_tool` hook ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)). Test it in the [compatible desktop release](../README.md#download-a-compatible-host). |
 | Ship native Rust code | A store bundle cannot carry it. The gate refuses native libraries, and native code needs a shell release ([delivery paths](DEVELOPMENT.md#choose-a-delivery-path)). | For pure computation, compile your Rust code to a WebAssembly module in `fns/` and request `wasm` ([Capabilities](PUBLISHING.md#capabilities)). Desktop RC2 runs it in standard builds on macOS and Linux; Windows, iOS and OpenHarmony builds leave the `wasm` service out, and RC1 left it disabled everywhere. App Flow's [Run your own Rust code](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.md) shows how to build it, and which route to take for device APIs, the network and files. |
 | Submit a system app (`os.*`) or a native app | No route here. System apps ship with the shells, and native code needs a shell release ([delivery paths](DEVELOPMENT.md#choose-a-delivery-path)). | Build a store app with an id of your own. |
 | Install an `auth` app on a phone | No released phone build can. | Use RC2 on macOS for these macOS-only samples; Android Google authorization is unavailable. |

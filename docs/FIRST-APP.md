@@ -158,7 +158,7 @@ my-app/
   draws over the app ([Sheets](PUBLISHING.md#sheets-apps-never-collect-secrets)).
 - `card-host` serves no host service except `runtime` discovery: every other
   `host.request` answers `no service answers "<family>" on this device`. Test
-  those screens in the [compatible RC2 release](../README.md#download-a-compatible-host)
+  those screens in the [compatible desktop release](../README.md#download-a-compatible-host)
   ([Before you start](SUBMITTING.md#before-you-start)).
 
 ### A card app
@@ -381,7 +381,7 @@ used a key-signed test app.
 | --- | --- |
 | `cargo build` stops with `no variant … TextInputStateQuery` | See [`card-host` fails to build](DEVELOPMENT.md#card-host-fails-to-build). |
 | `card-host: refused: this host has no GitHub publisher verifier` | The bundle is a sealed release. Run the editable source. |
-| `no service answers "<family>" on this device` | `card-host` serves no host service except `runtime` discovery. Test the screen in the [compatible RC2 release](../README.md#download-a-compatible-host). |
+| `no service answers "<family>" on this device` | `card-host` serves no host service except `runtime` discovery. Test the screen in the [compatible desktop release](../README.md#download-a-compatible-host). |
 | `curl: (22) The requested URL returned error: 404` from `/g?raw=1` | No frame is drawn yet. Wait a few seconds and capture again. |
 | `[refused] identity: app id "…" ends in "…", which is reserved` | The id's last segment is a [reserved name](PUBLISHING.md#ids-and-reserved-names). Choose another before your first release. |
 | `[refused] digest: the bundle hashes to …, the manifest claims …` | The bundle changed after `hub stamp`. Stamp again. |

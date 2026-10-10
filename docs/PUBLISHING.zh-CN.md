@@ -17,7 +17,7 @@
 
 `capabilities` 和 `network.hosts` 用于向用户和审核人员说明应用预计使用的
 API 与网络目的地。遗漏某个服务族或主机，不会阻止调用宿主已支持的公开 API。
-这是为下一个兼容版本准备的源码策略；RC2 的历史行为不代表该修改已经发布。
+这项策略已包含在[桌面 RC4](../README.zh-CN.md#下载兼容宿主)中。RC2 的历史行为另行记录，不代表当前的授权规则。
 
 每个准入应用都有独立的存储沙箱、已解析的配额和网络模块。设备访问仍需逐应用
 同意和系统权限；连接账户仍按应用、账户和提供商 scope 隔离。外部写入保留
@@ -162,7 +162,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 
 ### WebAssembly 组件
 
-`fns/` 中的文件也可以是 WebAssembly **组件**，而不是核心模块：一个用 `cargo build --target wasm32-wasip2` 构建的普通 Rust crate（[OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436)，提议中）。它的函数接收和返回带类型的值，在调用之间保留状态，并可以使用 WASI 的一部分。OctoSense #453 已合并组件加载以及 HTTP/宿主服务适配器。兼容的可下载宿主与确切应用仍须分别验收；RC2 只运行核心模块。
+`fns/` 中的文件也可以是 WebAssembly **组件**，而不是核心模块：一个用 `cargo build --target wasm32-wasip2` 构建的普通 Rust crate（[OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436)，提议中）。它的函数接收和返回带类型的值，在调用之间保留状态，并可以使用 WASI 的一部分。OctoSense #453 已合并组件加载以及 HTTP/宿主服务适配器，[桌面 RC4](../README.zh-CN.md#下载兼容宿主)包含这些支持；每个提交的应用仍须单独验收。历史 RC2 只运行核心模块。
 
 准入检查在以下条件都满足时接受组件：
 
@@ -264,7 +264,7 @@ $ hub component-info fns/notes.wasm
 
 **共享组件**是 App Hub 在签名目录中单独发布的 WebAssembly 组件，可供多个应用使用，就像共享 npm 包一样。与 npm 依赖不同的是，它被精确固定：应用指定一个确切版本和文件的 BLAKE3 摘要，所以已安装应用的代码只会随应用更新而改变（[ADR 0003](adr/0003-shared-components.zh-CN.md)，即 [OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436) 的第 4 阶段）。App Hub 像审核应用一样审核共享组件，并像验证应用自己的组件一样验证它（[WebAssembly 组件](#webassembly-组件)）。它能访问的，只有使用它的应用可以访问的内容：每个应用都以自己的身份、资源上限和实际授权运行自己的实例。
 
-共享组件需要兼容宿主，并在其经过验证的目录中发布；仅支持普通组件加载并不等于支持共享组件。在支持共享组件之前构建的宿主（包括 OctoSense 桌面版 RC1 和 RC2）会拒绝含有组件、或含有固定了组件的应用的整个签名目录，所以在兼容的宿主发行版发布之前，App Hub 不会发布这两种内容。
+共享组件需要兼容宿主，并在其经过验证的目录中发布。[桌面 RC4](../README.zh-CN.md#下载兼容宿主)实现共享组件的安装与执行；发布该宿主不会自动把组件或应用发布到公开目录，它们仍须通过 Hub 审核并获得发布批准。较旧宿主（包括桌面 RC1 和 RC2）会拒绝包含组件、或包含固定了组件的应用的整个目录；维护者规划目录迁移时仍须考虑这些客户端。
 
 ### 使用共享组件
 
@@ -825,7 +825,7 @@ App Hub 已允许声明 `device_calendar` 工具别名和 `mail.compose` / `mail
 
 ### 脚本工具执行（`script-tools-v1`）
 
-脚本工具是 `"implemented_by": "app"` 的工具：由应用自己的 Splash 代码在已打开的应用中运行。它需要提供 `app_tools.dispatch@1` 的宿主，例如[桌面 RC2](../README.zh-CN.md#下载兼容宿主)。OctoSense 桌面版 0.1.0-beta.2 拒绝这类工具，返回 `app_tool_unavailable`。
+脚本工具是 `"implemented_by": "app"` 的工具：由应用自己的 Splash 代码在已打开的应用中运行。它需要提供 `app_tools.dispatch@1` 的宿主，例如[桌面 RC4](../README.zh-CN.md#下载兼容宿主)。OctoSense 桌面版 0.1.0-beta.2 拒绝这类工具，返回 `app_tool_unavailable`。
 
 添加脚本工具：
 
@@ -1140,7 +1140,7 @@ my-notes 0.1.0 — PASSED
 
 ## 签名
 
-App Hub 只接受带 GitHub 证明的 Release（[ADR 0002](adr/0002-github-attested-publisher-identity.zh-CN.md)）。应用的 GitHub 工作流为每个 Release 生成证明，所以你无需创建、保存或轮换发布者密钥。带证明的 Release 使用 `publisher-github-v1`，它随应用契约 **1.8.0** 引入并保留在 **1.10.0** 中；[桌面 RC2](../README.zh-CN.md#下载兼容宿主) 是兼容的宿主发行版，RC1 也是。两个由标签推送生成的真实 Release 已通过下文记录的工作流和原生商店验收。
+App Hub 只接受带 GitHub 证明的 Release（[ADR 0002](adr/0002-github-attested-publisher-identity.zh-CN.md)）。应用的 GitHub 工作流为每个 Release 生成证明，所以你无需创建、保存或轮换发布者密钥。带证明的 Release 使用 `publisher-github-v1`，它随应用契约 **1.8.0** 引入并保留在 **1.11.0** 中；[桌面 RC4](../README.zh-CN.md#下载兼容宿主) 是当前兼容的预发布版。RC1 和 RC2 也支持同样的发布者证明。两个由标签推送生成的真实 Release 已通过下文记录的工作流和原生商店验收。
 
 ### GitHub 发布者来源证明
 
@@ -1166,7 +1166,7 @@ hub publisher-pack bundle --out build/app.bundle.pack.json
 
 验证使用公开的合成测试应用的 [v0.1.0 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736273522)与 [v0.1.1 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736765473)，没有使用仓库 Secret。两个工作流均生成并验证了真实 GitHub 证明。[原生验收示例](../crates/app-hub/examples/publisher_acceptance.rs)随后安装两个 Release pack，准备并验证启动、保留完整证明，并拒绝内容/证明/身份篡改、回滚、未签名的归属替换和已撤回版本。[验收记录](../reviews/github-publisher-v1/acceptance.json)绑定输入摘要与原生源码版本。其中的商店使用临时的本地测试签名目录；该测试应用没有 App Hub 提交 issue，也没有签名目录条目。这既不能证明应用界面可以运行，也不能证明手机可以安装 GitHub 发布者应用。
 
-在 macOS 上，OctoSense 桌面 RC1 安装了签名目录第 13 版中带 GitHub 证明的示例应用，并在安装和更新时检查了这些应用的证明和发布者连续性；[RC2](../README.zh-CN.md#下载兼容宿主) 以同样的方式读取签名目录。iOS、Windows 和 Linux 上的商店安装仍未验证，目前也没有任何已发行的手机版本支持 `publisher-github-v1`。
+在 macOS 上，OctoSense 桌面 RC1 安装了签名目录第 13 版中带 GitHub 证明的示例应用，并在安装和更新时检查了这些应用的证明和发布者连续性；[RC2](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.2) 以同样的方式读取签名目录。iOS、Windows 和 Linux 上的商店安装仍未验证，目前也没有任何已发行的手机版本支持 `publisher-github-v1`。
 
 请下载含有生成后证明清单的 **Release pack**；单独检出源码并不包含这些最终字节。审核人员可运行 `hub publisher-unpack app.bundle.pack.json --out review-bundle`，再运行 `hub publisher-verify review-bundle --catalog <authenticated-catalog>`。Unpack 要求新目录，拒绝路径穿越，失败时仅清理自己创建的输出。`hub publisher-entry review-bundle --catalog <authenticated-catalog> --out build/index.json` 生成审核候选条目，不会发布。
 

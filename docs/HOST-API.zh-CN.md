@@ -4,7 +4,7 @@
 
 契约 1.6 让应用可以声明自己需要的宿主 API，并查询宿主实现了哪些 API。它增加的是声明和发现机制，而不是访问权限：应用只能调用宿主中已编译的 Rust 服务，每次调用仍要经过应用自己的授权。同一版契约还让应用包可以声明自己的后端（[登录自己的后端](PUBLISHING.zh-CN.md#登录自己的后端)），并运行自己的 Agent 工具（[脚本工具执行](PUBLISHING.zh-CN.md#脚本工具执行script-tools-v1)）。
 
-这些发现机制的声明已随契约 1.8.0 发布。[RC2 发行版](../README.zh-CN.md#下载兼容宿主)（源码 `4ccf8e06`）和 RC1 一样按下文的平台限制实现这些 API；下载状态以该指南为准。旧宿主（例如 OctoSense 桌面版 0.1.0-beta.2）不提供这些 API，并会拒绝要求这些 API 的应用。
+这些发现机制的声明已随契约 1.8.0 发布。历史 [RC2 发行版](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.2)（源码 `4ccf8e06`）和 RC1 一样按下文的平台限制实现这些 API。当前契约 1.11 策略请使用[桌面 RC4](../README.zh-CN.md#下载兼容宿主)。旧宿主（例如 OctoSense 桌面版 0.1.0-beta.2）不提供这些 API，并会拒绝要求这些 API 的应用。
 
 已发布的契约 **1.10.0** 还支持 `files`、`device_calendar` 和 `audio`
 （[版本与发布凭据](../crates/app-contract/README.md#versions-on-cratesio)，英文）。
@@ -14,7 +14,7 @@
 
 `capabilities` 和 `network.hosts` 用于向用户和审核人员说明应用预计使用的
 API 与网络目的地。遗漏某个服务族或主机，不会阻止调用宿主已支持的公开 API。
-这是为下一个兼容版本准备的源码策略；RC2 的历史行为不代表该修改已经发布。
+这项策略已包含在[桌面 RC4](../README.zh-CN.md#下载兼容宿主)中。RC2 的历史行为另行记录，不代表当前的授权规则。
 
 每个准入应用都有独立的存储沙箱、已解析的配额和网络模块。设备访问仍需逐应用
 同意和系统权限；连接账户仍按应用、账户和提供商 scope 隔离。外部写入保留

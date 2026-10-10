@@ -21,9 +21,9 @@ true. Reviewers check those
 
 `capabilities` and `network.hosts` describe an app's expected API and network
 use for users and reviewers. Omitting a family or destination does not deny
-an otherwise supported public API. This is the source policy being prepared
-for the next compatible release; historical RC2 behavior is not evidence of
-this change being deployed.
+an otherwise supported public API. This policy is included in [desktop RC4](../README.md#download-a-compatible-host).
+Historical RC2 behavior is documented separately and does not describe these
+current authorization rules.
 
 Every admitted app gets a private storage jail with the resolved quota and a
 network module. Device access still needs per-app consent and OS permission;
@@ -234,8 +234,9 @@ an ordinary Rust crate built with `cargo build --target wasm32-wasip2`
 ([OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436),
 proposed). Its functions take and return typed values, keep their state
 between calls and may use part of WASI. OctoSense #453 merged component
-loading and its HTTP/host-service adapters. A compatible downloadable host
-and acceptance of the exact app are separate; RC2 runs core modules only.
+loading and its HTTP/host-service adapters. [Desktop RC4](../README.md#download-a-compatible-host)
+includes this support; each submitted app still needs its own acceptance.
+Historical RC2 runs core modules only.
 
 The gate admits a component when:
 
@@ -375,10 +376,12 @@ It reaches only what the app that uses it may: each app runs its own
 instance, under its own identity, resource limits and actual authorization.
 
 Shared components require a compatible host and publication in its verified
-catalog; ordinary component loading alone does not supply that support.
-Hosts built before shared components, OctoSense desktop RC1 and RC2 among
-them, refuse a whole catalog that holds a component or an app that pins one,
-so App Hub publishes neither until a compatible host release ships.
+catalog. [Desktop RC4](../README.md#download-a-compatible-host) implements
+shared-component installation and execution; its release does not itself
+publish a component or app to the public catalog. Each still needs Hub review
+and approved publication. Older hosts, including desktop RC1 and RC2, refuse
+a whole catalog containing a component or an app that pins one; maintainers
+must account for those clients when planning catalog migration.
 
 ### Use a shared component
 
@@ -692,7 +695,7 @@ other name:
 A capability describes expected usage; it neither authorizes a request nor
 provides a service to answer it. A **host service**, code in the OctoSense shell that does what the
 app may not do itself, answers them. **Served today** says what answers on
-[desktop RC2](../README.md#download-a-compatible-host), within its stated
+[historical desktop RC2](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.2), within its stated
 platform and provider limits; RC1 and historical beta differences are explicit.
 
 | Capability | Describes | The store says | Served today |
@@ -1113,7 +1116,7 @@ Source: `SHARED_HOST_METHODS` in `crates/app-policy/src/agent.rs`.
 
 A script tool is a tool with `"implemented_by": "app"`: the app's own Splash
 code runs it, inside the open app. It needs a host that advertises
-`app_tools.dispatch@1`, such as [desktop RC2](../README.md#download-a-compatible-host). OctoSense desktop 0.1.0-beta.2 refuses these tools with
+`app_tools.dispatch@1`, such as [desktop RC4](../README.md#download-a-compatible-host). OctoSense desktop 0.1.0-beta.2 refuses these tools with
 `app_tool_unavailable`.
 
 To add one:
@@ -1617,9 +1620,9 @@ App Hub accepts only GitHub-attested releases
 ([ADR 0002](adr/0002-github-attested-publisher-identity.md)). Your app's
 GitHub workflow attests each release, so you never create, store or rotate a
 publisher key. Attested releases use `publisher-github-v1`, introduced with app
-contract **1.8.0** and carried in **1.10.0**;
-[desktop RC2](../README.md#download-a-compatible-host) is the compatible
-released host, as RC1 was. Two real tag-push releases passed the workflow and
+contract **1.8.0** and retained in **1.11.0**;
+[desktop RC4](../README.md#download-a-compatible-host) is the current compatible
+prerelease. RC1 and RC2 supported the same publisher proof. Two real tag-push releases passed the workflow and
 the native Store acceptance described below.
 
 ### GitHub publisher provenance
@@ -1676,7 +1679,7 @@ This does not establish app UI execution or phone publisher installation.
 
 On macOS, OctoSense desktop RC1 installed the GitHub-attested sample apps in
 catalog sequence 13 and checked their attestations and publisher continuity at
-install and update; [RC2](../README.md#download-a-compatible-host) reads the
+install and update; [RC2](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.2) reads the
 catalog the same way. Store
 installs on iOS, Windows and Linux remain unverified, and no released phone
 build supports `publisher-github-v1`.

@@ -10,10 +10,10 @@ checks the app's actual authorization. The same contract lets a bundle declare i
 run its own agent tools
 ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)).
 
-These discovery declarations shipped in contract 1.8.0. The
-[RC2 release](../README.md#download-a-compatible-host), source `4ccf8e06`,
-implements them within the platform limits below, as RC1 did; its download
-status is tracked in that guide.
+These discovery declarations shipped in contract 1.8.0. The historical
+[RC2 release](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.2), source `4ccf8e06`,
+implemented them within the platform limits below, as RC1 did. Use
+[desktop RC4](../README.md#download-a-compatible-host) for the current contract 1.11 policy.
 An older host, such as OctoSense desktop 0.1.0-beta.2, serves none of these
 APIs and refuses an app that requires them.
 
@@ -28,9 +28,9 @@ nothing to an installed host.
 
 `capabilities` and `network.hosts` describe an app's expected API and network
 use for users and reviewers. Omitting a family or destination does not deny
-an otherwise supported public API. This is the source policy being prepared
-for the next compatible release; historical RC2 behavior is not evidence of
-this change being deployed.
+an otherwise supported public API. This policy is included in [desktop RC4](../README.md#download-a-compatible-host).
+Historical RC2 behavior is documented separately and does not describe these
+current authorization rules.
 
 Every admitted app gets a private storage jail with the resolved quota and a
 network module. Device access still needs per-app consent and OS permission;
