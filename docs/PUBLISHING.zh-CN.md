@@ -162,15 +162,15 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 
 ### WebAssembly 组件
 
-`fns/` 中的文件也可以是 WebAssembly **组件**，而不是核心模块：一个用 `cargo build --target wasm32-wasip2` 构建的普通 Rust crate（[OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436)，提议中）。它的函数接收和返回带类型的值，在调用之间保留状态，并可以使用 WASI 的一部分。目前还没有任何 OctoSense 构建加载组件；`wasm` 服务在 ADR 0014 的第 2 阶段才支持它们。
+`fns/` 中的文件也可以是 WebAssembly **组件**，而不是核心模块：一个用 `cargo build --target wasm32-wasip2` 构建的普通 Rust crate（[OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436)，提议中）。它的函数接收和返回带类型的值，在调用之间保留状态，并可以使用 WASI 的一部分。OctoSense #453 已合并组件加载以及 HTTP/宿主服务适配器。兼容的可下载宿主与确切应用仍须分别验收；RC2 只运行核心模块。
 
 准入检查在以下条件都满足时接受组件：
 
-- 清单在 `requires` 中声明了 `wasm-components-v1`，这需要 `wasm` 能力。`wasm` 服务只能加载核心模块的宿主不认识这个特性，因此会拒绝这个应用，而不是等到第一次调用时才失败；
+- 清单在 `requires` 中要求 `wasm-components-v1` ABI；`wasm` 只是使用披露。`wasm` 服务只能加载核心模块的宿主不认识这个特性，因此会拒绝这个应用，而不是等到第一次调用时才失败；
 - 组件能通过验证，且只从 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:http`、`wasi:io`、`wasi:random` 和 `octosense:host` 导入接口。组件自己定义的类型（例如某个函数返回的记录）不算导入。`wasi:sockets` 及其他任何导入都以 `contents-invalid` 拒绝；
 - 组件可以导入 `wasi:filesystem`，但只能访问本应用带配额的独立存储。按 ADR 0014，宿主只给它应用自己的存储文件夹；
 - 组件可以导入 `wasi:http`；`net` 用于披露网络用途。不要求 `network.hosts`：按 OctoSense 2026 年 10 月 8 日的裁定，应用的网络声明在安装时展示，运行时不强制，因此组件可以访问任何主机；
-- `octosense:host` 不需要单独的授权：组件通过它只能调用应用已获授权的宿主服务，与应用的脚本相同，而且绝不会调用打开面板或询问用户的方法。
+- `octosense:host` 以所属应用的身份路由，保留实际同意、账户和共享检查；组件不能打开前台授权面板。
 
 组件遵守与模块相同的名称和大小规则，并计入 8 个函数文件的上限。每个准入的组件都有一条警告，告诉审核人员它能访问什么：
 
@@ -258,13 +258,13 @@ $ hub component-info fns/notes.wasm
 
 对核心模块，它输出 `"kind": "module"`，导入写作 `module.name`，导出的函数附上核心类型，参数依次命名为 `p0`、`p1` 等。
 
-`wasm.<function>` 工具的 [`host_method` 规则](#把工具映射到共享服务host_method)是为核心模块制定的，核心模块的函数只看得到自己的输入。目前这些规则原样适用于组件，尽管有 `storage` 的组件可以读取应用的文件。
+`wasm.<function>` 工具的 [`host_method` 规则](#把工具映射到共享服务host_method)是为核心模块制定的，核心模块的函数只看得到自己的输入。目前这些规则原样适用于组件，尽管组件可以读取有配额的应用私有文件。
 
 ## 共享组件
 
 **共享组件**是 App Hub 在签名目录中单独发布的 WebAssembly 组件，可供多个应用使用，就像共享 npm 包一样。与 npm 依赖不同的是，它被精确固定：应用指定一个确切版本和文件的 BLAKE3 摘要，所以已安装应用的代码只会随应用更新而改变（[ADR 0003](adr/0003-shared-components.zh-CN.md)，即 [OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436) 的第 4 阶段）。App Hub 像审核应用一样审核共享组件，并像验证应用自己的组件一样验证它（[WebAssembly 组件](#webassembly-组件)）。它能访问的，只有使用它的应用可以访问的内容：每个应用都以自己的授权运行自己的实例。
 
-目前还没有任何 OctoSense 构建加载共享组件，签名目录中也还没有组件。在支持共享组件之前构建的宿主（包括 OctoSense 桌面版 RC1 和 RC2）会拒绝含有组件、或含有固定了组件的应用的整个签名目录，所以在兼容的宿主发行版发布之前，App Hub 不会发布这两种内容。
+共享组件需要兼容宿主，并在其经过验证的目录中发布；仅支持普通组件加载并不等于支持共享组件。在支持共享组件之前构建的宿主（包括 OctoSense 桌面版 RC1 和 RC2）会拒绝含有组件、或含有固定了组件的应用的整个签名目录，所以在兼容的宿主发行版发布之前，App Hub 不会发布这两种内容。
 
 ### 使用共享组件
 
@@ -398,7 +398,7 @@ org.example.markdown 1.0.0 (component c30d6e3125ff31676cad3c06735186d82cd0c01780
 hub: the component was refused
 ```
 
-**未验证**：目前还没有任何工作流为组件 Release 生成过证明，App Flow 也没有相应的工作流模板。
+App Flow 现已包含组件发布工作流。上面的 CLI 记录不是 Release 证明：审核者必须验证实际工作流对确切组件描述符和 Wasm 字节生成的证明。
 
 像提交应用一样提交组件（[向 App Hub 提交应用](SUBMITTING.zh-CN.md)）：开一个 issue，写明仓库、标签、commit，并附上两个 Release 文件。审核人员运行 `hub component-check`，即针对 Release 及其文件的准入检查：
 
@@ -460,7 +460,7 @@ hub: the bundle was refused
 - **卸载**：通过商店删除应用（`Store::remove`），以及每次通过商店安装或更新，都会删除已没有任何已安装应用固定的组件。
 - **宿主**：宿主的 `wasm` 服务用 `octosense_appstore::components::resolved(app_id)` 加载应用的组件，它返回每个组件的名字、ID、版本、摘要和已验证的文件。每次调用都会验证每个文件。系统应用的组件来自它自己的应用包。
 
-**未验证**：目前还没有任何 OctoSense 构建加载共享组件，也还没有任何手机或桌面宿主安装过固定了组件的应用。
+**验收边界**：本指南中的准入与目录夹具不证明最终发布宿主能安装和运行某个确切的组件应用；须单独验证其构建、平台和发布字节。
 
 ## 清单
 
@@ -544,7 +544,7 @@ hub: the bundle was refused
 | `research` | 通过系统工具箱搜索，不超出清单的 research 范围（[research 范围](#research-范围)）。每次搜索都由宿主执行。 | Search *范围允许的内容* | 仅系统应用，且只在手机版构建中 |
 | `crawl` | 通过系统工具箱抓取网站，深度和页数不超过范围中的 `max_depth` 和 `max_pages`，并遵守其中的域名列表。覆盖面比 `research` 更广。 | Crawl websites, *范围的限制*, which reaches more than searching | 同 `research` |
 | `runtime` | 用 `runtime.list` 和 `runtime.describe` 查询宿主实现了哪些 API（[宿主 API 兼容性](HOST-API.zh-CN.md)）。它不授予所列的任何 API。 | Inspect available host APIs without gaining access to their data or permissions | OctoSense 桌面版 0.1.0-beta.2 不提供，它的商店会拒绝这个名称。在基于 App Hub `main` 构建的每个宿主中（包括 `card-host`），由 App Hub 的请求分派器响应。 |
-| `wasm` | 应用自带的函数：应用包 `fns/` 中的 WebAssembly 核心模块或组件（最多 8 个），由宿主的 `wasm` 服务在沙盒中运行，有截止时间和内存上限。核心模块的函数只拿到自己的输入，接触不到文件、网络、时钟或其他应用。组件还可以读取时钟和随机数；有 `storage` 时可以访问应用自己的文件；有 `net` 时可以访问网络；还可以像应用的脚本一样调用应用已获授权的宿主服务。它接触不到其他应用（[WebAssembly 组件](#webassembly-组件)）。Agent 工具可以用 `host_method: "wasm.<function>"` 运行它。函数的编写、构建和调用方法见 App Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.zh-CN.md)。 | Run its own sandboxed functions on this device; they reach only what the app itself may | 桌面 RC2 的标准构建在 macOS 和 Linux 上提供它，属于有限支持（[服务及其限制](https://github.com/OctoSense-org/OctoSense/blob/main/docs/wasm.zh-CN.md#服务)）；RC1 默认关闭。受支持的 Android Home 源码构建也提供它。Windows、iOS 和 OpenHarmony 的构建不包含它：在那里调用会得到 `no service answers "wasm" on this device`。目前还没有任何构建加载组件。 |
+| `wasm` | 应用自带的函数：应用包 `fns/` 中的 WebAssembly 核心模块或组件（最多 8 个），由宿主的 `wasm` 服务在沙盒中运行，有截止时间和内存上限。核心模块的函数只拿到自己的输入，接触不到文件、网络、时钟或其他应用。组件还可以读取时钟和随机数；可以访问有配额的应用私有文件和 HTTP，并在与脚本相同的实际授权检查下调用可用的公开宿主服务。它接触不到其他应用（[WebAssembly 组件](#webassembly-组件)）。Agent 工具可以用 `host_method: "wasm.<function>"` 运行它。函数的编写、构建和调用方法见 App Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.zh-CN.md)。 | Run its own sandboxed functions on this device; they reach only what the app itself may | 桌面 RC2 的标准构建在 macOS 和 Linux 上提供它，属于有限支持（[服务及其限制](https://github.com/OctoSense-org/OctoSense/blob/main/docs/wasm.zh-CN.md#服务)）；RC1 默认关闭。受支持的 Android Home 源码构建也提供它。当前源码包含 Windows 和 OpenHarmony（Pulley），但不包含 iOS；真实平台与发布版验收仍需分别完成。组件源码集成已在 OctoSense #453 合并。 |
 | `sheet` | 通过 `sheet` 引擎（gridcraft）处理电子表格：工作簿、公式、重算和 xlsx，均在应用自己的文件内。 | Use the device's spreadsheet engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面和 Home 构建中提供。 |
 | `photo` | 通过 `photo` 引擎（photocraft）处理图像和照片文档：检查、转换、编辑命令和预览，均在应用自己的文件内。 | Use the device's image-editing engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面和 Home 构建中提供。 |
 | `word` | 通过 `word` 引擎（wordcraft）处理文档：创建、读取、检查，并在 docx、Markdown、HTML、RTF、ODT 和 PDF 之间转换，均在应用自己的文件内。 | Use the device's document engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
@@ -752,7 +752,7 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 }
 ```
 
-准入检查接受这些工具，但在商店应用中，OctoSense 会拒绝运行它们，因为它们没有 `host_method`（见 [OctoSense 目前的支持情况](#octosense-目前的支持情况)）。
+准入检查接受这些工具。调用仍须有对应解析方法的已注册实现，并通过服务的实际授权。命名空间本身不会创建服务；共享服务应使用经审核的 `host_method` 映射。较旧发布宿主的行为单独记录在下文（见 [OctoSense 目前的支持情况](#octosense-目前的支持情况)）。
 
 | 字段 | 含义 |
 | --- | --- |
@@ -862,7 +862,7 @@ fn app_tool(name, call_id) {
 - 在速览栏中的应用副本或第二个已打开的副本中运行。只有最先打开的完整应用持有这些工具；第二个副本拿不到工具，并显示 `App tools unavailable: app_busy: …`。
 - 弹出宿主面板，例如权限申请面板。只要应用还有未结束的调用，应用自己的界面也无法弹出宿主面板。
 - 在应用自己的界面上确认调用。如果脚本工具写了 `confirm: "app"`，宿主会拒绝它的破坏性或对外调用，所以请保留默认的 `confirm: "host"`。
-- 使用应用未获授权的宿主 API。
+- 绕过当前应用准入、账户作用域、设备同意、原生审核、资源上限或宿主可用性检查。能力族声明本身既不授予也不拒绝 API。
 
 未验证：在手机上以及搭配真实模型运行脚本工具。
 
@@ -1041,7 +1041,7 @@ host.request("mail.list", {…}, fn(r){ … })
 | `scopes` | 必须正好是 `["app.session"]`。 |
 | `operations` | 最多 64 个，以名称（`[A-Za-z0-9._-]`）为键。每个操作包含 `method`（`GET`、`POST`、`PUT`、`PATCH` 或 `DELETE`）、同一来源上的确切 `path`（不能是上述四个 URL 的路径），以及最多 32 个互不重复的 `query_keys`。 |
 
-清单还必须请求 `auth`、设置 `storage.accounts: true`，并在 `requires` 中声明 `backend-api-v1`。准入检查在解析清单时就会核对这些规则，所以声明有误时，`hub check` 只输出一行就停止，例如 `hub: backend requires auth and storage.accounts`。
+清单仍须设置 `storage.accounts: true`，并在 `requires` 中要求 `backend-api-v1`。应披露 `auth` 用途供审核；1.11 不再要求这个能力族才能准入后端。准入检查仍验证后端注册和账户布局。较旧工具可能报告 `backend requires auth and storage.accounts`。
 
 运行时，调用 `auth` 服务：
 

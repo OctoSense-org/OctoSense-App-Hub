@@ -57,7 +57,7 @@ owns those.
 - For agent or storage changes, also inspect OctoSense `crates/shell/src/host_tools`,
   `crates/shell/src/app_storage`, `crates/ai-host` and `crates/app-peers` at
   the revision the consumer pins. Do not claim a tool runs because
-  `tools.json` passes the gate: OctoSense runs granted
+  `tools.json` passes the gate: OctoSense runs available, authorized
   `implemented_by: "host-service"` tools on their services. A host that
   advertises `app_tools.dispatch@1` runs `implemented_by: "app"` tools in the
   admitted full app's existing Splash isolate; a closed app fails with
@@ -101,12 +101,11 @@ owns those.
   [`card-host` fails to build](docs/DEVELOPMENT.md#card-host-fails-to-build)
   lists the builds that need the patches.
 - [Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)
-  is the release authority. Published 1.10.0 includes `files`,
-  `device_calendar` and `audio`; this tree now prepares **1.11.0** and App
-  Policy requires 1.11.0 for component schemas and declaration-only policy.
-  Until publication, use a validation-only local patch at this revision;
-  do not ship an unresolved version or describe 1.10.0 as satisfying this
-  tree. This workspace patches the contract to `crates/app-contract`.
+  is the release authority. Published **1.11.0** includes the 1.10.0 `files`,
+  `device_calendar` and `audio` declarations, component schemas and the
+  declaration-only policy. App Policy requires 1.11.0, now available from
+  crates.io; do not describe 1.10.0 as satisfying this tree. This workspace
+  patches the contract to `crates/app-contract`.
   Update the publication status only after a real release receipt. A contract
   release never proves that a host binary implements its APIs.
 - Do not change pins or regenerate `Cargo.lock` in a documentation edit.

@@ -342,16 +342,15 @@ draws the implementation boundary. It loads each bundle with App Hub's
 
 - A tool marked `implemented_by: "host-service"` runs on the registered
   service of its namespace (`news.list` runs on the `news` service), with the
-  app's identity. The manifest must request that family's capability, or the
-  family must be a system app's own.
+  admitted app's identity. Family declarations disclose usage; the service
+  still checks identity, account scope, actual consent and availability.
 - A tool can name a `host_method` instead: a reviewed shared-service method
   from `SHARED_HOST_METHODS` in
   [`app-policy/src/agent.rs`](../crates/app-policy/src/agent.rs), such as
   `github.read`, `gmail.messages` or `glance.publish`. The tool keeps its name
   in the app's namespace, and the executor dispatches it to that method as the
-  app. Admission requires `implemented_by: "host-service"`,
-  `private_data: true`, at least the method's minimum risk, and the method's
-  family among the manifest's capabilities.
+  app. Admission requires `implemented_by: "host-service"` and the method's
+  listed risk/privacy rules. Missing family disclosure does not deny execution.
 - For the `github`, `gmail` and `gcalendar` families, the executor adds the
   app's active connection to the arguments; a tool cannot choose another.
 - A tool marked `implemented_by: "app"` uses the `script-tools-v1` runner:

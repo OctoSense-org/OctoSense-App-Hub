@@ -12,9 +12,11 @@ package:
 | Integrity | `digest_dir`, `bundle_digest`, `admit`, `admit_digest`, `SignatureVerifier`, `RefuseAllSignatures` |
 | Running a package | `SCRIPT_ENTRY`, `script_source`, `ASSETS_PLACEHOLDER`, `AssetServer`, `StaticAssets`, `rewrite_assets` |
 
-What an app may do is in the contract; how a host sandboxes it is not. Each
-host builds its own sandbox (an isolate's settings, an agent session) from
-`AppPolicy`, and **may restrict more than `AppPolicy` says, never less.**
+The contract describes app metadata, required ABIs and resource limits;
+the host enforces isolation and actual authorization. Capability names and
+network hosts in `AppPolicy` are usage disclosures, not execution grants.
+Keep app/account identity, bounded storage, device consent, provider scopes,
+trusted write reviews and inter-app sharing checks.
 App Hub's store, catalog, agents, listings and host services stay in
 `octosense-app-policy` and `octosense-app-hub`, which depend on this crate.
 
@@ -42,34 +44,39 @@ install and launch; admission alone does not prove runtime support.
 
 `backend::BackendRegistration` describes an app's public HTTPS login and named
 business operations. Credentials remain in the host. Backend and device access
-still require separate grants, supported native adapters and the person's
+still require actual authorization, supported native adapters and the person's
 consent. See [Host API compatibility](../../docs/HOST-API.md) for examples and
 limits.
 
 ## Versions on crates.io
 
-**[1.10.0 is published on crates.io](https://crates.io/crates/octosense-app-contract/1.10.0)**
-([publication receipt](../../reviews/public-os-api-v1/contract-1.10.0-publication.json)).
-It includes the unpublished 1.9.0 work's `files`
+**[1.11.0 is published on crates.io](https://crates.io/crates/octosense-app-contract/1.11.0)**
+through the [release workflow](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/38026012863)
+from commit `b7e4ba8f2f1ccc7606fc8815256f0bf123c43c57`.
+The registry checksum and independently downloaded archive SHA-256 both match
+`57d8c87511e17c5a8f965cbdba07a1cae100d78316159827c3a2061c84003bf6`.
+It adds component/shared-component ABI metadata and the declaration-only
+capability policy ([CHANGELOG.md](CHANGELOG.md)). App Policy requires 1.11.0;
+consumers can now resolve it from crates.io. Capabilities describe usage.
+Actual user consent, account scopes, integrity, quotas and API availability
+remain host checks. Publishing this crate does not update a host binary;
+component apps still need a compatible OctoSense release.
+
+[1.10.0](https://crates.io/crates/octosense-app-contract/1.10.0)
+([publication receipt](../../reviews/public-os-api-v1/contract-1.10.0-publication.json))
+included the unpublished 1.9.0 work's `files`
 capability, the distinct `device_calendar` capability and separate `audio`
 playback grant. Audio implies no recording, storage or background authority. `files` provides
 host-owned import/export dialogs, separate from `storage`; it grants no
 arbitrary filesystem access. `device_calendar` is separate from `calendar`
 and `gcalendar`. These declarations do not install a host adapter or grant OS
 access: declare required method versions and check the actual host. App Policy
-now requires contract 1.10, which consumers can resolve from crates.io without
-a git patch. Released hosts do not gain these APIs by parsing new capabilities.
+at that release required contract 1.10, which consumers can resolve from
+crates.io without a git patch. Released hosts do not gain these APIs by parsing
+new capabilities.
 
-This repository prepares **1.11.0**, which is not published yet. It adds
-component/shared-component ABI metadata and the declaration-only capability
-policy ([CHANGELOG.md](CHANGELOG.md)). App Policy requires 1.11.0 so a new
-consumer cannot silently combine these rules with the old crates.io contract.
-Until publication, validate against a local contract patch at this same
-revision; do not ship an unresolved dependency or claim a released host
-supports these changes. Capabilities describe usage. Actual user consent,
-account scopes, integrity, quotas and API availability remain host checks.
-
-crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0, 1.7.0, 1.7.1, 1.8.0 and 1.10.0.
+crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0, 1.7.0, 1.7.1, 1.8.0,
+1.10.0 and 1.11.0.
 Versions 1.3.0, 1.4.0 and 1.9.0 exist only in this repository
 ([CHANGELOG.md](CHANGELOG.md)); 1.5.0 includes the first two versions' changes,
 and 1.10.0 includes 1.9.0's changes. A lock file that still holds 1.2.0 refuses
@@ -85,7 +92,7 @@ app org.example.connect requests unknown capability "auth"
 `SignatureVerifier::verify_github` extension that refuses by default. Existing
 manifests and Ed25519 signing bytes remain unchanged. Hosts must supply a real
 provenance verifier; accepting the new marker alone does not authenticate an
-app. These additions remain available in 1.10.0.
+app. These additions remain available in 1.11.0.
 The contract release does not deliver a compatible OctoSense shell binary.
 
 Published 1.7.1 reserves exactly four full app IDs, ignoring ASCII case:
@@ -94,10 +101,11 @@ Published 1.7.1 reserves exactly four full app IDs, ignoring ASCII case:
 `org.example.lock` remain valid.
 
 `cargo update -p octosense-app-contract` moves an unconstrained 1.x consumer
-to 1.10.0. Hosts using API declarations must select 1.6 or later,
+to 1.11.0. Hosts using API declarations must select 1.6 or later,
 hosts serving `wasm` 1.7 or later, and hosts admitting `files`,
-`device_calendar` or `audio` a published version of at least 1.10;
-older checked-in lock files remain on their existing version. OctoSense
+`device_calendar` or `audio` a published version of at least 1.10. Hosts using
+component schemas and the corrected declaration-only policy must select 1.11
+or later; older checked-in lock files remain on their existing version. OctoSense
 desktop 0.1.0-beta.2 patched the crate to an App Hub revision. To build
 against a contract newer than the latest release, patch crates.io's copy with
 an App Hub revision, then update the lock file:
