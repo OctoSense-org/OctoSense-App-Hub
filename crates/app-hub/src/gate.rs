@@ -300,6 +300,15 @@ fn check_bundle_for(
             ));
         }
         findings.push(Finding::warn_at("functions", name.clone(), format!("{name} is a component that reaches {}", info.reach())));
+        // What it says it is built from, for reviewers and for
+        // `hub check --advisory-db` (the gate cannot check it against the code).
+        findings.push(Finding::warn_at("functions", name.clone(), match &info.crates {
+            Some(crates) => format!("{name} is built from {}", crate::functions::crate_line(crates)),
+            None => format!(
+                "{name} does not list the crates it is built from (its {} section); tools/octo wasm build and App Flow's release workflow add it",
+                crate::functions::CRATES_SECTION
+            ),
+        }));
     }
     if requires_components && components == 0 {
         findings.push(Finding::warn(

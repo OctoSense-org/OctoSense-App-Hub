@@ -13,7 +13,7 @@ hub — the OctoSense app hub command (ADR 0003)
   hub publisher-pack <bundle> --out <outside-bundle/app.bundle.pack.json> [--catalog <authenticated catalog>]
   hub publisher-unpack <app.bundle.pack.json> --out <new staging directory> [--catalog <authenticated catalog>]
   hub publisher-entry <bundle> --catalog <authenticated catalog> --out <index.json>
-  hub check <bundle> [--catalog <f> [--anchor <hex>]] [--allow-unsigned] [--publisher-key id=hex] [--json] [--system-app]
+  hub check <bundle> [--catalog <f> [--anchor <hex>]] [--allow-unsigned] [--publisher-key id=hex] [--json] [--system-app] [--advisory-db <dir>]
   hub publish <bundle> --catalog <f> --key <f> --anchor-cert <hex>
               --publisher <id> [--repo <url>] [--commit <sha>] [--out <dir>]
   hub withdraw <app or component> --version <v> --reason <text> --catalog <f> --key <f> --anchor-cert <hex>

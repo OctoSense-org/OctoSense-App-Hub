@@ -586,3 +586,88 @@ fn a_module_needs_no_feature_and_the_feature_alone_is_only_a_warning() {
         report.render()
     );
 }
+
+// ---- the crates a component lists (octosense-crates) ---------------------
+
+/// `bytes` with a custom section `name` holding `payload` appended, as App
+/// Flow's `tools/octo wasm build` appends the crate list.
+fn with_section(bytes: &[u8], name: &str, payload: &[u8]) -> Vec<u8> {
+    fn leb(mut n: usize, out: &mut Vec<u8>) {
+        loop {
+            let byte = (n & 0x7f) as u8;
+            n >>= 7;
+            if n == 0 {
+                out.push(byte);
+                return;
+            }
+            out.push(byte | 0x80);
+        }
+    }
+    let mut body = Vec::new();
+    leb(name.len(), &mut body);
+    body.extend_from_slice(name.as_bytes());
+    body.extend_from_slice(payload);
+    let mut out = bytes.to_vec();
+    out.push(0);
+    leb(body.len(), &mut out);
+    out.extend(body);
+    out
+}
+
+const CRATES: &str = r#"{"crates":[{"checksum":"0000000000000000000000000000000000000000000000000000000000000000","name":"getrandom","source":"crates.io","version":"0.4.1"},{"name":"pulldown-cmark","source":"crates.io","version":"0.9.0"}],"schema":1}"#;
+
+#[test]
+fn reviewers_see_the_crates_a_component_lists() {
+    let listed = with_section(NOTES, "octosense-crates", CRATES.as_bytes());
+    let report = with_component(true, &["wasm", "storage"], &listed);
+    assert!(report.passed(), "{}", report.render());
+    assert!(
+        report.findings.iter().any(|f| f.detail == "fns/notes.wasm is built from 2 crates: getrandom 0.4.1 and pulldown-cmark 0.9.0"),
+        "{}",
+        report.render()
+    );
+    let report = with_component(true, &["wasm", "storage"], NOTES);
+    assert!(
+        report.findings.iter().any(|f| f.detail.starts_with("fns/notes.wasm does not list the crates it is built from")),
+        "{}",
+        report.render()
+    );
+}
+
+#[test]
+fn two_crate_lists_or_an_unreadable_one_are_refused() {
+    let twice = with_section(&with_section(NOTES, "octosense-crates", CRATES.as_bytes()), "octosense-crates", CRATES.as_bytes());
+    let report = with_component(true, &["wasm", "storage"], &twice);
+    let finding = refusal(&report, "contents-invalid").unwrap_or_else(|| panic!("{}", report.render()));
+    assert!(finding.detail.contains("more than one octosense-crates section"), "{}", finding.detail);
+    let garbled = with_section(NOTES, "octosense-crates", b"{not json");
+    let report = with_component(true, &["wasm", "storage"], &garbled);
+    let finding = refusal(&report, "contents-invalid").unwrap_or_else(|| panic!("{}", report.render()));
+    assert!(finding.detail.contains("is not a crate list"), "{}", finding.detail);
+}
+
+#[test]
+fn listed_crates_are_checked_against_a_rustsec_checkout() {
+    let mut f = Fixture::new();
+    fs::create_dir_all(f.bundle.join("fns")).unwrap();
+    fs::write(f.bundle.join("fns/notes.wasm"), with_section(NOTES, "octosense-crates", CRATES.as_bytes())).unwrap();
+    f.manifest.capabilities.extend(["wasm".to_string(), "storage".to_string()]);
+    f.manifest.requires.push("wasm-components-v1".into());
+    f.sign();
+    let db = std::env::temp_dir().join(format!("advisory-db-gate-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&db);
+    fs::create_dir_all(db.join("crates/pulldown-cmark")).unwrap();
+    fs::write(
+        db.join("crates/pulldown-cmark/RUSTSEC-2099-0001.md"),
+        "```toml\n[advisory]\nid = \"RUSTSEC-2099-0001\"\npackage = \"pulldown-cmark\"\ndate = 2099-01-01\n\n[versions]\npatched = [\">= 0.9.3\"]\n```\n\n# A made-up flaw\n",
+    )
+    .unwrap();
+    let findings = octosense_app_hub::advisories::findings(&f.bundle, &db).unwrap();
+    assert_eq!(findings.len(), 1, "{findings:?}");
+    assert_eq!(
+        findings[0].detail,
+        "fns/notes.wasm includes pulldown-cmark 0.9.0, which RUSTSEC-2099-0001 reports as a vulnerability: A made-up flaw; fixed in >= 0.9.3"
+    );
+    assert!(octosense_app_hub::advisories::findings(&f.bundle, &f.bundle).is_err(), "not a database");
+    let _ = fs::remove_dir_all(&db);
+}

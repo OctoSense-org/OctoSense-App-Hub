@@ -276,7 +276,8 @@ impl ComponentRelease {
 }
 
 pub(crate) fn info_of(component: &ComponentManifest) -> crate::functions::ComponentInfo {
-    crate::functions::ComponentInfo { imports: component.imports.clone(), exports: component.exports.clone() }
+    // A release names its imports and exports; its crate list stays in its file.
+    crate::functions::ComponentInfo { imports: component.imports.clone(), exports: component.exports.clone(), crates: None }
 }
 
 /// What a publisher writes before `hub component-prepare` fills in the rest:

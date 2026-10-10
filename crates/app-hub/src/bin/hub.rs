@@ -302,7 +302,7 @@ fn run() -> Result<(), String> {
         }
         "check" => {
             let bundle = PathBuf::from(positional.ok_or("usage: hub check <bundle>")?);
-            let report = match gate_for(&bundle, &argv, has("allow-unsigned"), flag("catalog")) {
+            let mut report = match gate_for(&bundle, &argv, has("allow-unsigned"), flag("catalog")) {
                 Ok(report) => report,
                 Err(error) => {
                     // A bundle the gate cannot even read is a refusal too, in
@@ -314,6 +314,10 @@ fn run() -> Result<(), String> {
                     return Err(error);
                 }
             };
+            // The crates its components list, against a RustSec checkout.
+            if let Some(db) = flag("advisory-db") {
+                report.findings.extend(octosense_app_hub::advisories::findings(&bundle, Path::new(&db))?);
+            }
             if has("json") {
                 println!("{}", report.json());
             } else {

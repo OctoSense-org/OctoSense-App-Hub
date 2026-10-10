@@ -180,6 +180,36 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 [warning] functions (fns/hostcall.wasm): fns/hostcall.wasm is a component that reaches the clock and its app's host services, but no files, network or other app
 ```
 
+### 组件列出的 crate
+
+组件可以在名为 `octosense-crates` 的自定义段中说明它由哪些 crate 构建：JSON
+`{"schema": 1, "crates": [{"name", "version", "source", "checksum"}]}`，其中 `source` 是
+`crates.io`、`git+<url>#<commit>` 或 `path`。App Flow 的 `tools/octo wasm build` 会写入它；App Flow
+的发布工作流也会写入：它从打了标签的提交构建组件，并从其 `Cargo.lock` 取得列表，因此 GitHub 为两者出具证明。
+列表只包含二进制文件实际链接的内容：构建脚本和过程宏用到的 crate 不在其中。准入检查无法把列表与代码核对，
+只把它展示给审核人员。下面是带有 App Flow 为它写入的列表的 notes 组件：
+
+```text
+[warning] functions (fns/notes.wasm): fns/notes.wasm is built from 8 crates: bitflags 2.13.2, cfg-if 1.0.5, getrandom 0.4.3, memchr 2.8.3, pulldown-cmark 0.13.4, pulldown-cmark-escape 0.11.0, unicase 2.10.0 and wit-bindgen 0.62.0
+```
+
+没有这个段的组件也会被接受，并得到：
+
+```text
+[warning] functions (fns/hostcall.wasm): fns/hostcall.wasm does not list the crates it is built from (its octosense-crates section); tools/octo wasm build and App Flow's release workflow add it
+```
+
+有两个这样的段，或者段的内容不是 crate 列表时，以 `contents-invalid` 拒绝。`hub check <bundle> --advisory-db <dir>`
+（`<dir>` 是 [RustSec 安全公告数据库](https://github.com/rustsec/advisory-db)的检出）还会报告每个受公告影响的
+crates.io crate。下面几行来自一个列出两个旧 crate 的组件，对照的是 2026 年 10 月 9 日的数据库：
+
+```text
+[warning] advisories (fns/notes.wasm): fns/notes.wasm includes smallvec 0.6.9, which RUSTSEC-2019-0009 reports as a vulnerability: Double-free and use-after-free in SmallVec::grow(); fixed in >= 0.6.10
+[warning] advisories (fns/notes.wasm): fns/notes.wasm includes time 0.1.43, which RUSTSEC-2020-0071 reports as a vulnerability: Potential segfault in the time crate; fixed in >= 0.2.23
+```
+
+信息性公告（不再维护、不健全）会按其性质报告，已撤回的公告不报告。准入检查不会自己下载数据库。
+
 `hub component-info <file.wasm>` 输出函数文件的类型（`component` 或 `module`）、它的导入，以及它导出的函数，每个函数都附上 WIT 写法的参数和结果。下面在一个应用包中运行它，包中的 `fns/notes.wasm` 就是 App Hub 测试中的 notes 组件（`crates/app-hub/tests/fixtures/notes.component.wasm`），省略处以 `…` 标出：
 
 ```console
@@ -1043,7 +1073,7 @@ host.request("mail.list", {…}, fn(r){ … })
 | --- | --- |
 | `hub publisher-prepare/attach/verify/pack/unpack/entry` | 准备 GitHub 规范化主题、附加证明、验证、交付或生成审核候选；详见 [GitHub 发布者来源证明](#github-发布者来源证明)及 `hub --help` 的完整参数。均不会发布目录。 |
 | `hub stamp <bundle>` | 用准入检查的解析器解析 `manifest.json`，然后把应用包摘要写入 `integrity.bundle_blake3` 并输出。准入检查无法读取的清单，或已带 GitHub 证明的 Release，它都会拒绝处理。 |
-| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app]` | 准入检查本身。输出 `PASSED` 或 `REFUSED`、每个检查结果，以及应用将获得的授权。有拒绝时退出码为 1。`--json` 以 JSON 输出报告（`schema`、`stage`、`passed`、`app_id`、`version`、`digest`、`findings` 和 `resources`）。`--publisher-key` 用于检查旧格式的密钥签名应用包，发布时从不需要它。 |
+| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app] [--advisory-db <dir>]` | 准入检查本身。输出 `PASSED` 或 `REFUSED`、每个检查结果，以及应用将获得的授权。有拒绝时退出码为 1。`--json` 以 JSON 输出报告（`schema`、`stage`、`passed`、`app_id`、`version`、`digest`、`findings` 和 `resources`）。`--publisher-key` 用于检查旧格式的密钥签名应用包，发布时从不需要它。 `--advisory-db` 把其组件列出的 crate 与 RustSec 检出对照检查（见[组件列出的 crate](#组件列出的-crate)）。 |
 | `hub scan <bundle> [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--packet <out.json>] [--reviewer <cmd>] [--system-app]` | 先运行准入检查，再写出审核包，还可以把审核包交给一条审核命令。准入检查拒绝的应用包不会进入扫描。 |
 | `hub component-info <file.wasm>` | 以 JSON 输出函数文件的类型（`component` 或 `module`）、它的导入，以及它导出的函数及其参数和结果（[WebAssembly 组件](#webassembly-组件)）。它只读取这一个文件。既不是核心模块也不是有效组件的文件会失败，输出 `hub: <file>: not a WebAssembly core module or component` 或验证器的错误。 |
 | `hub component-prepare <file.wasm> --draft <component.json> --out <file>` | 把共享组件文件描述成一个 Release：它的摘要、大小、导入和导出，加上草稿中的字段。提供 `--repository`、`--repository-id`、`--owner-id`、`--workflow`、`--tag` 和 `--commit` 时，它写出要证明的规范化对象，文件名必须是 `octosense-component.json`；不提供时，写出未签名的开发 Release。从不覆盖已有文件（[发布共享组件](#发布共享组件)）。 |

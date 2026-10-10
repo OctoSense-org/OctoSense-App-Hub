@@ -31,6 +31,8 @@ octoscript-ui-l0 = { git = "https://github.com/OctoSense-org/Octoscript.git", re
 ureq = "3"
 sha2 = "0.10"
 semver = "1"
+# RustSec advisories' front matter (hub check --advisory-db).
+toml = { version = "0.8", default-features = false, features = ["parse"] }
 # Offline verification only: no signing credentials, subprocess or network/TUF
 # client in the device. The public-good trust snapshot ships with this build.
 sigstore-verify = { version = "=0.14.0", default-features = false }
