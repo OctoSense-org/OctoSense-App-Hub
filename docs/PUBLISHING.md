@@ -231,8 +231,9 @@ A file in `fns/` may be a WebAssembly **component** instead of a core module:
 an ordinary Rust crate built with `cargo build --target wasm32-wasip2`
 ([OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436),
 proposed). Its functions take and return typed values, keep their state
-between calls and may use part of WASI. No OctoSense build loads components
-yet; the `wasm` service gains them in ADR 0014's phase 2.
+between calls and may use part of WASI. OctoSense #453 merged component
+loading and its HTTP/host-service adapters. A compatible downloadable host
+and acceptance of the exact app are separate; RC2 runs core modules only.
 
 The gate admits a component when:
 
@@ -371,7 +372,8 @@ app's own component ([WebAssembly components](#webassembly-components)).
 It reaches only what the app that uses it may: each app runs its own
 instance, under its own grants.
 
-No OctoSense build loads shared components yet, and no catalog offers one.
+Shared components require a compatible host and publication in its verified
+catalog; ordinary component loading alone does not supply that support.
 Hosts built before shared components, OctoSense desktop RC1 and RC2 among
 them, refuse a whole catalog that holds a component or an app that pins one,
 so App Hub publishes neither until a compatible host release ships.
@@ -536,8 +538,9 @@ org.example.markdown 1.0.0 (component c30d6e3125ff31676cad3c06735186d82cd0c01780
 hub: the component was refused
 ```
 
-**Unverified:** no workflow has attested a component release yet, and App
-Flow has no workflow template for one.
+App Flow now includes the component publisher workflow. The CLI transcript
+above is not a release attestation: reviewers must verify the real workflow
+proof for the exact component descriptor and Wasm bytes.
 
 Submit a component as you submit an app
 ([Submit an app to the App Hub](SUBMITTING.md)): open an issue with the
@@ -625,8 +628,9 @@ hub: the bundle was refused
   component's name, id, version, digest and verified file. It verifies every
   file on every call. A system app's components come from its own bundle.
 
-**Unverified:** no OctoSense build loads shared components yet, and no phone
-or desktop host has installed an app that pins one.
+**Acceptance boundary:** the admission/catalog fixtures in this guide do not
+prove that a final released host installs and runs a particular component app.
+Validate its exact build, platform and released bytes separately.
 
 ## The manifest
 
@@ -719,7 +723,7 @@ platform and provider limits; RC1 and historical beta differences are explicit.
 | `research` | Searching through the system toolbox, within the manifest's research scope ([The research scope](#the-research-scope)). The host runs every search. | Search *what the scope allows* | System apps only, in phone builds |
 | `crawl` | Crawling sites through the system toolbox, up to the scope's `max_depth` and `max_pages`, inside its domain lists. More reach than `research`. | Crawl websites, *within the scope*, which reaches more than searching | As `research` |
 | `runtime` | Asking which APIs the host implements, with `runtime.list` and `runtime.describe` ([Host API compatibility](HOST-API.md)). It grants none of the APIs it lists. | Inspect available host APIs without gaining access to their data or permissions | Not on OctoSense desktop 0.1.0-beta.2, whose store refuses the name. App Hub's request dispatcher answers it in every host built from App Hub `main`, `card-host` included. |
-| `wasm` | The app's own functions: WebAssembly core modules or components in the bundle's `fns/` (at most 8), run by the host's `wasm` service in a sandbox with a deadline and a memory cap. A core module's function gets only its input and reaches no file, network, clock or other app. A component may also read the clock and random numbers; with `storage`, the app's own files; with `net`, the network; and the host services the app is granted, as its script does. It reaches no other app ([WebAssembly components](#webassembly-components)). An agent tool can run one with `host_method: "wasm.<function>"`. To write, build and call a function, see App Flow's [Run your own Rust code](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.md). | Run its own sandboxed functions on this device; they reach only what the app itself may | Desktop RC2 serves it in standard builds on macOS and Linux, with limited support ([the service and its limits](https://github.com/OctoSense-org/OctoSense/blob/main/docs/wasm.md#the-service)); RC1 left it disabled. Supported Android Home source builds serve it too. Builds for Windows, iOS and OpenHarmony leave it out: a call there answers `no service answers "wasm" on this device`. No build loads components yet. |
+| `wasm` | The app's own functions: WebAssembly core modules or components in the bundle's `fns/` (at most 8), run by the host's `wasm` service in a sandbox with a deadline and a memory cap. A core module's function gets only its input and reaches no file, network, clock or other app. A component may also read the clock and random numbers; the app's bounded private files; HTTP; and available public host services under the same actual authorization as its script. It reaches no other app ([WebAssembly components](#webassembly-components)). An agent tool can run one with `host_method: "wasm.<function>"`. To write, build and call a function, see App Flow's [Run your own Rust code](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.md). | Run its own sandboxed functions on this device; they reach only what the app itself may | Desktop RC2 serves it in standard builds on macOS and Linux, with limited support ([the service and its limits](https://github.com/OctoSense-org/OctoSense/blob/main/docs/wasm.md#the-service)); RC1 left it disabled. Supported Android Home source builds serve it too. Current source includes Windows and OpenHarmony (Pulley), but excludes iOS; actual platform and release acceptance remain separate. Component source integration is merged in OctoSense #453. |
 | `sheet` | Spreadsheets through the `sheet` engine (gridcraft): workbooks, formulas, recalculation and xlsx, inside the app's own files. | Use the device's spreadsheet engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop and Home builds. |
 | `photo` | Images and photo documents through the `photo` engine (photocraft): inspect, convert, edit commands and previews, inside the app's own files. | Use the device's image-editing engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop and Home builds. |
 | `word` | Documents through the `word` engine (wordcraft): create, read, inspect, and convert between docx, Markdown, HTML, RTF, ODT and PDF, inside the app's own files. | Use the device's document engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
@@ -976,8 +980,10 @@ abridged:
 }
 ```
 
-The gate admits these tools, but in a store app each call fails with
-`not_granted`, because they have no `host_method`
+The gate admits these tools. A call still needs a registered implementation
+for its resolved method and actual service authorization. A namespace alone
+does not create a service; use a reviewed `host_method` mapping for shared
+services. Older released-host behavior is recorded separately below
 ([What OctoSense runs today](#what-octosense-runs-today)).
 
 | Field | Meaning |
@@ -1158,7 +1164,9 @@ A script tool cannot:
 - Be confirmed on the app's own screen. The host refuses a destructive or
   outward call to a script tool that says `confirm: "app"`, so keep the
   default, `confirm: "host"`.
-- Use a host API that the app is not granted.
+- Bypass current app admission, account scope, device consent, native review,
+  resource limits or host availability. Capability-family declarations alone
+  neither grant nor deny the API.
 
 Unverified: script tools on a phone and with a real model.
 
@@ -1417,10 +1425,10 @@ backend in the manifest. The declaration is public and holds no credential:
 | `scopes` | Exactly `["app.session"]`. |
 | `operations` | Up to 64, keyed by name (`[A-Za-z0-9._-]`). Each has a `method` (`GET`, `POST`, `PUT`, `PATCH` or `DELETE`), an exact `path` on the same origin that is not one of the four URLs' paths, and up to 32 distinct `query_keys`. |
 
-The manifest must also request `auth`, set `storage.accounts: true` and require
-`backend-api-v1`. The gate checks these rules as it parses the manifest, so a
-broken declaration stops `hub check` with a single line, such as
-`hub: backend requires auth and storage.accounts`.
+The manifest must set `storage.accounts: true` and require `backend-api-v1`.
+Disclose `auth` use for review; 1.11 no longer requires that family to admit
+the backend. The gate still validates the backend registration and account
+layout. Older gates can report `backend requires auth and storage.accounts`.
 
 At runtime, call the `auth` service:
 

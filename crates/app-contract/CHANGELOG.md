@@ -3,13 +3,20 @@
 `octosense-app-contract` follows the rules in [README.md](README.md#stability):
 within `1.x` it only grows.
 
-crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0, 1.7.0, 1.7.1, 1.8.0 and 1.10.0.
+crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0, 1.7.0, 1.7.1, 1.8.0,
+1.10.0 and 1.11.0.
 Versions 1.3.0, 1.4.0 and 1.9.0 are unpublished: 1.5.0 includes the first two
 versions' changes, and 1.10.0 includes 1.9.0's changes.
 [README.md](README.md#versions-on-cratesio) shows how to update a lock file
 that holds 1.2.0.
 
-## 1.11.0 (prepared; not yet published)
+## 1.11.0 — 2026-10-10
+
+Published through the [release workflow](https://github.com/OctoSense-org/OctoSense-App-Hub/actions/runs/38026012863)
+from `b7e4ba8f2f1ccc7606fc8815256f0bf123c43c57`. The registry and downloaded
+archive SHA-256 both match
+`57d8c87511e17c5a8f965cbdba07a1cae100d78316159827c3a2061c84003bf6`.
+This contract release alone does not supply a compatible host binary.
 
 - Include the component and shared-component ABI/schema additions below.
 - Treat capability names and network destinations as usage declarations.
@@ -20,19 +27,17 @@ that holds 1.2.0.
   resource limits and required host features. `AppPolicy::allows` and
   `allows_host` remain declaration queries, not execution authorization.
 
-## Unreleased
-
 - Add the `wasm-components-v1` feature. An app whose `fns/` holds a
-  WebAssembly component (OctoSense ADR 0014) must list it in `requires`, with
-  the `wasm` capability. A host that does not know it refuses the app instead
+  WebAssembly component (OctoSense ADR 0014) must list it in `requires`;
+  `wasm` is a usage disclosure. A host that does not know it refuses the app instead
   of failing when the app first calls its functions. Existing manifests and
   their signing bytes do not change.
 - Add the optional `components` manifest field and the
   `wasm-shared-components-v1` feature (App Hub ADR 0003). An app pins each
   shared WebAssembly component from App Hub's catalog by its name for it
   (`as`), the component's `id`, one exact `version` and the file's `blake3`
-  digest. `parse` refuses the field without the feature, the feature without
-  the `wasm` capability, more than 8 entries (`MAX_COMPONENTS`), a name that
+  digest. `parse` refuses the field without the feature,
+  more than 8 entries (`MAX_COMPONENTS`), a name that
   is not `[a-z][a-z0-9_]{0,31}` or is used twice, a version that is not one
   exact semantic version, a digest that is not 64 lowercase hex characters,
   and an id that breaks the app id rules or starts with `os.`. New public
