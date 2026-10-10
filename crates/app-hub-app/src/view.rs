@@ -130,6 +130,7 @@ script_mod! {
                             subtitle := Meta{}
                         }
                     }
+                    unavailable := Text{visible: false}
                     action := Primary{text: "Get"}
                     // Beside Update: the installed release still opens.
                     open := Plain{width: Fill text: "Open" visible: false}
@@ -750,6 +751,14 @@ impl AppHubView {
     fn fill_entry(&mut self, cx: &mut Cx, item: &WidgetRef, entry: &Entry) {
         item.label(cx, ids!(name)).set_text(cx, &entry.name);
         item.label(cx, ids!(subtitle)).set_text(cx, &entry.subtitle);
+        // Details must explain a disabled action without requiring a click.
+        // Clear the text too: PortalList can reuse this widget for another app.
+        let reason = match &entry.status {
+            EntryStatus::Unavailable(reason) => Some(reason.as_str()),
+            _ => None,
+        };
+        item.label(cx, ids!(unavailable)).set_text(cx, reason.unwrap_or_default());
+        item.widget(cx, ids!(unavailable)).set_visible(cx, reason.is_some());
         item.button(cx, ids!(action)).set_enabled(
             cx,
             (!self.busy || entry.status == EntryStatus::BuiltIn) && can_activate(entry),
@@ -1231,6 +1240,47 @@ mod tests {
         drop(root);
         cx.free_splash_vm(vm_id);
     }
+    #[test]
+    fn unavailable_detail_explains_refusal_and_clears_recycled_text() {
+        let mut cx = Cx::new(Box::new(|_, _| {}));
+        cx.with_vm(makepad_widgets::script_mod);
+        let vm_id = cx.alloc_splash_vm_with_network(false);
+        let root = cx.with_script_vm_id_trusted(vm_id, |vm| {
+            crate::APP_HUB_MODULE.register(vm);
+            let value = script_eval!(vm, {use mod.widgets.* AppHubView{}});
+            let root = WidgetRef::script_from_value(vm, value);
+            assert!(vm.take_errors().is_empty());
+            root
+        });
+        let entered = makepad_widgets::widget_async::enter_isolate(&mut cx, vm_id);
+        {
+            let mut view = root.borrow_mut::<AppHubView>().unwrap();
+            view.started = true; // No catalog request or personal profile.
+            let detail = view.view.portal_list(&mut cx, ids!(list)).item(&mut cx, 0, id!(Detail));
+            let mut entry = catalog::preview_entries().remove(0);
+            entry.kind = CatalogKind::Live;
+            for reason in [
+                "This host does not provide app_tools.dispatch@1. Install a compatible OctoSense release.",
+                "This app was withdrawn by its publisher.\nIts saved data remains on this device.",
+            ] {
+                entry.status = EntryStatus::Unavailable(reason.into());
+                view.fill_entry(&mut cx, &detail, &entry);
+                assert!(detail.widget(&mut cx, ids!(unavailable)).visible());
+                assert_eq!(detail.label(&mut cx, ids!(unavailable)).text(), reason);
+                assert!(!detail.widget(&mut cx, ids!(action)).borrow::<Button>().unwrap().enabled());
+                assert!(!can_activate(&entry));
+            }
+            entry.status = EntryStatus::Installed;
+            view.fill_entry(&mut cx, &detail, &entry);
+            assert!(!detail.widget(&mut cx, ids!(unavailable)).visible());
+            assert_eq!(detail.label(&mut cx, ids!(unavailable)).text(), "");
+            assert!(detail.widget(&mut cx, ids!(action)).borrow::<Button>().unwrap().enabled());
+        }
+        makepad_widgets::widget_async::leave_isolate(&mut cx, entered);
+        drop(root);
+        cx.free_splash_vm(vm_id);
+    }
+
     #[test]
     fn missing_consent_and_unavailable_apps_cannot_activate() {
         let mut entry = catalog::preview_entries().remove(0);
