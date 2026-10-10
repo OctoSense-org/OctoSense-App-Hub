@@ -460,15 +460,24 @@ fn a_bundle_carries_at_most_eight_modules_and_hears_about_none() {
 /// Components built with plain `cargo build --target wasm32-wasip2`, copied
 /// from OctoSense's `crates/wasm-host/tests/fixtures` (its
 /// `tests/component-guest/build.sh` builds them). `notes` imports the clock,
-/// random numbers and the filesystem; `netprobe` imports `wasi:sockets`.
+/// random numbers and the filesystem; `netprobe` imports `wasi:sockets`;
+/// `fetch` imports `wasi:http` and `hostcall` `octosense:host` (OctoSense
+/// ADR 0014 phase 3).
 const NOTES: &[u8] = include_bytes!("fixtures/notes.component.wasm");
+const HOSTCALL: &[u8] = include_bytes!("fixtures/hostcall.component.wasm");
 const NETPROBE: &[u8] = include_bytes!("fixtures/netprobe.component.wasm");
+const FETCH: &[u8] = include_bytes!("fixtures/fetch.component.wasm");
 
 fn with_component(requires: bool, capabilities: &[&str], bytes: &[u8]) -> octosense_app_hub::GateReport {
+    with_component_hosts(requires, capabilities, &[], bytes)
+}
+
+fn with_component_hosts(requires: bool, capabilities: &[&str], hosts: &[&str], bytes: &[u8]) -> octosense_app_hub::GateReport {
     let mut f = Fixture::new();
     fs::create_dir_all(f.bundle.join("fns")).unwrap();
     fs::write(f.bundle.join("fns/notes.wasm"), bytes).unwrap();
     f.manifest.capabilities.extend(capabilities.iter().map(|c| c.to_string()));
+    f.manifest.network.hosts.extend(hosts.iter().map(|h| h.to_string()));
     if requires {
         f.manifest.requires.push("wasm-components-v1".into());
     }
@@ -508,6 +517,41 @@ fn a_component_that_uses_files_needs_the_storage_capability() {
     let report = with_component(true, &["wasm"], NOTES);
     let finding = refusal(&report, "functions").unwrap_or_else(|| panic!("{}", report.render()));
     assert!(finding.detail.contains("storage capability"), "{}", finding.detail);
+}
+
+#[test]
+fn a_component_that_uses_http_declares_net_and_reviewers_see_it() {
+    // network.hosts is a declaration, not a limit (OctoSense's ruling of
+    // 8 October 2026): the component reaches any host, listed or not.
+    for hosts in [&[][..], &["api.example.com"][..]] {
+        let report = with_component_hosts(true, &["wasm", "net"], hosts, FETCH);
+        assert!(report.passed(), "{}", report.render());
+        let reach = report
+            .findings
+            .iter()
+            .find(|f| f.path.as_deref() == Some("fns/notes.wasm"))
+            .unwrap_or_else(|| panic!("no reach line: {}", report.render()));
+        assert!(reach.detail.contains("the clock and the network, but no files or other app"), "{}", reach.detail);
+    }
+    let report = with_component(true, &["wasm"], FETCH);
+    let finding = refusal(&report, "functions").unwrap_or_else(|| panic!("{}", report.render()));
+    assert!(
+        finding.detail.contains("imports wasi:http, the network, which the app must declare with the net capability"),
+        "{}",
+        finding.detail
+    );
+}
+
+#[test]
+fn a_component_may_call_its_apps_host_services_with_no_grant_of_its_own() {
+    let report = with_component(true, &["wasm"], HOSTCALL);
+    assert!(report.passed(), "{}", report.render());
+    let reach = report
+        .findings
+        .iter()
+        .find(|f| f.path.as_deref() == Some("fns/notes.wasm"))
+        .unwrap_or_else(|| panic!("no reach line: {}", report.render()));
+    assert!(reach.detail.contains("its app's host services"), "{}", reach.detail);
 }
 
 #[test]

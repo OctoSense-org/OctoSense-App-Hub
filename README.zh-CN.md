@@ -67,6 +67,7 @@ GTK 3/WebKitGTK 和 X11/XWayland，Windows 需要 WebView2。这些引擎不随�
 | `index/<app>-<version>.json` | 每个应用版本对应一条已准入条目：清单、发布者、源码位置与状态。维护者在 `hub publish` 之后从目录导出。 |
 | `artifacts/<app>-<version>.bundle/` | App Hub 保存的应用包副本，与审核时的字节完全一致。由 `hub publish` 生成。 |
 | `artifacts/<app>-<version>.bundle.pack.json` | 打成单个文件的同一应用包，商店下载的就是它。 |
+| `artifacts/<component>-<version>.wasm` 和 `index/components/<component>-<version>.json` | 供应用固定的共享组件版本：App Hub 保存的已审核文件副本及其已准入条目（[ADR 0003](docs/adr/0003-shared-components.zh-CN.md)）。目前尚未发布任何组件。 |
 | `docs/FIRST-APP.md` | 第一个应用（卡片应用或脚本应用）的分步教程：创建、运行、截图与检查。 |
 | `docs/SUBMITTING.md` | 提交流程的四个阶段、每个 `hub` 命令由谁运行，以及从仓库结构到发布的每一步。 |
 | `docs/PUBLISHING.md` | 参考文档：准入规则；能力及其提供方；清单、商店信息和工具的字段；宿主服务；`hub` 命令；签名。 |
@@ -74,7 +75,7 @@ GTK 3/WebKitGTK 和 X11/XWayland，Windows 需要 WebView2。这些引擎不随�
 | `docs/HOST-API.md` | 声明应用需要的宿主 API、用 `runtime` 发现宿主 API，以及目前各宿主实现了哪些 API。 |
 | `docs/ICONS.md` | 规范图标的归属、导出约束与视觉评审。 |
 | `docs/DEVELOPMENT.md` | 指南导航、交付路径、`card-host` 及其远程控制路由，以及 `card-studio`。 |
-| `docs/adr/` | 架构决策：通过 GitHub 管理员身份认证目录（[ADR 0001](docs/adr/0001-github-attested-catalog.zh-CN.md)），以及通过 GitHub 证明发布者身份（[ADR 0002](docs/adr/0002-github-attested-publisher-identity.zh-CN.md)）。 |
+| `docs/adr/` | 架构决策：通过 GitHub 管理员身份认证目录（[ADR 0001](docs/adr/0001-github-attested-catalog.zh-CN.md)）、通过 GitHub 证明发布者身份（[ADR 0002](docs/adr/0002-github-attested-publisher-identity.zh-CN.md)），以及共享组件（[ADR 0003](docs/adr/0003-shared-components.zh-CN.md)，提议中）。 |
 | `templates/app/` | 卡片应用仓库脚手架，包含元数据、示例图标和链接好的 Agent 指引。 |
 | `crates/app-contract` | 应用契约 `octosense-app-contract`（[OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)）：清单、应用获得的策略、应用包完整性校验与运行应用包所需的内容。在 `1.x` 内只做增量变更（[README](crates/app-contract/README.md)）。契约 1.10.0 已发布到 crates.io（[crates.io 上的版本](crates/app-contract/README.md#versions-on-cratesio)，英文）。 |
 | `crates/app-policy` | 签名清单与商店信息、准入，以及解析为隔离环境设置和 Agent 会话配置（[OctoSense Home ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0002-agentic-app-security-model.md)）；应用自带的 Agent（`tools.json`、`AGENT.md`、技能）加载为 `AgentBundle`；原生模块的工具清单共用同一套 `tools.json` 解析与检查（`ToolManifest::load`）。它还重新导出应用契约。 |

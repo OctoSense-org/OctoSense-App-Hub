@@ -115,6 +115,18 @@ impl Origin {
         }
     }
 
+    /// A shared component's file, `artifacts/<id>-<version>.wasm` (App Hub
+    /// ADR 0003), unverified: the store checks its size and digest against
+    /// the verified catalog before it keeps it.
+    pub fn component(&self, artifact: &str) -> Result<Vec<u8>, String> {
+        let max = octosense_app_hub::components::MAX_COMPONENT_BYTES;
+        match self {
+            Origin::Directory(dir) => octosense_app_hub::admission::read_bounded(&dir.join(artifact), max)
+                .map_err(|e| format!("{artifact} is not in this hub mirror: {e}")),
+            Origin::Http(base) => Remote::new(base).component(artifact, max),
+        }
+    }
+
     /// Stage an artifact for install: put the bundle somewhere the store can
     /// hash it before it goes anywhere near an app jail.
     pub fn stage(&self, artifact: &str, into: &Path) -> Result<PathBuf, String> {

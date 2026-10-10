@@ -33,8 +33,24 @@ pub const SCHEMA_MINOR: u32 = 0;
 /// (OctoSense ADR 0014), not only core modules. A host whose `wasm` service
 /// loads only modules does not know it, so it refuses the app instead of
 /// failing when the app first calls its functions. It needs `wasm`.
-pub const KNOWN_FEATURES: &[&str] =
-    &["palpo-admin-v1", "host-api-v1", "backend-api-v1", "script-tools-v1", "publisher-github-v1", "wasm-components-v1"];
+///
+/// `wasm-shared-components-v1`: the manifest's [`AppManifest::components`]
+/// names shared components from App Hub's catalog (App Hub ADR 0003), which
+/// the app's functions use. A host that does not know it refuses the app
+/// instead of running it without them. It needs `wasm`.
+pub const KNOWN_FEATURES: &[&str] = &[
+    "palpo-admin-v1",
+    "host-api-v1",
+    "backend-api-v1",
+    "script-tools-v1",
+    "publisher-github-v1",
+    "wasm-components-v1",
+    "wasm-shared-components-v1",
+];
+
+/// The most shared components one manifest may name
+/// ([`AppManifest::components`]).
+pub const MAX_COMPONENTS: usize = 8;
 
 /// Parse a manifest: [`AppManifest::parse`].
 pub fn parse(json: &str) -> Result<AppManifest, String> {
@@ -135,7 +151,9 @@ pub const KNOWN_CAPABILITIES: &[&str] = &[
     // app: it gets its input and returns its output. A component
     // (`wasm-components-v1`, OctoSense ADR 0014) may also read the clock and
     // random numbers and, with `storage`, the app's own files; it reaches no
-    // network or other app.
+    // network or other app. Shared components from App Hub's catalog
+    // (`components`, `wasm-shared-components-v1`) run as the app's own
+    // functions, with the app's grants and nothing more.
     "wasm",
     // The craft engines (OctoSense ADR 0013), each behind its host service:
     // spreadsheets, images, documents, slide decks, drawings, raw photos,
@@ -306,6 +324,14 @@ pub struct AppManifest {
     /// Public developer backend registration. Tokens remain host-owned.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backend: Option<crate::backend::BackendRegistration>,
+    /// Shared WebAssembly components from App Hub's catalog that the app's
+    /// functions use (App Hub ADR 0003), each pinned to one exact version
+    /// and digest, so the app's code never changes without an app update.
+    /// Requires `wasm-shared-components-v1` and the `wasm` capability.
+    /// Skipped when empty, so a manifest written before it existed signs
+    /// exactly as it did.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub components: Vec<ComponentDependency>,
     /// Features added in `1.x` that this manifest needs a host to honour,
     /// because they restrict or change what the app gets. A host that does
     /// not know one ([`KNOWN_FEATURES`]) refuses the app rather than run it
@@ -421,6 +447,119 @@ impl Signature {
     pub fn new(key_id: impl Into<String>, value: impl Into<String>) -> Self {
         Signature { key_id: key_id.into(), value: value.into() }
     }
+}
+
+/// One shared component an app uses (App Hub ADR 0003): the catalog's
+/// component `id` at exactly `version`, whose WebAssembly file hashes to
+/// `blake3`. The app's script calls it by `as`. A host resolves it from its
+/// verified catalog and refuses any other bytes, so the app's code never
+/// changes without an app update.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+#[non_exhaustive]
+pub struct ComponentDependency {
+    /// The app's own name for it: `[a-z][a-z0-9_]{0,31}`, unique in the
+    /// manifest.
+    #[serde(rename = "as")]
+    pub alias: String,
+    /// The component's catalog id. Component ids follow the app id rules
+    /// and never start with `os.` ([`check_component_id`]).
+    pub id: String,
+    /// One exact semantic version, `major.minor.patch` (with an optional
+    /// pre-release and build), never a range.
+    pub version: String,
+    /// Lowercase hex BLAKE3 of the component's `.wasm` file, 64 characters.
+    pub blake3: String,
+}
+
+impl ComponentDependency {
+    /// A dependency on `id` at `version` with digest `blake3`, called `alias`.
+    pub fn new(alias: impl Into<String>, id: impl Into<String>, version: impl Into<String>, blake3: impl Into<String>) -> Self {
+        ComponentDependency { alias: alias.into(), id: id.into(), version: version.into(), blake3: blake3.into() }
+    }
+
+    /// How a person or a log names it: `markdown (org.example.markdown 1.2.0)`.
+    pub fn describe(&self) -> String {
+        format!("{} ({} {})", self.alias, self.id, self.version)
+    }
+
+    fn check(&self) -> Result<(), String> {
+        let alias = self.alias.as_bytes();
+        if alias.is_empty()
+            || alias.len() > 32
+            || !alias[0].is_ascii_lowercase()
+            || !alias.iter().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'_')
+        {
+            return Err(format!("component name {:?} must match [a-z][a-z0-9_]{{0,31}}", self.alias));
+        }
+        check_component_id(&self.id).map_err(|e| format!("component {}: {e}", self.alias))?;
+        if !is_exact_version(&self.version) {
+            return Err(format!(
+                "component {} names version {:?}; a component is pinned to one exact semantic version (major.minor.patch), never a range",
+                self.alias, self.version
+            ));
+        }
+        if self.blake3.len() != 64 || !self.blake3.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+            return Err(format!("component {}'s blake3 must be 64 lowercase hex characters", self.alias));
+        }
+        Ok(())
+    }
+}
+
+/// The rules a shared component's id follows (App Hub ADR 0003): an app
+/// id's (1 to 64 of `[a-z0-9.-]`, no navigation, no reserved name or
+/// namespace), and never `os.`, which only the system apps a build ships
+/// use.
+pub fn check_component_id(id: &str) -> Result<(), String> {
+    crate::policy::check_id_shape(id, "component id")?;
+    if id.starts_with("os.") {
+        return Err(format!("component id {id:?} is under os., which only system apps use"));
+    }
+    if check_reserved_id(id).is_err() {
+        return Err(format!(
+            "component id {id:?} is reserved: it, or its last segment {:?}, names a native app, the host or a host file",
+            short_id(id)
+        ));
+    }
+    Ok(())
+}
+
+/// Whether `version` is one exact semantic version (SemVer 2.0):
+/// `major.minor.patch`, numbers without leading zeros, then an optional
+/// `-pre.release` and `+build`. A range (`^1.2`, `~1`, `>=1.0.0`, `1.x`) is
+/// not one.
+pub fn is_exact_version(version: &str) -> bool {
+    fn numeric(s: &str) -> bool {
+        !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()) && (s == "0" || !s.starts_with('0'))
+    }
+    fn identifiers(s: &str, pre: bool) -> bool {
+        s.split('.').all(|id| {
+            !id.is_empty()
+                && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+                && (!pre || !id.bytes().all(|b| b.is_ascii_digit()) || numeric(id))
+        })
+    }
+    if version.is_empty() || version.len() > 64 {
+        return false;
+    }
+    let (rest, build) = match version.split_once('+') {
+        Some((rest, build)) => (rest, Some(build)),
+        None => (version, None),
+    };
+    let (core, pre) = match rest.split_once('-') {
+        Some((core, pre)) => (core, Some(pre)),
+        None => (rest, None),
+    };
+    let parts: Vec<&str> = core.split('.').collect();
+    let pre_ok = match pre {
+        Some(pre) => identifiers(pre, true),
+        None => true,
+    };
+    let build_ok = match build {
+        Some(build) => identifiers(build, false),
+        None => true,
+    };
+    parts.len() == 3 && parts.iter().all(|p| numeric(p)) && pre_ok && build_ok
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -793,12 +932,39 @@ impl AppManifest {
         if self.requires.iter().any(|f| f == "wasm-components-v1") && !self.capabilities.iter().any(|c| c == "wasm") {
             return Err("wasm-components-v1 requires the wasm capability".into());
         }
+        self.check_components()?;
         let unknown: Vec<&str> =
             self.requires.iter().map(String::as_str).filter(|feature| !KNOWN_FEATURES.contains(feature)).collect();
         if unknown.is_empty() {
             return Ok(());
         }
         Err(format!("app {} needs a newer host: {}", self.id, unknown.join(", ")))
+    }
+
+    /// The `components` rules (App Hub ADR 0003): the field needs
+    /// `wasm-shared-components-v1`, the feature needs `wasm`, and each of at
+    /// most [`MAX_COMPONENTS`] entries has a unique name, a component id, one
+    /// exact version and a BLAKE3 digest. Whether each resolves, and whether
+    /// the app grants what it imports, is the gate's and the host's check.
+    fn check_components(&self) -> Result<(), String> {
+        let required = self.requires.iter().any(|f| f == "wasm-shared-components-v1");
+        if !self.components.is_empty() && !required {
+            return Err("components requires wasm-shared-components-v1".into());
+        }
+        if required && !self.capabilities.iter().any(|c| c == "wasm") {
+            return Err("wasm-shared-components-v1 requires the wasm capability".into());
+        }
+        if self.components.len() > MAX_COMPONENTS {
+            return Err(format!("an app may name at most {MAX_COMPONENTS} components, not {}", self.components.len()));
+        }
+        let mut aliases = std::collections::BTreeSet::new();
+        for component in &self.components {
+            component.check()?;
+            if !aliases.insert(component.alias.as_str()) {
+                return Err(format!("component name {:?} is used twice", component.alias));
+            }
+        }
+        Ok(())
     }
 
     /// Device-side compatibility. Admission validates declarations separately;

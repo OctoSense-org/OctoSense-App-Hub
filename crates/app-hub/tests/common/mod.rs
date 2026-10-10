@@ -91,3 +91,100 @@ impl Drop for Fixture {
 pub fn write_catalog(path: &Path, catalog: &Catalog) {
     fs::write(path, serde_json::to_vec_pretty(catalog).unwrap()).unwrap();
 }
+
+// ---- shared components (App Hub ADR 0003) -----------------------------------
+
+/// Components built with plain `cargo build --target wasm32-wasip2`, copied
+/// byte for byte from OctoSense's `crates/wasm-host/tests/fixtures`.
+pub const NOTES: &[u8] = include_bytes!("../fixtures/notes.component.wasm");
+pub const FETCH: &[u8] = include_bytes!("../fixtures/fetch.component.wasm");
+pub const HOSTCALL: &[u8] = include_bytes!("../fixtures/hostcall.component.wasm");
+pub const NETPROBE: &[u8] = include_bytes!("../fixtures/netprobe.component.wasm");
+
+pub fn blake3_hex(bytes: &[u8]) -> String {
+    blake3::hash(bytes).to_hex().to_string()
+}
+
+/// What a publisher writes before `hub component-prepare`.
+pub fn draft_json(id: &str, version: &str) -> serde_json::Value {
+    serde_json::json!({
+        "component": {
+            "schema": 1, "id": id, "version": version, "name": "Notes",
+            "publisher": {"name": "Example", "support": "https://example.test/support", "privacy_policy_url": "https://example.test/privacy"},
+            "license": "MIT OR Apache-2.0"
+        },
+        "listing": {"subtitle": "Markdown notes", "description": "Renders and analyzes Markdown.", "keywords": ["markdown"]}
+    })
+}
+
+/// An unsigned development release of `wasm` as `id` `version`.
+pub fn release(id: &str, version: &str, wasm: &[u8]) -> components::ComponentRelease {
+    let draft: components::ComponentDraft = serde_json::from_value(draft_json(id, version)).unwrap();
+    components::ComponentRelease::from_draft(draft, wasm).unwrap()
+}
+
+/// The catalog entry the gate makes for an unsigned development release.
+pub fn component_entry(id: &str, version: &str, wasm: &[u8]) -> ComponentEntry {
+    let release = release(id, version, wasm);
+    let report = check_component(&release, wasm, false, None).unwrap();
+    assert!(report.passed(), "{}", report.render());
+    component_entry_for(&release, wasm, &report, "dev:example", "", "", "2026-10-09").unwrap()
+}
+
+/// A dependency on `entry` as the app calls it, `alias`.
+pub fn dependency(alias: &str, entry: &ComponentEntry) -> octosense_app_policy::ComponentDependency {
+    octosense_app_policy::ComponentDependency::new(alias, entry.id(), entry.version(), &entry.component.wasm_blake3)
+}
+
+impl Fixture {
+    /// The entry for this app, admitted against `previous`.
+    pub fn entry_with(&self, previous: Option<&Catalog>) -> Entry {
+        let report = self.report(previous);
+        assert!(report.passed(), "{}", report.render());
+        entry_for(&self.bundle, &report, "publisher-one", &self.publisher.public_hex(), "", "", "2026-09-25").unwrap()
+    }
+
+    /// Make this app pin `components`, with the feature and these extra
+    /// capabilities and hosts, and sign it again.
+    pub fn pin(&mut self, components: &[octosense_app_policy::ComponentDependency], capabilities: &[&str], hosts: &[&str]) {
+        self.manifest.components = components.to_vec();
+        if !self.manifest.requires.iter().any(|f| f == "wasm-shared-components-v1") {
+            self.manifest.requires.push("wasm-shared-components-v1".into());
+        }
+        for capability in ["wasm"].iter().chain(capabilities) {
+            if !self.manifest.capabilities.iter().any(|c| c == capability) {
+                self.manifest.capabilities.push(capability.to_string());
+            }
+        }
+        self.manifest.network.hosts = hosts.iter().map(|h| h.to_string()).collect();
+        self.sign();
+    }
+}
+
+/// A legacy anchor-signed catalog, for a development hub's tests.
+pub struct Hub {
+    pub anchor: HubKey,
+    pub working: HubKey,
+}
+
+impl Hub {
+    pub fn new() -> Self {
+        Hub { anchor: HubKey::generate(), working: HubKey::generate() }
+    }
+
+    pub fn sign(&self, catalog: &mut Catalog) {
+        let certificate = self.anchor.certify(&self.working.public_hex()).unwrap();
+        self.working.sign_catalog(catalog, &certificate).unwrap();
+    }
+
+    pub fn catalog(&self, sequence: u64, entries: Vec<Entry>, components: Vec<ComponentEntry>) -> Catalog {
+        let mut catalog = Catalog::new(sequence, &today(), entries);
+        catalog.components = components;
+        self.sign(&mut catalog);
+        catalog
+    }
+
+    pub fn json(&self, sequence: u64, entries: Vec<Entry>, components: Vec<ComponentEntry>) -> String {
+        serde_json::to_string(&self.catalog(sequence, entries, components)).unwrap()
+    }
+}

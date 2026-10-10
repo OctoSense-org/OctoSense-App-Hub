@@ -5,27 +5,57 @@
 //! and exports when it loads it. A component is validated here, and its
 //! imports must all come from the WASI packages a host scopes to the app
 //! ([`ALLOWED_COMPONENT_IMPORTS`]). Whether the manifest may carry one
-//! (`requires: ["wasm-components-v1"]`, `storage` for files) is the gate's
-//! check ([`crate::gate`]), which also tells reviewers what each component
-//! reaches ([`ComponentInfo::reach`]).
+//! (`requires: ["wasm-components-v1"]`, `storage` for files, `net` for
+//! HTTP) is the gate's check ([`crate::gate`]), which
+//! also tells reviewers what each component reaches
+//! ([`ComponentInfo::reach`]).
 //!
 //! [`describe`] is `hub component-info`: a file's kind, imports and exports,
 //! with each function's parameters and result written as WIT writes them
 //! (the same text OctoSense's `wasm.functions` shows).
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use wasmparser::component_types::{ComponentDefinedType, ComponentEntityType, ComponentFuncTypeId, ComponentValType};
 use wasmparser::types::TypesRef;
 use wasmparser::{ComponentTypeRef, Parser, Payload, PrimitiveValType, TypeBounds, Validator, WasmFeatures};
 
-/// The WASI packages a component may import: every interface of these, each
-/// scoped to its app by the host. Nothing else (`wasi:sockets`, `wasi:http`,
-/// non-WASI imports) is admitted.
+/// The packages a component may import, every interface of these. The host
+/// gives `wasi:filesystem` only the app's storage folder and
+/// `octosense:host` only the host services the app is granted, as its
+/// script has them (OctoSense ADR 0014 phase 3). `wasi:http` reaches any
+/// host: an app's network declarations are shown at install and not
+/// enforced (OctoSense's ruling of 8 October 2026). Nothing else
+/// (`wasi:sockets`, other packages) is admitted.
 pub const ALLOWED_COMPONENT_IMPORTS: &[&str] =
-    &["wasi:cli/", "wasi:clocks/", "wasi:filesystem/", "wasi:io/", "wasi:random/"];
+    &["wasi:cli/", "wasi:clocks/", "wasi:filesystem/", "wasi:http/", "wasi:io/", "wasi:random/", "octosense:host/"];
+
+/// The allowed packages in words: "wasi:cli, wasi:clocks, … and
+/// octosense:host".
+pub fn allowed_import_packages() -> String {
+    let names: Vec<&str> = ALLOWED_COMPONENT_IMPORTS.iter().map(|p| p.trim_end_matches('/')).collect();
+    match names.split_last() {
+        Some((last, [])) => last.to_string(),
+        Some((last, init)) => format!("{} and {last}", init.join(", ")),
+        None => String::new(),
+    }
+}
 
 /// The feature a manifest requires when its `fns/` holds a component.
 pub const COMPONENTS_FEATURE: &str = "wasm-components-v1";
+
+/// The feature a manifest requires when it names shared components from
+/// the catalog (`components`, App Hub ADR 0003).
+pub const SHARED_COMPONENTS_FEATURE: &str = "wasm-shared-components-v1";
+
+/// Validate `bytes` as a component whose imports a host scopes to its app:
+/// what admission requires of an app's own component and of a shared one.
+pub fn admissible_component(bytes: &[u8]) -> Result<ComponentInfo, String> {
+    let info = inspect_component(bytes)?;
+    if let Some(import) = info.refused_imports().first() {
+        return Err(format!("the component imports {import}; a component may import only {}", allowed_import_packages()));
+    }
+    Ok(info)
+}
 
 /// Whether `bytes` starts like a WebAssembly core module, version 1.
 pub fn is_module(bytes: &[u8]) -> bool {
@@ -41,7 +71,8 @@ pub fn is_component(bytes: &[u8]) -> bool {
 /// One function a component exports: `name`, or `interface.name` for a
 /// function in an exported interface. Each parameter is `(name, type)`; a
 /// core module's parameters are named `p0`, `p1`, ….
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Export {
     pub name: String,
     pub params: Vec<(String, String)>,
@@ -75,21 +106,45 @@ impl ComponentInfo {
         self.imports.iter().any(|name| name.starts_with("wasi:filesystem/"))
     }
 
-    /// What it reaches, for a reviewer: "the clock, random numbers and
-    /// files in its app folder, but no network or other app".
+    /// Whether it imports `wasi:http`: the network, which the app declares
+    /// with the `net` capability.
+    pub fn uses_http(&self) -> bool {
+        self.imports.iter().any(|name| name.starts_with("wasi:http/"))
+    }
+
+    /// Whether it imports `octosense:host`: the host services its app is
+    /// granted, which it calls as the app's script does.
+    pub fn uses_host_services(&self) -> bool {
+        self.imports.iter().any(|name| name.starts_with("octosense:host/"))
+    }
+
+    /// What it reaches, for a reviewer: "the clock, files in its app folder
+    /// and the network, but no other app".
     pub fn reach(&self) -> String {
         let imports = |prefix: &str| self.imports.iter().any(|n| n.starts_with(prefix));
         let mut reaches = Vec::new();
         if imports("wasi:clocks/") {
-            reaches.push("the clock");
+            reaches.push("the clock".to_string());
         }
         if imports("wasi:random/") {
-            reaches.push("random numbers");
+            reaches.push("random numbers".to_string());
         }
         if self.uses_files() {
-            reaches.push("files in its app folder");
+            reaches.push("files in its app folder".to_string());
         }
-        let not = if self.uses_files() { "no network or other app" } else { "no files, network or other app" };
+        let network = self.uses_http();
+        if network {
+            reaches.push("the network".to_string());
+        }
+        if self.uses_host_services() {
+            reaches.push("its app's host services".to_string());
+        }
+        let not = match (self.uses_files(), network) {
+            (true, true) => "no other app",
+            (true, false) => "no network or other app",
+            (false, true) => "no files or other app",
+            (false, false) => "no files, network or other app",
+        };
         match reaches.as_slice() {
             [] => "nothing but its input".into(),
             [one] => format!("{one}, but {not}"),
@@ -336,12 +391,31 @@ mod tests {
             info(&["wasi:filesystem/types@0.2.9"]).reach(),
             "files in its app folder, but no network or other app"
         );
+        assert_eq!(
+            info(&["wasi:http/outgoing-handler@0.2.4", "wasi:clocks/wall-clock@0.2.9"]).reach(),
+            "the clock and the network, but no files or other app"
+        );
+        assert_eq!(
+            info(&["wasi:http/outgoing-handler@0.2.4", "wasi:filesystem/types@0.2.9"]).reach(),
+            "files in its app folder and the network, but no other app"
+        );
+        assert_eq!(
+            info(&["octosense:host/services@0.1.0"]).reach(),
+            "its app's host services, but no files, network or other app"
+        );
+        // Any wasi:http interface is the network, even types alone.
+        assert_eq!(info(&["wasi:http/types@0.2.4"]).reach(), "the network, but no files or other app");
     }
 
     #[test]
     fn only_the_scoped_wasi_packages_are_allowed() {
-        let component = info(&["wasi:io/poll@0.2.9", "wasi:sockets/network@0.2.9", "wasi:http/types@0.2.9", "my:pkg/host"]);
-        assert_eq!(component.refused_imports(), ["wasi:sockets/network@0.2.9", "wasi:http/types@0.2.9", "my:pkg/host"]);
+        let component = info(&["wasi:io/poll@0.2.9", "wasi:sockets/network@0.2.9", "wasi:http/types@0.2.9", "my:pkg/host", "octosense:host/services@0.1.0", "octosense:hostile/x"]);
+        assert_eq!(component.refused_imports(), ["wasi:sockets/network@0.2.9", "my:pkg/host", "octosense:hostile/x"]);
+        assert!(component.uses_http());
+        assert_eq!(
+            allowed_import_packages(),
+            "wasi:cli, wasi:clocks, wasi:filesystem, wasi:http, wasi:io, wasi:random and octosense:host"
+        );
         // A package name is matched whole: wasi:clocksmith is not wasi:clocks.
         assert_eq!(info(&["wasi:clocksmith/x"]).refused_imports(), ["wasi:clocksmith/x"]);
     }

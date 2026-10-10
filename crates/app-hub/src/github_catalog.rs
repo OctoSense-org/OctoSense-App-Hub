@@ -77,6 +77,7 @@ fn parse_catalog(bytes: &[u8]) -> Result<Catalog, String> {
             return Err("catalog repeats an app version".into());
         }
     }
+    crate::components::check_catalog(&catalog)?;
     Ok(catalog)
 }
 
@@ -381,7 +382,7 @@ pub fn authenticated_publication_base(document: &[u8], legacy_anchor: &str) -> R
 /// Candidate construction never authenticates its output. Only a subsequent
 /// protected workflow attestation can publish the proposed releases.
 pub fn prepare_authenticated(base: &AuthenticatedCatalog, candidate_bytes: &[u8], artifact_root: &Path) -> Result<Vec<u8>, String> {
-    prepare_with_registry(base.catalog(), base.publishers(), candidate_bytes, artifact_root)
+    prepare_with_registry(base.catalog(), base.publishers(), candidate_bytes, artifact_root, true)
 }
 
 /// Admit a reviewed candidate, without credentials or contributor execution.
@@ -392,10 +393,112 @@ pub fn prepare(
     artifact_root: &Path,
 ) -> Result<Vec<u8>, String> {
     let registry=CatalogPublishers::from_catalog(base)?;
-    prepare_with_registry(base, &registry, candidate_bytes, artifact_root)
+    prepare_with_registry(base, &registry, candidate_bytes, artifact_root, true)
 }
 
-fn prepare_with_registry(base: &Catalog, registry: &CatalogPublishers, candidate_bytes: &[u8], artifact_root: &Path) -> Result<Vec<u8>, String> {
+/// What a prepared candidate adds to its base, for the publication receipt:
+/// each new app version's bundle, pack and index, and each new component
+/// version's file and index (App Hub ADR 0003).
+pub fn added_artifacts(base: &Catalog, candidate: &Catalog) -> Vec<serde_json::Value> {
+    let mut added: Vec<serde_json::Value> = candidate
+        .entries
+        .iter()
+        .filter(|entry| !base.entries.iter().any(|old| old.app_id() == entry.app_id() && old.version() == entry.version()))
+        .map(|entry| {
+            serde_json::json!({"bundle":entry.artifact,"pack":format!("{}.pack.json",entry.artifact),
+                "index":format!("index/{}-{}.json",entry.app_id(),entry.version())})
+        })
+        .collect();
+    added.extend(
+        candidate
+            .components
+            .iter()
+            .filter(|entry| base.component(entry.id(), entry.version()).is_none())
+            .map(|entry| serde_json::json!({"component":entry.artifact,"index":crate::components::index_path(entry.id(),entry.version())})),
+    );
+    added
+}
+
+/// The candidate's component history against its base (App Hub ADR 0003),
+/// by the apps' rules: existing versions keep their order and bytes and may
+/// only be withdrawn, with a reason; nothing is removed. Each new version is
+/// offered, names an immutable public GitHub source, passes the component
+/// gate (with GitHub provenance unless `provenance` is off, which only this
+/// module's tests do) and matches its reviewed file and index exactly.
+fn prepare_components(base: &Catalog, candidate: &Catalog, artifact_root: &Path, provenance: bool) -> Result<(), String> {
+    let old: std::collections::BTreeMap<(&str, &str), &crate::ComponentEntry> =
+        base.components.iter().map(|e| ((e.id(), e.version()), e)).collect();
+    if old.len() != base.components.len() {
+        return Err("base catalog has duplicate component versions".into());
+    }
+    let retained: Vec<_> = candidate.components.iter().filter(|e| old.contains_key(&(e.id(), e.version()))).map(|e| (e.id(), e.version())).collect();
+    let previous_order: Vec<_> = base.components.iter().map(|e| (e.id(), e.version())).collect();
+    if retained != previous_order {
+        return Err("candidate reorders or drops component history; withdraw instead".into());
+    }
+    for entry in &candidate.components {
+        if let Some(previous) = old.get(&(entry.id(), entry.version())) {
+            let mut allowed = (*previous).clone();
+            if matches!((&previous.status, &entry.status), (crate::Status::Offered, crate::Status::Withdrawn(reason)) if !reason.trim().is_empty() && reason.len() <= 4096) {
+                allowed.status = entry.status.clone();
+            }
+            if &allowed != entry {
+                return Err("candidate changes existing component history or re-offers a withdrawn version".into());
+            }
+            continue;
+        }
+        if !entry.status.is_offered() {
+            return Err("new candidate components must be offered".into());
+        }
+        if entry.source.commit.len() != 40 || !entry.source.commit.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err("new component source must name an immutable commit".into());
+        }
+        if !entry.source.repository.starts_with("https://github.com/")
+            || entry.source.repository[19..].split('/').count() != 2
+            || entry.source.repository.contains(['?', '#', '@', '\\'])
+        {
+            return Err("new component source must name a public GitHub repository URL".into());
+        }
+        if entry.artifact != crate::components::artifact_path(entry.id(), entry.version())
+            || Path::new(&entry.artifact).components().any(|c| !matches!(c, std::path::Component::Normal(_)))
+        {
+            return Err("candidate component artifact path is not canonical".into());
+        }
+        let file = artifact_root.join(&entry.artifact);
+        for ancestor in file.ancestors().take_while(|p| *p != artifact_root) {
+            if std::fs::symlink_metadata(ancestor).map_err(|_| "candidate component artifact is missing")?.file_type().is_symlink() {
+                return Err("candidate component artifact path contains a symlink".into());
+            }
+        }
+        let wasm = crate::admission::read_bounded(&file, crate::components::MAX_COMPONENT_BYTES)?;
+        let release = entry.release();
+        let report = crate::gate::check_component(&release, &wasm, provenance, Some(base))?;
+        if !report.passed() {
+            return Err(format!("candidate component was refused by the gate:\n{}", report.render()));
+        }
+        let rebuilt = crate::gate::component_entry_for(
+            &release,
+            &wasm,
+            &report,
+            &entry.publisher,
+            &entry.source.repository,
+            &entry.source.commit,
+            &entry.admitted,
+        )?;
+        if &rebuilt != entry {
+            return Err("candidate component entry differs from the release admitted by the gate".into());
+        }
+        let index_path = artifact_root.join(crate::components::index_path(entry.id(), entry.version()));
+        let index: serde_json::Value = serde_json::from_slice(&crate::admission::read_bounded(&index_path, 2 * 1024 * 1024)?)
+            .map_err(|_| "candidate component index is invalid")?;
+        if serde_json::to_value(entry).map_err(|_| "cannot encode candidate component")? != index {
+            return Err("candidate component index differs from its admitted entry".into());
+        }
+    }
+    Ok(())
+}
+
+fn prepare_with_registry(base: &Catalog, registry: &CatalogPublishers, candidate_bytes: &[u8], artifact_root: &Path, component_provenance: bool) -> Result<Vec<u8>, String> {
     let candidate = parse_catalog(candidate_bytes)?;
     if candidate.sequence
         != base
@@ -421,6 +524,11 @@ fn prepare_with_registry(base: &Catalog, registry: &CatalogPublishers, candidate
         .map(|e|(e.app_id(),e.version())).collect();
     let previous_order:Vec<_>=base.entries.iter().map(|e|(e.app_id(),e.version())).collect();
     if retained!=previous_order { return Err("candidate reorders or drops publisher history".into()); }
+    // Components first, so a new app may name a new component of the same
+    // candidate: apps resolve their components against the candidate's.
+    prepare_components(base, &candidate, artifact_root, component_provenance)?;
+    let mut resolving = base.clone();
+    resolving.components = candidate.components.clone();
     let mut present = std::collections::BTreeSet::new();
     for entry in &candidate.entries {
         let key = (entry.app_id(), entry.version());
@@ -477,8 +585,11 @@ fn prepare_with_registry(base: &Catalog, registry: &CatalogPublishers, candidate
         let keys = registry
             .trusted_keys(crate::PublisherKeys::new().with(&entry.publisher, &entry.publisher_key));
         let report = crate::gate::check_bundle_with_registry(
-            &bundle, &octosense_app_policy::HostLimits::default(), &keys, base, registry,
+            &bundle, &octosense_app_policy::HostLimits::default(), &keys, &resolving, registry,
         )?;
+        if !report.passed() {
+            return Err(format!("candidate bundle was refused by the gate:\n{}", report.render()));
+        }
         let rebuilt = crate::entry_for(
             &bundle,
             &report,
@@ -653,6 +764,64 @@ mod tests {
         )
         .is_err());
         assert!(authenticated_base(br#"{"schema":2,"signature":"legacy-looking"}"#).is_err());
+    }
+
+    /// A new component's whole admission path but its GitHub proof, which
+    /// `components_must_carry_github_provenance` and the publisher tests
+    /// cover: the file, the gate, the rebuilt entry, the index and the
+    /// receipt. Production preparation never turns the proof off.
+    #[test]
+    fn a_new_component_is_admitted_from_its_reviewed_file_and_index() {
+        const NOTES: &[u8] = include_bytes!("../tests/fixtures/notes.component.wasm");
+        let root = std::env::temp_dir().join(format!("hub-component-prepare-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("artifacts")).unwrap();
+        std::fs::create_dir_all(root.join("index/components")).unwrap();
+        let draft: crate::components::ComponentDraft = serde_json::from_value(serde_json::json!({
+            "component": {"schema": 1, "id": "org.example.markdown", "version": "1.0.0", "name": "Markdown",
+                "publisher": {"name": "Example", "support": "https://example.test/s", "privacy_policy_url": "https://example.test/p"},
+                "license": "MIT"},
+            "listing": {"description": "Renders Markdown."}
+        })).unwrap();
+        let release = crate::components::ComponentRelease::from_draft(draft, NOTES).unwrap();
+        let report = crate::gate::check_component(&release, NOTES, false, None).unwrap();
+        let entry = crate::gate::component_entry_for(
+            &release, NOTES, &report, "dev:example", "https://github.com/example/markdown", &"1".repeat(40), &crate::today(),
+        )
+        .unwrap();
+        std::fs::write(root.join(&entry.artifact), NOTES).unwrap();
+        std::fs::write(root.join(crate::components::index_path(entry.id(), entry.version())), serde_json::to_vec(&entry).unwrap()).unwrap();
+        let base = Catalog::new(4, "2026-10-08", vec![]);
+        let mut candidate = Catalog::new(5, &crate::today(), vec![]);
+        candidate.components.push(entry.clone());
+        let registry = CatalogPublishers::from_catalog(&base).unwrap();
+        let bytes = serde_json::to_vec(&candidate).unwrap();
+        let prepared = prepare_with_registry(&base, &registry, &bytes, &root, false).unwrap();
+        assert_eq!(prepared, bytes);
+        assert_eq!(
+            added_artifacts(&base, &serde_json::from_slice(&prepared).unwrap()),
+            [serde_json::json!({"component": "artifacts/org.example.markdown-1.0.0.wasm",
+                "index": "index/components/org.example.markdown-1.0.0.json"})]
+        );
+        // The public path requires GitHub provenance.
+        assert!(prepare(&base, &bytes, &root).unwrap_err().contains("App Hub accepts only GitHub-attested component releases"));
+        // An entry edited after review no longer matches its reviewed index,
+        // and a stale index or another file is refused.
+        let mut edited = candidate.clone();
+        edited.components[0].listing.description = "Something else.".into();
+        let edited = serde_json::to_vec(&edited).unwrap();
+        assert_eq!(
+            prepare_with_registry(&base, &registry, &edited, &root, false).unwrap_err(),
+            "candidate component index differs from its admitted entry"
+        );
+        std::fs::write(root.join(crate::components::index_path(entry.id(), entry.version())), b"{}").unwrap();
+        assert_eq!(
+            prepare_with_registry(&base, &registry, &bytes, &root, false).unwrap_err(),
+            "candidate component index differs from its admitted entry"
+        );
+        std::fs::write(root.join(&entry.artifact), &NOTES[..1000]).unwrap();
+        assert!(prepare_with_registry(&base, &registry, &bytes, &root, false).unwrap_err().contains("[refused] digest"));
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

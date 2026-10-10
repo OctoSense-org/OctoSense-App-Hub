@@ -18,7 +18,15 @@ fn palpo_extension_preserves_schema_and_declares_its_host_feature() {
     assert_eq!(SCHEMA_MINOR, 0);
     assert_eq!(
         KNOWN_FEATURES,
-        &["palpo-admin-v1", "host-api-v1", "backend-api-v1", "script-tools-v1", "publisher-github-v1", "wasm-components-v1"]
+        &[
+            "palpo-admin-v1",
+            "host-api-v1",
+            "backend-api-v1",
+            "script-tools-v1",
+            "publisher-github-v1",
+            "wasm-components-v1",
+            "wasm-shared-components-v1"
+        ]
     );
 }
 
@@ -30,6 +38,105 @@ fn wasm_components_need_the_wasm_capability() {
     assert!(parse(&manifest_with(r#""requires":["wasm-components-v1"],"capabilities":["storage"]"#)).is_err());
     let manifest = parse(&manifest_with(r#""requires":["wasm-components-v1"],"capabilities":["wasm","storage"]"#)).unwrap();
     assert_eq!(manifest.requires, ["wasm-components-v1"]);
+}
+
+// ---- shared components (App Hub ADR 0003) --------------------------------
+
+const DIGEST: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+fn with_components(components: &str) -> String {
+    manifest_with(&format!(
+        r#""requires":["wasm-shared-components-v1"],"capabilities":["wasm"],"components":{components}"#
+    ))
+}
+
+fn dependency(alias: &str, id: &str, version: &str, blake3: &str) -> String {
+    format!(r#"{{"as":"{alias}","id":"{id}","version":"{version}","blake3":"{blake3}"}}"#)
+}
+
+#[test]
+fn shared_components_parse_and_pin_one_exact_version_and_digest() {
+    let manifest = parse(&with_components(&format!("[{}]", dependency("markdown", "org.example.markdown", "1.2.0", DIGEST)))).unwrap();
+    assert_eq!(manifest.components, [ComponentDependency::new("markdown", "org.example.markdown", "1.2.0", DIGEST)]);
+    assert_eq!(manifest.components[0].describe(), "markdown (org.example.markdown 1.2.0)");
+    // The field serialises as `as`, and the policy grants nothing new.
+    let json = serde_json::to_value(&manifest).unwrap();
+    assert_eq!(json["components"][0]["as"], "markdown");
+    let policy = resolve(&manifest, &HostLimits::default().with_require_signature(false)).unwrap();
+    assert_eq!(policy.capabilities.iter().collect::<Vec<_>>(), ["wasm"]);
+    // Pre-releases and build metadata are exact versions too.
+    for version in ["0.1.0", "10.20.30", "1.0.0-alpha.1", "1.0.0+build.5", "1.0.0-rc.1+sha.abc"] {
+        assert!(parse(&with_components(&format!("[{}]", dependency("m", "org.example.m", version, DIGEST)))).is_ok(), "{version}");
+    }
+}
+
+#[test]
+fn shared_components_need_their_feature_and_the_wasm_capability() {
+    let one = format!("[{}]", dependency("markdown", "org.example.markdown", "1.2.0", DIGEST));
+    let err = parse(&manifest_with(&format!(r#""capabilities":["wasm"],"components":{one}"#))).unwrap_err();
+    assert_eq!(err, "components requires wasm-shared-components-v1");
+    let err = parse(&manifest_with(&format!(r#""requires":["wasm-shared-components-v1"],"components":{one}"#))).unwrap_err();
+    assert_eq!(err, "wasm-shared-components-v1 requires the wasm capability");
+    let err = parse(&manifest_with(r#""requires":["wasm-shared-components-v1"]"#)).unwrap_err();
+    assert_eq!(err, "wasm-shared-components-v1 requires the wasm capability");
+    // The feature alone, with wasm, parses: the gate warns about it.
+    let manifest = parse(&manifest_with(r#""requires":["wasm-shared-components-v1"],"capabilities":["wasm"]"#)).unwrap();
+    assert!(manifest.components.is_empty());
+}
+
+#[test]
+fn shared_component_entries_are_checked_one_by_one() {
+    let refused = |components: String| parse(&with_components(&components)).unwrap_err();
+    for alias in ["", "Markdown", "1md", "md-x", "a".repeat(33).as_str()] {
+        let err = refused(format!("[{}]", dependency(alias, "org.example.markdown", "1.2.0", DIGEST)));
+        assert!(err.contains("must match [a-z][a-z0-9_]{0,31}"), "{alias:?}: {err}");
+    }
+    assert!(parse(&with_components(&format!("[{}]", dependency(&"a".repeat(32), "org.example.m", "1.0.0", DIGEST)))).is_ok());
+    let twice = format!(
+        "[{},{}]",
+        dependency("md", "org.example.markdown", "1.2.0", DIGEST),
+        dependency("md", "org.example.other", "1.0.0", DIGEST)
+    );
+    assert_eq!(refused(twice), r#"component name "md" is used twice"#);
+    for version in ["1.2", "^1.2.0", "~1.2.0", ">=1.0.0", "1.x", "*", "01.2.0", "1.2.0-", "1.2.0-01", "v1.2.0", "1.2.0 "] {
+        let err = refused(format!("[{}]", dependency("md", "org.example.markdown", version, DIGEST)));
+        assert!(err.contains("one exact semantic version"), "{version:?}: {err}");
+    }
+    for digest in ["", "00", &DIGEST.to_uppercase(), &format!("{}g", &DIGEST[..63])] {
+        let err = refused(format!("[{}]", dependency("md", "org.example.markdown", "1.2.0", digest)));
+        assert!(err.contains("64 lowercase hex"), "{digest:?}: {err}");
+    }
+    for (id, needle) in [
+        ("os.markdown", "under os."),
+        ("Org.Example", "may hold only"),
+        ("../escape", "may hold only"),
+        ("org.example.notes", "reserved"),
+        ("", "1 to 64 characters"),
+    ] {
+        let err = refused(format!("[{}]", dependency("md", id, "1.2.0", DIGEST)));
+        assert!(err.starts_with("component md: component id") && err.contains(needle), "{id:?}: {err}");
+    }
+    let nine: Vec<String> = (0..9).map(|i| dependency(&format!("c{i}"), "org.example.markdown", "1.2.0", DIGEST)).collect();
+    assert_eq!(refused(format!("[{}]", nine.join(","))), "an app may name at most 8 components, not 9");
+    let eight = &nine[..8];
+    assert!(parse(&with_components(&format!("[{}]", eight.join(",")))).is_ok());
+    // An unknown field inside an entry is refused like any other.
+    let err = refused(r#"[{"as":"md","id":"org.example.markdown","version":"1.2.0","blake3":"x","range":"^1"}]"#.into());
+    assert!(err.contains("unknown field `range`"), "{err}");
+}
+
+#[test]
+fn a_manifest_without_components_signs_as_before() {
+    let text = manifest_with(r#""capabilities":["wasm"]"#);
+    let manifest = parse(&text).unwrap();
+    let json = serde_json::to_string(&manifest).unwrap();
+    assert!(!json.contains("components"), "{json}");
+    assert_eq!(
+        String::from_utf8(manifest.signing_bytes().unwrap()).unwrap(),
+        r#"{"agent":null,"capabilities":["wasm"],"compute":{"instruction_budget":null,"memory_bytes":null},"id":"forecast","integrity":{"bundle_blake3":"00","signature":null},"name":"Forecast","network":{"hosts":[]},"schema":1,"storage":{"max_bytes":null},"version":"1.0.0"}"#
+    );
+    assert!(check_component_id("org.example.markdown").is_ok());
+    assert!(is_exact_version("1.2.3") && !is_exact_version("1.2"));
 }
 
 #[test]

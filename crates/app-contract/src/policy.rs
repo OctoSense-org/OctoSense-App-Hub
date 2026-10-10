@@ -310,16 +310,23 @@ fn resolve_research(
 /// An id is a path component of the app's jail, so it may not be empty, may
 /// not navigate, and may not surprise a filesystem.
 fn check_id(id: &str) -> Result<(), String> {
+    check_id_shape(id, "app id")?;
+    crate::manifest::check_reserved_id(id)
+}
+
+/// The shape every id has (an app's, a shared component's): `what` names
+/// it in the refusal.
+pub(crate) fn check_id_shape(id: &str, what: &str) -> Result<(), String> {
     if id.is_empty() || id.len() > 64 {
-        return Err(format!("app id {id:?} must be 1 to 64 characters"));
+        return Err(format!("{what} {id:?} must be 1 to 64 characters"));
     }
     if !id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '.') {
-        return Err(format!("app id {id:?} may hold only lowercase letters, digits, '-' and '.'"));
+        return Err(format!("{what} {id:?} may hold only lowercase letters, digits, '-' and '.'"));
     }
     if id.starts_with('.') || id.contains("..") {
-        return Err(format!("app id {id:?} may not navigate the filesystem"));
+        return Err(format!("{what} {id:?} may not navigate the filesystem"));
     }
-    crate::manifest::check_reserved_id(id)
+    Ok(())
 }
 
 /// A bare host: no scheme, no path, no port, no wildcard. The service adds

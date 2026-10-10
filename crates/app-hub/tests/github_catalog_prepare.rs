@@ -163,3 +163,103 @@ fn cli_authenticates_current_legacy_catalog_and_emits_exact_review_receipt() {
     assert!(!refused.status.success());
     assert!(!envelope.exists());
 }
+
+// ---- shared components (App Hub ADR 0003) -----------------------------------
+
+use common::{component_entry, dependency, NOTES};
+use octosense_app_hub::ComponentEntry;
+
+fn base_with(components: Vec<ComponentEntry>) -> Catalog {
+    let mut base = Catalog::new(0, "2026-10-08", vec![]);
+    base.components = components;
+    base
+}
+
+fn next_of(base: &Catalog) -> Catalog {
+    let mut next = base.clone();
+    next.sequence += 1;
+    next.published = octosense_app_hub::today();
+    next
+}
+
+#[test]
+fn component_history_may_only_be_withdrawn() {
+    let f = Fixture::new();
+    let base = base_with(vec![component_entry("org.example.markdown", "1.0.0", NOTES)]);
+    let mut withdrawn = next_of(&base);
+    withdrawn.components[0].status = Status::Withdrawn("Renders scripts it should escape".into());
+    let bytes = prepare(&f, &base, &withdrawn).unwrap();
+    let prepared: Catalog = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(prepared.components[0].status, withdrawn.components[0].status);
+    assert_eq!(github_catalog::added_artifacts(&base, &prepared), Vec::<serde_json::Value>::new());
+
+    let mut changed = withdrawn.clone();
+    changed.components[0].admitted = "2026-10-01".into();
+    assert_eq!(
+        prepare(&f, &base, &changed).unwrap_err(),
+        "candidate changes existing component history or re-offers a withdrawn version"
+    );
+    let mut removed = withdrawn.clone();
+    removed.components.clear();
+    assert_eq!(prepare(&f, &base, &removed).unwrap_err(), "candidate reorders or drops component history; withdraw instead");
+    let mut revived = next_of(&withdrawn);
+    revived.components[0].status = Status::Offered;
+    assert!(prepare(&f, &withdrawn, &revived).is_err());
+    let mut empty_reason = next_of(&base);
+    empty_reason.components[0].status = Status::Withdrawn(" ".into());
+    assert!(prepare(&f, &base, &empty_reason).is_err());
+}
+
+#[test]
+fn a_new_component_needs_github_provenance_and_its_reviewed_files() {
+    let f = Fixture::new();
+    let base = base_with(vec![]);
+    let mut entry = component_entry("org.example.markdown", "1.0.0", NOTES);
+    let mut next = next_of(&base);
+    next.components.push(entry.clone());
+    // Its source first, as for an app.
+    assert_eq!(prepare(&f, &base, &next).unwrap_err(), "new component source must name an immutable commit");
+    entry.source.repository = "https://github.com/example/markdown".into();
+    entry.source.commit = "1".repeat(40);
+    next.components[0] = entry.clone();
+    assert_eq!(prepare(&f, &base, &next).unwrap_err(), "candidate component artifact is missing");
+    fs::create_dir_all(f.root.join("artifacts")).unwrap();
+    fs::write(f.root.join(&entry.artifact), NOTES).unwrap();
+    // Then the gate: App Hub publishes only GitHub-attested components.
+    let err = prepare(&f, &base, &next).unwrap_err();
+    assert!(err.starts_with("candidate component was refused by the gate:"), "{err}");
+    assert!(err.contains("[refused] publisher-signature: App Hub accepts only GitHub-attested component releases"), "{err}");
+    // An app's id is never a component's.
+    let mut clash = next_of(&base);
+    let app = f.entry();
+    clash.entries.push(app.clone());
+    let mut same_id = entry.clone();
+    same_id.component.id = app.manifest.id.clone();
+    same_id.artifact = format!("artifacts/{}-1.0.0.wasm", app.manifest.id);
+    clash.components.push(same_id);
+    assert_eq!(prepare(&f, &base, &clash).unwrap_err(), "example-app is both an app and a component in the catalog");
+}
+
+#[test]
+fn a_new_app_may_pin_a_component_its_catalog_offers() {
+    let mut f = Fixture::new();
+    let markdown = component_entry("org.example.markdown", "1.0.0", NOTES);
+    f.pin(&[dependency("markdown", &markdown)], &["storage"], &[]);
+    let base = base_with(vec![markdown.clone()]);
+    let mut c = candidate(&mut f);
+    c.components = base.components.clone();
+    let bytes = prepare(&f, &base, &c).unwrap();
+    let prepared: Catalog = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(prepared.components, std::slice::from_ref(&markdown));
+    assert_eq!(prepared.entries[0].manifest.components, [dependency("markdown", &markdown)]);
+
+    // The same app against a base without the component, or with it
+    // withdrawn, is refused by the gate.
+    let err = prepare(&f, &base_with(vec![]), &Catalog { components: vec![], ..c.clone() }).unwrap_err();
+    assert!(err.contains("component markdown (org.example.markdown 1.0.0) is not in the catalog"), "{err}");
+    let mut withdrawn = markdown.clone();
+    withdrawn.status = Status::Withdrawn("Renders scripts it should escape".into());
+    let base = base_with(vec![withdrawn.clone()]);
+    let err = prepare(&f, &base, &Catalog { components: vec![withdrawn], ..c.clone() }).unwrap_err();
+    assert!(err.contains("was withdrawn: Renders scripts it should escape"), "{err}");
+}
