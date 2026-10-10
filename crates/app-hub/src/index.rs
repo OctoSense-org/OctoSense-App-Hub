@@ -64,7 +64,7 @@ pub struct Entry {
     pub admitted: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Source {
     pub repository: String,
@@ -155,6 +155,12 @@ impl Entry {
             }
         }
         lines.extend(octosense_app_policy::agent_permission_lines(&self.manifest, &self.tools));
+        // Shared components run as the app's own functions, with its grants
+        // and nothing more; the line says whose reviewed code it runs.
+        if !self.manifest.components.is_empty() {
+            let pinned: Vec<String> = self.manifest.components.iter().map(|c| format!("{} {}", c.id, c.version)).collect();
+            lines.push(format!("Runs shared components App Hub reviewed, with only this app's permissions: {}", pinned.join(", ")));
+        }
         if lines.is_empty() {
             lines.push("Draw its screens, and nothing else".to_string());
         }
@@ -174,6 +180,13 @@ pub struct Catalog {
     /// is measured from here.
     pub published: String,
     pub entries: Vec<Entry>,
+    /// Shared components (App Hub ADR 0003): component versions apps pin,
+    /// beside the apps. Skipped when empty, so a catalog without them
+    /// serialises, signs and attests exactly as it did before the field
+    /// existed. A host that predates the field refuses a catalog that has
+    /// one, as it refuses any entry it cannot read.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub components: Vec<crate::components::ComponentEntry>,
     /// Hex ed25519 signature by the hub's working key.
     #[serde(default)]
     pub signature: Option<String>,
@@ -203,6 +216,7 @@ impl Catalog {
             sequence,
             published: published.to_string(),
             entries,
+            components: Vec::new(),
             signature: None,
             key: None,
         }
@@ -221,6 +235,11 @@ impl Catalog {
     /// The offered entry for an app id, if any.
     pub fn offered(&self, app_id: &str) -> Option<&Entry> {
         self.entries.iter().find(|e| e.app_id() == app_id && e.status.is_offered())
+    }
+
+    /// The entry for exactly this component version, offered or not.
+    pub fn component(&self, id: &str, version: &str) -> Option<&crate::components::ComponentEntry> {
+        crate::components::find(self, id, version)
     }
 }
 

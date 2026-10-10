@@ -99,6 +99,7 @@ engines are not bundled; see the [browser requirements](https://github.com/OctoS
 | `index/<app>-<version>.json` | One admitted entry per app version: its manifest, publisher, source and status. A maintainer exports it from the catalog after `hub publish`. |
 | `artifacts/<app>-<version>.bundle/` | App Hub's copy of the bundle, exactly the bytes that were reviewed. `hub publish` creates it. |
 | `artifacts/<app>-<version>.bundle.pack.json` | The same bundle as one file, which stores download. |
+| `artifacts/<component>-<version>.wasm` and `index/components/<component>-<version>.json` | A shared component version that apps pin: App Hub's copy of the reviewed file and its admitted entry ([ADR 0003](docs/adr/0003-shared-components.md)). None is published yet. |
 | `docs/FIRST-APP.md` | A first-app walkthrough for a card app or a script app: create, run, capture and check. |
 | `docs/SUBMITTING.md` | The submission's four stages, who runs each `hub` command, and every step from repository layout to publication. |
 | `docs/PUBLISHING.md` | The reference: gate rules; capabilities and who serves them; manifest, listing and tool fields; host services; `hub` commands; signing. |
@@ -106,7 +107,7 @@ engines are not bundled; see the [browser requirements](https://github.com/OctoS
 | `docs/HOST-API.md` | Declaring the host APIs an app needs, `runtime` discovery and what today's hosts implement. |
 | `docs/ICONS.md` | Canonical icon ownership, export constraints and visual review. |
 | `docs/DEVELOPMENT.md` | The guide map, delivery paths, `card-host` and its remote-control routes, and `card-studio`. |
-| `docs/adr/` | Architecture decisions: GitHub-admin catalog attestations ([ADR 0001](docs/adr/0001-github-attested-catalog.md)) and GitHub-attested publisher identity ([ADR 0002](docs/adr/0002-github-attested-publisher-identity.md)). |
+| `docs/adr/` | Architecture decisions: GitHub-admin catalog attestations ([ADR 0001](docs/adr/0001-github-attested-catalog.md)), GitHub-attested publisher identity ([ADR 0002](docs/adr/0002-github-attested-publisher-identity.md)) and shared components ([ADR 0003](docs/adr/0003-shared-components.md), proposed). |
 | `templates/app/` | A card app repository scaffold with metadata, an example icon and linked agent instructions. |
 | `crates/app-contract` | The app contract, `octosense-app-contract` ([OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)): the manifest, the policy an app gets, bundle integrity and running a bundle. Within `1.x` it only grows ([README](crates/app-contract/README.md)). Contract 1.10.0 is published on crates.io ([Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)). |
 | `crates/app-policy` | The signed manifest and listing, admission, and resolution into an isolate's settings and an agent session profile ([OctoSense Home ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0002-agentic-app-security-model.md)); an app's own agent (`tools.json`, `AGENT.md`, skills) loaded as an `AgentBundle`; the `tools.json` parser and checks that native modules' tool manifests share (`ToolManifest::load`). It also re-exports the app contract. |

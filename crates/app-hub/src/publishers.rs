@@ -160,7 +160,7 @@ pub fn verify_continuity(manifest: &AppManifest, registry: &dyn PublisherRegistr
     Ok(())
 }
 
-fn check_version_advance(next:&str,previous:Option<&str>)->Result<(),String>{
+pub(crate) fn check_version_advance(next:&str,previous:Option<&str>)->Result<(),String>{
     let next=semver::Version::parse(next).map_err(|_|"GitHub publisher version must be semantic version major.minor.patch")?;
     if let Some(previous)=previous {
         let previous=semver::Version::parse(previous).map_err(|_|"recorded GitHub publisher version is invalid")?;

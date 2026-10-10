@@ -212,15 +212,18 @@ fn check_bundle_for(
 
     // ---- contents -------------------------------------------------------
     let mut total = 0u64;
-    let mut modules = 0usize;
     let mut function_files = Vec::new();
+    // A system app's shared components, `components/<blake3>.wasm` (App Hub
+    // ADR 0003): checked with the manifest's `components` below.
+    let mut bundled_components = Vec::new();
     for file in list_files(bundle)? {
         let path = bundle.join(&file);
         let size = std::fs::metadata(&path).map_err(|e| e.to_string())?.len();
         total += size;
         let extension = file.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
-        if extension == "wasm" {
-            modules += 1;
+        if extension == "wasm" && file.starts_with(crate::components::BUNDLED_DIR) {
+            bundled_components.push(file.clone());
+        } else if extension == "wasm" {
             function_files.push(file.clone());
         } else if !ALLOWED_EXTENSIONS.contains(&extension.as_str()) {
             findings.push(Finding::refuse(
@@ -239,6 +242,7 @@ fn check_bundle_for(
     // run by the host's `wasm` service in a sandbox, under the `wasm`
     // capability a store shows the person.
     let declares_wasm = manifest.capabilities.iter().any(|c| c == "wasm");
+    let modules = function_files.len();
     if modules > 0 && !declares_wasm {
         findings.push(Finding::refuse(
             "functions",
@@ -251,7 +255,7 @@ fn check_bundle_for(
             format!("the bundle carries {modules} WebAssembly modules, over the {MAX_FUNCTION_MODULES} it may"),
         ));
     }
-    if declares_wasm && modules == 0 {
+    if declares_wasm && modules == 0 && manifest.components.is_empty() {
         findings.push(Finding::warn("functions", "the bundle declares the wasm capability but carries no fns/*.wasm"));
     }
     // A component (OctoSense ADR 0014) also reaches the clock, random numbers
@@ -312,6 +316,14 @@ fn check_bundle_for(
             format!("the manifest requires {} but fns/ holds no component; hosts without it refuse the app", crate::functions::COMPONENTS_FEATURE),
         ));
     }
+
+    // ---- shared components (App Hub ADR 0003) -----------------------------
+    // Each component the manifest names must resolve: from the catalog for a
+    // store app (the exact version, offered, hashing to the pinned digest),
+    // from the bundle's components/<blake3>.wasm for a system app. The app
+    // must grant what each imports, as for its own components, and
+    // reviewers see what each reaches.
+    shared_component_findings(bundle, &manifest, &bundled_components, previous, system_development, &mut findings);
 
     // ---- assets are local ----------------------------------------------
     // ADR 0002's prototype found a card with no network grant fetching nine
@@ -436,6 +448,257 @@ fn check_bundle_for(
 
     let admitted_manifest = serde_json::to_vec(&manifest).map_err(|e| e.to_string())?;
     Ok(GateReport { app_id: manifest.id, version: manifest.version, digest, findings, policy, resources, admitted_manifest })
+}
+
+/// The `components` findings for an app's shared components (App Hub ADR
+/// 0003): each resolved from `previous` (a store app) or from the bundle's
+/// `components/` (a system app), held to the app's grants, and told to
+/// reviewers.
+fn shared_component_findings(
+    bundle: &Path,
+    manifest: &AppManifest,
+    bundled: &[std::path::PathBuf],
+    previous: Option<&Catalog>,
+    system_development: bool,
+    findings: &mut Vec<Finding>,
+) {
+    use crate::functions::SHARED_COMPONENTS_FEATURE;
+    if manifest.requires.iter().any(|f| f == SHARED_COMPONENTS_FEATURE) && manifest.components.is_empty() {
+        findings.push(Finding::warn(
+            "components",
+            format!("the manifest requires {SHARED_COMPONENTS_FEATURE} but names no components; hosts without it refuse the app"),
+        ));
+    }
+    let named = |file: &std::path::Path| {
+        manifest.components.iter().any(|c| file == std::path::Path::new(crate::components::BUNDLED_DIR).join(format!("{}.wasm", c.blake3)))
+    };
+    for file in bundled {
+        let name = octosense_app_policy::portable_path(file).unwrap_or_else(|| file.to_string_lossy().replace('\\', "/"));
+        if !system_development {
+            findings.push(Finding::at(
+                "components",
+                name,
+                "components/ ships only in a system app's bundle; a store app's components come from the catalog",
+            ));
+        } else if !named(file) {
+            findings.push(Finding::at("components", name, "this file is not one of the manifest's components"));
+        }
+    }
+    for dependency in &manifest.components {
+        let info = if system_development {
+            let relative = format!("{}/{}.wasm", crate::components::BUNDLED_DIR, dependency.blake3);
+            let path = bundle.join(&relative);
+            if std::fs::symlink_metadata(&path).is_err() {
+                findings.push(Finding::refuse(
+                    "components",
+                    format!("component {} is not in the bundle: a system app ships it as {relative}", dependency.describe()),
+                ));
+                continue;
+            }
+            // Admission validated the file, its imports and its name.
+            match crate::admission::read_bounded(&path, MAX_BUNDLE_BYTES).and_then(|bytes| crate::functions::admissible_component(&bytes)) {
+                Ok(info) => info,
+                Err(_) => continue,
+            }
+        } else if let Some(catalog) = previous {
+            match crate::components::resolve(catalog, dependency) {
+                Ok(entry) => crate::components::info_of(&entry.component),
+                Err(e) => {
+                    findings.push(Finding::refuse("components", e));
+                    continue;
+                }
+            }
+        } else {
+            findings.push(Finding::warn(
+                "components",
+                format!(
+                    "component {} is not resolved: check with --catalog to see that it is offered, matches its digest and what it reaches",
+                    dependency.describe()
+                ),
+            ));
+            continue;
+        };
+        if let Some(missing) = crate::components::missing_grant(manifest, &info) {
+            findings.push(Finding::refuse("components", format!("component {} {missing}", dependency.describe())));
+        }
+        findings.push(Finding::warn("components", format!("component {} reaches {}", dependency.describe(), info.reach())));
+    }
+}
+
+/// The gate's report on a shared component release (App Hub ADR 0003).
+#[derive(Debug)]
+pub struct ComponentReport {
+    pub id: String,
+    pub version: String,
+    /// BLAKE3 of the file that was checked.
+    pub digest: String,
+    pub findings: Vec<Finding>,
+    /// The release this report checked, so an entry is made from exactly it.
+    pub(crate) admitted_release: Vec<u8>,
+}
+
+impl ComponentReport {
+    pub fn passed(&self) -> bool {
+        !self.findings.iter().any(|f| f.severity == Severity::Refusal)
+    }
+
+    /// One line per finding, as [`GateReport::render`] writes them.
+    pub fn render(&self) -> String {
+        let mut out = format!(
+            "{} {} (component {}) — {}\n",
+            self.id,
+            self.version,
+            self.digest,
+            if self.passed() { "PASSED" } else { "REFUSED" }
+        );
+        for finding in &self.findings {
+            let mark = match finding.severity {
+                Severity::Refusal => "refused",
+                Severity::Warning => "warning",
+            };
+            let path = finding.path.as_ref().map(|p| format!(" ({p})")).unwrap_or_default();
+            out.push_str(&format!("  [{mark}] {}{path}: {}\n", finding.check, finding.detail));
+        }
+        out
+    }
+
+    /// The report as `hub component-check --json` prints it.
+    pub fn json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "schema": 1, "stage": "structural", "kind": "component", "passed": self.passed(),
+            "id": self.id, "version": self.version, "digest": self.digest, "findings": self.findings,
+        })
+    }
+}
+
+/// Run the gate over a shared component release and its `.wasm` file.
+///
+/// The file is validated exactly as an app's own component is (allowed
+/// imports only) and must be the one the release describes: its BLAKE3
+/// digest, size, imports and exports. The release's own fields follow the
+/// component rules ([`crate::components::ComponentRelease::problems`]).
+/// `require_provenance` refuses a release without GitHub provenance, as
+/// App Hub does; a development check may turn it off. With `previous`, an
+/// authenticated catalog, the version must be new, the id no app's, and
+/// the publisher the one on record. Reviewers see what the component
+/// reaches in an app.
+pub fn check_component(
+    release: &crate::components::ComponentRelease,
+    wasm: &[u8],
+    require_provenance: bool,
+    previous: Option<&Catalog>,
+) -> Result<ComponentReport, String> {
+    let c = &release.component;
+    let digest = blake3::hash(wasm).to_hex().to_string();
+    let mut findings = Vec::new();
+    for problem in release.problems() {
+        findings.push(Finding::refuse("component", problem));
+    }
+    let file = format!("{}-{}.wasm", c.id, c.version);
+    if wasm.len() as u64 > crate::components::MAX_COMPONENT_BYTES {
+        findings.push(Finding::refuse(
+            "size",
+            format!("the component is {} bytes, over the {} ceiling", wasm.len(), crate::components::MAX_COMPONENT_BYTES),
+        ));
+    }
+    if digest != c.wasm_blake3 {
+        findings.push(Finding::refuse("digest", format!("the file hashes to {digest}, the release says {}", c.wasm_blake3)));
+    }
+    if wasm.len() as u64 != c.bytes {
+        findings.push(Finding::refuse("digest", format!("the file is {} bytes, the release says {}", wasm.len(), c.bytes)));
+    }
+    let admissible = if crate::functions::is_component(wasm) {
+        crate::functions::admissible_component(wasm)
+    } else {
+        Err("not a WebAssembly component".into())
+    };
+    match &admissible {
+        Err(e) => findings.push(Finding::at("contents-invalid", file.clone(), e.clone())),
+        Ok(info) => {
+            if info.imports != c.imports || info.exports != c.exports {
+                findings.push(Finding::refuse(
+                    "component",
+                    "the release's imports or exports are not the file's; prepare the release again from this file",
+                ));
+            }
+        }
+    }
+    match &c.integrity.github {
+        Some(github) => {
+            if let Err(e) = release.subject_bytes().and_then(|bytes| crate::github_publisher::verify_component(github, &bytes)) {
+                findings.push(Finding::refuse("publisher-signature", e));
+            }
+        }
+        None if require_provenance => {
+            findings.push(Finding::refuse("publisher-signature", "App Hub accepts only GitHub-attested component releases"));
+        }
+        None => findings.push(Finding::warn("publisher-signature", "unsigned: accountability rests on the hub alone")),
+    }
+    if let Some(catalog) = previous {
+        if catalog.entries.iter().any(|e| e.app_id() == c.id) {
+            findings.push(Finding::refuse("identity", format!("{} is an app's id in the catalog; a component needs an id of its own", c.id)));
+        }
+        let continuity = crate::components::ComponentPublishers::from_catalog(catalog).and_then(|registry| registry.authorize(release));
+        if let Err(e) = continuity {
+            let check = if e.contains("is already published") { "version" } else { "continuity" };
+            findings.push(Finding::refuse(check, e));
+        }
+    }
+    if let Ok(info) = &admissible {
+        // The gate checks each app that names this component against that
+        // app's own grants (`net` for wasi:http, `storage` for files).
+        findings.push(Finding::warn_at("functions", file, format!("{} {} is a component that reaches {}", c.id, c.version, info.reach())));
+    }
+    Ok(ComponentReport {
+        id: c.id.clone(),
+        version: c.version.clone(),
+        digest,
+        findings,
+        admitted_release: serde_json::to_vec(release).map_err(|e| e.to_string())?,
+    })
+}
+
+/// Build the catalog entry for a component release the gate passed.
+#[allow(clippy::too_many_arguments)]
+pub fn component_entry_for(
+    release: &crate::components::ComponentRelease,
+    wasm: &[u8],
+    report: &ComponentReport,
+    publisher: &str,
+    repository: &str,
+    commit: &str,
+    admitted: &str,
+) -> Result<crate::components::ComponentEntry, String> {
+    if !report.passed() {
+        return Err("cannot make an entry from a refused gate report".into());
+    }
+    if serde_json::to_vec(release).map_err(|e| e.to_string())? != report.admitted_release
+        || blake3::hash(wasm).to_hex().as_str() != report.digest
+    {
+        return Err("the release or its file changed after the gate; check it again".into());
+    }
+    let c = &release.component;
+    match &c.integrity.github {
+        Some(github) => {
+            if publisher != format!("github:{}", github.repository_id) {
+                return Err("GitHub publisher must be github: followed by its authenticated repository id".into());
+            }
+            if repository != github.repository_url() || commit != github.commit {
+                return Err("entry source does not match authenticated publisher repository and commit".into());
+            }
+        }
+        None if publisher.is_empty() => return Err("an entry needs a publisher".into()),
+        None => {}
+    }
+    Ok(crate::components::ComponentEntry {
+        component: c.clone(),
+        listing: release.listing.clone(),
+        artifact: crate::components::artifact_path(&c.id, &c.version),
+        publisher: publisher.to_string(),
+        source: crate::index::Source { repository: repository.to_string(), commit: commit.to_string() },
+        status: crate::index::Status::Offered,
+        admitted: admitted.to_string(),
+    })
 }
 
 /// Every file in the bundle except the manifest, relative to its root.

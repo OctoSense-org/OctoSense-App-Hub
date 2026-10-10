@@ -16,6 +16,19 @@ that holds 1.2.0.
   the `wasm` capability. A host that does not know it refuses the app instead
   of failing when the app first calls its functions. Existing manifests and
   their signing bytes do not change.
+- Add the optional `components` manifest field and the
+  `wasm-shared-components-v1` feature (App Hub ADR 0003). An app pins each
+  shared WebAssembly component from App Hub's catalog by its name for it
+  (`as`), the component's `id`, one exact `version` and the file's `blake3`
+  digest. `parse` refuses the field without the feature, the feature without
+  the `wasm` capability, more than 8 entries (`MAX_COMPONENTS`), a name that
+  is not `[a-z][a-z0-9_]{0,31}` or is used twice, a version that is not one
+  exact semantic version, a digest that is not 64 lowercase hex characters,
+  and an id that breaks the app id rules or starts with `os.`. New public
+  items: `ComponentDependency`, `MAX_COMPONENTS`, `check_component_id` and
+  `is_exact_version`. The field is skipped when empty, so existing manifests
+  and their signing bytes do not change. A host that does not know the
+  feature refuses the app.
 
 ## 1.10.0 — 2026-10-09
 

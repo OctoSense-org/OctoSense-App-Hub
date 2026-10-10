@@ -16,6 +16,7 @@
 pub mod admission;
 pub mod advisories;
 pub mod client;
+pub mod components;
 pub mod functions;
 pub mod gate;
 pub mod github_catalog;
@@ -36,8 +37,9 @@ pub use client::{
 pub use pack::{pack_dir, unpack, Pack};
 pub use remote::{today, Remote};
 pub use scan::{packet, scan, Packet, Route, Verdict};
-pub use gate::{check_bundle, entry_for, Finding, GateReport, Severity};
+pub use gate::{check_bundle, check_component, component_entry_for, entry_for, ComponentReport, Finding, GateReport, Severity};
 pub use index::{Catalog, Entry, Source, Status, WorkingKey, CATALOG_SCHEMA};
+pub use components::{ComponentEntry, ComponentListing, ComponentManifest, ComponentRelease, Resolved};
 pub use publishers::{verify_continuity, CatalogPublishers, PublisherBinding, PublisherRegistry};
 pub use signing::{sign_manifest, verify_catalog, HubKey, PublisherKeys};
 

@@ -437,6 +437,24 @@ fn check_svg_css(css: &str) -> Result<(), String> {
 /// WASI packages a host scopes to the app ([`crate::functions`]). Whether
 /// the manifest may carry a component is the gate's check.
 fn validate_wasm(path: &Path, name: &str) -> Result<(), String> {
+    // A system app ships its shared components (App Hub ADR 0003) at
+    // components/<blake3>.wasm, named by their digest. Whether a bundle may
+    // carry them, and whether the manifest names each, is the gate's check.
+    if let Some(stem) = name.strip_prefix("components/").and_then(|rest| rest.strip_suffix(".wasm")) {
+        if stem.len() != 64 || !stem.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+            return Err("a bundled shared component is named components/<blake3>.wasm, its 64-character lowercase BLAKE3 digest".into());
+        }
+        let bytes = read_bounded(path, MAX_BUNDLE_BYTES)?;
+        if !crate::functions::is_component(&bytes) {
+            return Err("a shared component must be a WebAssembly component".into());
+        }
+        crate::functions::admissible_component(&bytes)?;
+        let digest = blake3::hash(&bytes).to_hex().to_string();
+        if digest != stem {
+            return Err(format!("the file hashes to {digest}, not the digest its name gives"));
+        }
+        return Ok(());
+    }
     let stem = name
         .strip_prefix("fns/")
         .and_then(|rest| rest.strip_suffix(".wasm"))
@@ -454,13 +472,7 @@ fn validate_wasm(path: &Path, name: &str) -> Result<(), String> {
     if !crate::functions::is_component(&bytes) {
         return Err("not a WebAssembly core module (magic and version 1) or component".into());
     }
-    let info = crate::functions::inspect_component(&bytes)?;
-    if let Some(import) = info.refused_imports().first() {
-        return Err(format!(
-            "the component imports {import}; a component may import only {}",
-            crate::functions::allowed_import_packages()
-        ));
-    }
+    crate::functions::admissible_component(&bytes)?;
     Ok(())
 }
 

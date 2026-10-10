@@ -28,6 +28,34 @@ pub fn verify(identity: &GithubPublisher, payload: &[u8]) -> Result<(), String> 
     }
     semver::Version::parse(&manifest.version)
         .map_err(|_| "GitHub publisher version must be semantic version major.minor.patch")?;
+    verify_attestation(identity, payload, PUBLISHER_SUBJECT)
+}
+
+/// A shared component release's GitHub provenance (App Hub ADR 0003): the
+/// same proof and identity rules as an app's, over the canonical release
+/// ([`crate::components::ComponentRelease::subject_bytes`]) named
+/// [`crate::components::COMPONENT_SUBJECT`]. The release carries the file's
+/// digest, so the proof binds the `.wasm` file.
+pub fn verify_component(identity: &GithubPublisher, payload: &[u8]) -> Result<(), String> {
+    if payload.len() as u64 > crate::components::MAX_RELEASE_BYTES {
+        return Err("component subject exceeds the release limit".into());
+    }
+    let release: crate::components::ComponentRelease =
+        serde_json::from_slice(payload).map_err(|_| "component subject is not a component release")?;
+    let mut expected = identity.clone();
+    expected.attestation = None;
+    if release.component.integrity.github.as_ref() != Some(&expected) || release.subject_bytes()?.as_slice() != payload {
+        return Err("component subject must be the canonical release with this GitHub identity".into());
+    }
+    identity.validate(&release.component.version)?;
+    semver::Version::parse(&release.component.version)
+        .map_err(|_| "GitHub publisher version must be semantic version major.minor.patch")?;
+    verify_attestation(identity, payload, crate::components::COMPONENT_SUBJECT)
+}
+
+/// The Sigstore proof in `identity.attestation` over exactly `payload`,
+/// named `subject`, from the identity's public repository, tag and commit.
+fn verify_attestation(identity: &GithubPublisher, payload: &[u8], subject: &str) -> Result<(), String> {
     let proof = serde_json::to_vec(
         identity
             .attestation
@@ -55,7 +83,7 @@ pub fn verify(identity: &GithubPublisher, payload: &[u8]) -> Result<(), String> 
             .ok_or("missing publisher certificate")?
             .ci_claims,
     )?;
-    verify_subject(identity, &bundle, &hex::encode(Sha256::digest(payload)))
+    verify_subject(identity, &bundle, subject, &hex::encode(Sha256::digest(payload)))
 }
 
 fn authorize_claims(identity: &GithubPublisher, claims: &FulcioCiClaims) -> Result<(), String> {
@@ -136,18 +164,19 @@ fn authorize_claims(identity: &GithubPublisher, claims: &FulcioCiClaims) -> Resu
     Ok(())
 }
 
-fn verify_subject(identity: &GithubPublisher, bundle: &Bundle, digest: &str) -> Result<(), String> {
+fn verify_subject(identity: &GithubPublisher, bundle: &Bundle, subject: &str, digest: &str) -> Result<(), String> {
     let SignatureContent::DsseEnvelope(envelope) = &bundle.content else {
         return Err("publisher requires an in-toto attestation".into());
     };
     let statement: serde_json::Value = serde_json::from_slice(envelope.payload.as_bytes())
         .map_err(|_| "invalid publisher statement")?;
-    authorize_statement(identity, &statement, digest)
+    authorize_statement(identity, &statement, subject, digest)
 }
 
 fn authorize_statement(
     identity: &GithubPublisher,
     statement: &serde_json::Value,
+    subject: &str,
     digest: &str,
 ) -> Result<(), String> {
     if statement.get("_type").and_then(|v| v.as_str()) != Some("https://in-toto.io/Statement/v1")
@@ -161,13 +190,14 @@ fn authorize_statement(
         .and_then(|v| v.as_array())
         .ok_or("missing publisher subject")?;
     if subjects.len() != 1
-        || subjects[0].get("name").and_then(|v| v.as_str()) != Some(PUBLISHER_SUBJECT)
+        || subjects[0].get("name").and_then(|v| v.as_str()) != Some(subject)
         || subjects[0]
             .pointer("/digest/sha256")
             .and_then(|v| v.as_str())
             != Some(digest)
     {
-        return Err("publisher proof does not name the exact canonical manifest".into());
+        let what = if subject == PUBLISHER_SUBJECT { "manifest" } else { "component release" };
+        return Err(format!("publisher proof does not name the exact canonical {what}"));
     }
     let repository = identity.repository_url();
     let workflow = identity.workflow_uri();
@@ -314,7 +344,9 @@ mod tests {
                 "internalParameters":{"github":{"event_name":"push","repository_id":g.repository_id,"repository_owner_id":g.owner_id,"runner_environment":"github-hosted"}},
                 "resolvedDependencies":[{"uri":format!("git+{}@refs/tags/{}",g.repository_url(),g.tag),"digest":{"gitCommit":g.commit}}]
             }}});
-        authorize_statement(&g, &statement, &digest).unwrap();
+        authorize_statement(&g, &statement, PUBLISHER_SUBJECT, &digest).unwrap();
+        // The same proof never stands for a component release, or the reverse.
+        assert!(authorize_statement(&g, &statement, crate::components::COMPONENT_SUBJECT, &digest).is_err());
         for pointer in [
             "/subject/0/digest/sha256",
             "/subject/0/name",
@@ -326,11 +358,45 @@ mod tests {
             let mut changed = statement.clone();
             *changed.pointer_mut(pointer).unwrap() = json!("wrong");
             assert!(
-                authorize_statement(&g, &changed, &digest).is_err(),
+                authorize_statement(&g, &changed, PUBLISHER_SUBJECT, &digest).is_err(),
                 "{pointer}"
             );
         }
     }
+    #[test]
+    fn an_unrelated_or_missing_proof_cannot_authenticate_a_component_release() {
+        const NOTES: &[u8] = include_bytes!("../tests/fixtures/notes.component.wasm");
+        let draft: crate::components::ComponentDraft = serde_json::from_value(json!({
+            "component": {"schema": 1, "id": "example.markdown", "version": "1.2.3", "name": "Markdown",
+                "publisher": {"name": "Example", "support": "https://example.test/s", "privacy_policy_url": "https://example.test/p"},
+                "license": "MIT"},
+            "listing": {"description": "Renders Markdown."}
+        }))
+        .unwrap();
+        let mut release = crate::components::ComponentRelease::from_draft(draft, NOTES).unwrap();
+        let mut g = identity();
+        release.component.integrity.github = Some(g.clone());
+        let subject = release.subject_bytes().unwrap();
+        // No proof attached.
+        assert_eq!(verify_component(&g, &subject).unwrap_err(), "publisher attestation is missing");
+        // A real public proof for other bytes.
+        g.attestation = Some(serde_json::from_str(include_str!("../tests/fixtures/github-catalog/cosign-v3-blob.sigstore.json")).unwrap());
+        assert!(verify_component(&g, &subject).is_err());
+        // Not the canonical release, or another identity.
+        assert_eq!(
+            verify_component(&g, &serde_json::to_vec_pretty(&release).unwrap()).unwrap_err(),
+            "component subject must be the canonical release with this GitHub identity"
+        );
+        let mut other = identity();
+        other.repository_id = "999".into();
+        assert!(verify_component(&other, &subject).unwrap_err().contains("canonical release with this GitHub identity"));
+        // The tag must be v<version>.
+        let mut retagged = release.clone();
+        retagged.component.version = "1.2.4".into();
+        let bytes = retagged.subject_bytes().unwrap();
+        assert!(verify_component(&g, &bytes).unwrap_err().contains("publisher tag must be v followed by the exact manifest version"));
+    }
+
     #[test]
     fn incomplete_or_unrelated_public_proof_cannot_authenticate_a_manifest() {
         let mut g = identity();

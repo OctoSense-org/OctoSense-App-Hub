@@ -107,9 +107,9 @@ pub use assets::{rewrite_assets, AssetServer, StaticAssets};
 pub use bundle::{digest_dir, portable_path, MANIFEST_FILE};
 pub use entry::{script_source, ASSETS_PLACEHOLDER, SCRIPT_ENTRY};
 pub use manifest::{
-    check_reserved_id, parse, short_id, AgentSpec, AgentWorkspace, AppManifest, Compute, GithubPublisher, Integrity, ModelNeed, ModelSpec,
-    ModelTier, Network, ProfileMode, Signature, Storage, TaskModel, Triggers, KNOWN_CAPABILITIES, KNOWN_FEATURES,
-    KNOWN_MODEL_NEEDS, RESERVED_HOST_FILE_IDS, RESERVED_NAMES, SCHEMA, SCHEMA_MINOR,
+    check_component_id, check_reserved_id, is_exact_version, parse, short_id, AgentSpec, AgentWorkspace, AppManifest, ComponentDependency,
+    Compute, GithubPublisher, Integrity, ModelNeed, ModelSpec, ModelTier, Network, ProfileMode, Signature, Storage, TaskModel, Triggers,
+    KNOWN_CAPABILITIES, KNOWN_FEATURES, KNOWN_MODEL_NEEDS, MAX_COMPONENTS, RESERVED_HOST_FILE_IDS, RESERVED_NAMES, SCHEMA, SCHEMA_MINOR,
 };
 pub use policy::{resolve, AppPolicy, HostLimits, StorageGrant};
 pub use research::ResearchScope;

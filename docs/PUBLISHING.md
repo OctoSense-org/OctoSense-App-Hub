@@ -119,7 +119,8 @@ admission. A warning does not.
 | `publisher-signature` | The declared GitHub proof fails verification, even with `--allow-unsigned`; the manifest is unsigned and `--allow-unsigned` is absent; or a legacy Ed25519 signature fails verification or names an unknown key (`publisher key "<id>" is not registered with this hub`). | The manifest is unsigned and `--allow-unsigned` is given. |
 | `identity` | The id starts with `os.`; the id, or its last segment, is a reserved name ([Ids and reserved names](#ids-and-reserved-names)). | |
 | `contents` | A file's extension is not one of `.card`, `.json`, `.l0`, `.octoscript`, `.splash`, `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.ttf`, `.otf`, `.txt` or `.md`, and it is not a function module (`.wasm`, see `functions`). Files with no extension, such as `.DS_Store` and `LICENSE`, are refused too. | |
-| `functions` | The bundle carries a `.wasm` file without the `wasm` capability, or more than 8. A file that is not at `fns/<name>.wasm` (the name `[a-z0-9_-]`, at most 64 characters), or is neither a WebAssembly core module (the 8-byte header of version 1) nor a valid component, is refused as `contents-invalid`, as is a component that imports anything outside `wasi:cli`, `wasi:clocks`, `wasi:filesystem`, `wasi:http`, `wasi:io`, `wasi:random` and `octosense:host`. A component is refused here when the manifest does not require `wasm-components-v1`, when it imports `wasi:filesystem` without the `storage` capability, or when it imports `wasi:http` without the `net` capability ([WebAssembly components](#webassembly-components)). The gate checks nothing else inside a core module; the host checks its imports and exports when it loads the module. | The app declares `wasm` but carries no `fns/*.wasm`. The manifest requires `wasm-components-v1` but `fns/` holds no component. Each admitted component gets a line saying what it reaches. |
+| `functions` | The bundle carries a `.wasm` file in `fns/` without the `wasm` capability, or more than 8 there. A `.wasm` file that is not at `fns/<name>.wasm` (the name `[a-z0-9_-]`, at most 64 characters) or `components/<blake3>.wasm` (named by its own digest, see `components`), or is neither a WebAssembly core module (the 8-byte header of version 1) nor a valid component, is refused as `contents-invalid`, as is a component that imports anything outside `wasi:cli`, `wasi:clocks`, `wasi:filesystem`, `wasi:http`, `wasi:io`, `wasi:random` and `octosense:host`. A component is refused here when the manifest does not require `wasm-components-v1`, when it imports `wasi:filesystem` without the `storage` capability, or when it imports `wasi:http` without the `net` capability ([WebAssembly components](#webassembly-components)). The gate checks nothing else inside a core module; the host checks its imports and exports when it loads the module. | The app declares `wasm` but carries no `fns/*.wasm` and names no shared component. The manifest requires `wasm-components-v1` but `fns/` holds no component. Each admitted component gets a line saying what it reaches. |
+| `components` | A shared component the manifest names is missing from the `--catalog` catalog, withdrawn there or has another digest, or the app does not grant what it imports. A store app's bundle carries a `.wasm` file in `components/`. A system app's bundle (`--system-app`) lacks `components/<blake3>.wasm` for a component it pins, or carries one it does not pin ([Shared components](#shared-components)). | Each resolved component gets a line saying what it reaches. Without `--catalog`, each component is reported as not resolved. The manifest requires `wasm-shared-components-v1` but names no components. |
 | `contents-invalid` (text and images) | A text file (`.splash`, `.card`, `.json`, `.l0`, `.octoscript`, `.txt` or `.md`) is over 1 MiB or not UTF-8; JSON does not parse; a PNG, JPEG or WebP does not decode or is over 4096 px a side; the listing icon is not square, or is a bitmap over 1 MiB or 1024 px a side. | |
 | `contents-invalid` (SVG) | An SVG does not parse; lacks a numeric `width` and `height` or a `viewBox`; is over 4096 px a side; or holds a script, a `foreignObject` or an `on…` handler. Its styling (a `style` attribute or a `<style>` block) imports a stylesheet, uses an escape, uses a comment or points `url()` anywhere but a `#fragment` in the same file. | |
 | `entry` | The bundle has neither `main.splash` nor `page.card`; `page.card` is not valid L0; `page.data.json` is not JSON; neither `kit/native/<theme>/kit.json` nor every OctoScript kit module the card needs is in the bundle. | |
@@ -339,6 +340,282 @@ The [`host_method` rules](#map-a-tool-to-a-shared-service-host_method) for a
 their input. They apply to components unchanged for now, although a component
 with `storage` can read the app's files.
 
+## Shared components
+
+A **shared component** is a WebAssembly component that App Hub publishes in
+its catalog on its own, so that several apps can use it, as npm packages are
+shared. Unlike an npm dependency, it is pinned exactly: an app names one
+exact version and the file's BLAKE3 digest, so an installed app's code never
+changes without an app update
+([ADR 0003](adr/0003-shared-components.md), phase 4 of
+[OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436)).
+App Hub reviews a shared component like an app and validates it like an
+app's own component ([WebAssembly components](#webassembly-components)).
+It reaches only what the app that uses it may: each app runs its own
+instance, under its own grants.
+
+No OctoSense build loads shared components yet, and no catalog offers one.
+Hosts built before shared components, OctoSense desktop RC1 and RC2 among
+them, refuse a whole catalog that holds a component or an app that pins one,
+so App Hub publishes neither until a compatible host release ships.
+
+### Use a shared component
+
+Name each component in the manifest's `components`, and require
+`wasm-shared-components-v1`, which needs the `wasm` capability:
+
+```json
+"capabilities": ["wasm", "storage"],
+"requires": ["wasm-shared-components-v1"],
+"components": [
+  {
+    "as": "markdown",
+    "id": "org.example.markdown",
+    "version": "1.0.0",
+    "blake3": "c30d6e3125ff31676cad3c06735186d82cd0c017802afd344e3d2db876ff976c"
+  }
+]
+```
+
+| Field | Rule |
+| --- | --- |
+| `as` | The app's name for the component: `[a-z][a-z0-9_]{0,31}`, unique in the manifest. |
+| `id` | The component's id in the catalog. |
+| `version` | One exact semantic version, such as `1.0.0` or `1.0.0-rc.1`. A range such as `^1.0.0` is refused. |
+| `blake3` | The component file's BLAKE3 digest, 64 lowercase hex characters: the catalog entry's `wasm_blake3`. |
+
+An app names at most 8 components. The manifest parser refuses `components`
+without the feature (`components requires wasm-shared-components-v1`), the
+feature without `wasm` (`wasm-shared-components-v1 requires the wasm
+capability`), and an entry that breaks a rule above. A host that does not know
+the feature refuses the app. An app that uses only shared components needs no
+`fns/`.
+
+With `--catalog`, the gate resolves each component in that catalog. The
+`components` check refuses the app when a component is missing (`is not in
+the catalog`), withdrawn (`was withdrawn: <reason>`) or has another digest
+(`pins blake3 …, but the catalog's file hashes to …`). It also refuses the app
+when the app does not grant what the component imports: `storage` for
+`wasi:filesystem`, and `net` for `wasi:http`. `octosense:host` needs no grant of its own. Each component then
+gets a line that says what it reaches in this app. Without `--catalog`, the
+gate warns that it cannot resolve the components.
+
+This rehearsal ran on a local development hub (see
+[Rehearse with a development hub](#rehearse-with-a-development-hub)) whose
+catalog offers `org.example.markdown` 1.0.0, the notes component from App
+Hub's tests (`crates/app-hub/tests/fixtures/notes.component.wasm`). The app
+`writer` pins it and is granted `wasm` and `storage`:
+
+```console
+$ hub check writer --allow-unsigned --catalog dev-catalog.json --anchor "$(cat anchor.pub)"
+org.example.writer 1.0.0 — PASSED
+  [warning] publisher-signature: unsigned: accountability rests on the hub alone
+  [warning] components: component markdown (org.example.markdown 1.0.0) reaches the clock, random numbers and files in its app folder, but no network or other app
+  grants: capabilities {"storage", "wasm"}, hosts {}, storage 16777216 bytes, agent none
+```
+
+Without `storage`, the same app is refused:
+
+```text
+  [refused] components: component markdown (org.example.markdown 1.0.0) imports wasi:filesystem, the app's own files, which needs the storage capability
+```
+
+Without `--catalog`:
+
+```text
+  [warning] components: component markdown (org.example.markdown 1.0.0) is not resolved: check with --catalog to see that it is offered, matches its digest and what it reaches
+```
+
+A store app's bundle never carries a component: the gate refuses a `.wasm`
+file in `components/`, because the store fetches the components from the
+catalog. A
+shipped system app has no catalog. It carries each component it pins as
+`components/<blake3>.wasm` in its bundle. `hub check --system-app` checks
+that each of those files is a valid component with allowed imports, named by
+its own digest, whose imports the app grants. It refuses a file that the
+manifest does not pin.
+
+The store's permission lines for such an app add `Runs shared components App
+Hub reviewed, with only this app's permissions: org.example.markdown 1.0.0`.
+
+### Publish a shared component
+
+A component release is two files: the component, built with
+`cargo build --target wasm32-wasip2`, and `<id>-<version>.component.json`,
+which describes it. You write a draft with the fields in the first table
+below; `hub component-prepare` derives the rest from the file:
+
+```json
+{
+  "component": {
+    "schema": 1,
+    "id": "org.example.markdown",
+    "version": "1.0.0",
+    "name": "Markdown",
+    "publisher": {
+      "name": "Example Org",
+      "support": "https://example.org/support",
+      "privacy_policy_url": "https://example.org/privacy"
+    },
+    "license": "MIT OR Apache-2.0"
+  },
+  "listing": {
+    "subtitle": "Markdown to HTML, with word counts",
+    "description": "Renders CommonMark to HTML with pulldown-cmark and reports words, lines and headings.",
+    "keywords": ["markdown", "html"]
+  }
+}
+```
+
+| You write | Rule |
+| --- | --- |
+| `component.schema` | `1`. |
+| `component.id` | The rules for an app id ([Ids and reserved names](#ids-and-reserved-names)); never `os.`, and not the id of an app in the catalog. |
+| `component.version` | One exact semantic version. Every release is a new version, higher than the last one published. |
+| `component.name` | 1 to 64 characters. |
+| `component.publisher` | As a listing's `publisher` ([The listing](#the-listing)). |
+| `component.license` | An SPDX licence expression, such as `MIT OR Apache-2.0`. |
+| `listing` | `subtitle` (at most 80 characters), `description` (required, at most 4000) and `keywords` (at most 10). |
+
+| `hub component-prepare` writes | From |
+| --- | --- |
+| `component.wasm_blake3`, `component.bytes` | The file's BLAKE3 digest and size. |
+| `component.imports`, `component.exports` | The file, as `hub component-info` lists them. |
+| `component.integrity.github` | The GitHub identity flags, as for an app ([GitHub publisher provenance](#github-publisher-provenance)). Without them, the release is an unsigned development release. |
+
+```console
+$ hub component-prepare markdown.wasm --draft component.json --out markdown.component.json
+{"bytes":310601,"id":"org.example.markdown","schema":1,"status":"unsigned-development-release","version":"1.0.0","wasm_blake3":"c30d6e3125ff31676cad3c06735186d82cd0c017802afd344e3d2db876ff976c"}
+```
+
+A release's GitHub workflow, in a public repository and on a
+`v<version>` tag push as for an app, runs:
+
+```sh
+hub component-prepare target/wasm32-wasip2/release/markdown.wasm --draft component.json \
+  --repository OWNER/REPO --repository-id REPOSITORY_ID --owner-id OWNER_ID \
+  --workflow .github/workflows/publish-component.yml \
+  --tag v1.0.0 --commit IMMUTABLE_GIT_SHA \
+  --out build/octosense-component.json
+# actions/attest attests exactly build/octosense-component.json.
+hub component-pack build/octosense-component.json \
+  --wasm target/wasm32-wasip2/release/markdown.wasm \
+  --attestation build/component-attestation.sigstore.json --out build/release
+```
+
+`build/octosense-component.json` is the release in canonical JSON, without
+its proof: the bytes the attestation covers. It carries the file's digest, so
+the proof binds the file. Prepared with an example identity:
+
+```console
+$ hub component-prepare markdown.wasm --draft component.json --repository example-org/markdown --repository-id 123456789 --owner-id 987654321 --workflow .github/workflows/publish-component.yml --tag v1.0.0 --commit 0123456789abcdef0123456789abcdef01234567 --out build/octosense-component.json
+{"bytes":310601,"id":"org.example.markdown","schema":1,"sha256":"ae2ff83c70842a4f8e2aa20de538a1ba94f3de76a85a5152e1bf7e716c0c5c34","status":"awaiting-github-attestation","subject":"octosense-component.json","version":"1.0.0","wasm_blake3":"c30d6e3125ff31676cad3c06735186d82cd0c017802afd344e3d2db876ff976c"}
+```
+
+`hub component-pack` attaches the proof, runs the gate and writes
+`<id>-<version>.component.json` and `<id>-<version>.wasm` into a new
+directory. Without a proof that verifies, it writes nothing:
+
+```console
+$ hub component-pack build/octosense-component.json --wasm markdown.wasm --out release
+org.example.markdown 1.0.0 (component c30d6e3125ff31676cad3c06735186d82cd0c017802afd344e3d2db876ff976c) — REFUSED
+  [refused] publisher-signature: publisher attestation is missing
+  [warning] functions (org.example.markdown-1.0.0.wasm): org.example.markdown 1.0.0 is a component that reaches the clock, random numbers and files in its app folder, but no network or other app
+hub: the component was refused
+```
+
+**Unverified:** no workflow has attested a component release yet, and App
+Flow has no workflow template for one.
+
+Submit a component as you submit an app
+([Submit an app to the App Hub](SUBMITTING.md)): open an issue with the
+repository, tag, commit and the two release files. Reviewers run
+`hub component-check`, the gate for a release and its file:
+
+```console
+$ hub component-check markdown.component.json --wasm markdown.wasm
+org.example.markdown 1.0.0 (component c30d6e3125ff31676cad3c06735186d82cd0c017802afd344e3d2db876ff976c) — REFUSED
+  [refused] publisher-signature: App Hub accepts only GitHub-attested component releases
+  [warning] functions (org.example.markdown-1.0.0.wasm): org.example.markdown 1.0.0 is a component that reaches the clock, random numbers and files in its app folder, but no network or other app
+hub: the component was refused
+```
+
+| Check | Refused when |
+| --- | --- |
+| `component` | A field in the tables above breaks its rule, or the release's imports or exports are not the file's. |
+| `digest` | The file's BLAKE3 digest or size is not the release's. |
+| `size` | The file is over 8 MiB. |
+| `contents-invalid` | The file is not a valid component, or imports anything outside `wasi:cli`, `wasi:clocks`, `wasi:filesystem`, `wasi:http`, `wasi:io`, `wasi:random` and `octosense:host`. |
+| `publisher-signature` | The release has no GitHub provenance (a warning with `--allow-unsigned`), or its proof fails. |
+| `identity` (with `--catalog`) | An app in the catalog has the component's id. |
+| `version` (with `--catalog`) | The catalog already holds this version. |
+| `continuity` (with `--catalog`) | The repository, owner or workflow differs from the earlier versions', the version is not higher than the newest, or the history disagrees with itself. |
+
+The `functions` warning tells reviewers what the component reaches in any app
+that pins it; each app's own check then holds the component to that app's
+grants.
+
+An App Hub admin turns an approved release into a catalog candidate with
+`hub component-entry <release.json> --wasm <file.wasm> --catalog <authenticated
+catalog> --out <index.json>`, which requires GitHub provenance. The candidate
+adds `artifacts/<id>-<version>.wasm` and
+`index/components/<id>-<version>.json`
+([GitHub-admin publication](GITHUB-PUBLISHING.md#prepare-the-reviewed-candidate)).
+A withdrawal marks the entry withdrawn, with a reason, as for an app.
+
+### Rehearse with a development hub
+
+`hub component-publish` adds a component to a legacy-signed catalog, for a
+local rehearsal with throwaway keys. App Hub's own catalog is published only
+through the GitHub-admin flow:
+
+```console
+$ hub keygen anchor.key > anchor.pub
+$ hub keygen working.key > working.pub
+$ hub certify --anchor anchor.key --working working.key > working.cert
+$ hub component-publish markdown.component.json --wasm markdown.wasm --catalog dev-catalog.json --key working.key --anchor-cert "$(cat working.cert)" --publisher dev:example-org --out dev-hub --allow-unsigned
+org.example.markdown 1.0.0 (component c30d6e3125ff31676cad3c06735186d82cd0c017802afd344e3d2db876ff976c) — PASSED
+  [warning] publisher-signature: unsigned: accountability rests on the hub alone
+  [warning] functions (org.example.markdown-1.0.0.wasm): org.example.markdown 1.0.0 is a component that reaches the clock, random numbers and files in its app folder, but no network or other app
+published component org.example.markdown 1.0.0 (catalog sequence 1)
+```
+
+`hub withdraw` withdraws a component as it withdraws an app, and an app that
+pins it is then refused:
+
+```console
+$ hub withdraw org.example.markdown --version 1.0.0 --reason "Renders raw HTML it should escape" --catalog dev-catalog.json --key working.key --anchor-cert "$(cat working.cert)"
+withdrew org.example.markdown 1.0.0: Renders raw HTML it should escape (catalog sequence 2)
+$ hub check writer --allow-unsigned --catalog dev-catalog.json --anchor "$(cat anchor.pub)"
+org.example.writer 1.0.0 — REFUSED
+  [warning] publisher-signature: unsigned: accountability rests on the hub alone
+  [refused] components: component markdown (org.example.markdown 1.0.0) was withdrawn: Renders raw HTML it should escape
+  grants: capabilities {"storage", "wasm"}, hosts {}, storage 16777216 bytes, agent none
+hub: the bundle was refused
+```
+
+### On the device
+
+- **Install and update.** Before it installs or updates the app, the store
+  resolves each component from the same verified catalog. It fetches the
+  component's `artifacts/<id>-<version>.wasm` from the Hub, as it fetches the
+  app's bundle, and checks its size, digest and validity. It keeps each digest
+  once, read-only, at `<apps root>/.components/<blake3>.wasm`; an app is never
+  installed without its components.
+- **Launch.** Each launch checks the app's components with its bundle. A
+  missing, changed or withdrawn component stops the app until the person
+  updates or reinstalls it.
+- **Uninstall.** Removing an app through the store (`Store::remove`), and
+  each install or update through it, removes the components that no
+  installed app pins any more.
+- **Hosts.** A host's `wasm` service loads an app's components with
+  `octosense_appstore::components::resolved(app_id)`, which returns each
+  component's name, id, version, digest and verified file. It verifies every
+  file on every call. A system app's components come from its own bundle.
+
+**Unverified:** no OctoSense build loads shared components yet, and no phone
+or desktop host has installed an app that pins one.
+
 ## The manifest
 
 ```json
@@ -370,7 +647,8 @@ with `storage` can read the app's files.
 | `compute` | `instruction_budget`, `memory_bytes`. | Clamped to the host's ceilings. |
 | `agent` | The app's own agent. | Optional ([The manifest's `agent`](#the-manifests-agent)). |
 | `research` | The scope of `research` and `crawl`. | Required with `research` or `crawl`; refused when the manifest requests neither ([The research scope](#the-research-scope)). |
-| `requires` | Host features the app needs. | Each must be a feature the host knows: `palpo-admin-v1`, `host-api-v1`, `backend-api-v1`, `script-tools-v1`, `publisher-github-v1` or `wasm-components-v1`. GitHub publishing requires a real provenance verifier; the three API markers also need a host that implements their APIs ([Host API compatibility](HOST-API.md)). `wasm-components-v1` needs the `wasm` capability ([WebAssembly components](#webassembly-components)). |
+| `requires` | Host features the app needs. | Each must be a feature the host knows: `palpo-admin-v1`, `host-api-v1`, `backend-api-v1`, `script-tools-v1`, `publisher-github-v1`, `wasm-components-v1` or `wasm-shared-components-v1`. GitHub publishing requires a real provenance verifier; the three API markers also need a host that implements their APIs ([Host API compatibility](HOST-API.md)). `wasm-components-v1` and `wasm-shared-components-v1` need the `wasm` capability ([WebAssembly components](#webassembly-components), [Shared components](#shared-components)). |
+| `components` | The shared components the app's functions use, each pinned to one exact version and digest. | Optional; needs `wasm-shared-components-v1`; at most 8 ([Shared components](#shared-components)). |
 | `host_api` | The host API methods the app needs (`required`) or can use (`optional`), each with its ABI major version. | Optional; needs `host-api-v1` in `requires`. The store checks the `required` methods at install and at every launch ([Declare what the app needs](HOST-API.md#declare-what-the-app-needs)). |
 | `backend` | The app's own backend: its public sign-in endpoints and the operations the app may call. | Optional; needs `backend-api-v1` in `requires`, the `auth` capability and `storage.accounts: true`. Holds no credentials ([Sign in to your own backend](#sign-in-to-your-own-backend)). |
 | `schema_minor` | Which additions to schema 1 the manifest uses. | Leave it out. |
@@ -1227,6 +1505,11 @@ none of them reads a bundle or writes a file. An unknown command fails with
 | `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app] [--advisory-db <dir>]` | The gate. Prints `PASSED` or `REFUSED`, every finding and what the app will be granted. Exits 1 on a refusal. `--json` prints the report as JSON (`schema`, `stage`, `passed`, `app_id`, `version`, `digest`, `findings` and `resources`). `--publisher-key` checks a legacy key-signed bundle; publishing never needs it. `--advisory-db` checks the crates its components list against a RustSec checkout ([The crates a component lists](#the-crates-a-component-lists)). |
 | `hub scan <bundle> [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--packet <out.json>] [--reviewer <cmd>] [--system-app]` | Runs the gate, then writes the review packet and optionally hands it to a reviewer command. A bundle the gate refuses gets no scan. |
 | `hub component-info <file.wasm>` | Prints what a function file is (`component` or `module`), its imports and its exported functions with their parameters and results, as JSON ([WebAssembly components](#webassembly-components)). It reads only that file. A file that is neither a core module nor a valid component fails with `hub: <file>: not a WebAssembly core module or component` or the validator's error. |
+| `hub component-prepare <file.wasm> --draft <component.json> --out <file>` | Describes a shared component file as a release: its digest, size, imports and exports, with your draft's fields. With `--repository`, `--repository-id`, `--owner-id`, `--workflow`, `--tag` and `--commit`, it writes the canonical subject to attest, which must be named `octosense-component.json`; without them, an unsigned development release. Never overwrites a file ([Publish a shared component](#publish-a-shared-component)). |
+| `hub component-pack <release.json> --wasm <file.wasm> [--attestation <bundle.json>] [--allow-unsigned] --out <new directory>` | Attaches the proof, runs the component gate and writes `<id>-<version>.component.json` and `<id>-<version>.wasm`. Writes nothing when the gate refuses. |
+| `hub component-check <release.json> --wasm <file.wasm> [--catalog <file> [--anchor <hex>]] [--allow-unsigned] [--json]` | The gate for a component release and its file. Prints `PASSED` or `REFUSED` and every finding; exits 1 on a refusal. |
+| `hub component-entry <release.json> --wasm <file.wasm> --catalog <authenticated catalog> --out <index.json>` | Builds a catalog candidate's index entry for a GitHub-attested release, without publishing it. |
+| `hub component-publish <release.json> --wasm <file.wasm> --catalog <file> --key <file> --anchor-cert <hex> --publisher <id> [--out <dir>] [--allow-unsigned]` | Adds a component to a legacy-signed catalog, for a local rehearsal ([Rehearse with a development hub](#rehearse-with-a-development-hub)). |
 | `hub verify <catalog> --anchor <hex>` | Verifies a catalog against a trust anchor. |
 | `hub keygen`, `hub pubkey`, `hub sign-manifest` | Legacy Ed25519 key tools. Maintainers use them for the legacy catalog, and a local rehearsal uses `hub keygen` for its throwaway catalog keys. Never use them to sign an app: App Hub accepts only GitHub-attested releases. [Issue #168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168) decides whether they stay. |
 
@@ -1239,9 +1522,11 @@ verify against the Hub's anchor
 development hub. Otherwise `hub check` stops with
 `hub: could not authenticate base catalog: …`.
 
-`hub publish`, `hub withdraw`, `hub remove` and `hub certify` need the Hub's own
-keys, so only maintainers run them against App Hub's catalog; a local
-rehearsal runs `hub certify` and `hub publish` with throwaway keys.
+`hub publish`, `hub component-publish`, `hub withdraw`, `hub remove` and
+`hub certify` need the Hub's own keys, so only maintainers run them against
+App Hub's catalog; a local rehearsal runs `hub certify`, `hub publish` and
+`hub component-publish` with throwaway keys. `hub withdraw` withdraws an app
+version or a shared component version.
 
 ### Read a `hub check` report
 

@@ -34,6 +34,8 @@ catalog-candidates/<name>/catalog.json
 catalog-candidates/<name>/artifacts/<app>-<version>.bundle/...
 catalog-candidates/<name>/artifacts/<app>-<version>.bundle.pack.json
 catalog-candidates/<name>/index/<app>-<version>.json
+catalog-candidates/<name>/artifacts/<component>-<version>.wasm
+catalog-candidates/<name>/index/components/<component>-<version>.json
 ```
 
 候选 `catalog.json` 是未签名载荷：schema 为 1，不带 `key` 或
@@ -44,7 +46,14 @@ withdrawn；不能删除历史、替换既有字节或重新上架已撤回版�
 
 对于新版本，附上审核时的原样应用包、对应 pack 和 index。
 `hub catalog-prepare` 重新运行准入和发布者连续性检查，比较每个
-派生条目和打包文件。工作流仅把候选解压为数据，不运行其中的脚本
+派生条目和打包文件。
+
+共享组件（[ADR 0003](adr/0003-shared-components.zh-CN.md)）记录在签名目录的
+`components` 列表中，遵守相同的历史规则。对于新的组件版本，附上审核时的
+`.wasm` 文件和 `hub component-entry` 写出的 index 条目。`hub catalog-prepare`
+在要求 GitHub 来源证明的前提下重新运行组件的准入检查，把重建的条目与候选
+中的条目和 index 比较，并在回执中为每个新组件版本列出
+`{"component", "index"}`。同一份候选中的新应用可以固定其中的新组件。工作流仅把候选解压为数据，不运行其中的脚本
 或构建命令。
 
 [准备原生工作区](FIRST-APP.zh-CN.md#1-准备工具和应用仓库)后：

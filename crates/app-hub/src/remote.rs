@@ -47,6 +47,19 @@ impl Remote {
         let text = self.get(&format!("{artifact}.pack.json"))?;
         serde_json::from_str(&text).map_err(|e| format!("{artifact}: not a pack: {e}"))
     }
+
+    /// A shared component's file (`artifacts/<id>-<version>.wasm`, App Hub
+    /// ADR 0003), unverified and at most `max` bytes: the store checks its
+    /// size and digest against the verified catalog before keeping it.
+    pub fn component(&self, artifact: &str, max: u64) -> Result<Vec<u8>, String> {
+        let url = format!("{}/{}", self.base, artifact.trim_start_matches('/'));
+        let agent = ureq::Agent::config_builder()
+            .timeout_global(Some(std::time::Duration::from_secs(30)))
+            .build()
+            .new_agent();
+        let mut response = agent.get(&url).call().map_err(|e| format!("{url}: {e}"))?;
+        response.body_mut().with_config().limit(max).read_to_vec().map_err(|e| format!("{url}: {e}"))
+    }
 }
 
 /// Today's date as `YYYY-MM-DD`, from the system clock. What the freshness

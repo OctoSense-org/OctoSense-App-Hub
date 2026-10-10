@@ -14,7 +14,7 @@
 //! with each function's parameters and result written as WIT writes them
 //! (the same text OctoSense's `wasm.functions` shows).
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use wasmparser::component_types::{ComponentDefinedType, ComponentEntityType, ComponentFuncTypeId, ComponentValType};
 use wasmparser::types::TypesRef;
 use wasmparser::{ComponentTypeRef, Parser, Payload, PrimitiveValType, TypeBounds, Validator, WasmFeatures};
@@ -87,6 +87,20 @@ struct CrateList {
 /// The feature a manifest requires when its `fns/` holds a component.
 pub const COMPONENTS_FEATURE: &str = "wasm-components-v1";
 
+/// The feature a manifest requires when it names shared components from
+/// the catalog (`components`, App Hub ADR 0003).
+pub const SHARED_COMPONENTS_FEATURE: &str = "wasm-shared-components-v1";
+
+/// Validate `bytes` as a component whose imports a host scopes to its app:
+/// what admission requires of an app's own component and of a shared one.
+pub fn admissible_component(bytes: &[u8]) -> Result<ComponentInfo, String> {
+    let info = inspect_component(bytes)?;
+    if let Some(import) = info.refused_imports().first() {
+        return Err(format!("the component imports {import}; a component may import only {}", allowed_import_packages()));
+    }
+    Ok(info)
+}
+
 /// Whether `bytes` starts like a WebAssembly core module, version 1.
 pub fn is_module(bytes: &[u8]) -> bool {
     bytes.starts_with(b"\0asm\x01\0\0\0")
@@ -101,7 +115,8 @@ pub fn is_component(bytes: &[u8]) -> bool {
 /// One function a component exports: `name`, or `interface.name` for a
 /// function in an exported interface. Each parameter is `(name, type)`; a
 /// core module's parameters are named `p0`, `p1`, ….
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Export {
     pub name: String,
     pub params: Vec<(String, String)>,
