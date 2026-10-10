@@ -90,7 +90,7 @@ my-app/
 | `publisher-signature` | 声明的 GitHub 证明验证失败（即使加了 `--allow-unsigned`）；清单未签名，且没有加 `--allow-unsigned`；或者旧格式的 Ed25519 签名验证失败，或指向未知的密钥（`publisher key "<id>" is not registered with this hub`）。 | 清单未签名，且加了 `--allow-unsigned`。 |
 | `identity` | ID 以 `os.` 开头；ID 本身或其最后一段是保留名称（[ID 与保留名称](#id-与保留名称)）。 | |
 | `contents` | 文件的扩展名不是 `.card`、`.json`、`.l0`、`.octoscript`、`.splash`、`.svg`、`.png`、`.jpg`、`.jpeg`、`.webp`、`.ttf`、`.otf`、`.txt` 或 `.md` 之一，也不是函数模块（`.wasm`，见 `functions`）。准入检查同样拒绝没有扩展名的文件（例如 `.DS_Store` 和 `LICENSE`）。 | |
-| `functions` | 应用包带了 `.wasm` 文件却没有 `wasm` 能力，或带了 8 个以上。不在 `fns/<name>.wasm`（名称为 `[a-z0-9_-]`，最多 64 个字符），或既不是 WebAssembly 核心模块（版本 1 的 8 字节文件头）也不是有效组件的文件，以 `contents-invalid` 拒绝；导入了 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:http`、`wasi:io`、`wasi:random` 和 `octosense:host` 以外任何内容的组件也是如此。清单没有在 `requires` 中声明 `wasm-components-v1`，组件导入了 `wasi:filesystem` 而应用没有 `storage` 能力，或组件导入了 `wasi:http` 而应用没有 `net` 能力、`network.hosts` 中也没有至少一个主机时，组件在这一项被拒绝（[WebAssembly 组件](#webassembly-组件)）。除此之外，准入检查不检查核心模块内部；宿主在加载模块时检查它的导入和导出。 | 应用声明了 `wasm`，却没有带 `fns/*.wasm`。清单声明了 `wasm-components-v1`，`fns/` 中却没有组件。每个准入的组件都有一行说明它能访问什么。 |
+| `functions` | 应用包带了 `.wasm` 文件却没有 `wasm` 能力，或带了 8 个以上。不在 `fns/<name>.wasm`（名称为 `[a-z0-9_-]`，最多 64 个字符），或既不是 WebAssembly 核心模块（版本 1 的 8 字节文件头）也不是有效组件的文件，以 `contents-invalid` 拒绝；导入了 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:http`、`wasi:io`、`wasi:random` 和 `octosense:host` 以外任何内容的组件也是如此。清单没有在 `requires` 中声明 `wasm-components-v1`，组件导入了 `wasi:filesystem` 而应用没有 `storage` 能力，或组件导入了 `wasi:http` 而应用没有 `net` 能力时，组件在这一项被拒绝（[WebAssembly 组件](#webassembly-组件)）。除此之外，准入检查不检查核心模块内部；宿主在加载模块时检查它的导入和导出。 | 应用声明了 `wasm`，却没有带 `fns/*.wasm`。清单声明了 `wasm-components-v1`，`fns/` 中却没有组件。每个准入的组件都有一行说明它能访问什么。 |
 | `contents-invalid`（文本和图片） | 文本文件（`.splash`、`.card`、`.json`、`.l0`、`.octoscript`、`.txt` 或 `.md`）超过 1 MiB 或不是 UTF-8；JSON 无法解析；PNG、JPEG 或 WebP 无法解码，或单边超过 4096 像素；商店信息中的图标不是正方形，或者是超过 1 MiB 或单边超过 1024 像素的位图。 | |
 | `contents-invalid`（SVG） | SVG 无法解析；既没有数值形式的 `width` 和 `height`，也没有 `viewBox`；单边超过 4096 像素；或含有脚本、`foreignObject` 或 `on…` 事件属性。SVG 的样式（`style` 属性或 `<style>` 块）导入样式表、使用转义或注释，或让 `url()` 指向同一文件内 `#fragment` 以外的任何位置。 | |
 | `entry` | 应用包中既没有 `main.splash` 也没有 `page.card`；`page.card` 不是有效的 L0；`page.data.json` 不是 JSON；应用包中既没有 `kit/native/<theme>/kit.json`，卡片所需的 OctoScript kit 模块也不齐全。 | |
@@ -151,7 +151,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 - 清单在 `requires` 中声明了 `wasm-components-v1`，这需要 `wasm` 能力。`wasm` 服务只能加载核心模块的宿主不认识这个特性，因此会拒绝这个应用，而不是等到第一次调用时才失败；
 - 组件能通过验证，且只从 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:http`、`wasi:io`、`wasi:random` 和 `octosense:host` 导入接口。组件自己定义的类型（例如某个函数返回的记录）不算导入。`wasi:sockets` 及其他任何导入都以 `contents-invalid` 拒绝；
 - 只有应用有 `storage` 能力时，组件才可以导入 `wasi:filesystem`。按 ADR 0014，宿主只给它应用自己的存储文件夹；
-- 只有应用有 `net` 能力、且 `network.hosts` 中至少有一个主机时，组件才可以导入 `wasi:http`。按 ADR 0014 第 3 阶段，宿主只让它访问这些主机，规则与脚本的请求相同，并且使用 HTTPS（只有访问设备本身时才允许普通 HTTP）；
+- 只有应用有 `net` 能力时，组件才可以导入 `wasi:http`，这样应用的权限会说明它使用网络。不要求 `network.hosts`：按 OctoSense 2026 年 10 月 8 日的裁定，应用的网络声明在安装时展示，运行时不强制，因此组件可以访问任何主机；
 - `octosense:host` 不需要单独的授权：组件通过它只能调用应用已获授权的宿主服务，与应用的脚本相同，而且绝不会调用打开面板或询问用户的方法。
 
 组件遵守与模块相同的名称和大小规则，并计入 8 个函数文件的上限。每个准入的组件都有一条警告，告诉审核人员它能访问什么：
@@ -160,17 +160,17 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 [warning] functions (fns/notes.wasm): fns/notes.wasm is a component that reaches the clock, random numbers and files in its app folder, but no network or other app
 ```
 
-导入 `wasi:http` 的组件（这里是 App Hub 的 `fetch` 测试组件，所在应用有 `net` 能力，主机为
-`"hosts": ["api.example.com"]`）会得到：
+导入 `wasi:http` 的组件（这里是 App Hub 的 `fetch` 测试组件，所在应用有 `net` 能力，没有
+`network.hosts`）会得到：
 
 ```text
-[warning] functions (fns/fetch.wasm): fns/fetch.wasm is a component that reaches the clock and HTTPS to api.example.com, but no files or other app
+[warning] functions (fns/fetch.wasm): fns/fetch.wasm is a component that reaches the clock and the network, but no files or other app
 ```
 
-没有 `net` 能力或没有主机时，准入检查拒绝它：
+没有 `net` 能力时，准入检查拒绝它：
 
 ```text
-[refused] functions: fns/fetch.wasm imports wasi:http, which needs the net capability and the hosts it reaches in network.hosts
+[refused] functions: fns/fetch.wasm imports wasi:http, the network, which the app must declare with the net capability
 ```
 
 导入 `octosense:host` 的组件（App Hub 的 `hostcall` 测试组件，所在应用只有 `wasm` 能力）会得到：
@@ -323,7 +323,7 @@ $ hub component-info fns/notes.wasm
 | `research` | 通过系统工具箱搜索，不超出清单的 research 范围（[research 范围](#research-范围)）。每次搜索都由宿主执行。 | Search *范围允许的内容* | 仅系统应用，且只在手机版构建中 |
 | `crawl` | 通过系统工具箱抓取网站，深度和页数不超过范围中的 `max_depth` 和 `max_pages`，并遵守其中的域名列表。覆盖面比 `research` 更广。 | Crawl websites, *范围的限制*, which reaches more than searching | 同 `research` |
 | `runtime` | 用 `runtime.list` 和 `runtime.describe` 查询宿主实现了哪些 API（[宿主 API 兼容性](HOST-API.zh-CN.md)）。它不授予所列的任何 API。 | Inspect available host APIs without gaining access to their data or permissions | OctoSense 桌面版 0.1.0-beta.2 不提供，它的商店会拒绝这个名称。在基于 App Hub `main` 构建的每个宿主中（包括 `card-host`），由 App Hub 的请求分派器响应。 |
-| `wasm` | 应用自带的函数：应用包 `fns/` 中的 WebAssembly 核心模块或组件（最多 8 个），由宿主的 `wasm` 服务在沙盒中运行，有截止时间和内存上限。核心模块的函数只拿到自己的输入，接触不到文件、网络、时钟或其他应用。组件还可以读取时钟和随机数；有 `storage` 时可以访问应用自己的文件；有 `net` 时可以通过 HTTPS 访问应用列出的主机；还可以像应用的脚本一样调用应用已获授权的宿主服务。它接触不到其他应用（[WebAssembly 组件](#webassembly-组件)）。Agent 工具可以用 `host_method: "wasm.<function>"` 运行它。函数的编写、构建和调用方法见 App Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.zh-CN.md)。 | Run its own sandboxed functions on this device; they reach only what the app itself may | 桌面 RC2 的标准构建在 macOS 和 Linux 上提供它，属于有限支持（[服务及其限制](https://github.com/OctoSense-org/OctoSense/blob/main/docs/wasm.zh-CN.md#服务)）；RC1 默认关闭。受支持的 Android Home 源码构建也提供它。Windows、iOS 和 OpenHarmony 的构建不包含它：在那里调用会得到 `no service answers "wasm" on this device`。目前还没有任何构建加载组件。 |
+| `wasm` | 应用自带的函数：应用包 `fns/` 中的 WebAssembly 核心模块或组件（最多 8 个），由宿主的 `wasm` 服务在沙盒中运行，有截止时间和内存上限。核心模块的函数只拿到自己的输入，接触不到文件、网络、时钟或其他应用。组件还可以读取时钟和随机数；有 `storage` 时可以访问应用自己的文件；有 `net` 时可以访问网络；还可以像应用的脚本一样调用应用已获授权的宿主服务。它接触不到其他应用（[WebAssembly 组件](#webassembly-组件)）。Agent 工具可以用 `host_method: "wasm.<function>"` 运行它。函数的编写、构建和调用方法见 App Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.zh-CN.md)。 | Run its own sandboxed functions on this device; they reach only what the app itself may | 桌面 RC2 的标准构建在 macOS 和 Linux 上提供它，属于有限支持（[服务及其限制](https://github.com/OctoSense-org/OctoSense/blob/main/docs/wasm.zh-CN.md#服务)）；RC1 默认关闭。受支持的 Android Home 源码构建也提供它。Windows、iOS 和 OpenHarmony 的构建不包含它：在那里调用会得到 `no service answers "wasm" on this device`。目前还没有任何构建加载组件。 |
 | `sheet` | 通过 `sheet` 引擎（gridcraft）处理电子表格：工作簿、公式、重算和 xlsx，均在应用自己的文件内。 | Use the device's spreadsheet engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面和 Home 构建中提供。 |
 | `photo` | 通过 `photo` 引擎（photocraft）处理图像和照片文档：检查、转换、编辑命令和预览，均在应用自己的文件内。 | Use the device's image-editing engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面和 Home 构建中提供。 |
 | `word` | 通过 `word` 引擎（wordcraft）处理文档：创建、读取、检查，并在 docx、Markdown、HTML、RTF、ODT 和 PDF 之间转换，均在应用自己的文件内。 | Use the device's document engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |

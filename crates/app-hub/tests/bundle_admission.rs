@@ -520,20 +520,26 @@ fn a_component_that_uses_files_needs_the_storage_capability() {
 }
 
 #[test]
-fn a_component_that_uses_http_needs_net_and_hosts_and_reviewers_see_them() {
-    let report = with_component_hosts(true, &["wasm", "net"], &["api.example.com"], FETCH);
-    assert!(report.passed(), "{}", report.render());
-    let reach = report
-        .findings
-        .iter()
-        .find(|f| f.path.as_deref() == Some("fns/notes.wasm"))
-        .unwrap_or_else(|| panic!("no reach line: {}", report.render()));
-    assert!(reach.detail.contains("HTTPS to api.example.com, but no files or other app"), "{}", reach.detail);
-    for (capabilities, hosts) in [(&["wasm"][..], &[][..]), (&["wasm", "net"][..], &[][..])] {
-        let report = with_component_hosts(true, capabilities, hosts, FETCH);
-        let finding = refusal(&report, "functions").unwrap_or_else(|| panic!("{}", report.render()));
-        assert!(finding.detail.contains("imports wasi:http, which needs the net capability"), "{}", finding.detail);
+fn a_component_that_uses_http_declares_net_and_reviewers_see_it() {
+    // network.hosts is a declaration, not a limit (OctoSense's ruling of
+    // 8 October 2026): the component reaches any host, listed or not.
+    for hosts in [&[][..], &["api.example.com"][..]] {
+        let report = with_component_hosts(true, &["wasm", "net"], hosts, FETCH);
+        assert!(report.passed(), "{}", report.render());
+        let reach = report
+            .findings
+            .iter()
+            .find(|f| f.path.as_deref() == Some("fns/notes.wasm"))
+            .unwrap_or_else(|| panic!("no reach line: {}", report.render()));
+        assert!(reach.detail.contains("the clock and the network, but no files or other app"), "{}", reach.detail);
     }
+    let report = with_component(true, &["wasm"], FETCH);
+    let finding = refusal(&report, "functions").unwrap_or_else(|| panic!("{}", report.render()));
+    assert!(
+        finding.detail.contains("imports wasi:http, the network, which the app must declare with the net capability"),
+        "{}",
+        finding.detail
+    );
 }
 
 #[test]

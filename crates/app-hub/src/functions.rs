@@ -5,8 +5,8 @@
 //! and exports when it loads it. A component is validated here, and its
 //! imports must all come from the WASI packages a host scopes to the app
 //! ([`ALLOWED_COMPONENT_IMPORTS`]). Whether the manifest may carry one
-//! (`requires: ["wasm-components-v1"]`, `storage` for files, `net` and
-//! `network.hosts` for HTTP) is the gate's check ([`crate::gate`]), which
+//! (`requires: ["wasm-components-v1"]`, `storage` for files, `net` for
+//! HTTP) is the gate's check ([`crate::gate`]), which
 //! also tells reviewers what each component reaches
 //! ([`ComponentInfo::reach`]).
 //!
@@ -19,11 +19,13 @@ use wasmparser::component_types::{ComponentDefinedType, ComponentEntityType, Com
 use wasmparser::types::TypesRef;
 use wasmparser::{ComponentTypeRef, Parser, Payload, PrimitiveValType, TypeBounds, Validator, WasmFeatures};
 
-/// The packages a component may import: every interface of these, each
-/// scoped to its app by the host. `wasi:http` reaches only the app's
-/// `network.hosts`, over HTTPS, and `octosense:host` only the host services
-/// the app is granted, as its script does (OctoSense ADR 0014 phase 3).
-/// Nothing else (`wasi:sockets`, other packages) is admitted.
+/// The packages a component may import, every interface of these. The host
+/// gives `wasi:filesystem` only the app's storage folder and
+/// `octosense:host` only the host services the app is granted, as its
+/// script has them (OctoSense ADR 0014 phase 3). `wasi:http` reaches any
+/// host: an app's network declarations are shown at install and not
+/// enforced (OctoSense's ruling of 8 October 2026). Nothing else
+/// (`wasi:sockets`, other packages) is admitted.
 pub const ALLOWED_COMPONENT_IMPORTS: &[&str] =
     &["wasi:cli/", "wasi:clocks/", "wasi:filesystem/", "wasi:http/", "wasi:io/", "wasi:random/", "octosense:host/"];
 
@@ -136,8 +138,8 @@ impl ComponentInfo {
         self.imports.iter().any(|name| name.starts_with("wasi:filesystem/"))
     }
 
-    /// Whether it imports `wasi:http`: requests to the app's own
-    /// `network.hosts`, which the host allows only with the `net` capability.
+    /// Whether it imports `wasi:http`: the network, which the app declares
+    /// with the `net` capability.
     pub fn uses_http(&self) -> bool {
         self.imports.iter().any(|name| name.starts_with("wasi:http/"))
     }
@@ -148,10 +150,9 @@ impl ComponentInfo {
         self.imports.iter().any(|name| name.starts_with("octosense:host/"))
     }
 
-    /// What it reaches, for a reviewer, with the app's network `hosts`: "the
-    /// clock, files in its app folder and HTTPS to api.example.com, but no
-    /// other app".
-    pub fn reach(&self, hosts: &[String]) -> String {
+    /// What it reaches, for a reviewer: "the clock, files in its app folder
+    /// and the network, but no other app".
+    pub fn reach(&self) -> String {
         let imports = |prefix: &str| self.imports.iter().any(|n| n.starts_with(prefix));
         let mut reaches = Vec::new();
         if imports("wasi:clocks/") {
@@ -163,9 +164,9 @@ impl ComponentInfo {
         if self.uses_files() {
             reaches.push("files in its app folder".to_string());
         }
-        let network = self.uses_http() && !hosts.is_empty();
+        let network = self.uses_http();
         if network {
-            reaches.push(format!("HTTPS to {}", hosts.join(", ")));
+            reaches.push("the network".to_string());
         }
         if self.uses_host_services() {
             reaches.push("its app's host services".to_string());
@@ -429,32 +430,29 @@ mod tests {
 
     #[test]
     fn the_reach_line_names_what_a_component_imports() {
-        assert_eq!(info(&["wasi:cli/stdout@0.2.9"]).reach(&[]), "nothing but its input");
+        assert_eq!(info(&["wasi:cli/stdout@0.2.9"]).reach(), "nothing but its input");
         assert_eq!(
-            info(&["wasi:clocks/wall-clock@0.2.9", "wasi:random/random@0.2.9"]).reach(&[]),
+            info(&["wasi:clocks/wall-clock@0.2.9", "wasi:random/random@0.2.9"]).reach(),
             "the clock and random numbers, but no files, network or other app"
         );
         assert_eq!(
-            info(&["wasi:filesystem/types@0.2.9"]).reach(&[]),
+            info(&["wasi:filesystem/types@0.2.9"]).reach(),
             "files in its app folder, but no network or other app"
         );
-        let hosts = ["api.example.com".to_string(), "cdn.example.com".to_string()];
         assert_eq!(
-            info(&["wasi:http/outgoing-handler@0.2.4", "wasi:clocks/wall-clock@0.2.9"]).reach(&hosts),
-            "the clock and HTTPS to api.example.com, cdn.example.com, but no files or other app"
+            info(&["wasi:http/outgoing-handler@0.2.4", "wasi:clocks/wall-clock@0.2.9"]).reach(),
+            "the clock and the network, but no files or other app"
         );
         assert_eq!(
-            info(&["wasi:http/outgoing-handler@0.2.4", "wasi:filesystem/types@0.2.9"]).reach(&hosts[..1]),
-            "files in its app folder and HTTPS to api.example.com, but no other app"
+            info(&["wasi:http/outgoing-handler@0.2.4", "wasi:filesystem/types@0.2.9"]).reach(),
+            "files in its app folder and the network, but no other app"
         );
         assert_eq!(
-            info(&["octosense:host/services@0.1.0"]).reach(&[]),
+            info(&["octosense:host/services@0.1.0"]).reach(),
             "its app's host services, but no files, network or other app"
         );
-        // Hosts reach nothing without the import, and the import nothing
-        // without hosts.
-        assert_eq!(info(&["wasi:clocks/wall-clock@0.2.9"]).reach(&hosts), "the clock, but no files, network or other app");
-        assert_eq!(info(&["wasi:http/types@0.2.4"]).reach(&[]), "nothing but its input");
+        // Any wasi:http interface is the network, even types alone.
+        assert_eq!(info(&["wasi:http/types@0.2.4"]).reach(), "the network, but no files or other app");
     }
 
     #[test]
