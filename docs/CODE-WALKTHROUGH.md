@@ -168,8 +168,10 @@ Follow `policy_for` → `App::mount` in
 4. [`splash_adapter::apply`](../crates/app-policy/src/splash_adapter.rs) sets
    the jail, quota, public runtime flags, prompt surface, declared hosts,
    instruction metadata, heap limit and network module **before** evaluation.
-   The patched shell separately enables device flags with per-app consent;
-   plain `card-host` cannot supply that broker. `host.capabilities()` reports
+   The shared runner then calls `apply_device_consent` on the already admitted
+   bundle to bind its app identity before source evaluation. The patched shell
+   enables device flags with per-app consent; plain `card-host` cannot supply
+   that broker. `host.capabilities()` reports
    these runtime flags; the admitted manifest retains usage declarations.
 5. `card_source` loads `main.splash`, or realizes `page.card` with
    `page.data.json` and `kit/`. Card lowering first tries the measured design;

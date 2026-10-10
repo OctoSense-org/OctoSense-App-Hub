@@ -87,6 +87,14 @@ time the app opens. It refuses an app that the host cannot serve, with
 update that needs newer APIs does not take away an installed version that the
 host still serves.
 
+Before evaluating app source, the shared runner's `apply_device_consent` helper
+binds the verified bundle's app identity to its live Splash heap. Its caller
+must already have admitted the bundle; this helper does not replace admission.
+Native storage access requires that exact identity as well as the app's jail.
+The identity binding grants no device consent or OS permission. A failed bind
+clears the old identity, and the card runner clears it again on refusal or close.
+Plain Makepad still refuses apps that require the unsupported device broker.
+
 ## Discover what the host implements
 
 ### Native device calendars (contract 1.10)

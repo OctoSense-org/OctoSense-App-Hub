@@ -151,6 +151,10 @@ impl CardAppView {
     }
 
     fn refuse(&mut self, cx: &mut Cx, reason: &str) {
+        self.tool_registration = None;
+        self.admitted_prompts = false;
+        self.card_surface.set_host_tag(cx, None);
+        self.card_surface.set_host_prompts(cx, false);
         error!("card: {reason}");
         self.host_notice.set_text(cx, reason);
         self.view.redraw(cx);
@@ -238,6 +242,8 @@ impl AppModule for CardModule {
                     makepad_widgets::camera_preview::release_isolate_devices(cx, heap);
                     crate::services::cancel_heap(heap);
                 }
+                splash.set_host_tag(cx, None);
+                splash.set_host_prompts(cx, false);
                 // The sheet's own requests (a sign-in form's) end with it.
                 if let Some(heap) = sheet.borrow_mut().and_then(|mut s| s.isolate_heap_key(cx)) {
                     crate::services::cancel_heap(heap);
@@ -277,6 +283,81 @@ mod modal_tests {
         mod.widgets.PromptCallbackProbe = set_type_default() do #(PromptCallbackProbe::register_widget(vm)) {}
         mod.prelude.widgets.PromptCallbackProbe = mod.widgets.PromptCallbackProbe
     }
+    #[test]
+    fn real_start_binds_admitted_storage_identity_before_guest_source() {
+        const CHILD: &str = "APP_HUB_TEST_RUNNER_IDENTITY";
+        if std::env::var_os(CHILD).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "cardapp::modal_tests::real_start_binds_admitted_storage_identity_before_guest_source", "--nocapture"])
+                .env(CHILD, "1").output().unwrap();
+            assert!(output.status.success(), "{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+            return;
+        }
+        const APP: &str = "os.identity-fixture";
+        let directory = std::env::temp_dir().join(format!("appstore-real-identity-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        let bundle = directory.join("source");
+        let data = directory.join("apps");
+        std::fs::create_dir_all(&bundle).unwrap();
+        std::env::set_var("OCTOSENSE_APP_DATA", &data);
+        crate::set_data_root(data.clone());
+        std::fs::write(bundle.join("main.splash"), r#"
+            fs.write("identity.txt", "owned")
+            host.request("identity_probe.ready", {text: fs.read("identity.txt")}, fn(r){})
+            Label {text: "Identity fixture"}
+        "#).unwrap();
+        let digest = octosense_app_policy::digest_dir(&bundle).unwrap();
+        std::fs::write(bundle.join("manifest.json"), serde_json::json!({
+            "schema":1,"id":APP,"name":"Identity fixture","version":"1.0.0",
+            "capabilities":[],"integrity":{"bundle_blake3":digest}
+        }).to_string()).unwrap();
+        let pack = serde_json::to_string(&octosense_app_hub::pack::pack_dir(&bundle).unwrap()).unwrap();
+        crate::system::register_system_app(crate::system::SystemApp {
+            id: APP, name: "Identity fixture", pack: Box::leak(pack.into_boxed_str()), assets: &[],
+        });
+        let mut cx = Cx::new(Box::new(|_, _| {}));
+        let root = cx.with_vm(|vm| {
+            makepad_widgets::script_mod(vm);
+            CARD_MODULE.register(vm);
+            let value = script_eval!(vm, {use mod.widgets.* CardAppView {}});
+            WidgetRef::script_from_value(vm, value)
+        });
+        let card = {
+            let mut runner = root.borrow_mut::<CardAppView>().unwrap();
+            runner.app_id = APP.into();
+            // This is the production start path: no manual set_host_tag shim.
+            runner.start(&mut cx);
+            runner.card_surface.clone()
+        };
+        let heap = card.borrow_mut().unwrap().isolate_heap_key(&mut cx).unwrap();
+        let requests = splash_host::take_splash_host_requests_for(&[heap]);
+        assert_eq!(requests.len(), 1, "boot-time host request must reach the host");
+        assert_eq!(requests[0].app_tag, APP);
+        assert_eq!(serde_json::from_str::<serde_json::Value>(&requests[0].args_json).unwrap(), serde_json::json!({"text":"owned"}));
+        assert_eq!(std::fs::read_to_string(data.join(APP).join("identity.txt")).unwrap(), "owned");
+        #[cfg(feature = "text-input-state-query")]
+        {
+            let storage = splash_storage::storage_for_heap(heap, APP).expect("the admitted app owns its live jail");
+            assert_eq!(storage.read_bytes("identity.txt").unwrap(), b"owned");
+            assert!(splash_storage::storage_for_heap(heap, "os.other-identity").is_none());
+            // Identity permits lookup, never device access without consent.
+            assert!(splash_policy::service_allowed(heap, "camera.capture").is_err());
+            assert!(splash_policy::service_allowed(heap, "microphone.record_start").is_err());
+            assert!(splash_policy::service_allowed(heap, "location.get").is_err());
+        }
+        // A failed replacement must not leave the old app's native identity.
+        std::fs::write(bundle.join("manifest.json"), "invalid manifest").unwrap();
+        assert!(crate::apply_device_consent(&mut cx, &bundle, &card).is_err());
+        #[cfg(feature = "text-input-state-query")]
+        assert!(splash_storage::storage_for_heap(heap, APP).is_none());
+        card.set_text(&mut cx, r#"host.request("identity_probe.after_error", {}, fn(r){}) Label{}"#);
+        let heap = card.borrow_mut().unwrap().isolate_heap_key(&mut cx).unwrap();
+        let requests = splash_host::take_splash_host_requests_for(&[heap]);
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].app_tag, "");
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
     #[derive(Script, ScriptHook, Widget)]
     struct ModalInputProbe {
         #[deref] view: View,
