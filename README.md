@@ -209,8 +209,11 @@ remain system-app services; `photos`/`youtube` notifications serve only their
 system apps. Wasm is **on in RC2 on macOS and Linux**: standard builds run the app's own
 `fns/*.wasm`, with limited support; Windows, iOS and OpenHarmony builds leave
 it out, and RC1 and every earlier release left it off. Supported Android Home
-source builds run it too. Declaring a capability cannot add native code or
-enable a build feature. See [Host API compatibility](docs/HOST-API.md).
+source builds run it too. No release loads WebAssembly components yet;
+OctoSense `main` has loaded them since 10 October 2026
+([OctoSense #451](https://github.com/OctoSense-org/OctoSense/pull/451)).
+Declaring a capability cannot add native code or enable a build feature. See
+[Host API compatibility](docs/HOST-API.md).
 
 ## Trust anchor
 

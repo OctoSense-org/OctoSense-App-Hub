@@ -138,7 +138,7 @@ OCTOSENSE_PREVIEW_SIZE=1200x860 OCTOSENSE_APP_DATA="$(mktemp -d)" target/release
 
 `card-host` 仅提供 `runtime` 发现，不运行 Agent，并拒绝封存的 Release 和仅宿主
 支持的要求标记。`calendar`、`llm`、`news` 仍为系统应用服务；`photos`/`youtube`
-通知仅供各自的系统应用使用。Wasm **在 RC2 的 macOS 和 Linux 上已启用**：标准构建运行应用自带的 `fns/*.wasm`，属于有限支持；Windows、iOS 和 OpenHarmony 的构建不包含它，RC1 及更早的发行版都未启用。受支持的 Android Home 源码构建也运行它。声明能力不能添加原生代码或开启构建特性。见[宿主 API 兼容性](docs/HOST-API.zh-CN.md)。
+通知仅供各自的系统应用使用。Wasm **在 RC2 的 macOS 和 Linux 上已启用**：标准构建运行应用自带的 `fns/*.wasm`，属于有限支持；Windows、iOS 和 OpenHarmony 的构建不包含它，RC1 及更早的发行版都未启用。受支持的 Android Home 源码构建也运行它。目前还没有任何发行版加载 WebAssembly 组件；OctoSense `main` 自 2026 年 10 月 10 日起加载组件（[OctoSense #451](https://github.com/OctoSense-org/OctoSense/pull/451)）。声明能力不能添加原生代码或开启构建特性。见[宿主 API 兼容性](docs/HOST-API.zh-CN.md)。
 
 ## 信任锚
 
