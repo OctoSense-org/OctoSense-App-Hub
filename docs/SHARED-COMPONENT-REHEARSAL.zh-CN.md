@@ -27,5 +27,10 @@ cargo run --locked -p octosense-app-hub --example shared_component_candidate -- 
 使用该信封和完全匹配的候选文件执行隔离安装。声称端到端验证成功时，不能用假
 证明或旧密钥测试目录代替这个流程。
 
-示例的三个拒绝与清理测试使用仓库中的真实公开基础目录证明。新组件与应用的
-成功验证必须在真实发布者工作流完成后另行记录。
+示例的三个拒绝与清理测试使用仓库中的真实公开基础目录证明。真实证明演练已使用
+[合成 v0.1.0 发布](https://github.com/ymote/octosense-component-demo/releases/tag/v0.1.0)成功完成准备阶段：
+[发布者工作流 38024551136](https://github.com/ymote/octosense-component-demo/actions/runs/38024551136)
+构建并验证两个组件和两个消费应用。工具验证序号 15 的正式基础目录，并在
+[#195](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/195)中生成序号 16 的组合候选，
+载荷 SHA-256 为 `87bde245807a5ff6a1b3297c409d4ef6684414e47b038519a196feab29f42a7e`。
+管理员证明、原生安装和执行仍需要各自的回执；准备阶段成功不能证明这些后续步骤。

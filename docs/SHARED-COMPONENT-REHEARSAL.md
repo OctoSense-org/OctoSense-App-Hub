@@ -34,5 +34,12 @@ isolated local installation; never substitute a fake proof or legacy test
 catalog when claiming this end-to-end flow.
 
 The example's three refusal/cleanup tests use the repository's genuine public
-base proof. Success with newly attested components and consumers must be
-recorded separately after a real publisher workflow run.
+base proof. A successful real-proof rehearsal used
+[the synthetic v0.1.0 release](https://github.com/ymote/octosense-component-demo/releases/tag/v0.1.0):
+[publisher workflow 38024551136](https://github.com/ymote/octosense-component-demo/actions/runs/38024551136)
+built and verified two components and two consumers. The helper verified the
+sequence-15 public base and prepared the combined sequence-16 candidate in
+[#195](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/195), with payload
+SHA-256 `87bde245807a5ff6a1b3297c409d4ef6684414e47b038519a196feab29f42a7e`.
+Admin attestation and native installation/execution need their own receipts;
+this preparation result does not establish them.
