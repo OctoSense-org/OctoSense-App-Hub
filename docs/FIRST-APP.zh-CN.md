@@ -100,9 +100,9 @@ my-app/
 ```
 
 - 引用应用包自带的素材时，使用 `{{assets}}`，例如 `Image{src: http_resource("{{assets}}/assets/logo.png")}`。宿主会把 `{{assets}}` 替换为一个本地回环地址，这个地址只提供本应用包的内容。不要自己写这个地址，也不要写 `file://` 路径或 `../` 路径。
-- `main.splash` 中的 `https://` 地址只能指向清单的 `network.hosts` 中列出的主机；应用请求了 `images` 或 `web` 时不受此限。准入检查拒绝 `http://`。
+- 在 `main.splash` 中使用 HTTPS，并在 `network.hosts` 中准确披露预计访问的目的地。当前策略不把这份列表作为允许访问的白名单；准入检查仍拒绝 `http://`。
 - 不要让用户输入密码、PIN 或一次性验证码。准入检查会拒绝这类输入框，即使到了运行时，它们也不接受输入。登录由宿主服务负责，它在自己的面板上收集这些机密信息。面板是宿主覆盖在应用之上绘制的界面（详见[面板](PUBLISHING.zh-CN.md#面板应用从不收集机密信息)）。
-- 除了用于发现宿主 API 的 `runtime`，`card-host` 不提供任何宿主服务：其他 `host.request` 都只会得到 `no service answers "<family>" on this device`。用到宿主服务的界面，请在 [兼容的 RC2 发行版](../README.zh-CN.md#下载兼容宿主) 中测试（[开始之前](SUBMITTING.zh-CN.md#开始之前)）。
+- 除了用于发现宿主 API 的 `runtime`，`card-host` 不提供任何宿主服务：其他 `host.request` 都只会得到 `no service answers "<family>" on this device`。用到宿主服务的界面，请在 [兼容的桌面发行版](../README.zh-CN.md#下载兼容宿主) 中测试（[开始之前](SUBMITTING.zh-CN.md#开始之前)）。
 
 ### 卡片应用
 
@@ -128,7 +128,7 @@ my-app/
 ### 两类应用都适用
 
 - 所有素材引用都只能指向应用包内的文件。检查导出的 kit 文件和数据文件，确保其中没有作者本机的路径，也没有开发服务器的 URL。
-- 开发笔记放在 `bundle/` 之外；所用素材要求保留的许可证和来源说明应以 `.txt` 或 `.md` 随包提供。文档链接不会授予网络权限，卡片数据中的 URL 仍受素材检查约束。应用 Agent 的文件与 `main.splash` 一样，只能引用应用声明过的主机。
+- 开发笔记放在 `bundle/` 之外；所用素材要求保留的许可证和来源说明应以 `.txt` 或 `.md` 随包提供。文档链接不会授予网络权限，卡片数据中的 URL 仍受素材检查约束。应用 Agent 的文件与 `main.splash` 一样，拒绝不安全的引用（`http://`、`file://`、`../`），但不要求 HTTPS 主机出现在 `network.hosts` 中。
 - 如果某个流程依赖外部的 Python 或浏览器控制器，提交之前先改造它，让它能在应用的隔离环境中运行。
 
 ## 3. 选择 ID、能力和素材
@@ -137,7 +137,7 @@ my-app/
 
 - **`id`** 永久不变：由 1 到 64 个 `[a-z0-9.-]` 字符组成。准入检查会拒绝以 `os.` 开头的 ID，也会拒绝最后一段是保留名称的 ID。[保留名称](PUBLISHING.zh-CN.md#id-与保留名称)共 23 个，例如 `notes`、`weather` 和 `terminal`。如果应用以后可能附带工具，最后一段要能用作工具命名空间，即符合 `[a-z0-9_]{1,24}`：用 `com.example.mynotes`，而不是 `com.example.my-notes`。
 - **`version`** 从 `0.1.0` 开始，每次发布都要用新的版本号。
-- **`capabilities`** 只列出界面实际用到的能力。查看[能力](PUBLISHING.zh-CN.md#能力)一节的**目前由谁提供**列：有些能力（例如 `llm` 和 `calendar`）能通过准入检查，但只向系统应用提供；`prompt` 则没有任何宿主提供。`net` 还要求把每个主机都列在 `network.hosts` 中。
+- **`capabilities`** 只列出界面实际用到的能力。查看[能力](PUBLISHING.zh-CN.md#能力)一节的**目前由谁提供**列：有些能力（例如 `llm` 和 `calendar`）能通过准入检查，但只向系统应用提供；`prompt` 则没有任何宿主提供。请在 `network.hosts` 中披露预计访问的目的地；这两个字段都不会授权访问。兼容的公开 API 仍检查应用及账户范围、用户同意和资源上限。
 
 把 `bundle/listing.json` 中的占位内容全部换掉：`subtitle`、`description`、`category`、`publisher`（包括 `support` 和 `privacy_policy_url`）、`platforms`、`release_notes` 和 `license`。模板中的 `example.com` URL 都是占位内容。App Hub 的应用起步模板声明了 `"platforms": ["macos"]`，`tools/octo new` 写入的是你指定的平台；两者都不代表测试结果。只声明你实际运行过应用的平台。
 
@@ -209,7 +209,7 @@ hub stamp bundle
 hub check bundle --allow-unsigned
 ```
 
-成功时输出：
+较早 CLI 的历史输出（当前 CLI 将概要标为 `declarations:`，不再使用 `grants:`）：
 
 ```text
 com.example.mynotes 0.1.0 — PASSED
@@ -217,7 +217,7 @@ com.example.mynotes 0.1.0 — PASSED
   grants: capabilities {"storage"}, hosts {}, storage 16777216 bytes, agent none
 ```
 
-这个阶段出现未签名警告是正常的。对照应用界面上实际用到的权限核对 `grants:` 行；授予的多于所需时，精简清单。
+这个阶段出现未签名警告是正常的。请对照实际用途核对当前的 `declarations:` 行，补齐遗漏或删除未使用的声明。每个准入应用都有带配额的私有隔离目录，即使未声明 `storage` 也是如此；下方旧输出中的 `storage none` 不再描述当前策略。
 
 结果为 `REFUSED` 时，`hub check` 以退出码 1 退出。逐条修复 `[refused]` 行（[常见拒绝原因及修复](SUBMITTING.zh-CN.md#常见拒绝原因及修复)），然后重新写入摘要并再次检查。未经修改的应用起步模板会得到两项拒绝，分别针对入口文件和截图：
 
@@ -257,7 +257,7 @@ hub: the bundle was refused
 | --- | --- |
 | `cargo build` 停止并报 `no variant … TextInputStateQuery` | 见 [`card-host` 构建失败](DEVELOPMENT.zh-CN.md#card-host-构建失败)。 |
 | `card-host: refused: this host has no GitHub publisher verifier` | 应用包是已封存的 Release。请运行可编辑源码。 |
-| `no service answers "<family>" on this device` | 除了用于发现宿主 API 的 `runtime`，`card-host` 不提供任何宿主服务。在 [兼容的 RC2 发行版](../README.zh-CN.md#下载兼容宿主) 中测试这个界面。 |
+| `no service answers "<family>" on this device` | 除了用于发现宿主 API 的 `runtime`，`card-host` 不提供任何宿主服务。在 [兼容的桌面发行版](../README.zh-CN.md#下载兼容宿主) 中测试这个界面。 |
 | 请求 `/g?raw=1` 时报 `curl: (22) The requested URL returned error: 404` | 还没有绘制出任何一帧。等几秒再截取一次。 |
 | `[refused] identity: app id "…" ends in "…", which is reserved` | ID 的最后一段是[保留名称](PUBLISHING.zh-CN.md#id-与保留名称)。在首次发布之前换一个 ID。 |
 | `[refused] digest: the bundle hashes to …, the manifest claims …` | 应用包在 `hub stamp` 之后有改动。重新写入摘要。 |

@@ -28,35 +28,46 @@ App Hub 为 OctoSense 发布应用。本仓库包含：
 
 ## 下载兼容宿主
 
-[**桌面版 0.1.0-rc.2 已发布**](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.2)，源码为 `4ccf8e06`，2026-10-09 发布，支持带 GitHub 证明的应用、公开 v2 目录和 Host API v1，并在各自支持的平台上新增文档、设备日历、邮件草稿和音频 API（[宿主目前提供什么](#宿主目前提供什么)）。
+[**桌面版 0.1.0-rc.4**](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.4) 是兼容的预发布版，
+源码为 `9266b008`。它包含契约 1.11、仅作披露的能力策略、Wasm 核心模块与组件，
+以及共享组件目录和安装支持。已有宿主 API 和连接账户流程仍受平台、用户同意及
+提供商限制约束。
 
 | 平台 | 下载 |
 | --- | --- |
-| macOS Apple 芯片 | [DMG](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/OctoSense_0.1.0-rc.2_aarch64.dmg) 或 [应用 ZIP](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/OctoSense_0.1.0-rc.2_macos_aarch64.app.zip) |
-| Windows x64 | [安装程序](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/octosense_0.1.0-rc.2_x64-setup.exe) |
-| Linux x86_64 | [Debian 包](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/octosense_0.1.0-rc.2_amd64.deb) 或 [AppImage](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/octosense_0.1.0-rc.2_x86_64.AppImage) |
+| macOS Apple 芯片 | [DMG](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.4/OctoSense_0.1.0-rc.4_aarch64.dmg) 或 [应用 ZIP](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.4/OctoSense_0.1.0-rc.4_macos_aarch64.app.zip) |
+| Windows x64 | [安装程序](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.4/octosense_0.1.0-rc.4_x64-setup.exe) |
+| Linux x86_64 | [Debian 包](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.4/octosense_0.1.0-rc.4_amd64.deb) 或 [AppImage](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.4/octosense_0.1.0-rc.4_x86_64.AppImage) |
 
-请用 [SHA256SUMS](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/SHA256SUMS) 核对下载，并阅读[发行说明](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/RELEASE-NOTES.zh-CN.md)中的平台限制。
-这些预发行包**没有 Apple Developer ID 签名、公证或 Windows 发布者签名**。
-macOS 包在本机构建并以 ad-hoc 签名封存，Windows 和 Linux 包来自标签 CI 任务，Linux 打包的修正记录在发行来源记录中。
-[发行来源记录](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/RELEASE-PROVENANCE.json)记载确切文件及签名状态。
-自行构建请按[固定源码的环境准备指南](https://github.com/OctoSense-org/OctoSense/blob/4ccf8e068399b1da139771a9ed94cef05fa6ae60/README.zh-CN.md#环境准备)操作。
+请用 [SHA256SUMS](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.4/SHA256SUMS) 核对下载，并阅读
+[发布说明](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.4)中的平台限制。
+这些安装包**没有 Apple Developer ID 签名、公证或 Windows Authenticode 签名**。Mac 二进制只有链接器临时签名；三个平台的打包隐私扫描均已通过。
+[发布文件](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.4)包含各平台打包回执和确切校验和。
+Mac app ZIP 在候选包首次验收中通过 **11/11 项 App Hub/组件检查**；最终发布 ZIP 与 DMG 的哈希和已测文件一致。这不代表 Windows/Linux 安装后的界面、真实模型行为或账户写入已验证。
+自行构建请按[固定源码的环境准备指南](https://github.com/OctoSense-org/OctoSense/blob/9266b0083544d86bd7636543b5ff60c61b26460f/README.zh-CN.md#环境准备)操作。
 
 下面四个示例请在 **Apple 芯片 Mac** 上运行。打开 **App Hub → Search**，
-输入确切应用 ID，选择 **Get**，审阅权限后选择 **Install**，再点 **Open**。
+输入确切应用 ID，选择 **Get**，审阅用途披露后选择 **Install**，再点 **Open**。
 **Library** 可重新打开已安装应用，并在有兼容新版本时提供 **Update**。
 保留默认公开目录，不需要自定义来源、信任锚、开发者密钥或 OctoSense 云端账户。
-旧 beta.2 宿主无法读取新的发布者证明或公开 v2 目录：请换用兼容宿主，
+旧桌面 beta.2 宿主无法读取新的发布者证明或公开 v2 目录：请换用兼容宿主，
 不要修改应用证明或目录设置。
 
-RC2 **没有附带公开的 GitHub/Google OAuth 客户端注册信息**。本地草稿和未连接
+RC4 支持共享组件，但用户能够找到某个组件或应用之前，它仍须单独通过 Hub 审核
+并发布到目录。安装此桌面版不会升级 Android Home；现有手机版与隔离的 OnePlus
+验收测试包是不同的内容。
+
+RC4 **没有附带公开的 GitHub/Google OAuth 客户端注册信息**。本地草稿和未连接
 账户时的界面可用；提供商登录需要宿主发行方或运维人员提供注册信息
-（[配置](https://github.com/OctoSense-org/OctoSense/blob/4ccf8e068399b1da139771a9ed94cef05fa6ae60/crates/oauth-service/README.zh-CN.md)）。普通用户不应被要求注册
-Google 开发者项目。安装成功不代表登录、邮件投递、GitHub commit 或日历写入已验证。
-连接账户示例只声明 macOS。Linux/Windows 已实现外部浏览器后端登录和清单声明的后端读取；RC2 补上了登录所需的原生链接打开方式，用 RC2 源码构建的 Windows 测试程序已对一个模拟后端完成浏览器登录，Linux 上的登录仍未验证。嵌入式后端登录及受保护的写操作仍不支持，会拒绝执行。
-Android Google 授权仍不可用。普通 WebReader 与登录是不同的流程；Linux 需要
-GTK 3/WebKitGTK 和 X11/XWayland，Windows 需要 WebView2。这些引擎不随包附带，
-见[浏览器要求](https://github.com/OctoSense-org/OctoSense/blob/4ccf8e068399b1da139771a9ed94cef05fa6ae60/docs/desktop-embedded-browser.zh-CN.md)。
+（[配置](https://github.com/OctoSense-org/OctoSense/blob/9266b0083544d86bd7636543b5ff60c61b26460f/crates/oauth-service/README.zh-CN.md)）。
+普通用户不应被要求注册 Google 开发者项目。安装成功不代表登录、邮件投递、
+GitHub commit 或日历写入已验证。连接账户示例只声明 macOS。Linux/Windows 已实现
+外部浏览器后端登录和清单声明的后端读取。RC2 记录的 Windows 模拟后端登录结果
+属于历史验证，不是新安装 RC4 包的验收。Linux 拒绝嵌入式后端登录；Windows 运行时
+虽能拦截回调，但 RC4 的宿主嵌入式登录流程仍关闭，没有可启用的生产开关。两端都使用
+外部浏览器登录；受保护的写操作仍不支持，会拒绝执行。Android Google 授权仍不可用。普通 WebReader 与登录是不同的流程；
+Linux 需要 GTK 3/WebKitGTK 和 X11/XWayland，Windows 需要 WebView2。这些引擎不随包附带，
+见[浏览器要求](https://github.com/OctoSense-org/OctoSense/blob/9266b0083544d86bd7636543b5ff60c61b26460f/docs/desktop-embedded-browser.zh-CN.md)。
 
 ## 仓库结构
 
@@ -77,7 +88,7 @@ GTK 3/WebKitGTK 和 X11/XWayland，Windows 需要 WebView2。这些引擎不随�
 | `docs/DEVELOPMENT.md` | 指南导航、交付路径、`card-host` 及其远程控制路由，以及 `card-studio`。 |
 | `docs/adr/` | 架构决策：通过 GitHub 管理员身份认证目录（[ADR 0001](docs/adr/0001-github-attested-catalog.zh-CN.md)）、通过 GitHub 证明发布者身份（[ADR 0002](docs/adr/0002-github-attested-publisher-identity.zh-CN.md)），以及共享组件（[ADR 0003](docs/adr/0003-shared-components.zh-CN.md)，提议中）。 |
 | `templates/app/` | 卡片应用仓库脚手架，包含元数据、示例图标和链接好的 Agent 指引。 |
-| `crates/app-contract` | 应用契约 `octosense-app-contract`（[OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)）：清单、应用获得的策略、应用包完整性校验与运行应用包所需的内容。在 `1.x` 内只做增量变更（[README](crates/app-contract/README.md)）。契约 1.10.0 已发布到 crates.io（[crates.io 上的版本](crates/app-contract/README.md#versions-on-cratesio)，英文）。 |
+| `crates/app-contract` | 应用契约 `octosense-app-contract`（[OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)）：清单、应用获得的策略、应用包完整性校验与运行应用包所需的内容。在 `1.x` 内只做增量变更（[README](crates/app-contract/README.md)）。契约 1.11.0 已发布到 crates.io（[crates.io 上的版本](crates/app-contract/README.md#versions-on-cratesio)，英文）。 |
 | `crates/app-policy` | 签名清单与商店信息、准入，以及解析为隔离环境设置和 Agent 会话配置（[OctoSense Home ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0002-agentic-app-security-model.md)）；应用自带的 Agent（`tools.json`、`AGENT.md`、技能）加载为 `AgentBundle`；原生模块的工具清单共用同一套 `tools.json` 解析与检查（`ToolManifest::load`）。它还重新导出应用契约。 |
 | `crates/app-hub` | 索引、签名目录、准入检查、Agent 扫描、设备端客户端和 `hub` 命令（[OctoSense Home ADR 0003](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0003-app-hub-and-store.md)）。 |
 | `crates/appstore` | 作为 OctoSense 模块的商店；把已安装应用作为独立客户端运行的 `card` 模块；系统应用（`os.` 前缀 id）；以及宿主服务及其面板。 |
@@ -115,8 +126,8 @@ OCTOSENSE_PREVIEW_SIZE=1200x860 OCTOSENSE_APP_DATA="$(mktemp -d)" target/release
 
 ## 宿主目前提供什么
 
-准入检查接受能力名称；每次调用仍需要宿主实现并授权。
-完整参考见[能力](docs/PUBLISHING.zh-CN.md#能力)。[RC2 发行版](#下载兼容宿主)包含 RC1 的全部内容，以及标为 RC2 的新增项：
+准入检查校验用途声明；每次调用仍需要宿主实现并核对实际授权。当前源码把能力和目的地字段用作披露信息（见[策略](docs/PUBLISHING.zh-CN.md#当前源码策略声明与授权)）；RC4 在桌面版中包含这项策略、Wasm 组件和共享组件安装，并使用契约 1.11。应用与 ABI 准入、配额、用户同意、账户隔离及写入审阅仍保留。目录兼容不等于发布组件。下方清单保留较早的 RC2 基线。
+完整参考见[能力](docs/PUBLISHING.zh-CN.md#能力)。[历史 RC2 发行版](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.2)包含 RC1 的全部内容，以及标为 RC2 的新增项：
 
 - 公开 GitHub v2 目录及 `publisher-github-v1` 验证，使用契约 1.10.0（RC1 为 1.8.0）。
 - `runtime` 发现和 `script-tools-v1`：已准入的 `implemented_by: "app"` 工具

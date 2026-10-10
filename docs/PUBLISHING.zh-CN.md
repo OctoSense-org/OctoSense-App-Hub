@@ -17,7 +17,7 @@
 
 `capabilities` 和 `network.hosts` 用于向用户和审核人员说明应用预计使用的
 API 与网络目的地。遗漏某个服务族或主机，不会阻止调用宿主已支持的公开 API。
-这是为下一个兼容版本准备的源码策略；RC2 的历史行为不代表该修改已经发布。
+这项策略已包含在[桌面 RC4](../README.zh-CN.md#下载兼容宿主)中。RC2 的历史行为另行记录，不代表当前的授权规则。
 
 每个准入应用都有独立的存储沙箱、已解析的配额和网络模块。设备访问仍需逐应用
 同意和系统权限；连接账户仍按应用、账户和提供商 scope 隔离。外部写入保留
@@ -107,15 +107,15 @@ my-app/
 | `publisher-signature` | 声明的 GitHub 证明验证失败（即使加了 `--allow-unsigned`）；清单未签名，且没有加 `--allow-unsigned`；或者旧格式的 Ed25519 签名验证失败，或指向未知的密钥（`publisher key "<id>" is not registered with this hub`）。 | 清单未签名，且加了 `--allow-unsigned`。 |
 | `identity` | ID 以 `os.` 开头；ID 本身或其最后一段是保留名称（[ID 与保留名称](#id-与保留名称)）。 | |
 | `contents` | 文件的扩展名不是 `.card`、`.json`、`.l0`、`.octoscript`、`.splash`、`.svg`、`.png`、`.jpg`、`.jpeg`、`.webp`、`.ttf`、`.otf`、`.txt` 或 `.md` 之一，也不是函数模块（`.wasm`，见 `functions`）。准入检查同样拒绝没有扩展名的文件（例如 `.DS_Store` 和 `LICENSE`）。 | |
-| `functions` | 应用包的 `fns/` 中带了 `.wasm` 文件却没有 `wasm` 能力，或其中带了 8 个以上。既不在 `fns/<name>.wasm`（名称为 `[a-z0-9_-]`，最多 64 个字符），也不在 `components/<blake3>.wasm`（以自己的摘要命名，见 `components`）的 `.wasm` 文件，或既不是 WebAssembly 核心模块（版本 1 的 8 字节文件头）也不是有效组件的文件，以 `contents-invalid` 拒绝；导入了 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:http`、`wasi:io`、`wasi:random` 和 `octosense:host` 以外任何内容的组件也是如此。清单没有在 `requires` 中声明 `wasm-components-v1`时，组件在这一项被拒绝（[WebAssembly 组件](#webassembly-组件)）。除此之外，准入检查不检查核心模块内部；宿主在加载模块时检查它的导入和导出。 | 应用声明了 `wasm`，却没有带 `fns/*.wasm`，也没有指定共享组件。清单声明了 `wasm-components-v1`，`fns/` 中却没有组件。每个准入的组件都有一行说明它能访问什么。 |
+| `functions` | 应用包的 `fns/` 中带了 8 个以上的 `.wasm` 文件。既不在 `fns/<name>.wasm`（名称为 `[a-z0-9_-]`，最多 64 个字符），也不在 `components/<blake3>.wasm`（以自己的摘要命名，见 `components`）的 `.wasm` 文件，或既不是 WebAssembly 核心模块（版本 1 的 8 字节文件头）也不是有效组件的文件，以 `contents-invalid` 拒绝；导入了 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:http`、`wasi:io`、`wasi:random` 和 `octosense:host` 以外任何内容的组件也是如此。清单没有在 `requires` 中声明 `wasm-components-v1` 时，组件在这一项被拒绝（[WebAssembly 组件](#webassembly-组件)）。除此之外，准入检查不检查核心模块内部；宿主在加载模块时检查它的导入和导出。 | 应用声明了 `wasm`，却没有带 `fns/*.wasm`，也没有指定共享组件。清单声明了 `wasm-components-v1`，`fns/` 中却没有组件。每个准入的组件都有一行说明它能访问什么。随包函数未披露 `wasm`，或组件导入文件/HTTP 接口却未披露 `storage`/`net` 时，只产生警告，不会拒绝。 |
 | `components` | 清单指定的某个共享组件不在 `--catalog` 给出的签名目录中、已在其中被撤回或摘要不同，或导入了宿主不支持的接口。商店应用的应用包在 `components/` 中带有 `.wasm` 文件。系统应用的应用包（`--system-app`）缺少它固定的某个组件的 `components/<blake3>.wasm`，或带有它没有固定的组件（[共享组件](#共享组件)）。 | 每个解析成功的组件都有一行说明它能访问什么。不使用 `--catalog` 时，每个组件都会被报告为未解析。清单声明了 `wasm-shared-components-v1`，却没有指定任何组件。 |
 | `contents-invalid`（文本和图片） | 文本文件（`.splash`、`.card`、`.json`、`.l0`、`.octoscript`、`.txt` 或 `.md`）超过 1 MiB 或不是 UTF-8；JSON 无法解析；PNG、JPEG 或 WebP 无法解码，或单边超过 4096 像素；商店信息中的图标不是正方形，或者是超过 1 MiB 或单边超过 1024 像素的位图。 | |
 | `contents-invalid`（SVG） | SVG 无法解析；既没有数值形式的 `width` 和 `height`，也没有 `viewBox`；单边超过 4096 像素；或含有脚本、`foreignObject` 或 `on…` 事件属性。SVG 的样式（`style` 属性或 `<style>` 块）导入样式表、使用转义或注释，或让 `url()` 指向同一文件内 `#fragment` 以外的任何位置。 | |
 | `entry` | 应用包中既没有 `main.splash` 也没有 `page.card`；`page.card` 不是有效的 L0；`page.data.json` 不是 JSON；应用包中既没有 `kit/native/<theme>/kit.json`，卡片所需的 OctoScript kit 模块也不齐全。 | |
 | `resource-invalid` | 卡片对图片或字体的引用，或 SVG 的 `href`，指向应用包中没有的文件。检查结果会给出对应的 JSON 指针。见[字体](#字体)。 | |
-| `assets` | 除 `manifest.json`、`listing.json` 和 Agent 文件外，某个 `.card`、`.json`、`.l0` 或 `.octoscript` 文件含有 `http://`、`https://`、`file://` 或 `../`。普通文档中的链接不属于素材加载。`.splash` 文件或 Agent 文件含有 `http://`、`file://`、`../`，或不在 `network.hosts` 中的 `https://` 主机（应用请求了 `images` 或 `web` 时，允许任何公开主机）。 | |
+| `assets` | 除 `manifest.json`、`listing.json` 和 Agent 文件外，某个 `.card`、`.json`、`.l0` 或 `.octoscript` 文件含有 `http://`、`https://`、`file://` 或 `../`。普通文档中的链接不属于素材加载。`.splash` 文件或 Agent 文件含有 `http://`、`file://` 或 `../`。遗漏 `network.hosts` 条目不会导致拒绝。 | |
 | `secrets` | `.card`、`.l0`、`.octoscript` 或 `.splash` 文件声明了 `is_password: true`，或把 `TextInputContentType` 设为 `Password`、`NewPassword` 或 `OneTimeCode`。 | |
-| `storage` | | 没有 `storage` 能力时，某个 `.splash` 文件调用了 `fs.*`，或应用请求了 `camera`。`declarations:` 行仍显示带配额的独立存储。 |
+| `storage` | | 没有披露 `storage` 用途时，某个 `.splash` 文件调用了 `fs.*`，或应用请求了 `camera`。`declarations:` 行仍显示带配额的独立存储。 |
 | `listing` | 缺少 `listing.json`，或它违反了[商店信息](#商店信息)中的规则；商店信息未指定截图或未指定图标；指定的截图或图标不在应用包中。 | |
 | `tools`、`agent`、`skills` | `tools.json`、`AGENT.md` 或某个技能不符合 [Agent 文件的规则](#agent-文件的规则)。 | 某个工具是破坏性工具（风险为 `destructive`）或对外工具（带有 `outward`），每次调用都要等待批准；某个工具写了 `confirm: "app"`；应用声明了工具，但 `agent.model.needs` 中没有 `tool_calling`；后台 Agent 带有破坏性工具。 |
 | `policy` | 某项能力未知；ID 违反了 [ID 与保留名称](#id-与保留名称)中的规则；版本为空；某个主机不是纯主机名（[网络主机](#网络主机)）；`research` 范围或某个 `agent` 字段违反了相应规则；`storage.cache_max_bytes` 为 0。 | |
@@ -138,7 +138,7 @@ makepad_widgets:resources/LXGWWenKaiBold.ttf
 
 准入检查会拒绝其他内置名称和 crate 路径。如果需要上述资源以外的字体，请在许可允许的范围内随包提供字体子集。
 
-请随包保留字体所要求的许可证和来源说明。普通 `.txt` 和 `.md` 文档中的链接不属于素材加载，也不会授予网络权限。Agent 指令和技能仍受声明主机检查约束；卡片数据、脚本代码和 SVG 素材继续执行各自的资源检查。
+请随包保留字体所要求的许可证和来源说明。普通 `.txt` 和 `.md` 文档中的链接不属于素材加载，也不会授予网络权限。Agent 指令、技能和脚本仍拒绝不安全的引用（`http://`、`file://`、`../`），但它们的 HTTPS 链接不必匹配 `network.hosts` 条目。卡片数据和 SVG 素材保留更严格的资源检查。
 
 打包字体计入 8 MiB 上限，所以较大的 CJK 字体请只打包所需的子集。准入检查只核对字体路径，不解码字体文件，因此请在 `card-host` 中测试完整的应用包。用 Makepad 的 International 字体集构建的宿主（例如 `card-host`）还会用内置的 CJK 后备字体显示中文，这个字体在首次用到时才加载。
 
@@ -162,7 +162,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 
 ### WebAssembly 组件
 
-`fns/` 中的文件也可以是 WebAssembly **组件**，而不是核心模块：一个用 `cargo build --target wasm32-wasip2` 构建的普通 Rust crate（[OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436)，提议中）。它的函数接收和返回带类型的值，在调用之间保留状态，并可以使用 WASI 的一部分。OctoSense #453 已合并组件加载以及 HTTP/宿主服务适配器。兼容的可下载宿主与确切应用仍须分别验收；RC2 只运行核心模块。
+`fns/` 中的文件也可以是 WebAssembly **组件**，而不是核心模块：一个用 `cargo build --target wasm32-wasip2` 构建的普通 Rust crate（[OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/blob/9266b0083544d86bd7636543b5ff60c61b26460f/docs/adr/0014-app-components-in-webassembly.zh-CN.md)，已接受）。它的函数接收和返回带类型的值，在调用之间保留状态，并可以使用 WASI 的一部分。OctoSense #453 已合并组件加载以及 HTTP/宿主服务适配器，[桌面 RC4](../README.zh-CN.md#下载兼容宿主)包含这些支持；每个提交的应用仍须单独验收。历史 RC2 只运行核心模块。
 
 准入检查在以下条件都满足时接受组件：
 
@@ -262,9 +262,9 @@ $ hub component-info fns/notes.wasm
 
 ## 共享组件
 
-**共享组件**是 App Hub 在签名目录中单独发布的 WebAssembly 组件，可供多个应用使用，就像共享 npm 包一样。与 npm 依赖不同的是，它被精确固定：应用指定一个确切版本和文件的 BLAKE3 摘要，所以已安装应用的代码只会随应用更新而改变（[ADR 0003](adr/0003-shared-components.zh-CN.md)，即 [OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436) 的第 4 阶段）。App Hub 像审核应用一样审核共享组件，并像验证应用自己的组件一样验证它（[WebAssembly 组件](#webassembly-组件)）。它能访问的，只有使用它的应用可以访问的内容：每个应用都以自己的授权运行自己的实例。
+**共享组件**是 App Hub 在签名目录中单独发布的 WebAssembly 组件，可供多个应用使用，就像共享 npm 包一样。与 npm 依赖不同的是，它被精确固定：应用指定一个确切版本和文件的 BLAKE3 摘要，所以已安装应用的代码只会随应用更新而改变（[ADR 0003](adr/0003-shared-components.zh-CN.md)，即 [OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436) 的第 4 阶段）。App Hub 像审核应用一样审核共享组件，并像验证应用自己的组件一样验证它（[WebAssembly 组件](#webassembly-组件)）。它能访问的，只有使用它的应用可以访问的内容：每个应用都以自己的身份、资源上限和实际授权运行自己的实例。
 
-共享组件需要兼容宿主，并在其经过验证的目录中发布；仅支持普通组件加载并不等于支持共享组件。在支持共享组件之前构建的宿主（包括 OctoSense 桌面版 RC1 和 RC2）会拒绝含有组件、或含有固定了组件的应用的整个签名目录，所以在兼容的宿主发行版发布之前，App Hub 不会发布这两种内容。
+共享组件需要兼容宿主，并在其经过验证的目录中发布。[桌面 RC4](../README.zh-CN.md#下载兼容宿主)实现共享组件的安装与执行；发布该宿主不会自动把组件或应用发布到公开目录，它们仍须通过 Hub 审核并获得发布批准。较旧宿主（包括桌面 RC1 和 RC2）会拒绝包含组件、或包含固定了组件的应用的整个目录；维护者规划目录迁移时仍须考虑这些客户端。
 
 ### 使用共享组件
 
@@ -290,11 +290,11 @@ $ hub component-info fns/notes.wasm
 | `version` | 单个确切的语义版本，例如 `1.0.0` 或 `1.0.0-rc.1`。`^1.0.0` 这样的版本范围会被拒绝。 |
 | `blake3` | 组件文件的 BLAKE3 摘要，64 个小写十六进制字符，即签名目录条目中的 `wasm_blake3`。 |
 
-一个应用最多指定 8 个组件。没有该特性却写了 `components`（`components requires wasm-shared-components-v1`）、有该特性却没有 `wasm`（`wasm-shared-components-v1 requires the wasm capability`），或某个条目违反上述规则，清单解析器都会拒绝。不认识该特性的宿主会拒绝这个应用。只使用共享组件的应用不需要 `fns/`。
+一个应用最多指定 8 个组件。没有该特性却写了 `components`（`components requires wasm-shared-components-v1`），或某个条目违反上述规则时，清单解析器会拒绝。不认识该特性的宿主会拒绝这个应用。只使用共享组件的应用不需要 `fns/`。
 
 使用 `--catalog` 时，准入检查在该签名目录中解析每个组件。组件缺失（`is not in the catalog`）、已被撤回（`was withdrawn: <reason>`）或摘要不同（`pins blake3 …, but the catalog's file hashes to …`）时，`components` 检查项会拒绝这个应用。遗漏 `storage`、`net` 或 `wasm` 使用声明不会导致组件被拒绝。`octosense:host` 不需要单独的授权。随后，每个组件都有一行说明它在这个应用中能访问什么。不使用 `--catalog` 时，准入检查会警告它无法解析这些组件。
 
-下面的演练在本地开发 Hub 上运行（见[用开发 Hub 演练](#用开发-hub-演练)）。它的签名目录提供 `org.example.markdown` 1.0.0，即 App Hub 测试中的 notes 组件（`crates/app-hub/tests/fixtures/notes.component.wasm`）。应用 `writer` 固定了它，并获得 `wasm` 和 `storage` 能力：
+下面的演练在本地开发 Hub 上运行（见[用开发 Hub 演练](#用开发-hub-演练)）。它的签名目录提供 `org.example.markdown` 1.0.0，即 App Hub 测试中的 notes 组件（`crates/app-hub/tests/fixtures/notes.component.wasm`）。应用 `writer` 固定了它，并披露 `wasm` 和 `storage` 用途：
 
 ```console
 $ hub check writer --allow-unsigned --catalog dev-catalog.json --anchor "$(cat anchor.pub)"
@@ -421,7 +421,7 @@ hub: the component was refused
 | `version`（使用 `--catalog` 时） | 签名目录中已有这个版本。 |
 | `continuity`（使用 `--catalog` 时） | 仓库、所有者或工作流与早期版本不同，版本不高于最新版本，或历史记录自相矛盾。 |
 
-`functions` 警告告诉审核人员，这个组件在固定它的任何应用中能访问什么；随后，每个应用自己的检查会按该应用的授权检查组件。
+`functions` 警告告诉审核人员组件导入了哪些接口。准入检查验证导入兼容性和精确固定的版本；运行时组件继续受调用方的应用身份、隔离目录、配额和实际授权约束。
 
 App Hub 管理员用 `hub component-entry <release.json> --wasm <file.wasm> --catalog <authenticated catalog> --out <index.json>` 把已批准的 Release 变成签名目录候选内容，这需要 GitHub 来源证明。候选内容新增 `artifacts/<id>-<version>.wasm` 和 `index/components/<id>-<version>.json`（[通过 GitHub 发布目录](GITHUB-PUBLISHING.zh-CN.md#准备待审核候选)）。撤回时，与应用一样，把条目标记为已撤回并写明原因。
 
@@ -487,16 +487,16 @@ hub: the bundle was refused
 | `integrity.bundle_blake3` | 应用包摘要。 | 由 `hub stamp` 写入。不要手工修改。 |
 | `integrity.github` | GitHub 仓库/所有者 ID、工作流、标签、commit 和附加的 Sigstore 证明。 | 需要 `publisher-github-v1`，由 `publisher-prepare` 和 `publisher-attach` 生成。 |
 | `integrity.signature` | `{key_id, value}`，即旧格式的 Ed25519 清单签名。 | 省略此字段：App Hub 只接受带 GitHub 证明的 Release（[签名](#签名)）。在 [App Hub #168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168) 落地之前，准入检查仍会让用密钥签名的清单通过；审核人员会拒绝它。 |
-| `capabilities` | 应用可以使用的能力。 | 封闭列表中的名称（[能力](#能力)）。 |
-| `network.hosts` | 应用可以访问的主机。 | 纯主机名，且必须同时请求 `net`（[网络主机](#网络主机)）。 |
+| `capabilities` | 应用预计使用的能力。 | 封闭列表中的名称（[能力](#能力)）。 |
+| `network.hosts` | 披露预计访问的网络目的地。 | 纯主机名，即使没有声明 `net` 也会校验格式（[网络主机](#网络主机)）。 |
 | `storage` | `max_bytes`、`accounts`、`agent_workspace`、`cache_max_bytes`。 | 见[存储与配额](#存储与配额)。 |
 | `compute` | `instruction_budget`、`memory_bytes`。 | 会限制在宿主的上限以内。 |
 | `agent` | 应用自己的 Agent。 | 可选（[清单中的 `agent`](#清单中的-agent)）。 |
-| `research` | `research` 和 `crawl` 的范围。 | 请求了 `research` 或 `crawl` 时必需；两者都没请求时，出现此字段即拒绝（[research 范围](#research-范围)）。 |
-| `requires` | 应用需要的宿主特性。 | 每一项都必须是宿主已知的特性：`palpo-admin-v1`、`host-api-v1`、`backend-api-v1`、`script-tools-v1`、`publisher-github-v1`、`wasm-components-v1` 或 `wasm-shared-components-v1`。GitHub 发布需要真实来源证明验证器；三个 API 标记还需要宿主实现它们对应的 API（[宿主 API 兼容性](HOST-API.zh-CN.md)）。`wasm-components-v1` 和 `wasm-shared-components-v1` 需要 `wasm` 能力（[WebAssembly 组件](#webassembly-组件)、[共享组件](#共享组件)）。 |
+| `research` | `research` 和 `crawl` 的范围。 | 声明 `research` 或 `crawl` 时必需；即使未声明这两项，也接受有效的范围（[research 范围](#research-范围)）。 |
+| `requires` | 应用需要的宿主特性。 | 每一项都必须是宿主已知的特性：`palpo-admin-v1`、`host-api-v1`、`backend-api-v1`、`script-tools-v1`、`publisher-github-v1`、`wasm-components-v1` 或 `wasm-shared-components-v1`。GitHub 发布需要真实来源证明验证器；三个 API 标记还需要宿主实现它们对应的 API（[宿主 API 兼容性](HOST-API.zh-CN.md)）。`wasm-components-v1` 和 `wasm-shared-components-v1` 表示所需的组件 ABI（[WebAssembly 组件](#webassembly-组件)、[共享组件](#共享组件)）。 |
 | `components` | 应用的函数所用的共享组件，每个都固定到一个确切版本和摘要。 | 可选；需要 `wasm-shared-components-v1`；最多 8 个（[共享组件](#共享组件)）。 |
 | `host_api` | 应用需要（`required`）或可以使用（`optional`）的宿主 API 方法，每个方法都写明 ABI 主版本。 | 可选；须在 `requires` 中声明 `host-api-v1`。商店在安装时和每次启动时检查 `required` 中的方法（[声明应用需要什么](HOST-API.zh-CN.md#声明应用需要什么)）。 |
-| `backend` | 应用自己的后端：公开的登录端点，以及应用可以调用的操作。 | 可选；须在 `requires` 中声明 `backend-api-v1`，并请求 `auth` 能力、设置 `storage.accounts: true`。不含任何凭据（[登录自己的后端](#登录自己的后端)）。 |
+| `backend` | 应用自己的后端：公开的登录端点，以及应用可以调用的操作。 | 可选；须在 `requires` 中声明 `backend-api-v1`，并设置 `storage.accounts: true`。不含任何凭据（[登录自己的后端](#登录自己的后端)）。 |
 | `schema_minor` | 清单用到了 schema 1 的哪些新增内容。 | 省略此字段。 |
 
 其他字段一律拒绝。运行 `hub publisher-prepare` 之后，你省略的可选字段也会出现在清单中，值为 `null`，例如 `"agent": null`。这些字段不改变任何行为。
@@ -511,19 +511,19 @@ hub: the bundle was refused
 [refused] policy: app com.example.forecast requests unknown capability "model.image"
 ```
 
-能力让应用可以发出请求，但并不提供响应这些请求的服务。响应请求的是**宿主服务**：OctoSense Shell 中的代码，负责完成应用自己无权做的事。**目前由谁提供**一列说明[桌面 RC2](../README.zh-CN.md#下载兼容宿主)在其平台和提供商限制内由谁响应；RC1 和历史 beta 的区别会明确注明。
+能力声明说明预计用途，既不授权请求，也不提供响应这些请求的服务。响应请求的是**宿主服务**：OctoSense Shell 中的代码，负责完成应用自己无权做的事。**目前由谁提供**一列说明[桌面 RC2](../README.zh-CN.md#下载兼容宿主)在其平台和提供商限制内由谁响应；RC1 和历史 beta 的区别会明确注明。
 
 | 能力 | 描述的用途 | 商店显示的文字 | 目前由谁提供 |
 | --- | --- | --- | --- |
-| `storage` | 应用自己的存储文件夹：`fs.*`、相机拍摄的内容，以及控件读取的本地文件。没有它，所有 `fs.*` 调用都会失败。 | Keep its own data on this device | 运行时，所有宿主都提供 |
-| `files` | 导入或导出用户在宿主原生对话框中选择的文件。导入和导出还需要 `storage`；应用得到的是自身存储内的相对路径，不是任意文件系统访问权限。应用应声明所需的具体 `files.*` 方法。 | Import and export files you choose in the system file dialog | 桌面 RC2 在 macOS、Windows 以及安装了对话框辅助程序（zenity、qarma、matedialog 或 kdialog）的 Linux 上提供，兼容的 Android 构建也提供；RC1 不提供。单文件上限 1 MiB；`files.share` 仅限 Android，且只确认已交给系统分享选择器 |
-| `net` | 向 `network.hosts` 中的主机发出请求，不能访问其他主机。 | Reach only: *主机列表* | 运行时，所有宿主都提供 |
+| `storage` | 应用自己的存储文件夹：`fs.*`、相机拍摄的内容，以及控件读取的本地文件。即使没有这项声明，应用仍有自己的隔离目录和配额。 | Keep its own data on this device | 运行时，所有宿主都提供 |
+| `files` | 导入或导出用户在宿主原生对话框中选择的文件。导入和导出使用应用自己的隔离目录；应用得到的是自身存储内的相对路径，不是任意文件系统访问权限。应用应声明所需的具体 `files.*` 方法。 | Import and export files you choose in the system file dialog | 桌面 RC2 在 macOS、Windows 以及安装了对话框辅助程序（zenity、qarma、matedialog 或 kdialog）的 Linux 上提供，兼容的 Android 构建也提供；RC1 不提供。单文件上限 1 MiB；`files.share` 仅限 Android，且只确认已交给系统分享选择器 |
+| `net` | 直接联网；`network.hosts` 披露预计访问的目的地。 | Declared destinations: *主机列表* | 运行时，所有宿主都提供 |
 | `images` | 显示任何公开 https 主机上的图片，不限于 `network.hosts`。 | Show pictures from any website | 运行时 |
 | `web` | 在系统网页视图中打开任何公开 https 页面；网页视图没有任何回到应用的通道。 | Open web pages in a browser view | 运行时在支持的平台上提供，自 RC1 起包括 Windows/WebView2 和 Linux X11/XWayland/WebKitGTK；原生 Wayland 内嵌仍不支持（[运行条件](../README.zh-CN.md#下载兼容宿主)）。 |
 | `location` | 设备的位置。自桌面 RC1 起的 macOS 构建及兼容 Android 源码构建中：声明了 `host-api-v1` 的应用须先用 `location.permission.request` 请求权限，之后可以在 macOS 和 Android 上用 `location.sample` 读取新鲜位置（RC2），或仅在 Android 上用 `location.get` 读取上次已知的位置（[宿主 API 兼容性](HOST-API.zh-CN.md)）。 | Use your location | 运行时，限具备该功能的设备 |
-| `camera` | 相机。拍摄的内容保存在应用的存储中，所以应用还需要 `storage`。自桌面 RC1 起的 macOS 构建及兼容 Android 源码构建中：声明了 `host-api-v1` 的应用须先用 `camera.permission.request` 请求权限。 | Use the camera | 运行时，限具备该功能的设备 |
+| `camera` | 相机。拍摄的内容保存在应用带配额的私有存储中，即使没有声明 `storage` 也是如此。自桌面 RC1 起的 macOS 构建及兼容 Android 源码构建中：声明了 `host-api-v1` 的应用须先用 `camera.permission.request` 请求权限。 | Use the camera | 运行时，限具备该功能的设备 |
 | `microphone` | 获得应用及系统授权后录音。前台 `microphone.record_*` 会话随桌面 RC2 在 macOS 和兼容的 Android 构建上提供（30 秒以内的录音写入应用存储；硬件验收待完成）；较早的宿主以及 Windows 和 Linux 只有权限方法，没有录音方法。请声明确切所需的方法，先调用 `microphone.permission.request`。 | 使用麦克风 | 运行时，取决于设备是否支持 |
-| `audio` | 应用活跃时播放应用内音频，不隐含麦克风、存储或后台权限。 | 应用活跃时播放自己的音频文件 | 桌面 RC2 在 macOS 和兼容的 Android 构建上提供，还需要 `storage`（文件最大 1 MiB、最长 60 秒）；Windows、Linux 和 RC1 不提供；硬件验收待完成。 |
+| `audio` | 应用活跃时播放应用内音频，不授予麦克风访问或后台录音权限。 | 应用活跃时播放自己的音频文件 | 桌面 RC2 在 macOS 和兼容的 Android 构建上提供，还需要 `storage`（文件最大 1 MiB、最长 60 秒）；Windows、Linux 和 RC1 不提供；硬件验收待完成。 |
 | `library` | 把拍摄的内容提供给系统相册，其他应用也能看到。 | Save to your photo library, where other apps can see it | 运行时，限具备该功能的设备 |
 | `clipboard` | 剪贴板。 | Use the clipboard | 尚不支持：没有 API 使用它 |
 | `prompt` | 应用向用户提出的问题。 | Ask you questions | 尚不支持：没有宿主读取它。应用 Agent 用 `ask_user_question` 提问。 |
@@ -558,15 +558,15 @@ hub: the bundle was refused
 | `vector` | 通过 `vector` 引擎（vectorcraft）处理矢量图：检查、转换，并渲染 SVG、PDF、EPS 和 DXF，均在应用自己的文件内。 | Use the device's vector-drawing engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
 | `pdf` | 通过 `pdf` 引擎（pdfcraft）处理 PDF：信息、文本、页面渲染、合并和拆分，均在应用自己的文件内。 | Use the device's PDF engine on its own files | 仅系统应用。桌面 RC2 自带该引擎供系统助手使用，但其准入代码早于这个能力名，商店应用不得声明它；OctoSense `main` 在桌面构建（macOS、Linux、Windows）中提供，Home 不提供。 |
 
-任何能力都不隐含其他能力。尚不支持：面向商店应用的 `photos` 和 `youtube` 服务。脚本如何调用各项能力，见 App Flow 的[能力](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.zh-CN.md)文档；哪些能力会真正响应商店应用、支持哪些平台、从哪个版本开始，见其[宿主 API 能力族](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-FAMILIES.zh-CN.md)。
+声明不会授予访问权限或补上缺失的服务。尚不支持：面向商店应用的 `photos` 和 `youtube` 服务。脚本如何调用各项能力，见 App Flow 的[能力](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.zh-CN.md)文档；哪些能力会真正响应商店应用、支持哪些平台、从哪个版本开始，见其[宿主 API 能力族](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-FAMILIES.zh-CN.md)。
 
 源码：`crates/app-contract/src/manifest.rs` 中的 `KNOWN_CAPABILITIES`。
 
 ### 精确的服务名：`octos.*`、`matrix.*`、`palpo.*`
 
-这 78 个名称各是一项独立的能力，按全名精确匹配。`octos.` 或 `matrix.` 这样的前缀属于未知能力。仅通过准入检查还不够：每次调用时，宿主还会检查自己是否提供这个名称、应用的策略是否包含它，以及用户是否授权了它。
+这 78 个名称各是一项独立的用途声明，按全名精确匹配。`octos.` 或 `matrix.` 这样的前缀属于未知能力。在当前 OctoSense 宿主中，明确提供助手的应用，经用户同意后可以使用四个公开的 `octos.*` 方法，无须逐个声明这些方法的能力名。宿主仍核对准入的应用身份、会话归属、方法白名单和用户同意。公开这些方法本身不会创建助手，也不会授予其他应用的工具。Rinx 迷你应用采用独立的宿主授权路径。
 
-| 组 | 名称 | 授予的权限 | 目前由谁提供 |
+| 组 | 名称 | 描述的用途 | 目前由谁提供 |
 | --- | --- | --- | --- |
 | `octos.*` | 4 个：`octos.session.open`、`octos.session.history`、`octos.turn.start`、`octos.turn.interrupt` | 与应用自己的 Agent 对话，对话由 OctoSense 运行的 Agent 内核 octos 承载：打开对话、读取对话历史、开始一轮、停止应用发起的那一轮。应用从不指定提供商、模型或密钥。 | OctoSense，前提是用户允许了该应用的 Agent。在此之前，调用会得到 `Waiting for the person to allow this app's agent (OctoSense asks the first time)`。 |
 | `matrix.*` | 45 个，例如 `matrix.read_messages`、`matrix.room_members`、`matrix.send_message` | 每个名称对应一项 Matrix 操作，使用用户当前的账户，限于用户允许的房间。 | 没有任何 OctoSense 宿主服务提供它们。OctoSense 随附的原生应用 Rinx 通过自己的宿主，向用户导入其中的迷你应用提供这些名称；这不属于 App Hub 的安装途径。 |
@@ -598,13 +598,13 @@ ID 请以你能控制的反向域名前缀开头，例如把自己的域名倒�
 
 ### 网络主机
 
-除 `images` 和 `web` 外，应用只有请求了 `net` 并给出确切的主机列表，才能访问网络。运行时在每一条离开隔离环境的路径上强制执行这份列表：网络模块、素材加载和数据获取。`net` 配上空列表，什么也访问不了。主机按名称精确匹配：列出 `example.com` 并不允许访问 `api.example.com`。请写纯主机名，例如 `api.example.com`，不带协议、路径、端口或通配符：
+`network.hosts` 披露预计访问的目的地。即使没有声明 `net` 或列出主机，运行时网络模块也可用。已列出的主机仍须符合披露格式：纯主机名，不带协议、路径、端口或通配符。这项格式规则不会限制运行时的网络目的地。
 
 ```text
 [refused] policy: host "https://api.open-meteo.com/v1" must be a bare host name, with no scheme or path
 ```
 
-主机列表是每个签名版本的一部分，所以只列出稳定的主机：已发布的应用跟不上隧道换用的新名称，`localhost` 指向的也是用户自己的设备，而不是你的服务器。
+主机列表是每个签名版本的一部分，所以只列出稳定的主机：隧道改名不会更新已发布的披露信息。`localhost` 指向的是用户自己的设备，而不是你的服务器。
 
 ### 存储与配额
 
@@ -617,7 +617,7 @@ ID 请以你能控制的反向域名前缀开头，例如把自己的域名倒�
 | `compute.instruction_budget` | 每次会话累计可执行的脚本指令数。 |
 | `compute.memory_bytes` | 隔离环境的堆大小。 |
 
-配额只是请求。宿主会把每项配额限制在对应的上限（即宿主允许的最大值）以内；未填写的配额直接取上限。`hub check` 输出的 `grants:` 行显示限制之后应用实际获得的存储空间。
+配额只是请求。宿主会把每项配额限制在对应的上限（即宿主允许的最大值）以内；未填写的配额直接取上限。`hub check` 输出的 `declarations:` 行显示限制之后应用实际获得的存储空间。
 
 | 项目 | 上限 |
 | --- | --- |
@@ -655,7 +655,7 @@ ID 请以你能控制的反向域名前缀开头，例如把自己的域名倒�
 | `max_age_days` | 允许的最旧内容，以距今天数表示。 | 整数天数。 |
 | `categories` | 元搜索类别。 | `news`、`general`、`science`、`it` 或 `social`。 |
 | `max_results` | 每次搜索最多返回的结果数。 | 大于 0；默认 20。 |
-| `max_depth`、`max_pages` | `crawl` 的限制：单次抓取的链接深度和页数。 | 请求 `crawl` 时两者都必须大于 0；不请求时两者都为 0 或省略。 |
+| `max_depth`、`max_pages` | 抓取限制：单次抓取的链接深度和页数。 | 声明 `crawl` 时两者都须大于 0；否则可以省略或设为 0 来禁用抓取。即使未声明 `crawl`，也会校验已提供的范围。 |
 
 列表为空或省略，或者省略 `max_age_days`，都表示不设限制。`{}` 只保留默认值：每次搜索 20 条结果，不抓取。未知字段一律拒绝。
 
@@ -697,11 +697,11 @@ ID 请以你能控制的反向域名前缀开头，例如把自己的域名倒�
 | `instructions` | Agent 的指令，按惯例写在 `AGENT.md` 中。 | 不是应用包内的 `.md` 路径。 |
 | `skills` | 要加载的技能，以 `skills/` 下的目录名指定。 | 超过 16 个技能，或同一技能列出两次。 |
 
-Agent 的工作区就是应用自己的存储文件夹，它也只能访问应用获准访问的主机。Agent 得到的权限绝不会超过应用本身。
+Agent 的工作区遵循应用及账户的存储范围和 `agent_workspace` 设置。工具选择、research 范围、跨应用共享授权与用户同意，独立于描述用途的 `capabilities` 和 `network.hosts`；声明服务族不会添加工具。在提供 research/crawl 工具的宿主中，应用须在 `agent.tools` 中请求确切名称，并提供有效的 `research` 范围。商店应用的默认可选工具不包含这些工具（见[代码导读](CODE-WALKTHROUGH.md#6-what-declaring-an-app-agent-enables)）。
 
 ### 带 `tools.json` 的应用都有 Agent
 
-只要应用带有 `tools.json`，即使没有 `agent` 字段，OctoSense 也会为它提供“Ask &lt;app&gt;”。`hub check` 对这样的应用仍会输出 `agent none`，因为 `grants:` 行只反映清单中的 `agent` 字段。商店的隐私概要如何描述这类应用，取决于构建该商店所用的 App Hub 版本：
+只要应用带有 `tools.json`，即使没有 `agent` 字段，OctoSense 也会为它提供“Ask &lt;app&gt;”。`hub check` 对这样的应用仍会输出 `agent none`，因为 `declarations:` 行只反映清单中的 `agent` 字段。商店的隐私概要如何描述这类应用，取决于构建该商店所用的 App Hub 版本：
 
 | 商店 | 有 `tools.json`、没有 `agent` 时的隐私概要 |
 | --- | --- |
@@ -811,11 +811,11 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | `microphone` | `microphone.permission.status` | |
 | `location` | `location.permission.status`、`location.get` | |
 
-App Hub 已允许声明 `device_calendar` 工具别名和 `mail.compose` / `mail.compose_status`；桌面 RC2 在 macOS 和兼容的 Android 构建上实现了它们，RC1 没有，Windows 和 Linux 可以撰写草稿和读取状态，但不能批准发送。它们均需要 `private_data: true` 和对应能力。日历权限申请、日历选择和事件修改仅限前台，`mail.review_send` 和 `mail.send` 也一样。准备草稿不会发送邮件；兼容宿主仍须重新核验授权，并在用户批准对外写操作前显示宿主自己的不可变审阅内容。
+App Hub 已允许声明 `device_calendar` 工具别名和 `mail.compose` / `mail.compose_status`；桌面 RC2 在 macOS 和兼容的 Android 构建上实现了它们，RC1 没有，Windows 和 Linux 可以撰写草稿和读取状态，但不能批准发送。这些别名仍要求 `private_data: true` 及所列风险级别；当前策略不会仅因遗漏服务族披露而拒绝路由。日历权限申请、日历选择和事件修改仅限前台，`mail.review_send` 和 `mail.send` 也一样。准备草稿不会发送邮件；兼容宿主仍须重新核验授权，并在用户批准对外写操作前显示宿主自己的不可变审阅内容。
 
-`wasm.<function>` 运行应用自带的函数之一（`fns/*.wasm`，`wasm` 能力）。它只在提供 `wasm` 的宿主上可用（见[能力](#能力)）：桌面 RC2 的 macOS 和 Linux 构建提供，RC1 默认关闭。RC2 在[平台限制](HOST-API.zh-CN.md#限制)内实现上表中的 `auth`、`runtime`、`camera`、`microphone`、`location`、`device_calendar` 和 `mail` 方法。上面的规则同样适用于这些方法，`runtime.list` 和 `runtime.describe` 也不例外。通过准入不等于已经配置账户、取得权限或补上缺少的 API：请用 `runtime.describe` 查询宿主实现了什么。映射到 `auth.backend.request` 的工具只能执行后端声明的 `GET` 操作；写操作仍须应用在前台，并由用户在宿主的原生审阅界面上批准。权限的 `request` 和 `revoke`、账户管理，以及 `app_tools.dispatch@1` 等运行时 ABI，都没有 `host_method`。
+`wasm.<function>` 运行应用自带的函数之一（`fns/*.wasm`，用 `wasm` 披露用途）。它只在提供 `wasm` 的宿主上可用（见[能力](#能力)）：桌面 RC2 的 macOS 和 Linux 构建提供，RC1 默认关闭。RC2 在[平台限制](HOST-API.zh-CN.md#限制)内实现上表中的 `auth`、`runtime`、`camera`、`microphone`、`location`、`device_calendar` 和 `mail` 方法。上面的规则同样适用于这些方法，`runtime.list` 和 `runtime.describe` 也不例外。通过准入不等于已经配置账户、取得权限或补上缺少的 API：请用 `runtime.describe` 查询宿主实现了什么。映射到 `auth.backend.request` 的工具只能执行后端声明的 `GET` 操作；写操作仍须应用在前台，并由用户在宿主的原生审阅界面上批准。权限的 `request` 和 `revoke`、账户管理，以及 `app_tools.dispatch@1` 等运行时 ABI，都没有 `host_method`。
 
-上述七个媒体别名需要 [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368)，桌面 RC1 和 RC2 已包含这些方法。它们仍要求 `model` 能力和 `private_data: true`。生成与向量请求可能计费，因此它们和视频取消至少需要 `act` 风险，并使用有资源上限的模型服务。发现 API 不代表供应商账户已有权益；远端视频任务已运行时，取消可能失败。额度和进程内任务生命周期见双语[媒体契约](https://github.com/OctoSense-org/OctoSense/blob/main/apps/ai-providers/host-service/MEDIA.zh-CN.md)。这些策略别名不构成真实供应商或设备验证。
+上述七个媒体别名需要 [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368)，桌面 RC1 和 RC2 已包含这些方法。当前策略保留 `private_data: true` 和方法风险要求，不再以 `model` 声明作为执行门槛。生成与向量请求可能计费，因此它们和视频取消至少需要 `act` 风险，并使用有资源上限的模型服务。发现 API 不代表供应商账户已有权益；远端视频任务已运行时，取消可能失败。额度和进程内任务生命周期见双语[媒体契约](https://github.com/OctoSense-org/OctoSense/blob/main/apps/ai-providers/host-service/MEDIA.zh-CN.md)。这些策略别名不构成真实供应商或设备验证。
 
 账户/业务写入、登录、确认和批准都没有 `host_method`：这些操作由用户在应用自己的界面上发起。上述有上限的模型任务是模型供应商提交的明确例外。
 
@@ -825,7 +825,7 @@ App Hub 已允许声明 `device_calendar` 工具别名和 `mail.compose` / `mail
 
 ### 脚本工具执行（`script-tools-v1`）
 
-脚本工具是 `"implemented_by": "app"` 的工具：由应用自己的 Splash 代码在已打开的应用中运行。它需要提供 `app_tools.dispatch@1` 的宿主，例如[桌面 RC2](../README.zh-CN.md#下载兼容宿主)。OctoSense 桌面版 0.1.0-beta.2 拒绝这类工具，返回 `app_tool_unavailable`。
+脚本工具是 `"implemented_by": "app"` 的工具：由应用自己的 Splash 代码在已打开的应用中运行。它需要提供 `app_tools.dispatch@1` 的宿主，例如[桌面 RC4](../README.zh-CN.md#下载兼容宿主)。OctoSense 桌面版 0.1.0-beta.2 拒绝这类工具，返回 `app_tool_unavailable`。
 
 添加脚本工具：
 
@@ -944,7 +944,7 @@ OctoSense 桌面 RC1 改变了四点，RC2 沿用这些改动：
 
 ## 商店信息
 
-`listing.json` 是用户安装前在商店中看到的内容。它与应用包一同接受审核，并随签名目录分发，因此审核人员读到的内容就是商店显示的内容。商店信息旁边显示的权限来自清单，而不是商店信息，所以商店信息无法淡化应用的实际行为。
+`listing.json` 是用户安装前在商店中看到的内容。它与应用包一同接受审核，并随签名目录分发，因此审核人员读到的内容就是商店显示的内容。商店信息旁的用途披露来自清单，而不是商店信息。两者都应准确描述应用行为；遗漏声明不代表应用无法存储数据或联网。
 
 | 字段 | 规则 |
 | --- | --- |
@@ -989,7 +989,7 @@ host.request("mail.list", {…}, fn(r){ … })
 
 ### 已连接账户
 
-使用 GitHub 或 Google 的应用要声明 `auth`，再加上它用到的提供商能力：`github`、`gcalendar` 或 `gmail`。用户在宿主面板上登录，应用拿到的是连接句柄，绝不是令牌。写操作要经过宿主确认。请设置 `storage.accounts: true`，让每个账户各自保存数据。哪些宿主支持这类应用，见[开始之前](SUBMITTING.zh-CN.md#开始之前)；具体如何调用，见 App Flow 的[使用已连接账户](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.zh-CN.md#使用已连接账户)。
+使用 GitHub 或 Google 的应用应披露 `auth` 及实际使用的提供商服务族：`github`、`gcalendar` 或 `gmail`。这些声明不会授权访问账户。用户在宿主面板上登录，应用拿到的是连接句柄，绝不是令牌。写操作要经过宿主确认。请设置 `storage.accounts: true`，让每个账户各自保存数据。哪些宿主支持这类应用，见[开始之前](SUBMITTING.zh-CN.md#开始之前)；具体如何调用，见 App Flow 的[使用已连接账户](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.zh-CN.md#使用已连接账户)。
 
 宿主强制执行哪些规则，取决于构建版本和平台。Windows/Linux 的受保护写操作仍不支持，会拒绝执行，见[平台限制](../README.zh-CN.md#下载兼容宿主)：
 
@@ -1090,7 +1090,7 @@ host.request("mail.list", {…}, fn(r){ … })
 | --- | --- |
 | `hub publisher-prepare/attach/verify/pack/unpack/entry` | 准备 GitHub 规范化主题、附加证明、验证、交付或生成审核候选；详见 [GitHub 发布者来源证明](#github-发布者来源证明)及 `hub --help` 的完整参数。均不会发布目录。 |
 | `hub stamp <bundle>` | 用准入检查的解析器解析 `manifest.json`，然后把应用包摘要写入 `integrity.bundle_blake3` 并输出。准入检查无法读取的清单，或已带 GitHub 证明的 Release，它都会拒绝处理。 |
-| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app] [--advisory-db <dir>]` | 准入检查本身。输出 `PASSED` 或 `REFUSED`、每个检查结果，以及应用将获得的授权。有拒绝时退出码为 1。`--json` 以 JSON 输出报告（`schema`、`stage`、`passed`、`app_id`、`version`、`digest`、`findings` 和 `resources`）。`--publisher-key` 用于检查旧格式的密钥签名应用包，发布时从不需要它。 `--advisory-db` 把其组件列出的 crate 与 RustSec 检出对照检查（见[组件列出的 crate](#组件列出的-crate)）。 |
+| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app] [--advisory-db <dir>]` | 准入检查本身。输出 `PASSED` 或 `REFUSED`、每个检查结果，以及用途声明和解析后的资源上限。有拒绝时退出码为 1。`--json` 以 JSON 输出报告（`schema`、`stage`、`passed`、`app_id`、`version`、`digest`、`findings` 和 `resources`）。`--publisher-key` 用于检查旧格式的密钥签名应用包，发布时从不需要它。 `--advisory-db` 把其组件列出的 crate 与 RustSec 检出对照检查（见[组件列出的 crate](#组件列出的-crate)）。 |
 | `hub scan <bundle> [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--packet <out.json>] [--reviewer <cmd>] [--system-app]` | 先运行准入检查，再写出审核包，还可以把审核包交给一条审核命令。准入检查拒绝的应用包不会进入扫描。 |
 | `hub component-info <file.wasm>` | 以 JSON 输出函数文件的类型（`component` 或 `module`）、它的导入，以及它导出的函数及其参数和结果（[WebAssembly 组件](#webassembly-组件)）。它只读取这一个文件。既不是核心模块也不是有效组件的文件会失败，输出 `hub: <file>: not a WebAssembly core module or component` 或验证器的错误。 |
 | `hub component-prepare <file.wasm> --draft <component.json> --out <file>` | 把共享组件文件描述成一个 Release：它的摘要、大小、导入和导出，加上草稿中的字段。提供 `--repository`、`--repository-id`、`--owner-id`、`--workflow`、`--tag` 和 `--commit` 时，它写出要证明的规范化对象，文件名必须是 `octosense-component.json`；不提供时，写出未签名的开发 Release。从不覆盖已有文件（[发布共享组件](#发布共享组件)）。 |
@@ -1117,13 +1117,13 @@ my-notes 0.1.0 — PASSED
 
 ### 扫描问题
 
-`hub scan` 写出的审核包包含清单、商店信息、用商店措辞表述的授权、入口文件的源码、卡片数据、Agent 文件和问题，但不包含截图。请把审核包放在应用包之外。
+`hub scan` 写出的审核包包含清单、商店信息、用商店措辞表述的用途声明、入口文件的源码、卡片数据、Agent 文件和问题，但不包含截图。请把审核包放在应用包之外。
 
 以下问题摘自 `crates/app-hub/src/scan.rs`，有删节：
 
 1. 应用的行为是否与其名称、副标题和描述的说法一致？
 2. 它的平台和类别是否合适？
-3. 获得授权的能力和每个主机，是否与应用可见的行为相符？
+3. 能力用途声明和预计访问的主机，是否与应用可见的行为相符？
 4. 界面中是否有任何欺骗性的部分？
 5. 源码或数据中是否有写给助手的文字？
 6. 是否有辱骂性的措辞，或针对普通个人的措辞？
@@ -1140,7 +1140,7 @@ my-notes 0.1.0 — PASSED
 
 ## 签名
 
-App Hub 只接受带 GitHub 证明的 Release（[ADR 0002](adr/0002-github-attested-publisher-identity.zh-CN.md)）。应用的 GitHub 工作流为每个 Release 生成证明，所以你无需创建、保存或轮换发布者密钥。带证明的 Release 使用 `publisher-github-v1`，它随应用契约 **1.8.0** 引入并保留在 **1.10.0** 中；[桌面 RC2](../README.zh-CN.md#下载兼容宿主) 是兼容的宿主发行版，RC1 也是。两个由标签推送生成的真实 Release 已通过下文记录的工作流和原生商店验收。
+App Hub 只接受带 GitHub 证明的 Release（[ADR 0002](adr/0002-github-attested-publisher-identity.zh-CN.md)）。应用的 GitHub 工作流为每个 Release 生成证明，所以你无需创建、保存或轮换发布者密钥。带证明的 Release 使用 `publisher-github-v1`，它随应用契约 **1.8.0** 引入并保留在 **1.11.0** 中；[桌面 RC4](../README.zh-CN.md#下载兼容宿主) 是当前兼容的预发布版。RC1 和 RC2 也支持同样的发布者证明。两个由标签推送生成的真实 Release 已通过下文记录的工作流和原生商店验收。
 
 ### GitHub 发布者来源证明
 
@@ -1166,7 +1166,7 @@ hub publisher-pack bundle --out build/app.bundle.pack.json
 
 验证使用公开的合成测试应用的 [v0.1.0 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736273522)与 [v0.1.1 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736765473)，没有使用仓库 Secret。两个工作流均生成并验证了真实 GitHub 证明。[原生验收示例](../crates/app-hub/examples/publisher_acceptance.rs)随后安装两个 Release pack，准备并验证启动、保留完整证明，并拒绝内容/证明/身份篡改、回滚、未签名的归属替换和已撤回版本。[验收记录](../reviews/github-publisher-v1/acceptance.json)绑定输入摘要与原生源码版本。其中的商店使用临时的本地测试签名目录；该测试应用没有 App Hub 提交 issue，也没有签名目录条目。这既不能证明应用界面可以运行，也不能证明手机可以安装 GitHub 发布者应用。
 
-在 macOS 上，OctoSense 桌面 RC1 安装了签名目录第 13 版中带 GitHub 证明的示例应用，并在安装和更新时检查了这些应用的证明和发布者连续性；[RC2](../README.zh-CN.md#下载兼容宿主) 以同样的方式读取签名目录。iOS、Windows 和 Linux 上的商店安装仍未验证，目前也没有任何已发行的手机版本支持 `publisher-github-v1`。
+在 macOS 上，OctoSense 桌面 RC1 安装了签名目录第 13 版中带 GitHub 证明的示例应用，并在安装和更新时检查了这些应用的证明和发布者连续性；[RC2](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.2) 以同样的方式读取签名目录。[Home beta.2](https://github.com/OctoSense-org/OctoSense/releases/tag/home-v0.1.0-beta.2) 的源码 `f6759edd` 通过 Hub `95e4831a` 和契约 1.10 包含 GitHub 发布者证明支持。其发布冒烟测试已访问真实目录，但没有验证手机上带证明应用的安装和更新。此处也未验证 iOS、Windows 和 Linux 上的商店安装。
 
 请下载含有生成后证明清单的 **Release pack**；单独检出源码并不包含这些最终字节。审核人员可运行 `hub publisher-unpack app.bundle.pack.json --out review-bundle`，再运行 `hub publisher-verify review-bundle --catalog <authenticated-catalog>`。Unpack 要求新目录，拒绝路径穿越，失败时仅清理自己创建的输出。`hub publisher-entry review-bundle --catalog <authenticated-catalog> --out build/index.json` 生成审核候选条目，不会发布。
 
@@ -1200,6 +1200,6 @@ Release 的证明覆盖清单，包括 `integrity.bundle_blake3`。请遵守以�
 
 ## 发布之后
 
-- **版本。** 已安装的应用运行的是已安装的那个版本，并沿用该版本的授权。较新的版本是用户可以选择安装的更新；在用户安装之前，打开的仍是已安装的版本。
+- **版本。** 已安装的应用运行该版本已审核的应用包，并遵守宿主当前的授权检查。较新的版本是用户可以选择安装的更新；在用户安装之前，打开的仍是已安装的版本。
 - **完整性。** 宿主把已安装的应用包存放在应用的存储之外，因此应用无法写入它。每次启动时，宿主都会对照签名目录检查应用包：清单、摘要和发布者的证明。应用包一旦不再一致，宿主就会拒绝运行它，直到用户重新安装该应用。
 - **撤回。** 每台设备下次拉取签名目录时，已撤回的版本就会停止运行，其他版本照常运行（[提交之后](SUBMITTING.zh-CN.md#9-提交之后)）。

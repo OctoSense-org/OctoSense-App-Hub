@@ -4,16 +4,16 @@ English | [简体中文](HOST-API.zh-CN.md)
 
 Contract 1.6 lets an app declare the host APIs it needs and discover the ones
 a host implements. It adds declarations and discovery, not access: an app can
-call only the Rust services compiled into its host, and every call still needs
-the app's grants. The same contract lets a bundle declare its own backend
+call only the Rust services compiled into its host, and every call still
+checks the app's actual authorization. The same contract lets a bundle declare its own backend
 ([Sign in to your own backend](PUBLISHING.md#sign-in-to-your-own-backend)) and
 run its own agent tools
 ([Script tool execution](PUBLISHING.md#script-tool-execution-script-tools-v1)).
 
-These discovery declarations shipped in contract 1.8.0. The
-[RC2 release](../README.md#download-a-compatible-host), source `4ccf8e06`,
-implements them within the platform limits below, as RC1 did; its download
-status is tracked in that guide.
+These discovery declarations shipped in contract 1.8.0. The historical
+[RC2 release](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.2), source `4ccf8e06`,
+implemented them within the platform limits below, as RC1 did. Use
+[desktop RC4](../README.md#download-a-compatible-host) for the current contract 1.11 policy.
 An older host, such as OctoSense desktop 0.1.0-beta.2, serves none of these
 APIs and refuses an app that requires them.
 
@@ -28,9 +28,9 @@ nothing to an installed host.
 
 `capabilities` and `network.hosts` describe an app's expected API and network
 use for users and reviewers. Omitting a family or destination does not deny
-an otherwise supported public API. This is the source policy being prepared
-for the next compatible release; historical RC2 behavior is not evidence of
-this change being deployed.
+an otherwise supported public API. This policy is included in [desktop RC4](../README.md#download-a-compatible-host).
+Historical RC2 behavior is documented separately and does not describe these
+current authorization rules.
 
 Every admitted app gets a private storage jail with the resolved quota and a
 network module. Device access still needs per-app consent and OS permission;
@@ -117,7 +117,7 @@ authority for supported platforms and agent access.
 
 ### Reviewed Mail drafts (desktop RC2)
 
-With the existing `mail` capability, a compatible host exposes `mail.compose`
+A compatible host exposes `mail.compose`
 for app/account-bound local draft changes and `mail.compose_status` for their
 status. Agent aliases require minimum risk `act` and `read`, respectively,
 with `private_data: true`. They do not send mail. The foreground app requests
@@ -137,7 +137,7 @@ For discovery, call `runtime.list` with `{}` for every
 described method, or `runtime.describe` with `{"method":"location.get"}` for
 one:
 
-- A method description gives its schemas, ABI version, capability, platforms
+- A method description gives its schemas, ABI version, usage family, platforms
   and whether agents may call it.
 - `runtime_features` lists runtime ABIs, such as `app_tools.dispatch@1`.
   `host.request` cannot call a runtime ABI.
@@ -147,15 +147,17 @@ one:
 
 Availability is not configuration or permission. `configured: null` means the
 host does not know, and `authorization: "checked-on-call"` means the host
-checks the app's grants on every call. To learn whether a service is
+checks actual authorization on every call. To learn whether a service is
 configured and authorized, call its status or account methods. Declaring a
 requirement neither turns on an OS permission nor adds a provider
 registration.
 
 ## Selected-file transfer (published in contract 1.10)
 
-The `files` capability grants access to host-owned file dialogs, not arbitrary
-host paths. Import/export also need `storage`; neither grant implies the other.
+The `files` declaration describes host-owned file dialogs, not arbitrary
+host paths. Current hosts give every admitted app a bounded private jail;
+import/export does not require `files` or `storage` family declarations. The
+person still selects the file in a foreground host-owned dialog.
 Require `files.import@1` or `files.export@1` through `host_api.required`, or declare
 them optional and inspect `runtime.list`. Desktop RC2 implements these APIs;
 RC1 does not, and contract support alone never does. `files.status` reports
@@ -176,15 +178,15 @@ host's status and release notes for build and device validation.
 
 ### Photo selection and text sharing (desktop RC2)
 
-A matching host adds `files.pick_photo({"path":"photos/chosen.jpg"})`, using
-`files` plus `storage`. It opens an image chooser and validates PNG, JPEG or
-WebP signatures before importing into a new app-relative path. It returns
+A matching host adds `files.pick_photo({"path":"photos/chosen.jpg"})`, which
+imports into the app's private jail. It opens an image chooser and validates
+PNG, JPEG or WebP signatures before importing into a new app-relative path. It returns
 `path`, `bytes` and `mime`, or `{"cancelled":true}`. The 1 MiB limit still
 applies: larger originals fail explicitly; no image is silently resized.
 
-`files.share({"text":"A short note"})` uses `files` only and is Android-only
-in this batch. Text must contain 1–8192 UTF-8 bytes. The foreground call opens
-the native chooser and returns
+`files.share({"text":"A short note"})` opens Android's share chooser and is
+Android-only in this batch. Text must contain 1–8192 UTF-8 bytes. The
+foreground call opens the native chooser and returns
 `{"handoff":"chooser_opened","delivery":"unknown"}` only when that handoff
 succeeds. It does not prove delivery or support attachments. Neither method
 has an agent alias. Declare each method version and check the host's status;
@@ -198,12 +200,16 @@ RC1, Windows and Linux do not. Declare the method versions rather than
 inferring support from the capability name, and put them under
 `host_api.optional` when the listing names a platform without them:
 
-| Methods | Required capabilities | Behavior |
+| Methods | Usage disclosures | Behavior |
 | --- | --- | --- |
 | `microphone.record_start({path,max_duration_ms})` | `microphone`, `storage` | After app and OS consent, record at most 30 seconds of mono 16 kHz PCM WAV into a new app file. |
 | `microphone.record_status/record_stop/record_cancel({session})` | `microphone` | Inspect, stop and save, or discard this live app's recording. |
 | `audio.play({path})` | `audio`, `storage` | Play a bounded local WAV, MP3, FLAC or Ogg file. |
 | `audio.status/audio.stop({session})` | `audio` | Inspect or stop this live app's playback. |
+
+The table names usage disclosures, not execution grants. Current hosts do
+not reject these methods merely because a family declaration is absent;
+recording still requires the consent described below.
 
 Each response contains an opaque `session`, `status`, `path`, `error`, `frames`
 and `format`. A start response means `starting`, not successful recording or

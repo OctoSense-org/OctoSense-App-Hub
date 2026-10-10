@@ -35,14 +35,14 @@
 | 路径 | 要构建的内容 | 交付方式 |
 | --- | --- | --- |
 | Hub 卡片应用 | `page.card` 及其数据和 `kit/`、本地素材、`manifest.json` 和 `listing.json`。宿主把卡片转换（lower）为原生控件：卡片自身没有逻辑，只在宿主已有的能力范围内运行。 | 商店应用包，提交到 Hub。 |
-| Hub 脚本应用 | `main.splash`、本地素材、`manifest.json` 和 `listing.json`。这是一个 Splash 程序，有自己的状态、处理函数、请求和存储，在自己的隔离环境（独立的脚本运行环境）中按清单解析出的策略运行。它只能通过自己声明的主机访问网络，只能通过已获授予的能力和 Shell 提供的宿主服务访问用户的位置、相机和邮件。 | 商店应用包，提交到 Hub。 |
+| Hub 脚本应用 | `main.splash`、本地素材、`manifest.json` 和 `listing.json`。这是一个 Splash 程序，有自己的状态、处理函数、请求和存储，在自己的隔离环境（独立的脚本运行环境）中按清单解析出的策略运行。能力和目的地声明用于披露用途。私有隔离目录与配额、设备授权、账户 scope 和服务可用性仍约束执行；遗漏服务族或主机不会阻止公开 API 调用。 | 商店应用包，提交到 Hub。 |
 | 系统应用 | 使用保留 `os.` id 的脚本应用包，在构建时打包进 Shell。OctoSense 的系统应用位于 `apps/`。 | 随 Shell 版本发布。商店应用包不能使用 `os.` id。 |
 | 内置原生应用 | 编译进 Shell 版本的源码，按原生工作区和所属应用的构建说明构建。共享的图标约定同样适用。 | 随 Shell 版本发布。仅声明图标，并不能让它通过 Hub 安装。 |
 | Agent 生成的应用类型 | 位于 OctoSense `apps/appcard` 的规格说明和 lint 规则，教 AppCard 的 Agent 组合出一种新的应用类型。 | 不是应用包。 |
 
 已安装的 L0 卡片在宿主应用面板内保留其测量画布。渲染器按面板的相对坐标放置子控件；当画布超过可用空间时，原生双轴滚动视图让底部和右侧控件仍可操作。验收时应测试非零面板位置，以及小于原画布的高度和宽度，并滚动到最后一个控件后点击。不带测量位置的语义角色 L0 使用与 `card-host` 相同的流式布局转换。脚本应用继续自行管理响应式布局与滚动。
 
-商店应用包不含原生代码。新的原生 Rust 或 JNI 代码、Python 服务和浏览器控制器，都无法作为卡片应用或脚本应用安装。编译成 WebAssembly 模块的 Rust 代码可以借助 `wasm` 能力随商店应用发布，在没有文件、网络和时钟的沙盒中运行。OctoSense `main` 的标准桌面版和 Home 构建在 macOS、Linux 和 Android 上运行它，目前还没有任何发布版包含它（见 App Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.zh-CN.md)）。
+商店应用包不含原生代码。新的原生 Rust 或 JNI 代码、Python 服务和浏览器控制器，都无法作为卡片应用或脚本应用安装。Rust 编译成 WebAssembly 后可以随商店应用包发布，用 `wasm` 披露这项用途。核心模块无法访问文件、网络或时钟；组件可以在应用的实际授权和资源上限内使用受支持的 WASI 与公开宿主 API。桌面 RC2 在 macOS 和 Linux 上提供核心模块支持。当前 OctoSense 源码还包含 Windows 和 Android 支持，以及使用 Pulley 的 OpenHarmony 构建；构建包含这些功能不等于完成设备或发布版验收（见 App Flow 的[运行自己的 Rust 代码](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.zh-CN.md)）。
 
 有些 App Flow 示例包含原生服务或网站集成。以这类示例为基础开发 Hub 应用之前，先确认每一项行为都能在应用的隔离环境中运行。复制某个服务项目的源码目录，并不能让它变得可安装。
 
@@ -82,7 +82,7 @@ card-host --help
 
 | 日志行 | 含义 |
 | --- | --- |
-| `card-host: <id> <version> admitted — capabilities {…}, hosts {…}, storage <n> bytes, agent <profile>` | 应用包已准入，获得了日志中列出的授权。 |
+| `card-host: <id> <version> admitted — capabilities {…}, hosts {…}, storage <n> bytes, agent <profile>` | 应用包已准入；日志列出用途声明和解析后的资源上限，不代表用户同意。 |
 | `card-host: refused: <reason>` | `card-host` 拒绝了这个应用包。窗口显示“card-host refused this bundle”和原因，应用包中的任何代码都不会运行。 |
 | `card-host: realize {json}` | L0 卡片的 lint 和 realize 报告，在绘制卡片之前记录。脚本应用没有这一行。 |
 | `card-host: the card did not lower: <error>` | 卡片已准入，但无法转换为控件。 |

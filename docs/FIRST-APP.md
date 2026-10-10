@@ -149,16 +149,16 @@ my-app/
   `Image{src: http_resource("{{assets}}/assets/logo.png")}`. The host replaces
   `{{assets}}` with the loopback origin that serves this bundle and nothing
   else. Never write that origin, a `file://` path or a `../` path yourself.
-- An `https://` address in `main.splash` must name a host in the manifest's
-  `network.hosts`, unless the app requests `images` or `web`. The gate
-  refuses `http://`.
+- Use HTTPS in `main.splash` and accurately disclose expected destinations
+  in `network.hosts`. Current policy does not use that list as an allowlist;
+  the gate still refuses `http://`.
 - Never ask for a password, PIN or one-time code. The gate refuses such a
   field, and at runtime such a field accepts no input. Sign-in belongs to a
   host service, which collects the secret on its own sheet, a panel the host
   draws over the app ([Sheets](PUBLISHING.md#sheets-apps-never-collect-secrets)).
 - `card-host` serves no host service except `runtime` discovery: every other
   `host.request` answers `no service answers "<family>" on this device`. Test
-  those screens in the [compatible RC2 release](../README.md#download-a-compatible-host)
+  those screens in the [compatible desktop release](../README.md#download-a-compatible-host)
   ([Before you start](SUBMITTING.md#before-you-start)).
 
 ### A card app
@@ -196,8 +196,9 @@ before you set a font or show Chinese text.
   files for author-machine paths and development-server URLs.
 - Keep development notes outside `bundle/`; retain required asset licenses
   and attribution as `.txt` or `.md`. Documentation links do not grant network
-  access. URLs in card data still face the asset checks. Like `main.splash`,
-  the agent's files may name only the hosts the app declares.
+  access. URLs in card data still face the asset checks. Agent files and
+  `main.splash` reject unsafe references (`http://`, `file://`, `../`),
+  without requiring HTTPS hosts to appear in `network.hosts`.
 - Adapt any flow that relies on an external Python or browser controller to
   the contained runtime before you submit.
 
@@ -215,8 +216,9 @@ Edit `bundle/manifest.json`:
 - **`capabilities`** lists only what a screen uses. Check the **Served today**
   column of [Capabilities](PUBLISHING.md#capabilities): some, such as `llm`
   and `calendar`, pass the gate but are served only to system apps, and
-  `prompt` is served nowhere. `net` also needs each host listed in
-  `network.hosts`.
+  `prompt` is served nowhere. Disclose expected destinations in
+  `network.hosts`; neither field grants access. Compatible public APIs still
+  check app/account scope, consent and resource limits.
 
 Edit every placeholder in `bundle/listing.json`: `subtitle`, `description`,
 `category`, `publisher` (with `support` and `privacy_policy_url`),
@@ -314,7 +316,8 @@ hub stamp bundle
 hub check bundle --allow-unsigned
 ```
 
-Success:
+Historical output from an earlier CLI (the current CLI labels the summary
+`declarations:`, not `grants:`):
 
 ```text
 com.example.mynotes 0.1.0 — PASSED
@@ -322,8 +325,11 @@ com.example.mynotes 0.1.0 — PASSED
   grants: capabilities {"storage"}, hosts {}, storage 16777216 bytes, agent none
 ```
 
-The unsigned warning is expected at this stage. Read the `grants:` line
-against what the app visibly needs, and shrink the manifest if it grants more.
+The unsigned warning is expected at this stage. Compare the current
+`declarations:` line with actual usage and correct missing or unused
+disclosures. Every admitted app has a bounded private jail, even without a
+`storage` declaration; the older `storage none` output below no longer
+describes current policy.
 
 On `REFUSED`, `hub check` exits 1. Fix each `[refused]` line
 ([Common refusals and how to fix them](SUBMITTING.md#common-refusals-and-how-to-fix-them)),
@@ -375,7 +381,7 @@ used a key-signed test app.
 | --- | --- |
 | `cargo build` stops with `no variant … TextInputStateQuery` | See [`card-host` fails to build](DEVELOPMENT.md#card-host-fails-to-build). |
 | `card-host: refused: this host has no GitHub publisher verifier` | The bundle is a sealed release. Run the editable source. |
-| `no service answers "<family>" on this device` | `card-host` serves no host service except `runtime` discovery. Test the screen in the [compatible RC2 release](../README.md#download-a-compatible-host). |
+| `no service answers "<family>" on this device` | `card-host` serves no host service except `runtime` discovery. Test the screen in the [compatible desktop release](../README.md#download-a-compatible-host). |
 | `curl: (22) The requested URL returned error: 404` from `/g?raw=1` | No frame is drawn yet. Wait a few seconds and capture again. |
 | `[refused] identity: app id "…" ends in "…", which is reserved` | The id's last segment is a [reserved name](PUBLISHING.md#ids-and-reserved-names). Choose another before your first release. |
 | `[refused] digest: the bundle hashes to …, the manifest claims …` | The bundle changed after `hub stamp`. Stamp again. |

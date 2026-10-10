@@ -46,49 +46,56 @@ app declares the host APIs it needs and checks which ones a host implements.
 
 ## Download a compatible host
 
-[**Desktop 0.1.0-rc.2 is available**](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.2), built from source
-`4ccf8e06` and published on 2026-10-09, for GitHub-proven apps, the public v2
-catalog and Host API v1, now with document, device-calendar, Mail-draft and
-audio APIs on their supported platforms ([what hosts serve today](#what-hosts-serve-today)).
+[**Desktop 0.1.0-rc.4**](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.4) is the compatible prerelease,
+built from source `9266b008`. It includes contract 1.11, declaration-only
+capability policy, Wasm core modules and components, and shared-component
+catalog/installation support. Existing Host API and connected-account flows
+retain their platform, consent and provider limits.
 
 | Platform | Download |
 | --- | --- |
-| macOS Apple silicon | [DMG](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/OctoSense_0.1.0-rc.2_aarch64.dmg) or [app ZIP](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/OctoSense_0.1.0-rc.2_macos_aarch64.app.zip) |
-| Windows x64 | [Installer](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/octosense_0.1.0-rc.2_x64-setup.exe) |
-| Linux x86_64 | [Debian package](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/octosense_0.1.0-rc.2_amd64.deb) or [AppImage](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/octosense_0.1.0-rc.2_x86_64.AppImage) |
+| macOS Apple silicon | [DMG](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.4/OctoSense_0.1.0-rc.4_aarch64.dmg) or [app ZIP](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.4/OctoSense_0.1.0-rc.4_macos_aarch64.app.zip) |
+| Windows x64 | [Installer](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.4/octosense_0.1.0-rc.4_x64-setup.exe) |
+| Linux x86_64 | [Debian package](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.4/octosense_0.1.0-rc.4_amd64.deb) or [AppImage](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.4/octosense_0.1.0-rc.4_x86_64.AppImage) |
 
-Check downloads against [SHA256SUMS](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/SHA256SUMS) and read the [release notes](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/RELEASE-NOTES.md)
-for platform limits. These prerelease packages have **no Apple Developer ID
-signature or notarization, and no Windows publisher signature**. The macOS
-packages were built and sealed locally with an ad-hoc signature; Windows and
-Linux packages came from the tagged CI jobs, with the Linux packaging
-corrections that the provenance records. [Release provenance](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.2/RELEASE-PROVENANCE.json)
-records the exact files and signing status. To build yourself, follow the
-[pinned setup guide](https://github.com/OctoSense-org/OctoSense/blob/4ccf8e068399b1da139771a9ed94cef05fa6ae60/README.md#set-up).
+Check downloads against [SHA256SUMS](https://github.com/OctoSense-org/OctoSense/releases/download/desktop-v0.1.0-rc.4/SHA256SUMS) and read the
+[release notes](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.4) for platform limits.
+These packages have **no Apple Developer ID signature or notarization, and no Windows Authenticode signature**. The Mac binary has only a linker ad-hoc signature. Package privacy scans passed on all three platforms.
+The [release assets](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.4) include platform packaging receipts and exact checksums.
+The Mac app ZIP passed **11/11 App Hub/component checks** on its first candidate run; final release ZIP and DMG hashes match the tested bytes. This does not establish Windows/Linux installed GUI acceptance, live-model behavior or account writes.
+To build yourself, follow the
+[pinned setup guide](https://github.com/OctoSense-org/OctoSense/blob/9266b0083544d86bd7636543b5ff60c61b26460f/README.md#set-up).
 
 For the four samples below, use **macOS on Apple silicon**. Open **App Hub →
-Search**, enter the exact app ID, choose **Get**, review its permissions and
-choose **Install**, then **Open**. **Library** reopens an installed app and
-offers **Update** when a compatible newer version is available. Keep the
+Search**, enter the exact app ID, choose **Get**, review its usage disclosures
+and choose **Install**, then **Open**. **Library** reopens an installed app
+and offers **Update** when a compatible newer version is available. Keep the
 default public catalog; no custom origin, anchor, developer key or OctoSense
-cloud account is needed. An older beta.2 host cannot read the new publisher
+cloud account is needed. An older desktop beta.2 host cannot read the new publisher
 proof or public v2 channel: install a compatible host instead of changing the
 app's proof or catalog settings.
 
-RC2 does **not** ship public GitHub/Google OAuth client registrations.
+RC4 supports shared components, but a component or app still needs separate
+Hub review and catalog publication before users can find it. Installing this
+desktop release does not upgrade Android Home; existing phone releases and
+isolated OnePlus acceptance fixtures are separate.
+
+RC4 does **not** ship public GitHub/Google OAuth client registrations.
 Local drafts and no-account screens work; provider sign-in needs registration
-supplied by the host distributor/operator ([configuration](https://github.com/OctoSense-org/OctoSense/blob/4ccf8e068399b1da139771a9ed94cef05fa6ae60/crates/oauth-service/README.md#configure-a-release-maintainers)).
+supplied by the host distributor/operator ([configuration](https://github.com/OctoSense-org/OctoSense/blob/9266b0083544d86bd7636543b5ff60c61b26460f/crates/oauth-service/README.md#configure-a-release-maintainers)).
 Ordinary users should not need to register a Google developer project.
 Installing an app does not prove login, email delivery, a GitHub commit or a
 Calendar write. The connected samples declare macOS only. Linux/Windows
-implement external-browser backend login and declared backend reads; RC2 adds
-the native link openers that login needs, and a Windows fixture built from
-RC2's source completed a browser sign-in against a synthetic backend, while
-Linux sign-in is not validated. Embedded backend login and
-protected writes remain unsupported and fail closed. Android Google
+implement external-browser backend login and declared backend reads. The
+Windows synthetic-backend sign-in result recorded for RC2 is historical,
+not acceptance of a newly installed RC4 package. Linux refuses embedded backend
+login; the Windows runtime can intercept callbacks, but RC4's host-owned
+embedded login flow is disabled, with no production opt-in. Both platforms
+use the external browser instead; protected writes remain unsupported and
+fail closed. Android Google
 authorization remains unavailable. Ordinary WebReader is separate from login;
 Linux needs GTK 3/WebKitGTK and X11/XWayland, and Windows needs WebView2. Those
-engines are not bundled; see the [browser requirements](https://github.com/OctoSense-org/OctoSense/blob/4ccf8e068399b1da139771a9ed94cef05fa6ae60/docs/desktop-embedded-browser.md).
+engines are not bundled; see the [browser requirements](https://github.com/OctoSense-org/OctoSense/blob/9266b0083544d86bd7636543b5ff60c61b26460f/docs/desktop-embedded-browser.md).
 
 ## Repository layout
 
@@ -109,7 +116,7 @@ engines are not bundled; see the [browser requirements](https://github.com/OctoS
 | `docs/DEVELOPMENT.md` | The guide map, delivery paths, `card-host` and its remote-control routes, and `card-studio`. |
 | `docs/adr/` | Architecture decisions: GitHub-admin catalog attestations ([ADR 0001](docs/adr/0001-github-attested-catalog.md)), GitHub-attested publisher identity ([ADR 0002](docs/adr/0002-github-attested-publisher-identity.md)) and shared components ([ADR 0003](docs/adr/0003-shared-components.md), proposed). |
 | `templates/app/` | A card app repository scaffold with metadata, an example icon and linked agent instructions. |
-| `crates/app-contract` | The app contract, `octosense-app-contract` ([OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)): the manifest, the policy an app gets, bundle integrity and running a bundle. Within `1.x` it only grows ([README](crates/app-contract/README.md)). Contract 1.10.0 is published on crates.io ([Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)). |
+| `crates/app-contract` | The app contract, `octosense-app-contract` ([OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)): the manifest, the policy an app gets, bundle integrity and running a bundle. Within `1.x` it only grows ([README](crates/app-contract/README.md)). Contract 1.11.0 is published on crates.io ([Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)). |
 | `crates/app-policy` | The signed manifest and listing, admission, and resolution into an isolate's settings and an agent session profile ([OctoSense Home ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0002-agentic-app-security-model.md)); an app's own agent (`tools.json`, `AGENT.md`, skills) loaded as an `AgentBundle`; the `tools.json` parser and checks that native modules' tool manifests share (`ToolManifest::load`). It also re-exports the app contract. |
 | `crates/app-hub` | The index, the signed catalog, the gate, the agent scan, the device client and the `hub` command ([OctoSense Home ADR 0003](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0003-app-hub-and-store.md)). |
 | `crates/appstore` | The store as an OctoSense module, the `card` module that runs an installed app as its own client, system apps (`os.` ids) and host services with their sheets. |
@@ -169,9 +176,15 @@ are in [AGENTS.md](AGENTS.md).
 
 ## What hosts serve today
 
-The gate admits capability names; the host must implement and grant each call.
+The gate validates usage declarations; the host must implement each call and
+check actual authorization. Current source treats capability and destination
+fields as disclosures ([policy](docs/PUBLISHING.md#current-source-policy-declarations-and-authorization));
+RC4 includes that policy, Wasm components and shared-component installation
+with contract 1.11 on desktop. App/ABI admission, quotas, consent, account
+isolation and reviewed writes remain. Catalog compatibility does not publish
+a component. The inventory below records the earlier RC2 baseline.
 [Capabilities](docs/PUBLISHING.md#capabilities) is the reference. The
-[RC2 release](#download-a-compatible-host) includes everything RC1 had, plus
+[historical RC2 release](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.2) includes everything RC1 had, plus
 the items marked RC2:
 
 - Public GitHub v2 catalog and `publisher-github-v1` verification, with contract 1.10.0 (RC1: 1.8.0).
@@ -242,7 +255,7 @@ with any v2 cache refuses a legacy downgrade, even if that cache is malformed.
 An old legacy cache is not converted offline: the first v2 fetch needs network
 access (or an explicitly supplied mirror containing a verified v2 envelope).
 Fetch/proof failure never falls back to legacy. Older beta hosts continue to use `catalog.json`; use the
-[RC2 release](#download-a-compatible-host) for the public v2 catalog.
+[historical RC2 release](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.2) for the public v2 catalog.
 
 ## How the Hub publishes an app
 
