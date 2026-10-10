@@ -50,7 +50,7 @@ Mac app ZIP 在候选包首次验收中通过 **11/11 项 App Hub/组件检查**
 输入确切应用 ID，选择 **Get**，审阅用途披露后选择 **Install**，再点 **Open**。
 **Library** 可重新打开已安装应用，并在有兼容新版本时提供 **Update**。
 保留默认公开目录，不需要自定义来源、信任锚、开发者密钥或 OctoSense 云端账户。
-旧 beta.2 宿主无法读取新的发布者证明或公开 v2 目录：请换用兼容宿主，
+旧桌面 beta.2 宿主无法读取新的发布者证明或公开 v2 目录：请换用兼容宿主，
 不要修改应用证明或目录设置。
 
 RC4 支持共享组件，但用户能够找到某个组件或应用之前，它仍须单独通过 Hub 审核
@@ -63,8 +63,9 @@ RC4 **没有附带公开的 GitHub/Google OAuth 客户端注册信息**。本地
 普通用户不应被要求注册 Google 开发者项目。安装成功不代表登录、邮件投递、
 GitHub commit 或日历写入已验证。连接账户示例只声明 macOS。Linux/Windows 已实现
 外部浏览器后端登录和清单声明的后端读取。RC2 记录的 Windows 模拟后端登录结果
-属于历史验证，不是新安装 RC4 包的验收。嵌入式后端登录及受保护写操作仍不支持，
-会拒绝执行。Android Google 授权仍不可用。普通 WebReader 与登录是不同的流程；
+属于历史验证，不是新安装 RC4 包的验收。Linux 拒绝嵌入式后端登录；Windows 运行时
+虽能拦截回调，但 RC4 的宿主嵌入式登录流程仍关闭，没有可启用的生产开关。两端都使用
+外部浏览器登录；受保护的写操作仍不支持，会拒绝执行。Android Google 授权仍不可用。普通 WebReader 与登录是不同的流程；
 Linux 需要 GTK 3/WebKitGTK 和 X11/XWayland，Windows 需要 WebView2。这些引擎不随包附带，
 见[浏览器要求](https://github.com/OctoSense-org/OctoSense/blob/9266b0083544d86bd7636543b5ff60c61b26460f/docs/desktop-embedded-browser.zh-CN.md)。
 

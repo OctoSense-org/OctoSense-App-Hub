@@ -231,8 +231,8 @@ Unverified: how the OctoSense shells draw these fonts.
 
 A file in `fns/` may be a WebAssembly **component** instead of a core module:
 an ordinary Rust crate built with `cargo build --target wasm32-wasip2`
-([OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436),
-proposed). Its functions take and return typed values, keep their state
+([OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/blob/9266b0083544d86bd7636543b5ff60c61b26460f/docs/adr/0014-app-components-in-webassembly.md),
+Accepted). Its functions take and return typed values, keep their state
 between calls and may use part of WASI. OctoSense #453 merged component
 loading and its HTTP/host-service adapters. [Desktop RC4](../README.md#download-a-compatible-host)
 includes this support; each submitted app still needs its own acceptance.
@@ -1680,9 +1680,11 @@ This does not establish app UI execution or phone publisher installation.
 On macOS, OctoSense desktop RC1 installed the GitHub-attested sample apps in
 catalog sequence 13 and checked their attestations and publisher continuity at
 install and update; [RC2](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.2) reads the
-catalog the same way. Store
-installs on iOS, Windows and Linux remain unverified, and no released phone
-build supports `publisher-github-v1`.
+catalog the same way. [Home beta.2](https://github.com/OctoSense-org/OctoSense/releases/tag/home-v0.1.0-beta.2),
+source `f6759edd`, includes GitHub-attested publisher support through Hub
+`95e4831a` and contract 1.10. Its release smoke reached the live catalog,
+but did not establish attested app installation/update acceptance on the phone.
+Store installs on iOS, Windows and Linux also remain unverified here.
 
 Download the **release pack**, which contains the generated attested manifest;
 a source checkout alone does not contain those final bytes. A reviewer can

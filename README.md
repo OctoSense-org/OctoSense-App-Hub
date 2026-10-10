@@ -71,7 +71,7 @@ Search**, enter the exact app ID, choose **Get**, review its usage disclosures
 and choose **Install**, then **Open**. **Library** reopens an installed app
 and offers **Update** when a compatible newer version is available. Keep the
 default public catalog; no custom origin, anchor, developer key or OctoSense
-cloud account is needed. An older beta.2 host cannot read the new publisher
+cloud account is needed. An older desktop beta.2 host cannot read the new publisher
 proof or public v2 channel: install a compatible host instead of changing the
 app's proof or catalog settings.
 
@@ -88,8 +88,11 @@ Installing an app does not prove login, email delivery, a GitHub commit or a
 Calendar write. The connected samples declare macOS only. Linux/Windows
 implement external-browser backend login and declared backend reads. The
 Windows synthetic-backend sign-in result recorded for RC2 is historical,
-not acceptance of a newly installed RC4 package. Embedded backend login and
-protected writes remain unsupported and fail closed. Android Google
+not acceptance of a newly installed RC4 package. Linux refuses embedded backend
+login; the Windows runtime can intercept callbacks, but RC4's host-owned
+embedded login flow is disabled, with no production opt-in. Both platforms
+use the external browser instead; protected writes remain unsupported and
+fail closed. Android Google
 authorization remains unavailable. Ordinary WebReader is separate from login;
 Linux needs GTK 3/WebKitGTK and X11/XWayland, and Windows needs WebView2. Those
 engines are not bundled; see the [browser requirements](https://github.com/OctoSense-org/OctoSense/blob/9266b0083544d86bd7636543b5ff60c61b26460f/docs/desktop-embedded-browser.md).

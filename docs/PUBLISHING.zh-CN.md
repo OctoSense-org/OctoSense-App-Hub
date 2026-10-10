@@ -162,7 +162,7 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 
 ### WebAssembly 组件
 
-`fns/` 中的文件也可以是 WebAssembly **组件**，而不是核心模块：一个用 `cargo build --target wasm32-wasip2` 构建的普通 Rust crate（[OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436)，提议中）。它的函数接收和返回带类型的值，在调用之间保留状态，并可以使用 WASI 的一部分。OctoSense #453 已合并组件加载以及 HTTP/宿主服务适配器，[桌面 RC4](../README.zh-CN.md#下载兼容宿主)包含这些支持；每个提交的应用仍须单独验收。历史 RC2 只运行核心模块。
+`fns/` 中的文件也可以是 WebAssembly **组件**，而不是核心模块：一个用 `cargo build --target wasm32-wasip2` 构建的普通 Rust crate（[OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/blob/9266b0083544d86bd7636543b5ff60c61b26460f/docs/adr/0014-app-components-in-webassembly.zh-CN.md)，已接受）。它的函数接收和返回带类型的值，在调用之间保留状态，并可以使用 WASI 的一部分。OctoSense #453 已合并组件加载以及 HTTP/宿主服务适配器，[桌面 RC4](../README.zh-CN.md#下载兼容宿主)包含这些支持；每个提交的应用仍须单独验收。历史 RC2 只运行核心模块。
 
 准入检查在以下条件都满足时接受组件：
 
@@ -1166,7 +1166,7 @@ hub publisher-pack bundle --out build/app.bundle.pack.json
 
 验证使用公开的合成测试应用的 [v0.1.0 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736273522)与 [v0.1.1 工作流](https://github.com/ymote/octosense-publisher-fixture/actions/runs/37736765473)，没有使用仓库 Secret。两个工作流均生成并验证了真实 GitHub 证明。[原生验收示例](../crates/app-hub/examples/publisher_acceptance.rs)随后安装两个 Release pack，准备并验证启动、保留完整证明，并拒绝内容/证明/身份篡改、回滚、未签名的归属替换和已撤回版本。[验收记录](../reviews/github-publisher-v1/acceptance.json)绑定输入摘要与原生源码版本。其中的商店使用临时的本地测试签名目录；该测试应用没有 App Hub 提交 issue，也没有签名目录条目。这既不能证明应用界面可以运行，也不能证明手机可以安装 GitHub 发布者应用。
 
-在 macOS 上，OctoSense 桌面 RC1 安装了签名目录第 13 版中带 GitHub 证明的示例应用，并在安装和更新时检查了这些应用的证明和发布者连续性；[RC2](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.2) 以同样的方式读取签名目录。iOS、Windows 和 Linux 上的商店安装仍未验证，目前也没有任何已发行的手机版本支持 `publisher-github-v1`。
+在 macOS 上，OctoSense 桌面 RC1 安装了签名目录第 13 版中带 GitHub 证明的示例应用，并在安装和更新时检查了这些应用的证明和发布者连续性；[RC2](https://github.com/OctoSense-org/OctoSense/releases/tag/desktop-v0.1.0-rc.2) 以同样的方式读取签名目录。[Home beta.2](https://github.com/OctoSense-org/OctoSense/releases/tag/home-v0.1.0-beta.2) 的源码 `f6759edd` 通过 Hub `95e4831a` 和契约 1.10 包含 GitHub 发布者证明支持。其发布冒烟测试已访问真实目录，但没有验证手机上带证明应用的安装和更新。此处也未验证 iOS、Windows 和 Linux 上的商店安装。
 
 请下载含有生成后证明清单的 **Release pack**；单独检出源码并不包含这些最终字节。审核人员可运行 `hub publisher-unpack app.bundle.pack.json --out review-bundle`，再运行 `hub publisher-verify review-bundle --catalog <authenticated-catalog>`。Unpack 要求新目录，拒绝路径穿越，失败时仅清理自己创建的输出。`hub publisher-entry review-bundle --catalog <authenticated-catalog> --out build/index.json` 生成审核候选条目，不会发布。
 
