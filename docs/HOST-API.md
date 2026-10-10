@@ -48,6 +48,11 @@ execution authorization. Use `runtime.list` / `runtime.describe` to discover
 actual methods and their platform/consent requirements.
 
 
+The compatible runtime must include explicit camera intent: `capture({library:true})`
+and `record_start({audio:true,library:true})`; omitted options are false.
+Enabling public runtime flags must never implicitly record audio or export
+captures. This overlay and the updated Hub adapter ship together.
+
 ## Declare what the app needs
 
 This manifest fragment requires `runtime.list` and uses `location.get` when

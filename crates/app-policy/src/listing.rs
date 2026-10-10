@@ -164,6 +164,7 @@ pub fn privacy_summary_with_tools(manifest: &AppManifest, tools: &[ToolSpec]) ->
         lines.push("No network destinations declared; this does not mean the app is offline.".into());
     }
     lines.push("Device access, connected-account scopes, external-write review and sharing with other apps still need the host's authorization.".into());
+    lines.push("Available host services can contact external providers after their actual authorization checks, even when a usage declaration is absent.".into());
     let provider_services = manifest.capabilities.iter().any(|cap| {
         matches!(cap.as_str(), "auth" | "github" | "gmail" | "gcalendar" | "device_calendar" | "mail" | "images" | "web"
             | "news" | "youtube" | "model" | "research" | "crawl" | "octos.turn.start")
@@ -373,6 +374,7 @@ mod tests {
         let lines = privacy_summary(&quiet);
         assert!(lines.iter().any(|line| line.contains("own local storage and quota")));
         assert!(lines.contains(&"No network destinations declared; this does not mean the app is offline.".to_string()));
+        assert!(lines.iter().any(|line| line.contains("Available host services can contact external providers")));
     }
 
     #[test]

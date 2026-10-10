@@ -46,7 +46,8 @@ owns those.
 ## Code rules
 
 - Trace behavior to executable code. Distinguish manifest validation,
-  resolved grants, shell registration and the code that executes a call.
+  descriptive declarations, actual consent, shell registration and the code
+  that executes a call.
   `AgentBundle::load` alone starts no peer. OctoSense loads `AGENT.md` and
   skills as per-turn guidance, not as kernel skills.
 - Keep native `AppModule`, Splash script bundles and OctoScript L0 cards
@@ -64,7 +65,9 @@ owns those.
   Glance copy as a tool owner.
 - Preserve contract compatibility and refusal behavior. Consult
   [app-contract's compatibility rules](crates/app-contract/README.md#stability).
-  Do not widen an app's resolved grants in a mounting path.
+  Preserve app/account identity, jail and quota, consent and sharing checks
+  in mounting paths. Do not turn descriptive capability fields back into
+  execution permission gates.
 - Keep new routing fields out of catalog entries: older stores parse catalog
   tool summaries strictly, so `entry_for` drops `host_method` from them. Hosts
   dispatch from the signed bundle's `tools.json`.
@@ -98,16 +101,14 @@ owns those.
   [`card-host` fails to build](docs/DEVELOPMENT.md#card-host-fails-to-build)
   lists the builds that need the patches.
 - [Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)
-  lists the `octosense-app-contract` releases. Published 1.10.0 includes
-  `files`, `device_calendar` and `audio`, and satisfies this tree's App Policy
-  minimum version. Version 1.9.0 remains source-only; its changes shipped in
-  1.10.0. Do not take a published contract as proof that a released host
-  implements its APIs. This workspace's `[patch.crates-io]` points the crate at
-  `crates/app-contract`. Never tell readers that a lock file holding 1.2.0 or
-  older admits `calendar`, `auth`, `github`, `gcalendar`, `gmail`, `photos`
-  or `youtube`; `cargo update -p octosense-app-contract` moves an
-  unconstrained 1.x consumer to 1.10.0. When the tree gets ahead of crates.io
-  again, or a new version is published, update that section.
+  is the release authority. Published 1.10.0 includes `files`,
+  `device_calendar` and `audio`; this tree now prepares **1.11.0** and App
+  Policy requires 1.11.0 for component schemas and declaration-only policy.
+  Until publication, use a validation-only local patch at this revision;
+  do not ship an unresolved version or describe 1.10.0 as satisfying this
+  tree. This workspace patches the contract to `crates/app-contract`.
+  Update the publication status only after a real release receipt. A contract
+  release never proves that a host binary implements its APIs.
 - Do not change pins or regenerate `Cargo.lock` in a documentation edit.
 - Match validation to the change:
 
@@ -128,7 +129,7 @@ owns those.
 
 - In walkthroughs, lead with a launch path, then trace one request to its
   reply. Define routing terms at first use and keep source inventories after
-  the main path. Preserve prerequisites and capability limits in examples.
+  the main path. Preserve ABI prerequisites, real authorization and resource limits in examples.
 - Label source-reviewed commands separately from commands you ran. Mark a
   command nobody ran "(not run)" or **unverified**.
 - Never edit evidence records such as `reviews/**/*.json`.

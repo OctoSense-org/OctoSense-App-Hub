@@ -48,10 +48,10 @@ pub fn public_runtime_capabilities(declared: &[String], device_consent: bool) ->
         .cloned().collect();
     capabilities.extend(["storage", "net", "images", "web", "prompt"].map(str::to_string));
     if device_consent {
-        capabilities.extend(["camera", "microphone", "location"].map(str::to_string));
-        // `library` is a capture side-effect preference, not a callable API.
-        // Do not start exporting every capture merely by enabling public APIs.
-        if declared.iter().any(|name| name == "library") { capabilities.insert("library".into()); }
+        // The compatible shell's CameraPreview uses explicit capture intent:
+        // capture({library:true}), record_start({audio:true,library:true}).
+        // Availability alone must not enable recording or library export.
+        capabilities.extend(device.map(str::to_string));
     }
     capabilities.into_iter().collect()
 }

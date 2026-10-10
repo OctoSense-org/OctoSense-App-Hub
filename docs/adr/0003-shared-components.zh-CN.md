@@ -2,7 +2,7 @@
 
 [English](0003-shared-components.md) | 简体中文
 
-状态：提议中，2026 年 10 月 9 日。这是 [OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436)（提议中）第 4 阶段在 App Hub 一侧的部分，在 App Hub 中实现，基于 [#186](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/186) 和 [#188](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/188)；这两项改动让准入检查接受应用自己的 WebAssembly 组件。目前签名目录中还没有任何组件，也还没有任何 OctoSense 构建加载组件。
+状态：提议中，2026 年 10 月 9 日。这是 [OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436)（提议中）第 4 阶段在 App Hub 一侧的部分，在 App Hub 中实现，基于 [#186](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/186) 和 [#188](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/188)；这两项改动让准入检查接受应用自己的 WebAssembly 组件。目前签名目录中还没有任何组件，仍需发布兼容宿主；源码支持不等于发布验收。
 
 ## 当前源码策略：声明与授权
 
@@ -95,7 +95,7 @@ ADR 0014 让应用把普通的 Rust crate 作为 WebAssembly 组件放在应用�
 "components": [{"as": "markdown", "id": "org.example.markdown", "version": "1.2.0", "blake3": "<64 hex>"}]
 ```
 
-`as` 是应用给组件起的名字：`[a-z][a-z0-9_]{0,31}`，且不能重复。一个应用最多指定 8 个组件，每个都固定到一个确切版本**和**摘要。没有该特性却写了这个字段，或有该特性却没有 `wasm` 能力，解析器都会拒绝。字段为空时不写出，所以现有清单及其签名字节不变。不认识该特性的宿主会拒绝这个应用。
+`as` 是应用给组件起的名字：`[a-z][a-z0-9_]{0,31}`，且不能重复。一个应用最多指定 8 个组件，每个都固定到一个确切版本**和**摘要。没有所需宿主特性却写了这个字段时，解析器会拒绝；不要求 `wasm` 使用声明。字段为空时不写出，所以现有清单及其签名字节不变。不认识该特性的宿主会拒绝这个应用。
 
 ### 5. 准入固定了组件的应用
 

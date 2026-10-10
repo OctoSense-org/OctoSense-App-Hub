@@ -8,7 +8,7 @@ Status: proposed, 9 October 2026. This is phase 4 of
 [#186](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/186) and
 [#188](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/188), which
 admit an app's own WebAssembly components. No catalog offers a component, and
-no OctoSense build loads one yet.
+a compatible host release is still required; source support is not release acceptance.
 
 ## Current source policy: declarations and authorization
 

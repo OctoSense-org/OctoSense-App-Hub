@@ -28,6 +28,10 @@ ABI 与导入验证、确切摘要、发布者证明、目录撤回、配额和�
 `runtime.describe` 查询实际方法及其平台、同意要求。
 
 
+兼容运行时必须包含显式拍摄意图：`capture({library:true})` 与
+`record_start({audio:true,library:true})`；省略的选项为 false。开放运行时
+能力不能隐式开始录音或导出照片。这份运行时补丁与更新的 Hub 适配器须一起发布。
+
 ## 声明应用需要什么
 
 下面的清单片段要求 `runtime.list`，并在宿主提供 `location.get` 时使用它：

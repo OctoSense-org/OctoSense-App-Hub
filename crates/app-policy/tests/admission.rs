@@ -552,7 +552,6 @@ fn runtime_flags_cannot_expose_host_private_data_or_bypass_device_consent() {
         assert!(!standalone.iter().any(|v| v == flag), "{flag}");
     }
     let consent_host = public_runtime_capabilities(&[], true);
-    for flag in ["location", "camera", "microphone"] { assert!(consent_host.iter().any(|v| v == flag)); }
-    assert!(!consent_host.iter().any(|v| v == "library"), "public API availability must not auto-export captures");
+    for flag in ["location", "camera", "microphone", "library"] { assert!(consent_host.iter().any(|v| v == flag)); }
     for flag in ["profile", "agent", "llm", "ledger.read"] { assert!(!consent_host.iter().any(|v| v == flag)); }
 }
