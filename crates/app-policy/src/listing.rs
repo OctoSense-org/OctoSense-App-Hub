@@ -157,16 +157,13 @@ pub fn privacy_summary(manifest: &AppManifest) -> Vec<String> {
 pub fn privacy_summary_with_tools(manifest: &AppManifest, tools: &[ToolSpec]) -> Vec<String> {
     let has = |c: &str| manifest.capabilities.iter().any(|x| x == c);
     let mut lines = Vec::new();
-    if has("storage") {
-        lines.push("Keeps its own data on this device, in a space only it can read.".to_string());
+    lines.push("Runs with its own local storage and quota. Capability and network declarations describe expected use; they are not permission limits.".into());
+    if !manifest.network.hosts.is_empty() {
+        lines.push(format!("Declared network destinations: {}.", manifest.network.hosts.join(", ")));
     } else {
-        lines.push("Stores nothing.".to_string());
+        lines.push("No network destinations declared; this does not mean the app is offline.".into());
     }
-    if has("net") && !manifest.network.hosts.is_empty() {
-        lines.push(format!("Direct network requests are limited to: {}.", manifest.network.hosts.join(", ")));
-    } else {
-        lines.push("No direct network access is granted.".to_string());
-    }
+    lines.push("Device access, connected-account scopes, external-write review and sharing with other apps still need the host's authorization.".into());
     let provider_services = manifest.capabilities.iter().any(|cap| {
         matches!(cap.as_str(), "auth" | "github" | "gmail" | "gcalendar" | "device_calendar" | "mail" | "images" | "web"
             | "news" | "youtube" | "model" | "research" | "crawl" | "octos.turn.start")
@@ -177,7 +174,7 @@ pub fn privacy_summary_with_tools(manifest: &AppManifest, tools: &[ToolSpec]) ->
         !agent.model.as_ref().is_some_and(|model| model.local_only)
     });
     if provider_services || remote_agent_allowed {
-        lines.push("Shared host services and assistants may send data to their providers, under the permissions you allow. Direct-network limits do not restrict those service requests.".to_string());
+        lines.push("Shared host services and assistants may send data to their providers, under the permissions you allow. Network declarations do not restrict those service requests.".to_string());
     }
     if has("ledger.read") {
         lines.push("Reads your shared data.".to_string());
@@ -205,7 +202,7 @@ pub fn privacy_summary_with_tools(manifest: &AppManifest, tools: &[ToolSpec]) ->
         ("news", "Reads news the device collects from its feeds and topics."),
         ("photos", "Reads Photos's own library and publishes photo collections."),
         ("youtube", "Searches YouTube videos and manages music recommendations; playback requires a tap."),
-        ("wasm", "Runs its own functions in a sandbox on this device; they reach only what the app itself may: its own files, its listed hosts and the services it is granted."),
+        ("wasm", "Runs its own functions in a sandbox on this device; they share the app's isolation, quotas and host consent checks."),
         ("glance", "Shows short cards on your glance screen; each opens only this app."),
         ("model", "Sends what you give it to the AI provider you configured, for one-off answers within a daily budget; it never sees your API keys."),
     ] {
@@ -374,8 +371,8 @@ mod tests {
         assert!(lines.iter().any(|l| l.contains("no assistant")));
         let quiet = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"}}"#).unwrap();
         let lines = privacy_summary(&quiet);
-        assert!(lines.contains(&"Stores nothing.".to_string()));
-        assert!(lines.contains(&"No direct network access is granted.".to_string()));
+        assert!(lines.iter().any(|line| line.contains("own local storage and quota")));
+        assert!(lines.contains(&"No network destinations declared; this does not mean the app is offline.".to_string()));
     }
 
     #[test]
@@ -384,7 +381,7 @@ mod tests {
             "capabilities":["glance"]}"#).unwrap();
         let lines = privacy_summary(&m);
         assert!(lines.contains(&"Shows short cards on your glance screen; each opens only this app.".to_string()), "{lines:?}");
-        assert!(lines.contains(&"No direct network access is granted.".to_string()), "{lines:?}");
+        assert!(lines.contains(&"No network destinations declared; this does not mean the app is offline.".to_string()), "{lines:?}");
         let quiet = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"}}"#).unwrap();
         assert!(!privacy_summary(&quiet).iter().any(|l| l.contains("glance")));
     }
@@ -400,7 +397,7 @@ mod tests {
         );
         assert!(!lines.iter().any(|l| l.starts_with("Crawls")), "{lines:?}");
         // Host-mediated searches must not be described as offline.
-        assert!(lines.contains(&"No direct network access is granted.".to_string()), "{lines:?}");
+        assert!(lines.contains(&"No network destinations declared; this does not mean the app is offline.".to_string()), "{lines:?}");
 
         let m = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"},
             "capabilities":["crawl"],"research":{"domains_allow":["docs.rs"],"max_depth":2,"max_pages":30}}"#).unwrap();
@@ -422,7 +419,7 @@ mod tests {
             "{lines:?}"
         );
         // Model calls may leave the device even without a direct-network grant.
-        assert!(lines.contains(&"No direct network access is granted.".to_string()), "{lines:?}");
+        assert!(lines.contains(&"No network destinations declared; this does not mean the app is offline.".to_string()), "{lines:?}");
         let quiet = AppManifest::parse(r#"{"schema":1,"id":"a","version":"1","name":"A","integrity":{"bundle_blake3":"00"}}"#).unwrap();
         assert!(!privacy_summary(&quiet).iter().any(|l| l.contains("AI provider")));
     }
@@ -435,7 +432,7 @@ mod tests {
                 "integrity":{"bundle_blake3":"00"},"capabilities":[capability]
             }).to_string()).unwrap();
             let lines = privacy_summary(&m);
-            assert!(lines.iter().any(|line| line == "No direct network access is granted."), "{capability}: {lines:?}");
+            assert!(lines.iter().any(|line| line == "No network destinations declared; this does not mean the app is offline."), "{capability}: {lines:?}");
             assert!(lines.iter().any(|line| line.contains("may send data to their providers")), "{capability}: {lines:?}");
             assert!(!lines.iter().any(|line| line.contains("Never contacts") || line.starts_with("Contacts only:")));
             if ["auth", "github", "gmail", "gcalendar"].contains(&capability) {
@@ -450,8 +447,8 @@ mod tests {
             "integrity":{"bundle_blake3":"00"},"capabilities":["net","github"],
             "network":{"hosts":["notes.example"]}}"#).unwrap();
         let lines = privacy_summary(&m);
-        assert!(lines.contains(&"Direct network requests are limited to: notes.example.".into()));
-        assert!(lines.iter().any(|line| line.contains("Direct-network limits do not restrict those service requests")));
+        assert!(lines.contains(&"Declared network destinations: notes.example.".into()));
+        assert!(lines.iter().any(|line| line.contains("Network declarations do not restrict those service requests")));
         assert!(lines.iter().any(|line| line.contains("GitHub repositories")));
     }
 
@@ -463,7 +460,7 @@ mod tests {
         m.agent = None;
         m.capabilities = vec!["storage".into(), "glance".into()];
         let lines = privacy_summary(&m);
-        assert!(lines.contains(&"No direct network access is granted.".into()));
+        assert!(lines.contains(&"No network destinations declared; this does not mean the app is offline.".into()));
         assert!(!lines.iter().any(|line| line.contains("may send data to their providers")));
     }
 

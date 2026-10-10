@@ -181,3 +181,12 @@ reviewer check one:
 - Publish only a submission that an App Hub admin has approved, within the
   user's authorized scope, after the checks in
   [What reviewers check](docs/SUBMITTING.md#8-what-reviewers-check).
+
+## Declaration-only capability policy
+
+Capability names and network destinations are disclosures, not runtime
+authorization. Do not reject a public call, agent alias or component merely
+for an omitted family declaration. Keep ABI compatibility, bundle/provenance
+integrity, quotas, app/account scope, explicit device consent, native reviews
+and inter-app sharing. Every admitted app keeps a bounded private jail and
+network module. See [publishing policy](docs/PUBLISHING.md#current-source-policy-declarations-and-authorization).

@@ -9,6 +9,17 @@ versions' changes, and 1.10.0 includes 1.9.0's changes.
 [README.md](README.md#versions-on-cratesio) shows how to update a lock file
 that holds 1.2.0.
 
+## 1.11.0 (prepared; not yet published)
+
+- Include the component and shared-component ABI/schema additions below.
+- Treat capability names and network destinations as usage declarations.
+  Backend configuration keeps its required ABI and account storage layout,
+  but does not require `auth` in the capability list. Component ABIs no longer
+  require `wasm`, and network/research metadata does not need a family grant.
+- Preserve manifest signing bytes, exact dependencies, format validation,
+  resource limits and required host features. `AppPolicy::allows` and
+  `allows_host` remain declaration queries, not execution authorization.
+
 ## Unreleased
 
 - Add the `wasm-components-v1` feature. An app whose `fns/` holds a

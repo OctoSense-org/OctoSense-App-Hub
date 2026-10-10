@@ -95,15 +95,9 @@ impl GateReport {
             out.push_str(&format!("  [{mark}] {}{path}: {}\n", finding.check, finding.detail));
         }
         if let Some(policy) = &self.policy {
-            // The quota is resolved either way; the app gets storage only
-            // when it declares it.
-            let storage = if policy.capabilities.iter().any(|c| c == "storage") {
-                format!("{} bytes", policy.storage_bytes)
-            } else {
-                "none".to_string()
-            };
+            let storage = format!("{} bytes", policy.storage_bytes);
             out.push_str(&format!(
-                "  grants: capabilities {:?}, hosts {:?}, storage {storage}, agent {}\n",
+                "  declarations: capabilities {:?}, hosts {:?}, storage {storage}, agent {}\n",
                 policy.capabilities,
                 policy.hosts,
                 policy.agent.as_ref().map(|a| a.profile.as_kernel_mode()).unwrap_or("none")
@@ -244,9 +238,9 @@ fn check_bundle_for(
     let declares_wasm = manifest.capabilities.iter().any(|c| c == "wasm");
     let modules = function_files.len();
     if modules > 0 && !declares_wasm {
-        findings.push(Finding::refuse(
+        findings.push(Finding::warn(
             "functions",
-            format!("the bundle carries {modules} WebAssembly module(s) but does not declare the wasm capability"),
+            format!("the bundle carries {modules} WebAssembly module(s); add wasm to its usage disclosures"),
         ));
     }
     if modules > MAX_FUNCTION_MODULES {
@@ -288,15 +282,15 @@ fn check_bundle_for(
             ));
         }
         if info.uses_files() && !declares_storage {
-            findings.push(Finding::refuse(
+            findings.push(Finding::warn(
                 "functions",
-                format!("{name} imports wasi:filesystem, the app's own files, which needs the storage capability"),
+                format!("{name} imports wasi:filesystem; disclose storage usage (the app jail and quota still apply)"),
             ));
         }
         if info.uses_http() && !declares_net {
-            findings.push(Finding::refuse(
+            findings.push(Finding::warn(
                 "functions",
-                format!("{name} imports wasi:http, the network, which the app must declare with the net capability"),
+                format!("{name} imports wasi:http; disclose net usage"),
             ));
         }
         findings.push(Finding::warn_at("functions", name.clone(), format!("{name} is a component that reaches {}", info.reach())));
@@ -770,30 +764,16 @@ fn external_references(root: &Path, manifest: &AppManifest) -> Result<Vec<String
     Ok(found)
 }
 
-/// A script app fetches what it declares (ADR 0004): an `https://` address
-/// may name only a host in the manifest's `network.hosts`, or any public host
-/// when the app is granted `images` (pictures) or `web` (a web view). Plain
-/// `http://`, `file://` and paths out of the bundle are refused outright. The
-/// runtime holds the app to the same list on every request; this refuses the
-/// bundle before a person installs it.
-fn script_references(file: &Path, text: &str, manifest: &AppManifest) -> Vec<String> {
+/// Check unsafe source references independently of usage declarations.
+/// Plain `http://`, `file://` and paths out of the bundle remain admission
+/// refusals. HTTPS destinations need no matching disclosure to be admitted.
+fn script_references(file: &Path, text: &str, _manifest: &AppManifest) -> Vec<String> {
     let mut found = Vec::new();
     for needle in ["http://", "file://", "../"] {
         if let Some(at) = text.find(needle) {
             let snippet: String = text[at..].chars().take(60).collect();
             found.push(format!("{} contains {}", file.display(), snippet.replace('\n', " ")));
         }
-    }
-    let any_public = manifest.capabilities.iter().any(|c| c == "images" || c == "web");
-    let mut rest = text;
-    while let Some(at) = rest.find("https://") {
-        rest = &rest[at + "https://".len()..];
-        let host: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '.' || *c == '-').collect::<String>().to_ascii_lowercase();
-        // `https://` followed by an interpolation or nothing names no host.
-        if host.is_empty() || any_public || manifest.network.hosts.iter().any(|h| h.eq_ignore_ascii_case(&host)) {
-            continue;
-        }
-        found.push(format!("{} reaches {host}, which the manifest does not declare in network.hosts", file.display()));
     }
     found.sort();
     found.dedup();
@@ -822,9 +802,8 @@ fn secret_fields(root: &Path) -> Result<Vec<String>, String> {
 /// The splash runtime's `fs` methods, all of which need the app's storage.
 const FS_METHODS: &[&str] = &["read", "read_bytes", "write", "append", "exists", "list", "mkdir", "remove"];
 
-/// What an app that did not declare `storage` will find does not work: each
-/// script that calls `fs`, and the camera's captures, which land in the
-/// app's storage.
+/// Incomplete storage disclosures for review. The app still receives its
+/// private jail and quota; this warning does not deny execution.
 fn storage_warnings(root: &Path, manifest: &AppManifest) -> Result<Vec<String>, String> {
     let has = |capability: &str| manifest.capabilities.iter().any(|c| c == capability);
     if has("storage") {
@@ -839,11 +818,11 @@ fn storage_warnings(root: &Path, manifest: &AppManifest) -> Result<Vec<String>, 
         let compact: String = text.chars().filter(|c| !c.is_whitespace()).collect();
         let calls: Vec<String> = FS_METHODS.iter().filter(|m| compact.contains(&format!("fs.{m}("))).map(|m| format!("fs.{m}")).collect();
         if !calls.is_empty() {
-            found.push(format!("{} calls {}, which fail without the storage capability", file.display(), calls.join(", ")));
+            found.push(format!("{} calls {}, without a storage usage disclosure; its jail and quota still apply", file.display(), calls.join(", ")));
         }
     }
     if has("camera") {
-        found.push("camera without storage: the preview shows, but a capture saves nothing; captures land in the app's storage".to_string());
+        found.push("camera captures use the app's storage; add storage to the usage disclosures".to_string());
     }
     Ok(found)
 }
@@ -940,8 +919,7 @@ mod tests {
             }).to_string()).unwrap()
         };
         let refused = external_references(&dir, &manifest(&["net"], &["api.example.com"])).unwrap();
-        assert_eq!(refused.len(), 1, "{refused:?}");
-        assert!(refused[0].contains("tracker.example.net"));
+        assert!(refused.is_empty(), "unlisted public hosts are declarations, not refusals: {refused:?}");
         assert!(external_references(&dir, &manifest(&["net"], &["api.example.com", "tracker.example.net"])).unwrap().is_empty());
         assert!(external_references(&dir, &manifest(&["net", "images"], &["api.example.com"])).unwrap().is_empty(), "images reaches any public host");
         std::fs::write(dir.join("main.splash"), "let x = \"http://api.example.com\"").unwrap();
@@ -1020,7 +998,7 @@ mod tests {
         assert_eq!(found.len(), 1, "one warning per script: {found:?}");
         assert!(found[0].contains("main.splash") && found[0].contains("fs.write"), "{found:?}");
         let grants = |dir: &Path| check_bundle(dir, &limits, &octosense_app_policy::RefuseAllSignatures, None).unwrap().render();
-        assert!(grants(&dir).contains("storage none"), "{}", grants(&dir));
+        assert!(grants(&dir).contains("storage 16777216 bytes"), "{}", grants(&dir));
         write(&["storage"]);
         assert!(warnings(&dir).is_empty());
         assert!(grants(&dir).contains("storage 16777216 bytes"), "{}", grants(&dir));

@@ -10,6 +10,24 @@
 （[版本与发布凭据](../crates/app-contract/README.md#versions-on-cratesio)，英文）。
 文件能力包含未单独发布的 1.9.0 工作。桌面 RC2 锁定这版契约，并在下文各节注明的平台上实现这些原生适配器；RC1 一个都没有，仅发布契约包也不会给已安装的宿主增加任何实现。
 
+## 当前源码策略：声明与授权
+
+`capabilities` 和 `network.hosts` 用于向用户和审核人员说明应用预计使用的
+API 与网络目的地。遗漏某个服务族或主机，不会阻止调用宿主已支持的公开 API。
+这是为下一个兼容版本准备的源码策略；RC2 的历史行为不代表该修改已经发布。
+
+每个准入应用都有独立的存储沙箱、已解析的配额和网络模块。设备访问仍需逐应用
+同意和系统权限；连接账户仍按应用、账户和提供商 scope 隔离。外部写入保留
+原生审阅，Agent 保留用户启用和工具审核，访问其他应用的数据或工具仍需共享
+授权。宿主私有用户资料和不带调用方身份的 `agent.notify` 不是公开 API。
+
+`requires` 和 `host_api.required` 仍用于检查兼容性，不是能力授权。组件的
+ABI 与导入验证、确切摘要、发布者证明、目录撤回、配额和平台支持检查继续生效。
+遗漏使用声明可以产生审核警告。`AppPolicy::allows` 与 `allows_host` 是历史
+声明查询接口；宿主不能把它们当作执行授权。请用 `runtime.list` 和
+`runtime.describe` 查询实际方法及其平台、同意要求。
+
+
 ## 声明应用需要什么
 
 下面的清单片段要求 `runtime.list`，并在宿主提供 `location.get` 时使用它：
@@ -49,7 +67,7 @@
 
 ### 运行时清单
 
-应用声明 `runtime` 能力后，可以用 `{}` 调用 `runtime.list` 列出所有已描述的方法，或用 `{"method":"location.get"}` 调用 `runtime.describe` 查询单个方法：
+应用可以用 `{}` 调用 `runtime.list` 列出所有已描述的方法，或用 `{"method":"location.get"}` 调用 `runtime.describe` 查询单个方法：
 
 - 方法描述包含输入和输出 schema、ABI 版本、所需能力、支持的平台，以及 Agent 能否调用它。
 - `runtime_features` 列出运行时 ABI，例如 `app_tools.dispatch@1`。`host.request` 不能调用运行时 ABI。
@@ -117,7 +135,7 @@ Android 文档提供方 URI。传输仅限前台，agent 和后台任务不能�
 
 ## 限制
 
-- **Agent 工具。** `host-service` 工具可以用 `host_method` 映射到 `auth.backend.me`、`auth.backend.request`、`runtime.list`、`runtime.describe`、三个 `*.permission.status` 方法或 `location.get`，最低风险为 `read`，并且需要该方法所属的能力和 `private_data: true`（[把工具映射到共享服务](PUBLISHING.zh-CN.md#把工具映射到共享服务host_method)）。Agent 的调用从不弹出提示，所以 `auth.backend.request` 只执行已声明的 `GET` 操作，宿主会在发出任何 HTTP 请求之前拒绝写操作；写操作仍须在前台应用中发起，并在宿主的原生审阅界面上确认。权限申请和撤销、账户管理和面板控制都没有 `host_method`。准入不能代替宿主对账户、授权和平台的检查。
+- **Agent 工具。** `host-service` 工具可以用 `host_method` 映射到 `auth.backend.me`、`auth.backend.request`、`runtime.list`、`runtime.describe`、三个 `*.permission.status` 方法或 `location.get`，最低风险为 `read`，并且需要 `private_data: true`（[把工具映射到共享服务](PUBLISHING.zh-CN.md#把工具映射到共享服务host_method)）。Agent 的调用从不弹出提示，所以 `auth.backend.request` 只执行已声明的 `GET` 操作，宿主会在发出任何 HTTP 请求之前拒绝写操作；写操作仍须在前台应用中发起，并在宿主的原生审阅界面上确认。权限申请和撤销、账户管理和面板控制都没有 `host_method`。准入不能代替宿主对账户、授权和平台的检查。
 - **后端。** 宿主只从已准入的签名应用包读取 `backend` 块。它返回不透明的连接句柄，拒绝重定向和任何含有令牌的后端应答，并在原生审阅界面上让用户批准每一次写操作。后台调用和 Agent 调用都无法批准写操作。修改端点、更新应用或撤回应用，都会结束应用的后端会话。
 - **脚本工具。** 签名的 `app_tool(name, call_id)` 处理函数运行在已打开的完整应用中，使用该应用自己的 VM 和存储文件夹。它不加载任何原生库或 Wasm；应用关闭时返回 `app_not_running`。
 - **平台。** 设备权限方法支持 Android 和 macOS；`location.get` 只支持 Android，返回上次已知的位置，时效未知，而 RC2 的 `location.sample` 在 macOS 和 Android 上返回新鲜位置。两个 RC 都在 Windows（WebView2）和 Linux X11/XWayland（WebKitGTK）中嵌入普通 `WebReader` 网页；原生 Wayland 不支持。Linux/Windows 声明 `auth.backend.request@1`，用于清单声明的读取，并实现外部浏览器后端登录；RC2 补上了登录所需的原生链接打开方式，用 RC2 源码构建的 Windows 测试程序已对一个模拟后端完成浏览器登录，Linux 上的登录未验证。嵌入式后端登录和受保护的写操作仍不支持，会拒绝执行。

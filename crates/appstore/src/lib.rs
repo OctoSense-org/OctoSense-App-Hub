@@ -481,9 +481,15 @@ pub fn register_policy_runtime_features() {
 pub fn apply_device_consent(cx: &mut Cx, bundle: &std::path::Path, splash: &SplashRef) -> Result<(), String> {
     let text = std::fs::read_to_string(bundle.join("manifest.json")).map_err(|error| error.to_string())?;
     let manifest = octosense_app_policy::AppManifest::parse(&text)?;
+    #[cfg(not(feature = "text-input-state-query"))]
     let required = manifest.requires.iter().any(|feature| feature == "host-api-v1");
     #[cfg(feature = "text-input-state-query")]
-    splash.set_device_consent(cx, required);
+    {
+        // Apply to every admitted app, including legacy manifests: otherwise
+        // an omitted host-api-v1 could inherit the shell's OS permission.
+        splash.set_device_consent(cx, true);
+        splash.set_host_caps(cx, octosense_app_policy::containers::public_runtime_capabilities(&manifest.capabilities, true));
+    }
     #[cfg(not(feature = "text-input-state-query"))]
     {
         let _ = (cx, splash);

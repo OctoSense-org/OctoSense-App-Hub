@@ -303,20 +303,7 @@ impl ToolManifest {
             .as_ref()
             .and_then(|a| a.model.as_ref())
             .is_some_and(|m| m.local_only);
-        let mut issues = self.validate(short_id(&manifest.id), ToolHost::Contained, local_only);
-        for tool in &self.tools {
-            if let Some(method) = &tool.host_method {
-                let family = method.split('.').next().unwrap_or("");
-                if !manifest
-                    .capabilities
-                    .iter()
-                    .any(|grant| grant == family || grant == method)
-                {
-                    issues.push(Issue::refuse("tools", format!("{}: host_method {method:?} requires the declared {family:?} service capability", tool.name)));
-                }
-            }
-        }
-        issues
+        self.validate(short_id(&manifest.id), ToolHost::Contained, local_only)
     }
 
     /// Every rule for one owner's tools: `namespace` is the app's short id
@@ -507,7 +494,7 @@ fn check_host_method(tool: &ToolSpec) -> Result<(), String> {
     // clock, random numbers and, with `storage`, the app's own folder, as
     // the app's script does. Neither reaches shared data, so nothing sets a
     // risk floor or calls for `private_data`. `check` still requires the
-    // app to declare the `wasm` capability.
+    // app to use an available Wasm runtime; capabilities describe usage.
     if method.split('.').count() == 2 && method.starts_with("wasm.") {
         return Ok(());
     }

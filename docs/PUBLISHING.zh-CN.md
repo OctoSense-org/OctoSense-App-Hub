@@ -13,9 +13,26 @@
 
 准入检查决定应用包能否进入 Hub。用 `hub check` 自行运行准入检查：每违反一条规则，它都会报告一条拒绝或警告。通过准入检查，并不能说明应用能正常渲染、图标在小尺寸下依然清晰，或商店信息属实。这些由审核人员检查（[审核检查什么](SUBMITTING.zh-CN.md#8-审核检查什么)）。
 
+## 当前源码策略：声明与授权
+
+`capabilities` 和 `network.hosts` 用于向用户和审核人员说明应用预计使用的
+API 与网络目的地。遗漏某个服务族或主机，不会阻止调用宿主已支持的公开 API。
+这是为下一个兼容版本准备的源码策略；RC2 的历史行为不代表该修改已经发布。
+
+每个准入应用都有独立的存储沙箱、已解析的配额和网络模块。设备访问仍需逐应用
+同意和系统权限；连接账户仍按应用、账户和提供商 scope 隔离。外部写入保留
+原生审阅，Agent 保留用户启用和工具审核，访问其他应用的数据或工具仍需共享
+授权。宿主私有用户资料和不带调用方身份的 `agent.notify` 不是公开 API。
+
+`requires` 和 `host_api.required` 仍用于检查兼容性，不是能力授权。组件的
+ABI 与导入验证、确切摘要、发布者证明、目录撤回、配额和平台支持检查继续生效。
+遗漏使用声明可以产生审核警告。`AppPolicy::allows` 与 `allows_host` 是历史
+声明查询接口；宿主不能把它们当作执行授权。请用 `runtime.list` 和
+`runtime.describe` 查询实际方法及其平台、同意要求。
+
 ## 应用是什么
 
-应用包是一个由文本和素材组成的目录。运行应用包的是**宿主**：OctoSense Shell（桌面版或手机版应用）或 `card-host`。每个应用都运行在自己的**隔离环境**（一个独立的沙箱化脚本运行环境）中，并受其**策略**约束：只能使用清单请求、并经宿主授予的内容。应用包不含原生代码。需要新原生代码的应用，要改为随 Shell 版本发布（[选择合适的交付路径](DEVELOPMENT.zh-CN.md#选择合适的交付路径)）。
+应用包是一个由文本和素材组成的目录。运行应用包的是**宿主**：OctoSense Shell（桌面版或手机版应用）或 `card-host`。每个应用都运行在自己的**隔离环境**（一个独立的沙箱化脚本运行环境）中，并受其**策略**约束：遵守独立存储边界、资源配额和宿主的实际同意要求。应用包不含原生代码。需要新原生代码的应用，要改为随 Shell 版本发布（[选择合适的交付路径](DEVELOPMENT.zh-CN.md#选择合适的交付路径)）。
 
 入口文件决定应用的类型：
 
@@ -90,18 +107,18 @@ my-app/
 | `publisher-signature` | 声明的 GitHub 证明验证失败（即使加了 `--allow-unsigned`）；清单未签名，且没有加 `--allow-unsigned`；或者旧格式的 Ed25519 签名验证失败，或指向未知的密钥（`publisher key "<id>" is not registered with this hub`）。 | 清单未签名，且加了 `--allow-unsigned`。 |
 | `identity` | ID 以 `os.` 开头；ID 本身或其最后一段是保留名称（[ID 与保留名称](#id-与保留名称)）。 | |
 | `contents` | 文件的扩展名不是 `.card`、`.json`、`.l0`、`.octoscript`、`.splash`、`.svg`、`.png`、`.jpg`、`.jpeg`、`.webp`、`.ttf`、`.otf`、`.txt` 或 `.md` 之一，也不是函数模块（`.wasm`，见 `functions`）。准入检查同样拒绝没有扩展名的文件（例如 `.DS_Store` 和 `LICENSE`）。 | |
-| `functions` | 应用包的 `fns/` 中带了 `.wasm` 文件却没有 `wasm` 能力，或其中带了 8 个以上。既不在 `fns/<name>.wasm`（名称为 `[a-z0-9_-]`，最多 64 个字符），也不在 `components/<blake3>.wasm`（以自己的摘要命名，见 `components`）的 `.wasm` 文件，或既不是 WebAssembly 核心模块（版本 1 的 8 字节文件头）也不是有效组件的文件，以 `contents-invalid` 拒绝；导入了 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:http`、`wasi:io`、`wasi:random` 和 `octosense:host` 以外任何内容的组件也是如此。清单没有在 `requires` 中声明 `wasm-components-v1`，组件导入了 `wasi:filesystem` 而应用没有 `storage` 能力，或组件导入了 `wasi:http` 而应用没有 `net` 能力时，组件在这一项被拒绝（[WebAssembly 组件](#webassembly-组件)）。除此之外，准入检查不检查核心模块内部；宿主在加载模块时检查它的导入和导出。 | 应用声明了 `wasm`，却没有带 `fns/*.wasm`，也没有指定共享组件。清单声明了 `wasm-components-v1`，`fns/` 中却没有组件。每个准入的组件都有一行说明它能访问什么。 |
-| `components` | 清单指定的某个共享组件不在 `--catalog` 给出的签名目录中、已在其中被撤回或摘要不同，或应用没有授予它所导入内容需要的权限。商店应用的应用包在 `components/` 中带有 `.wasm` 文件。系统应用的应用包（`--system-app`）缺少它固定的某个组件的 `components/<blake3>.wasm`，或带有它没有固定的组件（[共享组件](#共享组件)）。 | 每个解析成功的组件都有一行说明它能访问什么。不使用 `--catalog` 时，每个组件都会被报告为未解析。清单声明了 `wasm-shared-components-v1`，却没有指定任何组件。 |
+| `functions` | 应用包的 `fns/` 中带了 `.wasm` 文件却没有 `wasm` 能力，或其中带了 8 个以上。既不在 `fns/<name>.wasm`（名称为 `[a-z0-9_-]`，最多 64 个字符），也不在 `components/<blake3>.wasm`（以自己的摘要命名，见 `components`）的 `.wasm` 文件，或既不是 WebAssembly 核心模块（版本 1 的 8 字节文件头）也不是有效组件的文件，以 `contents-invalid` 拒绝；导入了 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:http`、`wasi:io`、`wasi:random` 和 `octosense:host` 以外任何内容的组件也是如此。清单没有在 `requires` 中声明 `wasm-components-v1`时，组件在这一项被拒绝（[WebAssembly 组件](#webassembly-组件)）。除此之外，准入检查不检查核心模块内部；宿主在加载模块时检查它的导入和导出。 | 应用声明了 `wasm`，却没有带 `fns/*.wasm`，也没有指定共享组件。清单声明了 `wasm-components-v1`，`fns/` 中却没有组件。每个准入的组件都有一行说明它能访问什么。 |
+| `components` | 清单指定的某个共享组件不在 `--catalog` 给出的签名目录中、已在其中被撤回或摘要不同，或导入了宿主不支持的接口。商店应用的应用包在 `components/` 中带有 `.wasm` 文件。系统应用的应用包（`--system-app`）缺少它固定的某个组件的 `components/<blake3>.wasm`，或带有它没有固定的组件（[共享组件](#共享组件)）。 | 每个解析成功的组件都有一行说明它能访问什么。不使用 `--catalog` 时，每个组件都会被报告为未解析。清单声明了 `wasm-shared-components-v1`，却没有指定任何组件。 |
 | `contents-invalid`（文本和图片） | 文本文件（`.splash`、`.card`、`.json`、`.l0`、`.octoscript`、`.txt` 或 `.md`）超过 1 MiB 或不是 UTF-8；JSON 无法解析；PNG、JPEG 或 WebP 无法解码，或单边超过 4096 像素；商店信息中的图标不是正方形，或者是超过 1 MiB 或单边超过 1024 像素的位图。 | |
 | `contents-invalid`（SVG） | SVG 无法解析；既没有数值形式的 `width` 和 `height`，也没有 `viewBox`；单边超过 4096 像素；或含有脚本、`foreignObject` 或 `on…` 事件属性。SVG 的样式（`style` 属性或 `<style>` 块）导入样式表、使用转义或注释，或让 `url()` 指向同一文件内 `#fragment` 以外的任何位置。 | |
 | `entry` | 应用包中既没有 `main.splash` 也没有 `page.card`；`page.card` 不是有效的 L0；`page.data.json` 不是 JSON；应用包中既没有 `kit/native/<theme>/kit.json`，卡片所需的 OctoScript kit 模块也不齐全。 | |
 | `resource-invalid` | 卡片对图片或字体的引用，或 SVG 的 `href`，指向应用包中没有的文件。检查结果会给出对应的 JSON 指针。见[字体](#字体)。 | |
 | `assets` | 除 `manifest.json`、`listing.json` 和 Agent 文件外，某个 `.card`、`.json`、`.l0` 或 `.octoscript` 文件含有 `http://`、`https://`、`file://` 或 `../`。普通文档中的链接不属于素材加载。`.splash` 文件或 Agent 文件含有 `http://`、`file://`、`../`，或不在 `network.hosts` 中的 `https://` 主机（应用请求了 `images` 或 `web` 时，允许任何公开主机）。 | |
 | `secrets` | `.card`、`.l0`、`.octoscript` 或 `.splash` 文件声明了 `is_password: true`，或把 `TextInputContentType` 设为 `Password`、`NewPassword` 或 `OneTimeCode`。 | |
-| `storage` | | 没有 `storage` 能力时，某个 `.splash` 文件调用了 `fs.*`，或应用请求了 `camera`。此时 `grants:` 行显示 `storage none`。 |
+| `storage` | | 没有 `storage` 能力时，某个 `.splash` 文件调用了 `fs.*`，或应用请求了 `camera`。`declarations:` 行仍显示带配额的独立存储。 |
 | `listing` | 缺少 `listing.json`，或它违反了[商店信息](#商店信息)中的规则；商店信息未指定截图或未指定图标；指定的截图或图标不在应用包中。 | |
 | `tools`、`agent`、`skills` | `tools.json`、`AGENT.md` 或某个技能不符合 [Agent 文件的规则](#agent-文件的规则)。 | 某个工具是破坏性工具（风险为 `destructive`）或对外工具（带有 `outward`），每次调用都要等待批准；某个工具写了 `confirm: "app"`；应用声明了工具，但 `agent.model.needs` 中没有 `tool_calling`；后台 Agent 带有破坏性工具。 |
-| `policy` | 某项能力未知；ID 违反了 [ID 与保留名称](#id-与保留名称)中的规则；版本为空；某个主机不是纯主机名，或者列出了主机却没有请求 `net`（[网络主机](#网络主机)）；`research` 范围或某个 `agent` 字段违反了相应规则；`storage.cache_max_bytes` 为 0。 | |
+| `policy` | 某项能力未知；ID 违反了 [ID 与保留名称](#id-与保留名称)中的规则；版本为空；某个主机不是纯主机名（[网络主机](#网络主机)）；`research` 范围或某个 `agent` 字段违反了相应规则；`storage.cache_max_bytes` 为 0。 | |
 | `version`（使用 `--catalog` 时） | 签名目录中已有该应用的这个版本。 | |
 | `continuity`（使用 `--catalog` 时） | 违反了[发布者连续性](#发布者连续性)中的规则，或签名目录的历史记录自相矛盾。 | |
 
@@ -151,8 +168,8 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 
 - 清单在 `requires` 中声明了 `wasm-components-v1`，这需要 `wasm` 能力。`wasm` 服务只能加载核心模块的宿主不认识这个特性，因此会拒绝这个应用，而不是等到第一次调用时才失败；
 - 组件能通过验证，且只从 `wasi:cli`、`wasi:clocks`、`wasi:filesystem`、`wasi:http`、`wasi:io`、`wasi:random` 和 `octosense:host` 导入接口。组件自己定义的类型（例如某个函数返回的记录）不算导入。`wasi:sockets` 及其他任何导入都以 `contents-invalid` 拒绝；
-- 只有应用有 `storage` 能力时，组件才可以导入 `wasi:filesystem`。按 ADR 0014，宿主只给它应用自己的存储文件夹；
-- 只有应用有 `net` 能力时，组件才可以导入 `wasi:http`，这样应用的权限会说明它使用网络。不要求 `network.hosts`：按 OctoSense 2026 年 10 月 8 日的裁定，应用的网络声明在安装时展示，运行时不强制，因此组件可以访问任何主机；
+- 组件可以导入 `wasi:filesystem`，但只能访问本应用带配额的独立存储。按 ADR 0014，宿主只给它应用自己的存储文件夹；
+- 组件可以导入 `wasi:http`；`net` 用于披露网络用途。不要求 `network.hosts`：按 OctoSense 2026 年 10 月 8 日的裁定，应用的网络声明在安装时展示，运行时不强制，因此组件可以访问任何主机；
 - `octosense:host` 不需要单独的授权：组件通过它只能调用应用已获授权的宿主服务，与应用的脚本相同，而且绝不会调用打开面板或询问用户的方法。
 
 组件遵守与模块相同的名称和大小规则，并计入 8 个函数文件的上限。每个准入的组件都有一条警告，告诉审核人员它能访问什么：
@@ -168,10 +185,10 @@ Label{text: "Hello" draw_text.text_style: TextStyle{font_family: FontFamily{lati
 [warning] functions (fns/fetch.wasm): fns/fetch.wasm is a component that reaches the clock and the network, but no files or other app
 ```
 
-没有 `net` 能力时，准入检查拒绝它：
+没有 `net` 使用声明时，准入检查提出披露警告：
 
 ```text
-[refused] functions: fns/fetch.wasm imports wasi:http, the network, which the app must declare with the net capability
+[warning] functions: fns/fetch.wasm imports wasi:http; disclose net usage
 ```
 
 导入 `octosense:host` 的组件（App Hub 的 `hostcall` 测试组件，所在应用只有 `wasm` 能力）会得到：
@@ -251,7 +268,7 @@ $ hub component-info fns/notes.wasm
 
 ### 使用共享组件
 
-在清单的 `components` 中列出每个组件，并在 `requires` 中声明 `wasm-shared-components-v1`，它需要 `wasm` 能力：
+在清单的 `components` 中列出每个组件，并在 `requires` 中声明 `wasm-shared-components-v1`，它标识所需的宿主 ABI：
 
 ```json
 "capabilities": ["wasm", "storage"],
@@ -275,7 +292,7 @@ $ hub component-info fns/notes.wasm
 
 一个应用最多指定 8 个组件。没有该特性却写了 `components`（`components requires wasm-shared-components-v1`）、有该特性却没有 `wasm`（`wasm-shared-components-v1 requires the wasm capability`），或某个条目违反上述规则，清单解析器都会拒绝。不认识该特性的宿主会拒绝这个应用。只使用共享组件的应用不需要 `fns/`。
 
-使用 `--catalog` 时，准入检查在该签名目录中解析每个组件。组件缺失（`is not in the catalog`）、已被撤回（`was withdrawn: <reason>`）或摘要不同（`pins blake3 …, but the catalog's file hashes to …`）时，`components` 检查项会拒绝这个应用。应用没有授予组件所导入内容需要的权限时，它也会拒绝：`wasi:filesystem` 需要 `storage`，`wasi:http` 需要 `net`。`octosense:host` 不需要单独的授权。随后，每个组件都有一行说明它在这个应用中能访问什么。不使用 `--catalog` 时，准入检查会警告它无法解析这些组件。
+使用 `--catalog` 时，准入检查在该签名目录中解析每个组件。组件缺失（`is not in the catalog`）、已被撤回（`was withdrawn: <reason>`）或摘要不同（`pins blake3 …, but the catalog's file hashes to …`）时，`components` 检查项会拒绝这个应用。遗漏 `storage`、`net` 或 `wasm` 使用声明不会导致组件被拒绝。`octosense:host` 不需要单独的授权。随后，每个组件都有一行说明它在这个应用中能访问什么。不使用 `--catalog` 时，准入检查会警告它无法解析这些组件。
 
 下面的演练在本地开发 Hub 上运行（见[用开发 Hub 演练](#用开发-hub-演练)）。它的签名目录提供 `org.example.markdown` 1.0.0，即 App Hub 测试中的 notes 组件（`crates/app-hub/tests/fixtures/notes.component.wasm`）。应用 `writer` 固定了它，并获得 `wasm` 和 `storage` 能力：
 
@@ -284,13 +301,13 @@ $ hub check writer --allow-unsigned --catalog dev-catalog.json --anchor "$(cat a
 org.example.writer 1.0.0 — PASSED
   [warning] publisher-signature: unsigned: accountability rests on the hub alone
   [warning] components: component markdown (org.example.markdown 1.0.0) reaches the clock, random numbers and files in its app folder, but no network or other app
-  grants: capabilities {"storage", "wasm"}, hosts {}, storage 16777216 bytes, agent none
+  declarations: capabilities {"storage", "wasm"}, hosts {}, storage 16777216 bytes, agent none
 ```
 
-没有 `storage` 时，同一个应用会被拒绝：
+没有 `storage` 使用声明时，同一个应用仍可准入，独立存储和配额保持生效：
 
 ```text
-  [refused] components: component markdown (org.example.markdown 1.0.0) imports wasi:filesystem, the app's own files, which needs the storage capability
+  [warning] components: component markdown reaches files in its app folder; storage remains bounded
 ```
 
 不使用 `--catalog` 时：
@@ -299,7 +316,7 @@ org.example.writer 1.0.0 — PASSED
   [warning] components: component markdown (org.example.markdown 1.0.0) is not resolved: check with --catalog to see that it is offered, matches its digest and what it reaches
 ```
 
-商店应用的应用包绝不携带组件：准入检查拒绝 `components/` 中的 `.wasm` 文件，因为商店会从签名目录获取组件。随构建发布的系统应用没有签名目录，它把固定的每个组件放在应用包的 `components/<blake3>.wasm`。`hub check --system-app` 检查其中每个文件：它必须是有效组件、只有允许的导入、以自己的摘要命名，并且应用授予了它所导入内容需要的权限。清单没有固定的文件会被拒绝。
+商店应用的应用包绝不携带组件：准入检查拒绝 `components/` 中的 `.wasm` 文件，因为商店会从签名目录获取组件。随构建发布的系统应用没有签名目录，它把固定的每个组件放在应用包的 `components/<blake3>.wasm`。`hub check --system-app` 检查其中每个文件：它必须是有效组件、只有允许的导入、以自己的摘要命名，且只包含支持的导入。清单没有固定的文件会被拒绝。
 
 对于这样的应用，商店的权限说明会多一行：`Runs shared components App Hub reviewed, with only this app's permissions: org.example.markdown 1.0.0`。
 
@@ -432,7 +449,7 @@ $ hub check writer --allow-unsigned --catalog dev-catalog.json --anchor "$(cat a
 org.example.writer 1.0.0 — REFUSED
   [warning] publisher-signature: unsigned: accountability rests on the hub alone
   [refused] components: component markdown (org.example.markdown 1.0.0) was withdrawn: Renders raw HTML it should escape
-  grants: capabilities {"storage", "wasm"}, hosts {}, storage 16777216 bytes, agent none
+  declarations: capabilities {"storage", "wasm"}, hosts {}, storage 16777216 bytes, agent none
 hub: the bundle was refused
 ```
 
@@ -484,7 +501,7 @@ hub: the bundle was refused
 
 其他字段一律拒绝。运行 `hub publisher-prepare` 之后，你省略的可选字段也会出现在清单中，值为 `null`，例如 `"agent": null`。这些字段不改变任何行为。
 
-只请求应用所需的最小权限。清单没有请求的，宿主一律不授予；安装前，商店会用通俗的话向用户展示每一项请求。
+请准确披露预计用途。商店展示的是使用声明；遗漏声明不代表应用不存储数据或不能联网。
 
 ### 能力
 
@@ -496,7 +513,7 @@ hub: the bundle was refused
 
 能力让应用可以发出请求，但并不提供响应这些请求的服务。响应请求的是**宿主服务**：OctoSense Shell 中的代码，负责完成应用自己无权做的事。**目前由谁提供**一列说明[桌面 RC2](../README.zh-CN.md#下载兼容宿主)在其平台和提供商限制内由谁响应；RC1 和历史 beta 的区别会明确注明。
 
-| 能力 | 授予的权限 | 商店显示的文字 | 目前由谁提供 |
+| 能力 | 描述的用途 | 商店显示的文字 | 目前由谁提供 |
 | --- | --- | --- | --- |
 | `storage` | 应用自己的存储文件夹：`fs.*`、相机拍摄的内容，以及控件读取的本地文件。没有它，所有 `fs.*` 调用都会失败。 | Keep its own data on this device | 运行时，所有宿主都提供 |
 | `files` | 导入或导出用户在宿主原生对话框中选择的文件。导入和导出还需要 `storage`；应用得到的是自身存储内的相对路径，不是任意文件系统访问权限。应用应声明所需的具体 `files.*` 方法。 | Import and export files you choose in the system file dialog | 桌面 RC2 在 macOS、Windows 以及安装了对话框辅助程序（zenity、qarma、matedialog 或 kdialog）的 Linux 上提供，兼容的 Android 构建也提供；RC1 不提供。单文件上限 1 MiB；`files.share` 仅限 Android，且只确认已交给系统分享选择器 |
@@ -777,7 +794,7 @@ Agent 的工作区就是应用自己的存储文件夹，它也只能访问应�
 | 该方法列在下表中，或者是 `wasm.<function>`：应用自带的函数之一，`wasm.` 之后只有一段。 | `host_method "<m>" is not in the reviewed shared-service tool contract` |
 | 工具的 `risk` 不低于该方法要求的最低风险（`wasm.<function>` 除外）。 | `host_method "<m>" requires at least <risk> risk` |
 | 工具声明了 `"private_data": true`（`wasm.<function>` 除外，它只看得到自己的输入）。 | `shared-service tools must declare private_data: true` |
-| 清单把该方法所属的服务族声明为能力，或者声明了这个方法本身。 | `host_method "<m>" requires the declared "<family>" service capability` |
+| 服务族声明用于披露用途。 | 遗漏声明不会拒绝已经审核的方法。 |
 
 | 服务族 | 最低风险为 `read` 的方法 | 最低风险为 `act` 的方法 |
 | --- | --- | --- |
@@ -958,7 +975,7 @@ OctoSense 桌面 RC1 改变了四点，RC2 沿用这些改动：
 host.request("mail.list", {…}, fn(r){ … })
 ```
 
-除非应用的策略授予了相应的服务族（`mail.*` 对应 `mail`）或确切的服务名，否则隔离环境会拒绝调用。获准的调用会交给宿主为该服务族注册的服务。服务完成工作后返回数据，绝不返回凭据；它返回的连接句柄不透明，并与该应用绑定。如果某个服务族没有任何服务响应，对它的调用会立即失败，返回 `no service answers "<family>" on this device`；`card-host` 不注册任何服务，在那里只有 App Hub 用于发现宿主 API 的 `runtime` 会响应。哪个 Shell 提供哪个服务族，见 App Flow 的[宿主服务](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。
+公开调用交给宿主为该服务族注册的服务，检查实际同意、账户 scope 和可用性；不会仅因遗漏服务族声明而拒绝。服务完成工作后返回数据，绝不返回凭据；它返回的连接句柄不透明，并与该应用绑定。如果某个服务族没有任何服务响应，对它的调用会立即失败，返回 `no service answers "<family>" on this device`；`card-host` 不注册任何服务，在那里只有 App Hub 用于发现宿主 API 的 `runtime` 会响应。哪个 Shell 提供哪个服务族，见 App Flow 的[宿主服务](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-SERVICES.zh-CN.md)。
 
 `card-host` 也没有实现 `host-api-v1`、`backend-api-v1` 和 `script-tools-v1` 所需的任何 API，因此会拒绝清单要求其中任何一项的应用。这类应用请在[桌面 RC1](../README.zh-CN.md#下载兼容宿主) 中测试，它在自身的[平台限制](HOST-API.zh-CN.md#限制)内实现了这些 API。
 
@@ -1093,10 +1110,10 @@ host.request("mail.list", {…}, fn(r){ … })
 ```text
 my-notes 0.1.0 — PASSED
   [warning] publisher-signature: unsigned: accountability rests on the hub alone
-  grants: capabilities {"storage"}, hosts {}, storage 16777216 bytes, agent none
+  declarations: capabilities {"storage"}, hosts {}, storage 16777216 bytes, agent none
 ```
 
-第一行给出应用 ID、版本和结论。每一行检查结果都采用[检查结果](#检查结果)一节中的格式。`grants:` 行是应用将获得的授权：能力、主机、以字节为单位的存储配额（没有 `storage` 时为 `none`），以及 Agent 的权限配置（没有 `agent` 字段时为 `none`）。权限配置按内核的写法显示：`workspace-write-never-ask` 显示为 `workspace-write-never`。
+第一行给出应用 ID、版本和结论。每一行检查结果都采用[检查结果](#检查结果)一节中的格式。`declarations:` 行显示服务族和主机使用声明、以字节为单位的独立存储配额，以及 Agent 的权限配置（没有 `agent` 字段时为 `none`）。权限配置按内核的写法显示：`workspace-write-never-ask` 显示为 `workspace-write-never`。
 
 ### 扫描问题
 
