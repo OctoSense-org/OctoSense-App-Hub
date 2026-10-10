@@ -109,7 +109,7 @@ engines are not bundled; see the [browser requirements](https://github.com/OctoS
 | `docs/DEVELOPMENT.md` | The guide map, delivery paths, `card-host` and its remote-control routes, and `card-studio`. |
 | `docs/adr/` | Architecture decisions: GitHub-admin catalog attestations ([ADR 0001](docs/adr/0001-github-attested-catalog.md)), GitHub-attested publisher identity ([ADR 0002](docs/adr/0002-github-attested-publisher-identity.md)) and shared components ([ADR 0003](docs/adr/0003-shared-components.md), proposed). |
 | `templates/app/` | A card app repository scaffold with metadata, an example icon and linked agent instructions. |
-| `crates/app-contract` | The app contract, `octosense-app-contract` ([OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)): the manifest, the policy an app gets, bundle integrity and running a bundle. Within `1.x` it only grows ([README](crates/app-contract/README.md)). Contract 1.10.0 is published on crates.io ([Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)). |
+| `crates/app-contract` | The app contract, `octosense-app-contract` ([OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)): the manifest, the policy an app gets, bundle integrity and running a bundle. Within `1.x` it only grows ([README](crates/app-contract/README.md)). Contract 1.11.0 is published on crates.io ([Versions on crates.io](crates/app-contract/README.md#versions-on-cratesio)). |
 | `crates/app-policy` | The signed manifest and listing, admission, and resolution into an isolate's settings and an agent session profile ([OctoSense Home ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0002-agentic-app-security-model.md)); an app's own agent (`tools.json`, `AGENT.md`, skills) loaded as an `AgentBundle`; the `tools.json` parser and checks that native modules' tool manifests share (`ToolManifest::load`). It also re-exports the app contract. |
 | `crates/app-hub` | The index, the signed catalog, the gate, the agent scan, the device client and the `hub` command ([OctoSense Home ADR 0003](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0003-app-hub-and-store.md)). |
 | `crates/appstore` | The store as an OctoSense module, the `card` module that runs an installed app as its own client, system apps (`os.` ids) and host services with their sheets. |
@@ -169,7 +169,10 @@ are in [AGENTS.md](AGENTS.md).
 
 ## What hosts serve today
 
-The gate admits capability names; the host must implement and grant each call.
+The gate validates usage declarations; the host must implement each call and
+check actual authorization. Current source treats capability and destination
+fields as disclosures ([policy](docs/PUBLISHING.md#current-source-policy-declarations-and-authorization));
+the release inventory below describes RC2.
 [Capabilities](docs/PUBLISHING.md#capabilities) is the reference. The
 [RC2 release](#download-a-compatible-host) includes everything RC1 had, plus
 the items marked RC2:

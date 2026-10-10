@@ -77,7 +77,7 @@ GTK 3/WebKitGTK 和 X11/XWayland，Windows 需要 WebView2。这些引擎不随�
 | `docs/DEVELOPMENT.md` | 指南导航、交付路径、`card-host` 及其远程控制路由，以及 `card-studio`。 |
 | `docs/adr/` | 架构决策：通过 GitHub 管理员身份认证目录（[ADR 0001](docs/adr/0001-github-attested-catalog.zh-CN.md)）、通过 GitHub 证明发布者身份（[ADR 0002](docs/adr/0002-github-attested-publisher-identity.zh-CN.md)），以及共享组件（[ADR 0003](docs/adr/0003-shared-components.zh-CN.md)，提议中）。 |
 | `templates/app/` | 卡片应用仓库脚手架，包含元数据、示例图标和链接好的 Agent 指引。 |
-| `crates/app-contract` | 应用契约 `octosense-app-contract`（[OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)）：清单、应用获得的策略、应用包完整性校验与运行应用包所需的内容。在 `1.x` 内只做增量变更（[README](crates/app-contract/README.md)）。契约 1.10.0 已发布到 crates.io（[crates.io 上的版本](crates/app-contract/README.md#versions-on-cratesio)，英文）。 |
+| `crates/app-contract` | 应用契约 `octosense-app-contract`（[OctoSense ADR 0005](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/0005-app-contract.md)）：清单、应用获得的策略、应用包完整性校验与运行应用包所需的内容。在 `1.x` 内只做增量变更（[README](crates/app-contract/README.md)）。契约 1.11.0 已发布到 crates.io（[crates.io 上的版本](crates/app-contract/README.md#versions-on-cratesio)，英文）。 |
 | `crates/app-policy` | 签名清单与商店信息、准入，以及解析为隔离环境设置和 Agent 会话配置（[OctoSense Home ADR 0002](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0002-agentic-app-security-model.md)）；应用自带的 Agent（`tools.json`、`AGENT.md`、技能）加载为 `AgentBundle`；原生模块的工具清单共用同一套 `tools.json` 解析与检查（`ToolManifest::load`）。它还重新导出应用契约。 |
 | `crates/app-hub` | 索引、签名目录、准入检查、Agent 扫描、设备端客户端和 `hub` 命令（[OctoSense Home ADR 0003](https://github.com/OctoSense-org/OctoSense/blob/main/docs/adr/home/0003-app-hub-and-store.md)）。 |
 | `crates/appstore` | 作为 OctoSense 模块的商店；把已安装应用作为独立客户端运行的 `card` 模块；系统应用（`os.` 前缀 id）；以及宿主服务及其面板。 |
@@ -115,7 +115,7 @@ OCTOSENSE_PREVIEW_SIZE=1200x860 OCTOSENSE_APP_DATA="$(mktemp -d)" target/release
 
 ## 宿主目前提供什么
 
-准入检查接受能力名称；每次调用仍需要宿主实现并授权。
+准入检查校验用途声明；每次调用仍需要宿主实现并核对实际授权。当前源码把能力和目的地字段用作披露信息（见[策略](docs/PUBLISHING.zh-CN.md#当前源码策略声明与授权)）；下方发布版清单描述的是 RC2。
 完整参考见[能力](docs/PUBLISHING.zh-CN.md#能力)。[RC2 发行版](#下载兼容宿主)包含 RC1 的全部内容，以及标为 RC2 的新增项：
 
 - 公开 GitHub v2 目录及 `publisher-github-v1` 验证，使用契约 1.10.0（RC1 为 1.8.0）。

@@ -233,11 +233,12 @@ from `appstore` through `AppHostView`.
 
 ## 5. A host-service request, line by line
 
-Take a granted app that calls `host.request("mail.list", args, callback)`:
+Take an admitted app that calls `host.request("mail.list", args, callback)`:
 
-1. Makepad's Splash host API checks the capability and queues a request
-   identified by `(heap_key, req_id)`. The heap key selects the originating
-   isolate, and the request id selects its callback.
+1. Makepad's Splash host API queues a public request identified by
+   `(heap_key, req_id)`; the family declaration is not an authorization gate.
+   The heap key selects the originating isolate, and the request id selects
+   its callback.
 2. The runner calls `services::pump` on UI events, never during drawing. It
    collects requests for this app and its visible host sheet only, parses the
    arguments and builds a `ServiceCall` with the app's identity, `from_sheet`,
@@ -248,7 +249,9 @@ Take a granted app that calls `host.request("mail.list", args, callback)`:
 3. `dispatch` finds the registered `HostService` for the `mail` family. With
    none registered, the app gets `no service answers "mail" on this device`.
    A request from an app to `mail.sheet.*` is refused before dispatch.
-4. The Rust service answers at once or moves its `Replier` to a worker.
+4. The Rust service checks app/account ownership, actual consent and any
+   foreground or trusted-review requirement, then answers at once or moves
+   its `Replier` to a worker.
    `Replier::send` removes the pending request, queues a JSON reply and wakes
    the UI with `SignalToUI`.
 5. A later `pump` delivers the result to the original isolate's callback. A
@@ -331,7 +334,7 @@ each declaration:
 
 | Layer | App Hub | OctoSense shell |
 | --- | --- | --- |
-| `agent`, model needs, background and triggers | Parsed and validated; budgets resolved | Runs two triggers: `mail.messages.new` for Mail, and `<namespace>.new_message` for a `background: true` store app granted `auth` and `gmail` with a connected Google account. Model needs do not select a model. |
+| `agent`, model needs, background and triggers | Parsed and validated; budgets resolved | Runs two triggers: `mail.messages.new` for Mail, and `<namespace>.new_message` for an opted-in, consented `background: true` store app with that exact trigger and its own connected Google account carrying the required mail-read scope. Family disclosures do not authorize or block the trigger. Model needs do not select a model. |
 | `AGENT.md` and `skills/` | Reviewed and loaded into `AgentBundle` | Passed to the app's peer as per-turn guidance (`agent_events::install_guidance`). They are not installed as kernel skills and grant no tools. |
 | `tools.json` | Names, schemas and policy checked | `implemented_by: "host-service"` tools run on a registered service (below); `implemented_by: "app"` tools run in the open full app through the `app_tools.dispatch@1` runtime ABI; a closed app returns `app_not_running` |
 | Agent account data | The contract has `storage.accounts` and `agent_workspace` | The shell builds the account workspace and its bounded read tools |

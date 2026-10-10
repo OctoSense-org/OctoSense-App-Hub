@@ -75,13 +75,13 @@ ABI 与导入验证、确切摘要、发布者证明、目录撤回、配额和�
 
 ### 邮件草稿与发送审阅（桌面 RC2）
 
-兼容宿主在既有的 `mail` 能力下提供 `mail.compose`，用于修改与应用及账户绑定的本地草稿，并通过 `mail.compose_status` 查询状态。两者的 Agent 别名最低风险分别是 `act` 和 `read`，都须声明 `private_data: true`，且不会发送邮件。前台应用调用 `mail.review_send`（或同样需要审阅的兼容入口 `mail.send`），宿主显示确切草稿，只有用户亲手批准后才发送。请声明所需方法版本；如果商店信息列出 Windows 或 Linux，请把 `mail.review_send` 放在 `host_api.optional` 下。桌面 RC2 向任何获得 `mail` 授权的应用提供这套流程：撰写草稿和查询状态在所有桌面平台可用，发送审阅只在 macOS 和 Android 上可用（在 Windows 和 Linux 上会以 `Physical Mail send approval is unavailable on this platform` 失败）。RC1 完全不提供，原有的系统邮件草稿方法仍仅限系统应用，真实的 SMTP 投递也尚未验证。
+兼容宿主提供 `mail.compose`，用于修改与应用及账户绑定的本地草稿，并通过 `mail.compose_status` 查询状态。两者的 Agent 别名最低风险分别是 `act` 和 `read`，都须声明 `private_data: true`，且不会发送邮件。前台应用调用 `mail.review_send`（或同样需要审阅的兼容入口 `mail.send`），宿主显示确切草稿，只有用户亲手批准后才发送。请声明所需方法版本；如果商店信息列出 Windows 或 Linux，请把 `mail.review_send` 放在 `host_api.optional` 下。桌面 RC2 向任何获得 `mail` 授权的应用提供这套流程：撰写草稿和查询状态在所有桌面平台可用，发送审阅只在 macOS 和 Android 上可用（在 Windows 和 Linux 上会以 `Physical Mail send approval is unavailable on this platform` 失败）。RC1 完全不提供，原有的系统邮件草稿方法仍仅限系统应用，真实的 SMTP 投递也尚未验证。
 
 ### 运行时清单
 
 应用可以用 `{}` 调用 `runtime.list` 列出所有已描述的方法，或用 `{"method":"location.get"}` 调用 `runtime.describe` 查询单个方法：
 
-- 方法描述包含输入和输出 schema、ABI 版本、所需能力、支持的平台，以及 Agent 能否调用它。
+- 方法描述包含输入和输出 schema、ABI 版本、用途服务族、支持的平台，以及 Agent 能否调用它。
 - `runtime_features` 列出运行时 ABI，例如 `app_tools.dispatch@1`。`host.request` 不能调用运行时 ABI。
 - 只有注册了描述的方法才会出现。一些较早的服务没有描述，所以这份列表并不完整。
 - 结果不含账户数据或凭据。
@@ -90,8 +90,9 @@ API 可用不等于已经配置，也不等于已经授权。`configured: null` 
 
 ## 用户选择的文件传输（随契约 1.10 发布）
 
-`files` 能力允许应用使用宿主的文件选择窗口，不允许访问任意宿主路径。
-导入和导出还需要 `storage`，两种授权互不隐含。通过 `host_api.required`
+`files` 声明描述宿主的文件选择窗口，不代表任意宿主路径访问权限。当前宿主为每个
+准入应用提供带配额的私有隔离目录；导入和导出不要求声明 `files` 或 `storage`
+服务族。用户仍须在前台的宿主文件窗口中选择文件。通过 `host_api.required`
 要求 `files.import@1` 或 `files.export@1`，也可以将其声明为可选并检查
 `runtime.list`。桌面 RC2 实现了这些 API，RC1 没有，仅支持新契约从来不代表宿主已实现；
 `files.status` 返回当前平台适配器是否可用。
@@ -109,13 +110,13 @@ Android 文档提供方 URI。传输仅限前台，agent 和后台任务不能�
 
 ### 选择照片与分享文本（桌面 RC2）
 
-配套宿主新增 `files.pick_photo({"path":"photos/chosen.jpg"})`，同时需要
-`files` 和 `storage`。它打开图片选择窗口，验证 PNG、JPEG 或 WebP 文件签名后，
+配套宿主新增 `files.pick_photo({"path":"photos/chosen.jpg"})`，将照片导入
+应用的私有隔离目录。它打开图片选择窗口，验证 PNG、JPEG 或 WebP 文件签名后，
 导入应用内的新路径。返回 `path`、`bytes`、`mime`，取消则返回
 `{"cancelled":true}`。单文件 1 MiB 上限仍适用：过大的原图会明确失败，不会
 悄悄缩小图片。
 
-`files.share({"text":"一条简短记录"})` 只需要 `files`，本批次仅支持 Android。
+`files.share({"text":"一条简短记录"})` 打开 Android 分享选择器，本批次仅支持 Android。
 文本须为 1–8192 个 UTF-8 字节。前台调用打开原生分享选择器；只有成功交给
 选择器后，才返回 `{"handoff":"chooser_opened","delivery":"unknown"}`。
 这不证明对方已收到内容，也不支持附件。两种方法都没有 Agent 别名。请声明
@@ -126,12 +127,15 @@ Android 文档提供方 URI。传输仅限前台，agent 和后台任务不能�
 
 桌面 RC2 的 macOS 构建和兼容的 Android 宿主提供以下方法，RC1、Windows 和 Linux 不提供；请声明方法版本，不要仅凭能力名称推断支持情况，商店信息列出没有这些方法的平台时请把它们放在 `host_api.optional` 下：
 
-| 方法 | 所需能力 | 行为 |
+| 方法 | 用途声明 | 行为 |
 | --- | --- | --- |
 | `microphone.record_start({path,max_duration_ms})` | `microphone`、`storage` | 获得应用和系统授权后，录制最多 30 秒的单声道 16 kHz PCM WAV，写入应用内的新文件。 |
 | `microphone.record_status/record_stop/record_cancel({session})` | `microphone` | 查询、停止并保存，或丢弃本活跃应用的录音。 |
 | `audio.play({path})` | `audio`、`storage` | 播放有大小限制的本地 WAV、MP3、FLAC 或 Ogg 文件。 |
 | `audio.status/audio.stop({session})` | `audio` | 查询或停止本活跃应用的播放。 |
+
+表中列的是用途声明，不是执行授权。当前宿主不会仅因遗漏服务族声明而拒绝
+这些方法；录音仍须获得下文所述的授权。
 
 每次返回包含不透明的 `session`、`status`、`path`、`error`、`frames` 和 `format`。
 启动返回 `starting` 不代表已成功录音或播放；轮询状态，直到第一个原生回调

@@ -41,7 +41,7 @@ Find the guide for your task:
 | Path | What you build | How it ships |
 | --- | --- | --- |
 | Hub card app | `page.card` with its data and `kit/`, local artwork, `manifest.json` and `listing.json`. The host converts (lowers) the card to native widgets: the card has no logic of its own and runs within the host's existing capabilities. | A store bundle, submitted to the Hub. |
-| Hub script app | `main.splash`, local artwork, `manifest.json` and `listing.json`. A Splash program with its own state, handlers, requests and storage, run in its own isolate (a separate script environment) under the policy its manifest resolves to. It reaches the network only through the hosts it declares, and the person's location, camera and mail only through the capabilities it is granted and the host services the shell offers. | A store bundle, submitted to the Hub. |
+| Hub script app | `main.splash`, local artwork, `manifest.json` and `listing.json`. A Splash program with its own state, handlers, requests and storage, run in its own isolate (a separate script environment) under the policy its manifest resolves to. Capability and destination declarations disclose usage. The private jail and quotas, device consent, account scopes and service availability still govern execution; omitting a family or host does not deny a public API. | A store bundle, submitted to the Hub. |
 | System app | A script app bundle under a reserved `os.` id, packed into a shell at build time. OctoSense's are in `apps/`. | With the shell release. A store bundle may not take an `os.` id. |
 | Built-in native app | Source compiled into a shell release, built with the native workspace and the owning app's instructions. The shared icon conventions apply. | With the shell release. An icon declaration does not make it installable from the Hub. |
 | Agent-generated app type | Specifications and lint rules in OctoSense `apps/appcard` that teach AppCard's agents to compose a new kind of app. | Not a bundle. |
@@ -56,10 +56,13 @@ Script apps continue to manage their own responsive layout and scrolling.
 
 A store bundle carries no native code. New native Rust or JNI code, Python
 services and browser controllers do not install as a card app or a script app.
-Rust code compiled to a WebAssembly module can ship in a store app under the
-`wasm` capability, in a sandbox with no files, network or clock. Standard
-desktop and Home builds of OctoSense `main` run it on macOS, Linux and
-Android, and no release includes it yet (App Flow's
+Rust compiled to WebAssembly can ship in a store bundle, with `wasm`
+disclosing that usage. Core modules reach no files, network or clock;
+components use supported WASI and public host APIs within the app's actual
+authorization and resource limits. Desktop RC2 includes core-module support
+on macOS and Linux. Current OctoSense source also includes Windows and
+Android support and OpenHarmony builds using Pulley; build inclusion is not
+device or release acceptance (App Flow's
 [Run your own Rust code](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/RUST.md)).
 
 Some App Flow examples include a native service or a website integration.
@@ -109,7 +112,7 @@ The log says what happened:
 
 | Log line | Meaning |
 | --- | --- |
-| `card-host: <id> <version> admitted — capabilities {…}, hosts {…}, storage <n> bytes, agent <profile>` | The bundle was admitted with these grants. |
+| `card-host: <id> <version> admitted — capabilities {…}, hosts {…}, storage <n> bytes, agent <profile>` | The bundle was admitted; the log shows usage declarations and resolved resource limits, not user consent. |
 | `card-host: refused: <reason>` | The bundle was refused. The window shows "card-host refused this bundle" and the reason. None of the bundle's code runs. |
 | `card-host: realize {json}` | An L0 card's lint and realize report, logged before the card is drawn. A script app logs none. |
 | `card-host: the card did not lower: <error>` | The card was admitted but could not be lowered to widgets. |

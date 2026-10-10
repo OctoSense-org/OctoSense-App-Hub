@@ -142,15 +142,15 @@ admission. A warning does not.
 | `publisher-signature` | The declared GitHub proof fails verification, even with `--allow-unsigned`; the manifest is unsigned and `--allow-unsigned` is absent; or a legacy Ed25519 signature fails verification or names an unknown key (`publisher key "<id>" is not registered with this hub`). | The manifest is unsigned and `--allow-unsigned` is given. |
 | `identity` | The id starts with `os.`; the id, or its last segment, is a reserved name ([Ids and reserved names](#ids-and-reserved-names)). | |
 | `contents` | A file's extension is not one of `.card`, `.json`, `.l0`, `.octoscript`, `.splash`, `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.ttf`, `.otf`, `.txt` or `.md`, and it is not a function module (`.wasm`, see `functions`). Files with no extension, such as `.DS_Store` and `LICENSE`, are refused too. | |
-| `functions` | The bundle carries more than 8 `.wasm` files in `fns/`. A `.wasm` file that is not at `fns/<name>.wasm` (the name `[a-z0-9_-]`, at most 64 characters) or `components/<blake3>.wasm` (named by its own digest, see `components`), or is neither a WebAssembly core module (the 8-byte header of version 1) nor a valid component, is refused as `contents-invalid`, as is a component that imports anything outside `wasi:cli`, `wasi:clocks`, `wasi:filesystem`, `wasi:http`, `wasi:io`, `wasi:random` and `octosense:host`. A component is refused here when the manifest does not require `wasm-components-v1` ([WebAssembly components](#webassembly-components)). The gate checks nothing else inside a core module; the host checks its imports and exports when it loads the module. | The app declares `wasm` but carries no `fns/*.wasm` and names no shared component. The manifest requires `wasm-components-v1` but `fns/` holds no component. Each admitted component gets a line saying what it reaches. |
+| `functions` | The bundle carries more than 8 `.wasm` files in `fns/`. A `.wasm` file that is not at `fns/<name>.wasm` (the name `[a-z0-9_-]`, at most 64 characters) or `components/<blake3>.wasm` (named by its own digest, see `components`), or is neither a WebAssembly core module (the 8-byte header of version 1) nor a valid component, is refused as `contents-invalid`, as is a component that imports anything outside `wasi:cli`, `wasi:clocks`, `wasi:filesystem`, `wasi:http`, `wasi:io`, `wasi:random` and `octosense:host`. A component is refused here when the manifest does not require `wasm-components-v1` ([WebAssembly components](#webassembly-components)). The gate checks nothing else inside a core module; the host checks its imports and exports when it loads the module. | The app declares `wasm` but carries no `fns/*.wasm` and names no shared component. The manifest requires `wasm-components-v1` but `fns/` holds no component. Each admitted component gets a line saying what it reaches. Bundled functions without a `wasm` disclosure, or component file/HTTP imports without `storage`/`net` disclosures, produce warnings, not refusals. |
 | `components` | A shared component the manifest names is missing from the `--catalog` catalog, withdrawn there or has another digest, or its imports are unsupported. A store app's bundle carries a `.wasm` file in `components/`. A system app's bundle (`--system-app`) lacks `components/<blake3>.wasm` for a component it pins, or carries one it does not pin ([Shared components](#shared-components)). | Each resolved component gets a line saying what it reaches. Without `--catalog`, each component is reported as not resolved. The manifest requires `wasm-shared-components-v1` but names no components. |
 | `contents-invalid` (text and images) | A text file (`.splash`, `.card`, `.json`, `.l0`, `.octoscript`, `.txt` or `.md`) is over 1 MiB or not UTF-8; JSON does not parse; a PNG, JPEG or WebP does not decode or is over 4096 px a side; the listing icon is not square, or is a bitmap over 1 MiB or 1024 px a side. | |
 | `contents-invalid` (SVG) | An SVG does not parse; lacks a numeric `width` and `height` or a `viewBox`; is over 4096 px a side; or holds a script, a `foreignObject` or an `on…` handler. Its styling (a `style` attribute or a `<style>` block) imports a stylesheet, uses an escape, uses a comment or points `url()` anywhere but a `#fragment` in the same file. | |
 | `entry` | The bundle has neither `main.splash` nor `page.card`; `page.card` is not valid L0; `page.data.json` is not JSON; neither `kit/native/<theme>/kit.json` nor every OctoScript kit module the card needs is in the bundle. | |
 | `resource-invalid` | A card's image or font reference, or an SVG `href`, names a file that is not in the bundle. The finding names the JSON pointer. See [Fonts](#fonts). | |
-| `assets` | A `.card`, `.json`, `.l0` or `.octoscript` file other than `manifest.json`, `listing.json` and the agent files contains `http://`, `https://`, `file://` or `../`. Plain documentation links are not asset loads. A `.splash` file or an agent file contains `http://`, `file://`, `../` . Missing `network.hosts` entries do not cause refusal. | |
+| `assets` | A `.card`, `.json`, `.l0` or `.octoscript` file other than `manifest.json`, `listing.json` and the agent files contains `http://`, `https://`, `file://` or `../`. Plain documentation links are not asset loads. A `.splash` file or an agent file contains `http://`, `file://`, `../`. Missing `network.hosts` entries do not cause refusal. | |
 | `secrets` | A `.card`, `.l0`, `.octoscript` or `.splash` file declares `is_password: true` or a `TextInputContentType` of `Password`, `NewPassword` or `OneTimeCode`. | |
-| `storage` | | A `.splash` file calls `fs.*`, or the app requests `camera`, without the `storage` capability. The `declarations:` line still reports the bounded storage quota. |
+| `storage` | | A `.splash` file calls `fs.*`, or the app requests `camera`, without the `storage` disclosure. The `declarations:` line still reports the bounded storage quota. |
 | `listing` | `listing.json` is missing or breaks a rule in [The listing](#the-listing); the listing names no screenshot or no icon; it names a screenshot or icon that is not in the bundle. | |
 | `tools`, `agent`, `skills` | `tools.json`, `AGENT.md` or a skill breaks a rule in [Rules for agent files](#rules-for-agent-files). | A tool is destructive or outward (each call waits for approval); a tool says `confirm: "app"`; the app declares tools but `agent.model.needs` omits `tool_calling`; a background agent has destructive tools. |
 | `policy` | A capability is unknown; the id breaks a rule in [Ids and reserved names](#ids-and-reserved-names); the version is empty; a host is not a bare host name, ([Network hosts](#network-hosts)); the `research` scope or an `agent` field breaks its rules; `storage.cache_max_bytes` is 0. | |
@@ -186,8 +186,10 @@ subset when it is not one of these shipped resources.
 
 Keep the font's required license and attribution with the bundle. Links in
 plain `.txt` and `.md` documentation are not asset loads and grant no network
-access. Agent instructions and skills still follow the declared-host checks;
-card data, script code and SVG resources keep their own resource checks.
+access. Agent instructions, skills and scripts reject unsafe references
+(`http://`, `file://`, `../`); their HTTPS links do not require a matching
+`network.hosts` entry. Card data and SVG resources retain their stricter
+resource checks.
 
 A bundled font counts toward the 8 MiB limit, so bundle a subset of a large
 CJK font. The gate checks the font's path but does not decode the file, so
@@ -370,7 +372,7 @@ changes without an app update
 App Hub reviews a shared component like an app and validates it like an
 app's own component ([WebAssembly components](#webassembly-components)).
 It reaches only what the app that uses it may: each app runs its own
-instance, under its own grants.
+instance, under its own identity, resource limits and actual authorization.
 
 Shared components require a compatible host and publication in its verified
 catalog; ordinary component loading alone does not supply that support.
@@ -421,7 +423,7 @@ This rehearsal ran on a local development hub (see
 [Rehearse with a development hub](#rehearse-with-a-development-hub)) whose
 catalog offers `org.example.markdown` 1.0.0, the notes component from App
 Hub's tests (`crates/app-hub/tests/fixtures/notes.component.wasm`). The app
-`writer` pins it and is granted `wasm` and `storage`:
+`writer` pins it and discloses `wasm` and `storage` usage:
 
 ```console
 $ hub check writer --allow-unsigned --catalog dev-catalog.json --anchor "$(cat anchor.pub)"
@@ -566,9 +568,10 @@ hub: the component was refused
 | `version` (with `--catalog`) | The catalog already holds this version. |
 | `continuity` (with `--catalog`) | The repository, owner or workflow differs from the earlier versions', the version is not higher than the newest, or the history disagrees with itself. |
 
-The `functions` warning tells reviewers what the component reaches in any app
-that pins it; each app's own check then holds the component to that app's
-grants.
+The `functions` warning tells reviewers which interfaces the component
+imports. Admission validates compatible imports and exact pins; at runtime
+the component keeps the calling app's identity, jail, quotas and actual
+authorization.
 
 An App Hub admin turns an approved release into a catalog candidate with
 `hub component-entry <release.json> --wasm <file.wasm> --catalog <authenticated
@@ -657,12 +660,12 @@ Validate its exact build, platform and released bytes separately.
 | `integrity.bundle_blake3` | The bundle's digest. | Written by `hub stamp`. Never edit it by hand. |
 | `integrity.github` | GitHub repository/owner IDs, workflow, tag, commit and attached Sigstore proof. | Requires `publisher-github-v1`; generated by `publisher-prepare` and `publisher-attach`. |
 | `integrity.signature` | `{key_id, value}`, a legacy Ed25519 signature over the manifest. | Leave it out: App Hub accepts only GitHub-attested releases ([Signing](#signing)). Until [App Hub #168](https://github.com/OctoSense-org/OctoSense-App-Hub/issues/168) lands, the gate still admits a key-signed manifest; reviewers refuse it. |
-| `capabilities` | What the app may use. | Names from the closed list ([Capabilities](#capabilities)). |
-| `network.hosts` | The hosts the app may reach. | Bare host names, and only with `net` ([Network hosts](#network-hosts)). |
+| `capabilities` | What the app expects to use. | Names from the closed list ([Capabilities](#capabilities)). |
+| `network.hosts` | Expected network destinations, for disclosure. | Bare host names, validated even without `net` ([Network hosts](#network-hosts)). |
 | `storage` | `max_bytes`, `accounts`, `agent_workspace`, `cache_max_bytes`. | See [Storage and quotas](#storage-and-quotas). |
 | `compute` | `instruction_budget`, `memory_bytes`. | Clamped to the host's ceilings. |
 | `agent` | The app's own agent. | Optional ([The manifest's `agent`](#the-manifests-agent)). |
-| `research` | The scope of `research` and `crawl`. | Required with `research` or `crawl`; refused when the manifest requests neither ([The research scope](#the-research-scope)). |
+| `research` | The scope of `research` and `crawl`. | Required when declaring `research` or `crawl`; a valid scope is also accepted without either declaration ([The research scope](#the-research-scope)). |
 | `requires` | Host features the app needs. | Each must be a feature the host knows: `palpo-admin-v1`, `host-api-v1`, `backend-api-v1`, `script-tools-v1`, `publisher-github-v1`, `wasm-components-v1` or `wasm-shared-components-v1`. GitHub publishing requires a real provenance verifier; the three API markers also need a host that implements their APIs ([Host API compatibility](HOST-API.md)). `wasm-components-v1` and `wasm-shared-components-v1` identify required component ABIs ([WebAssembly components](#webassembly-components), [Shared components](#shared-components)). |
 | `components` | The shared components the app's functions use, each pinned to one exact version and digest. | Optional; needs `wasm-shared-components-v1`; at most 8 ([Shared components](#shared-components)). |
 | `host_api` | The host API methods the app needs (`required`) or can use (`optional`), each with its ABI major version. | Optional; needs `host-api-v1` in `requires`. The store checks the `required` methods at install and at every launch ([Declare what the app needs](HOST-API.md#declare-what-the-app-needs)). |
@@ -700,9 +703,9 @@ platform and provider limits; RC1 and historical beta differences are explicit.
 | `images` | Pictures from any public https host, not only `network.hosts`. | Show pictures from any website | The runtime |
 | `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime on supported platforms, including Windows/WebView2 and Linux X11/XWayland/WebKitGTK since RC1; native Wayland embedding is unsupported ([requirements](../README.md#download-a-compatible-host)). |
 | `location` | The device's location. On macOS since desktop RC1 and in compatible Android source builds, an app that declares `host-api-v1` must first ask with `location.permission.request`; it can then read a fresh fix with `location.sample` on macOS and Android (RC2), or the last-known fix with `location.get` on Android only ([Host API compatibility](HOST-API.md)). | Use your location | The runtime, where the device has it |
-| `camera` | The camera. A capture is saved in the app's storage, so the app also needs `storage`. On macOS since desktop RC1 and in compatible Android source builds, an app that declares `host-api-v1` must first ask with `camera.permission.request`. | Use the camera | The runtime, where the device has it |
+| `camera` | The camera. A capture is saved in the app's bounded private storage, even without a `storage` declaration. On macOS since desktop RC1 and in compatible Android source builds, an app that declares `host-api-v1` must first ask with `camera.permission.request`. | Use the camera | The runtime, where the device has it |
 | `microphone` | Record sound after app and OS consent. Foreground `microphone.record_*` sessions arrive with desktop RC2 on macOS and compatible Android builds (clips of up to 30 seconds into the app's storage; hardware acceptance pending); earlier hosts, and Windows and Linux, expose permission methods without recording. Declare the exact required methods and first request `microphone.permission.request`. | Use the microphone | The runtime, where the device has it |
-| `audio` | Play app-local audio while the app is active. Does not imply microphone, storage or background access. | Play its own audio files while the app is active | Desktop RC2 on macOS and compatible Android builds, with `storage` (files of at most 1 MiB and 60 seconds); not Windows, Linux or RC1; hardware acceptance pending. |
+| `audio` | Play app-local audio while the app is active. Does not grant microphone consent or background recording. | Play its own audio files while the app is active | Desktop RC2 on macOS and compatible Android builds, with `storage` (files of at most 1 MiB and 60 seconds); not Windows, Linux or RC1; hardware acceptance pending. |
 | `library` | Offering captures to the system photo library, where other apps can see them. | Save to your photo library, where other apps can see it | The runtime, where the device has it |
 | `clipboard` | The clipboard. | Use the clipboard | Not yet: no API uses it |
 | `prompt` | Questions the app asks the person. | Ask you questions | Not yet: no host reads it. An app agent asks with `ask_user_question`. |
@@ -737,8 +740,8 @@ platform and provider limits; RC1 and historical beta differences are explicit.
 | `vector` | Vector art through the `vector` engine (vectorcraft): inspect, convert, and render SVG, PDF, EPS and DXF, inside the app's own files. | Use the device's vector-drawing engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
 | `pdf` | PDFs through the `pdf` engine (pdfcraft): info, text, page renders, merge and split, inside the app's own files. | Use the device's PDF engine on its own files | System apps only. Desktop RC2 includes the engine for the system assistant, but its admission code predates this capability name, so a store app must not declare it; OctoSense `main` serves it in desktop builds (macOS, Linux, Windows), not in Home. |
 
-No capability implies another. Not yet: `photos` and `youtube` services for
-store apps. For how a script calls each capability, see App Flow's
+Declarations do not grant access or supply missing services. Not yet:
+`photos` and `youtube` services for store apps. For how a script calls each capability, see App Flow's
 [Capabilities](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/CAPABILITIES.md); for which capabilities actually answer a
 store app, on which platforms and since which release, its
 [Host API families](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/docs/HOST-API-FAMILIES.md).
@@ -747,12 +750,16 @@ Source: `KNOWN_CAPABILITIES` in `crates/app-contract/src/manifest.rs`.
 
 ### Exact service names: `octos.*`, `matrix.*`, `palpo.*`
 
-Each of these 78 names is a separate capability, matched exactly. A prefix
-such as `octos.` or `matrix.` is an unknown capability. Passing the gate is not enough: on every call, the host also
-checks that it serves the name, that the app's policy includes it and that the
-person granted it.
+Each of these 78 names is a separate disclosure, matched exactly. A prefix
+such as `octos.` or `matrix.` is an unknown capability. On the current
+OctoSense host, an opted-in app assistant can use the four public `octos.*`
+methods after the person consents, without declaring each method as a
+capability. The host still checks the admitted app identity, session
+ownership, method allowlist and consent. It does not create an assistant
+merely because these methods exist, or grant another app's tools. Rinx
+mini-app authorization is a separate hosting path.
 
-| Group | Names | Grants | Served today |
+| Group | Names | Describes | Served today |
 | --- | --- | --- | --- |
 | `octos.*` | 4: `octos.session.open`, `octos.session.history`, `octos.turn.start`, `octos.turn.interrupt` | A conversation with the app's own agent, run by octos, the agent kernel OctoSense runs: open it, read its history, start a turn, stop a turn the app started. The app never names a provider, a model or a key. | OctoSense, once the person allows the app's agent. Until then a call answers `Waiting for the person to allow this app's agent (OctoSense asks the first time)`. |
 | `matrix.*` | 45, such as `matrix.read_messages`, `matrix.room_members`, `matrix.send_message` | One Matrix operation each, on the person's current account, in the rooms they allow. | No OctoSense host service serves them. Rinx, a native app OctoSense ships, serves them through its own host to the bundles a person imports into it as mini-apps; that is not the App Hub install path. |
@@ -804,8 +811,8 @@ port or wildcard. This format rule does not restrict runtime destinations.
 ```
 
 The host list is part of each signed version, so list only stable hosts: a
-published app cannot follow a tunnel's new name, and `localhost` is the
-person's own device, not your server.
+published disclosure does not change when a tunnel gets a new name.
+`localhost` is the person's own device, not your server.
 
 ### Storage and quotas
 
@@ -819,7 +826,7 @@ person's own device, not your server.
 | `compute.memory_bytes` | The isolate's heap. |
 
 Quotas are requests. The host clamps each one to its ceiling, the host's
-maximum, and an absent value gets the ceiling. The `grants:` line of
+maximum, and an absent value gets the ceiling. The `declarations:` line of
 `hub check` shows the storage the app gets after clamping.
 
 | Ceiling | Value |
@@ -860,7 +867,7 @@ JSON to the system toolbox.
 | `max_age_days` | The oldest material, in days back from now. | A whole number of days. |
 | `categories` | Metasearch categories. | `news`, `general`, `science`, `it` or `social`. |
 | `max_results` | The most results per search. | Above 0; default 20. |
-| `max_depth`, `max_pages` | The `crawl` limits: link depth and pages of one crawl. | Both above 0 with `crawl`; both 0 or absent without it. |
+| `max_depth`, `max_pages` | The crawl limits: link depth and pages of one crawl. | Both above 0 when declaring `crawl`; otherwise they may be absent or 0 to disable crawling. A supplied scope is validated even without a `crawl` declaration. |
 
 An empty or absent list, or an absent `max_age_days`, means no limit. `{}`
 keeps only the defaults: 20 results a search and no crawl. Unknown fields are
@@ -911,14 +918,19 @@ app's assistant.
 | `instructions` | The agent's instructions, conventionally `AGENT.md`. | Not a `.md` path in the bundle. |
 | `skills` | The skills to load, by directory name under `skills/`. | More than 16 skills, or one named twice. |
 
-The agent's workspace is the app's own storage folder, and the agent reaches
-only the app's hosts. It never gets more than the app has.
+The agent's workspace follows the app/account storage scope and
+`agent_workspace` setting. Its tool selection, research scope, sharing grants
+and user consent remain separate from descriptive `capabilities` and
+`network.hosts`; declaring a family does not add tools. On a host that offers
+research/crawl tools, request the exact names in `agent.tools` and provide a
+valid `research` scope. The default store-app offer does not include those
+tools ([Code walkthrough](CODE-WALKTHROUGH.md#6-what-declaring-an-app-agent-enables)).
 
 ### An app with `tools.json` has an agent
 
 OctoSense offers "Ask &lt;app&gt;" for any app that ships `tools.json`, even one with
 no `agent` block. `hub check` still prints `agent none` for it, because the
-`grants:` line reports only the manifest's `agent` block. What the store's
+`declarations:` line reports only the manifest's `agent` block. What the store's
 privacy summary says about such an app depends on the App Hub revision the
 store was built from:
 
@@ -1050,14 +1062,15 @@ The gate refuses a `host_method` unless every rule holds:
 App Hub admits the `device_calendar` aliases and `mail.compose` /
 `mail.compose_status`; desktop RC2 implements them on macOS and compatible
 Android builds, RC1 does not, and Windows and Linux compose and read a draft's
-status but cannot approve a send. All require `private_data: true` and the corresponding
-capability. Calendar permission prompts, calendar selection and event writes
+status but cannot approve a send. These aliases require `private_data: true`
+and the stated risk; current policy does not require a family disclosure to
+route them. Calendar permission prompts, calendar selection and event writes
 are foreground-only; so are `mail.review_send` and `mail.send`. Preparing a
 draft does not send it. The compatible host must check authorization again
 and show its own immutable review before a person approves an external write.
 
 `wasm.<function>` runs one of the app's own functions (`fns/*.wasm`, the
-`wasm` capability), only on hosts that serve `wasm`
+`wasm` usage disclosure), only on hosts that serve `wasm`
 ([Capabilities](#capabilities)): desktop RC2 on macOS and Linux, while RC1
 left it disabled. RC2 implements the `auth`, `runtime`, `camera`,
 `microphone`, `location`, `device_calendar` and `mail` methods above within the
@@ -1072,8 +1085,9 @@ person's approval on the host's native review screen. Permission `request` and
 have no `host_method`.
 
 The seven media aliases above require [OctoSense #368](https://github.com/OctoSense-org/OctoSense/pull/368);
-desktop RC1 and RC2 include them. They keep the `model` capability and
-`private_data: true` requirements. Generation and embeddings may be billable,
+desktop RC1 and RC2 include them. Current policy keeps `private_data: true`
+and the method's risk requirement, without a `model` declaration gate.
+Generation and embeddings may be billable,
 so they and video cancellation require `act` risk and use the bounded model
 service. Discovery does not prove provider entitlement; video cancellation
 can fail when the remote job is already running. See the bilingual
@@ -1280,9 +1294,9 @@ OctoSense desktop RC1 changed four things, and RC2 keeps them:
 
 `listing.json` is what a person sees in the store before installing. It is
 reviewed with the bundle and travels in the signed catalog, so what a reviewer
-read is what the store shows. The permissions shown beside it come from the
-manifest, never from the listing, so a listing cannot understate what the app
-does.
+read is what the store shows. The usage disclosures beside it come from the
+manifest, not the listing. Both must describe actual behavior accurately;
+omitted disclosures do not prove that an app cannot store data or go online.
 
 | Field | Rule |
 | --- | --- |
@@ -1358,9 +1372,10 @@ See App Flow's
 
 ### Connected accounts
 
-An app that works with GitHub or Google declares `auth` plus the provider
-capability it uses: `github`, `gcalendar` or `gmail`. The person signs in on a
-host sheet, and the app gets a connection handle, never a token. Writes go
+An app that works with GitHub or Google should disclose `auth` plus the
+provider families it uses: `github`, `gcalendar` or `gmail`. These declarations
+do not authorize account access. The person signs in on a host sheet, and
+the app gets a connection handle, never a token. Writes go
 through a host review. Set `storage.accounts: true`, so that each account keeps
 its own data. For the hosts that serve these apps, see
 [Before you start](SUBMITTING.md#before-you-start); for the calls, see
@@ -1519,7 +1534,7 @@ none of them reads a bundle or writes a file. An unknown command fails with
 | --- | --- |
 | `hub publisher-prepare/attach/verify/pack/unpack/entry` | Prepare a canonical GitHub subject, attach its proof, verify, deliver or build a review candidate; see [GitHub publisher provenance](#github-publisher-provenance) and `hub --help` for exact flags. No command publishes the catalog. |
 | `hub stamp <bundle>` | Parses `manifest.json` with the gate's parser, then writes the bundle's digest into `integrity.bundle_blake3` and prints it. Refuses a manifest the gate cannot read or an already GitHub-attested release. |
-| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app] [--advisory-db <dir>]` | The gate. Prints `PASSED` or `REFUSED`, every finding and what the app will be granted. Exits 1 on a refusal. `--json` prints the report as JSON (`schema`, `stage`, `passed`, `app_id`, `version`, `digest`, `findings` and `resources`). `--publisher-key` checks a legacy key-signed bundle; publishing never needs it. `--advisory-db` checks the crates its components list against a RustSec checkout ([The crates a component lists](#the-crates-a-component-lists)). |
+| `hub check <bundle> [--allow-unsigned] [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--json] [--system-app] [--advisory-db <dir>]` | The gate. Prints `PASSED` or `REFUSED`, every finding, usage declarations and resolved resource limits. Exits 1 on a refusal. `--json` prints the report as JSON (`schema`, `stage`, `passed`, `app_id`, `version`, `digest`, `findings` and `resources`). `--publisher-key` checks a legacy key-signed bundle; publishing never needs it. `--advisory-db` checks the crates its components list against a RustSec checkout ([The crates a component lists](#the-crates-a-component-lists)). |
 | `hub scan <bundle> [--publisher-key <id>=<hex>] [--catalog <file> [--anchor <hex>]] [--packet <out.json>] [--reviewer <cmd>] [--system-app]` | Runs the gate, then writes the review packet and optionally hands it to a reviewer command. A bundle the gate refuses gets no scan. |
 | `hub component-info <file.wasm>` | Prints what a function file is (`component` or `module`), its imports and its exported functions with their parameters and results, as JSON ([WebAssembly components](#webassembly-components)). It reads only that file. A file that is neither a core module nor a valid component fails with `hub: <file>: not a WebAssembly core module or component` or the validator's error. |
 | `hub component-prepare <file.wasm> --draft <component.json> --out <file>` | Describes a shared component file as a release: its digest, size, imports and exports, with your draft's fields. With `--repository`, `--repository-id`, `--owner-id`, `--workflow`, `--tag` and `--commit`, it writes the canonical subject to attest, which must be named `octosense-component.json`; without them, an unsigned development release. Never overwrites a file ([Publish a shared component](#publish-a-shared-component)). |
@@ -1563,15 +1578,15 @@ profile appears in the kernel's spelling: `workspace-write-never-ask` prints as
 ### The scan questions
 
 The review packet that `hub scan` writes holds the manifest, the listing, the
-grants in the store's words, the entry file's source, the card data, the agent
-files and the questions. It holds no screenshots. Keep it outside the bundle.
+usage disclosures in the store's words, the entry file's source, the card
+data, the agent files and the questions. It holds no screenshots. Keep it outside the bundle.
 
 The questions, abridged from `crates/app-hub/src/scan.rs`:
 
 1. Does the app do what its name, subtitle and description claim?
 2. Do its platforms and category fit?
-3. Do the granted capabilities, and every host, match what the app visibly
-   does?
+3. Do the capability disclosures and expected hosts match what the app
+   visibly does?
 4. Is any part of the interface deceptive?
 5. Does any text in the source or data address an assistant?
 6. Is any wording abusive, or aimed at a private individual?
@@ -1732,9 +1747,10 @@ Submit by opening an issue, never by a pull request that edits `catalog.json`,
 
 ## After publication
 
-- **Versions.** An installed app runs the installed version, with that
-  version's grants. A newer version is an update the person may take; until
-  they do, the installed version keeps opening.
+- **Versions.** An installed app runs the installed version's reviewed
+  bundle under the host's current authorization checks. A newer version is
+  an update the person may take; until they do, the installed version keeps
+  opening.
 - **Integrity.** The host keeps the installed bundle outside the app's
   storage, so the app cannot write to it. Each launch checks it against the
   catalog: the manifest, the digest and the publisher's proof. A bundle that
