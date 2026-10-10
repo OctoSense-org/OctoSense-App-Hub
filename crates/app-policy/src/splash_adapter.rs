@@ -1,13 +1,9 @@
 //! Applying a resolved policy to the isolate that will run the app.
 //!
-//! This is ADR 0002 phase 1 in seven calls, and since phases 2 to 4 landed
-//! in the runtime every one of them is ENFORCED: a card's surface gets its
-//! jail and quota, its capability list (checked before any host request is
-//! queued), its prompt right, its host allowlist (checked on every network
-//! path, including artwork and `sys.*` data), a cumulative instruction
-//! budget, and a heap ceiling — at creation, from one place. A mount path
-//! that calls [`apply`] cannot forget one of them, and nothing downstream may
-//! widen what it set.
+//! Every admitted app receives its own jail and quota, a network module and
+//! the public non-device runtime APIs. Declarations remain in the policy for
+//! disclosure. Device APIs are enabled separately by a host that supplies
+//! per-app consent; internal profile data and unowned notifications stay out.
 use crate::containers::IsolateSettings;
 use makepad_widgets::{Cx, SplashRef};
 
@@ -28,14 +24,14 @@ pub struct Applied {
 /// come next; the isolate's own network module is granted last, so a failure
 /// earlier leaves an isolate with less reach rather than more.
 pub fn apply(splash: &SplashRef, cx: &mut Cx, settings: &IsolateSettings) -> Applied {
-    // Storage only for an app granted `storage`: no root, no quota.
+    // Isolation and quota apply whether or not usage was declared.
     let storage_quota = settings.granted_storage_quota();
     splash.set_sandbox_dir(cx, settings.storage_root());
     splash.set_storage_quota(cx, Some(storage_quota));
-    splash.set_host_caps(cx, settings.capabilities.clone());
+    splash.set_host_caps(cx, crate::containers::public_runtime_capabilities(&settings.capabilities, false, false));
     splash.set_host_prompts(cx, settings.host_prompts);
-    // `Some(hosts)` is what turns enforcement on for this isolate; an empty
-    // list under a granted `net` reaches nothing, as the policy resolved.
+    // A policy still marks an app isolate and protects private host APIs.
+    // The current runtime treats destinations as declarations, not a gate.
     splash.set_policy(cx, Some(settings.hosts.clone()), Some(settings.instruction_budget));
     splash.set_memory_bytes(cx, Some(settings.memory_bytes as usize));
     if let Some(mut inner) = splash.borrow_mut() {

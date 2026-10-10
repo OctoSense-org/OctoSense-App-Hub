@@ -2,7 +2,25 @@
 
 [English](0003-shared-components.md) | 简体中文
 
-状态：提议中，2026 年 10 月 9 日。这是 [OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436)（提议中）第 4 阶段在 App Hub 一侧的部分，在 App Hub 中实现，基于 [#186](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/186) 和 [#188](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/188)；这两项改动让准入检查接受应用自己的 WebAssembly 组件。目前签名目录中还没有任何组件，也还没有任何 OctoSense 构建加载组件。
+状态：提议中，2026 年 10 月 9 日。这是 [OctoSense ADR 0014](https://github.com/OctoSense-org/OctoSense/pull/436)（提议中）第 4 阶段在 App Hub 一侧的部分，在 App Hub 中实现，基于 [#186](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/186) 和 [#188](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/188)；这两项改动让准入检查接受应用自己的 WebAssembly 组件。目前签名目录中还没有任何组件，仍需发布兼容宿主；源码支持不等于发布验收。
+
+## 当前源码策略：声明与授权
+
+`capabilities` 和 `network.hosts` 用于向用户和审核人员说明应用预计使用的
+API 与网络目的地。遗漏某个服务族或主机，不会阻止调用宿主已支持的公开 API。
+这是为下一个兼容版本准备的源码策略；RC2 的历史行为不代表该修改已经发布。
+
+每个准入应用都有独立的存储沙箱、已解析的配额和网络模块。设备访问仍需逐应用
+同意和系统权限；连接账户仍按应用、账户和提供商 scope 隔离。外部写入保留
+原生审阅，Agent 保留用户启用和工具审核，访问其他应用的数据或工具仍需共享
+授权。宿主私有用户资料和不带调用方身份的 `agent.notify` 不是公开 API。
+
+`requires` 和 `host_api.required` 仍用于检查兼容性，不是能力授权。组件的
+ABI 与导入验证、确切摘要、发布者证明、目录撤回、配额和平台支持检查继续生效。
+遗漏使用声明可以产生审核警告。`AppPolicy::allows` 与 `allows_host` 是历史
+声明查询接口；宿主不能把它们当作执行授权。请用 `runtime.list` 和
+`runtime.describe` 查询实际方法及其平台、同意要求。
+
 
 ## 背景
 
@@ -77,11 +95,11 @@ ADR 0014 让应用把普通的 Rust crate 作为 WebAssembly 组件放在应用�
 "components": [{"as": "markdown", "id": "org.example.markdown", "version": "1.2.0", "blake3": "<64 hex>"}]
 ```
 
-`as` 是应用给组件起的名字：`[a-z][a-z0-9_]{0,31}`，且不能重复。一个应用最多指定 8 个组件，每个都固定到一个确切版本**和**摘要。没有该特性却写了这个字段，或有该特性却没有 `wasm` 能力，解析器都会拒绝。字段为空时不写出，所以现有清单及其签名字节不变。不认识该特性的宿主会拒绝这个应用。
+`as` 是应用给组件起的名字：`[a-z][a-z0-9_]{0,31}`，且不能重复。一个应用最多指定 8 个组件，每个都固定到一个确切版本**和**摘要。没有所需宿主特性却写了这个字段时，解析器会拒绝；不要求 `wasm` 使用声明。字段为空时不写出，所以现有清单及其签名字节不变。不认识该特性的宿主会拒绝这个应用。
 
 ### 5. 准入固定了组件的应用
 
-提供签名目录时，准入检查会解析每个组件：签名目录中必须有这个确切版本，它必须仍在提供，并且哈希值等于固定的摘要。应用必须授予组件所导入内容需要的权限，与应用自己的组件相同：`wasi:filesystem` 需要 `storage`，`wasi:http` 需要 `net`（这是声明：OctoSense 不把组件限制在 `network.hosts` 内）。`octosense:host` 不需要授权。每个组件都有一行给审核人员看的说明，例如 `component markdown (org.example.markdown 1.2.0) reaches the clock, but no files, network or other app`。
+提供签名目录时，准入检查会解析每个组件：签名目录中必须有这个确切版本，它必须仍在提供，并且哈希值等于固定的摘要。支持的导入不依赖 `storage`、`net` 或 `wasm` 使用声明；执行仍遵守应用沙箱、配额和宿主服务的实际同意要求。`octosense:host` 不需要授权。每个组件都有一行给审核人员看的说明，例如 `component markdown (org.example.markdown 1.2.0) reaches the clock, but no files, network or other app`。
 
 商店应用的应用包绝不携带 `components/`：它的组件来自签名目录。随构建发布的系统应用没有签名目录，它把固定的每个组件放在应用包的 `components/<blake3>.wasm`，系统应用检查会验证每个文件。
 

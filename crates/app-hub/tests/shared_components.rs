@@ -169,7 +169,7 @@ fn an_app_resolves_its_components_from_the_catalog_and_reviewers_see_their_reach
 }
 
 #[test]
-fn an_app_must_grant_what_each_component_imports() {
+fn missing_declarations_do_not_refuse_supported_component_imports() {
     let hub = Hub::new();
     let notes = component_entry("org.example.markdown", "1.0.0", NOTES);
     let fetch = component_entry("org.example.fetch", "1.0.0", FETCH);
@@ -178,16 +178,9 @@ fn an_app_must_grant_what_each_component_imports() {
 
     let mut f = Fixture::new();
     f.pin(&[dependency("markdown", &notes)], &[], &[]);
-    assert_eq!(
-        refusals(&f.report(Some(&catalog)).findings, "components"),
-        ["component markdown (org.example.markdown 1.0.0) imports wasi:filesystem, the app's own files, which needs the storage capability"]
-    );
-
+    assert!(f.report(Some(&catalog)).passed());
     f.pin(&[dependency("fetch", &fetch)], &[], &[]);
-    assert_eq!(
-        refusals(&f.report(Some(&catalog)).findings, "components"),
-        ["component fetch (org.example.fetch 1.0.0) imports wasi:http, the network, which the app must declare with the net capability"]
-    );
+    assert!(f.report(Some(&catalog)).passed());
     // net is the declaration; network.hosts is not required (OctoSense's
     // ruling of 8 October 2026).
     for hosts in [&[][..], &["api.example.com"][..]] {

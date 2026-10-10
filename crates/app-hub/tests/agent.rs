@@ -112,12 +112,12 @@ fn the_gate_refuses_what_the_agent_review_refuses_and_the_digest_pins_agent_file
 }
 
 #[test]
-fn agent_files_may_name_only_the_apps_hosts() {
+fn agent_destinations_are_disclosures_not_host_allowlists() {
     let dir = scratch("hosts");
     std::fs::write(dir.join("AGENT.md"), "# News\n\nPrefer stories from https://feeds.example.org/top when fresh.\n").unwrap();
     stamp(&dir);
     let found = agent_findings(&dir);
-    assert!(found.iter().any(|(s, d)| *s == Severity::Refusal && d.contains("reaches feeds.example.org")), "{found:?}");
+    assert!(!found.iter().any(|(s, _)| *s == Severity::Refusal), "{found:?}");
 
     let path = dir.join(MANIFEST_FILE);
     let mut manifest: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();

@@ -162,12 +162,15 @@ Follow `policy_for` → `App::mount` in
 3. `isolate_settings` in
    [`containers.rs`](../crates/app-policy/src/containers.rs) chooses
    `<app-data>/<manifest-id>` as the jail. The isolate gets the jail and its
-   quota only when the manifest declares `storage`. An `AssetServer` serves
-   the bundle's artwork on a loopback port, and only that port joins the
-   allowlist.
+   quota even without a `storage` declaration. An `AssetServer` serves
+   only that bundle's artwork on a loopback port; network destinations are
+   disclosures rather than runtime allowlists.
 4. [`splash_adapter::apply`](../crates/app-policy/src/splash_adapter.rs) sets
-   the jail, quota, capabilities, prompt permission, host allowlist,
-   instruction budget, heap limit and network access **before** evaluation.
+   the jail, quota, public runtime flags, prompt surface, declared hosts,
+   instruction metadata, heap limit and network module **before** evaluation.
+   The patched shell separately enables device flags with per-app consent;
+   plain `card-host` cannot supply that broker. `host.capabilities()` reports
+   these runtime flags; the admitted manifest retains usage declarations.
 5. `card_source` loads `main.splash`, or realizes `page.card` with
    `page.data.json` and `kit/`. Card lowering first tries the measured design;
    an ordinary L0 kit card falls back to the kit lowering. The output enters
@@ -293,8 +296,8 @@ allowed its agent in the OctoSense shell.
    `agent.tools`, for example, fails default admission; it is not a working
    cross-app recipe.
 
-Three separate decisions meet here: admission grants what the app may
-request, the shell supplies tools that execute, and the active
+Three separate decisions meet here: admission validates the bundle and
+reviewed tools, the shell checks actual authorization when tools execute, and the active
 conversation decides where the answer returns. Standalone `card-host` stops
 before this agent path: it has no registered services and no agent runtime.
 
@@ -412,9 +415,9 @@ admission through reply delivery; the table covers the other hosts and the
 authoring support.
 
 1. [`app-contract/src/lib.rs`](../crates/app-contract/src/lib.rs): defines the
-   shared, versioned data contract. `AppManifest` describes requests; `AppPolicy`
-   describes grants. The shell uses these declarations when it prepares an
-   authorized octos session.
+   shared, versioned data contract. `AppManifest` describes usage and ABI
+   needs; `AppPolicy` retains disclosures and resolved resource bounds. The
+   shell separately authorizes device/account access and octos sessions.
 2. [`app-policy/src/policy.rs`](../crates/app-policy/src/policy.rs): resolves
    the app contract and the agent requests against `HostLimits`.
 3. [`app-policy/src/agent.rs`](../crates/app-policy/src/agent.rs): validates

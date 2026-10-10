@@ -31,13 +31,11 @@ fn palpo_extension_preserves_schema_and_declares_its_host_feature() {
 }
 
 #[test]
-fn wasm_components_need_the_wasm_capability() {
-    // ADR 0014: a bundle with a component in fns/ requires the feature, and
-    // the feature means nothing without the wasm capability.
-    assert!(parse(&manifest_with(r#""requires":["wasm-components-v1"]"#)).is_err());
-    assert!(parse(&manifest_with(r#""requires":["wasm-components-v1"],"capabilities":["storage"]"#)).is_err());
-    let manifest = parse(&manifest_with(r#""requires":["wasm-components-v1"],"capabilities":["wasm","storage"]"#)).unwrap();
-    assert_eq!(manifest.requires, ["wasm-components-v1"]);
+fn wasm_component_abi_is_independent_of_usage_declarations() {
+    for fields in [r#""requires":["wasm-components-v1"]"#, r#""requires":["wasm-components-v1"],"capabilities":["storage"]"#] {
+        let manifest = parse(&manifest_with(fields)).unwrap();
+        assert_eq!(manifest.requires, ["wasm-components-v1"]);
+    }
 }
 
 // ---- shared components (App Hub ADR 0003) --------------------------------
@@ -71,17 +69,13 @@ fn shared_components_parse_and_pin_one_exact_version_and_digest() {
 }
 
 #[test]
-fn shared_components_need_their_feature_and_the_wasm_capability() {
+fn shared_components_need_their_abi_not_a_capability_grant() {
     let one = format!("[{}]", dependency("markdown", "org.example.markdown", "1.2.0", DIGEST));
-    let err = parse(&manifest_with(&format!(r#""capabilities":["wasm"],"components":{one}"#))).unwrap_err();
+    let err = parse(&manifest_with(&format!(r#""components":{one}"#))).unwrap_err();
     assert_eq!(err, "components requires wasm-shared-components-v1");
-    let err = parse(&manifest_with(&format!(r#""requires":["wasm-shared-components-v1"],"components":{one}"#))).unwrap_err();
-    assert_eq!(err, "wasm-shared-components-v1 requires the wasm capability");
-    let err = parse(&manifest_with(r#""requires":["wasm-shared-components-v1"]"#)).unwrap_err();
-    assert_eq!(err, "wasm-shared-components-v1 requires the wasm capability");
-    // The feature alone, with wasm, parses: the gate warns about it.
-    let manifest = parse(&manifest_with(r#""requires":["wasm-shared-components-v1"],"capabilities":["wasm"]"#)).unwrap();
-    assert!(manifest.components.is_empty());
+    let manifest = parse(&manifest_with(&format!(r#""requires":["wasm-shared-components-v1"],"components":{one}"#))).unwrap();
+    assert!(manifest.capabilities.is_empty());
+    assert_eq!(manifest.components.len(), 1);
 }
 
 #[test]
@@ -429,4 +423,15 @@ fn hostlimits_builders_set_each_ceiling() {
         (1, 2, 3, 4, 5)
     );
     assert_eq!(limits.offered_tools, ["net.fetch"]);
+}
+
+#[test]
+fn backend_configuration_keeps_account_and_abi_boundaries_without_auth_disclosure() {
+    let registration = r#""backend":{"id":"notes","client_id":"public-test-client","authorization_url":"https://example.com/authorize","token_url":"https://example.com/token","me_url":"https://example.com/me","logout_url":"https://example.com/logout","scopes":["app.session"]}"#;
+    let body = format!(r#""requires":["backend-api-v1"],"storage":{{"accounts":true}},{registration}"#);
+    let manifest = parse(&manifest_with(&body)).unwrap();
+    assert!(manifest.capabilities.is_empty());
+    assert!(manifest.backend.is_some());
+    assert!(parse(&manifest_with(&format!(r#""requires":["backend-api-v1"],{registration}"#))).unwrap_err().contains("storage.accounts"));
+    assert!(parse(&manifest_with(&format!(r#""storage":{{"accounts":true}},{registration}"#))).unwrap_err().contains("backend-api-v1"));
 }

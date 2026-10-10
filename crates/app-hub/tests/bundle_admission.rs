@@ -413,11 +413,11 @@ fn with_functions(capability: bool, files: &[(&str, &[u8])]) -> octosense_app_hu
 }
 
 #[test]
-fn an_apps_own_functions_pass_only_under_the_wasm_capability() {
+fn an_apps_own_functions_pass_with_or_without_wasm_disclosure() {
     let report = with_functions(true, &[("fns/rank.wasm", MODULE)]);
     assert!(report.passed(), "{}", report.render());
     let report = with_functions(false, &[("fns/rank.wasm", MODULE)]);
-    assert!(!report.passed());
+    assert!(report.passed(), "{}", report.render());
     assert!(report.findings.iter().any(|f| f.check == "functions"), "{}", report.render());
 }
 
@@ -513,10 +513,10 @@ fn a_component_is_refused_unless_the_manifest_requires_components() {
 }
 
 #[test]
-fn a_component_that_uses_files_needs_the_storage_capability() {
-    let report = with_component(true, &["wasm"], NOTES);
-    let finding = refusal(&report, "functions").unwrap_or_else(|| panic!("{}", report.render()));
-    assert!(finding.detail.contains("storage capability"), "{}", finding.detail);
+fn component_files_work_without_usage_declarations_and_remain_disclosed() {
+    let report = with_component(true, &[], NOTES);
+    assert!(report.passed(), "{}", report.render());
+    assert!(report.findings.iter().any(|f| f.detail.contains("disclose storage usage")));
 }
 
 #[test]
@@ -533,13 +533,9 @@ fn a_component_that_uses_http_declares_net_and_reviewers_see_it() {
             .unwrap_or_else(|| panic!("no reach line: {}", report.render()));
         assert!(reach.detail.contains("the clock and the network, but no files or other app"), "{}", reach.detail);
     }
-    let report = with_component(true, &["wasm"], FETCH);
-    let finding = refusal(&report, "functions").unwrap_or_else(|| panic!("{}", report.render()));
-    assert!(
-        finding.detail.contains("imports wasi:http, the network, which the app must declare with the net capability"),
-        "{}",
-        finding.detail
-    );
+    let report = with_component(true, &[], FETCH);
+    assert!(report.passed(), "{}", report.render());
+    assert!(report.findings.iter().any(|f| f.detail.contains("disclose net usage")));
 }
 
 #[test]

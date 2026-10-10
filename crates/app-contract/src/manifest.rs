@@ -32,12 +32,12 @@ pub const SCHEMA_MINOR: u32 = 0;
 /// `wasm-components-v1`: the bundle's `fns/` holds a WebAssembly component
 /// (OctoSense ADR 0014), not only core modules. A host whose `wasm` service
 /// loads only modules does not know it, so it refuses the app instead of
-/// failing when the app first calls its functions. It needs `wasm`.
+/// failing when the app first calls its functions. The `wasm` capability describes usage; it is not an admission grant.
 ///
 /// `wasm-shared-components-v1`: the manifest's [`AppManifest::components`]
 /// names shared components from App Hub's catalog (App Hub ADR 0003), which
 /// the app's functions use. A host that does not know it refuses the app
-/// instead of running it without them. It needs `wasm`.
+/// instead of running it without them. The `wasm` capability describes usage; it is not an admission grant.
 pub const KNOWN_FEATURES: &[&str] = &[
     "palpo-admin-v1",
     "host-api-v1",
@@ -327,7 +327,7 @@ pub struct AppManifest {
     /// Shared WebAssembly components from App Hub's catalog that the app's
     /// functions use (App Hub ADR 0003), each pinned to one exact version
     /// and digest, so the app's code never changes without an app update.
-    /// Requires `wasm-shared-components-v1` and the `wasm` capability.
+    /// Requires the `wasm-shared-components-v1` host ABI.
     /// Skipped when empty, so a manifest written before it existed signs
     /// exactly as it did.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -924,13 +924,10 @@ impl AppManifest {
             if !self.requires.iter().any(|f| f == "backend-api-v1") {
                 return Err("backend requires backend-api-v1".into());
             }
-            if !self.capabilities.iter().any(|c| c == "auth") || !self.storage.accounts {
-                return Err("backend requires auth and storage.accounts".into());
+            if !self.storage.accounts {
+                return Err("backend requires storage.accounts".into());
             }
             backend.validate()?;
-        }
-        if self.requires.iter().any(|f| f == "wasm-components-v1") && !self.capabilities.iter().any(|c| c == "wasm") {
-            return Err("wasm-components-v1 requires the wasm capability".into());
         }
         self.check_components()?;
         let unknown: Vec<&str> =
@@ -942,17 +939,14 @@ impl AppManifest {
     }
 
     /// The `components` rules (App Hub ADR 0003): the field needs
-    /// `wasm-shared-components-v1`, the feature needs `wasm`, and each of at
+    /// `wasm-shared-components-v1`, and each of at
     /// most [`MAX_COMPONENTS`] entries has a unique name, a component id, one
     /// exact version and a BLAKE3 digest. Whether each resolves, and whether
-    /// the app grants what it imports, is the gate's and the host's check.
+    /// its imports are implemented, is the gate's and the host's check.
     fn check_components(&self) -> Result<(), String> {
         let required = self.requires.iter().any(|f| f == "wasm-shared-components-v1");
         if !self.components.is_empty() && !required {
             return Err("components requires wasm-shared-components-v1".into());
-        }
-        if required && !self.capabilities.iter().any(|c| c == "wasm") {
-            return Err("wasm-shared-components-v1 requires the wasm capability".into());
         }
         if self.components.len() > MAX_COMPONENTS {
             return Err(format!("an app may name at most {MAX_COMPONENTS} components, not {}", self.components.len()));

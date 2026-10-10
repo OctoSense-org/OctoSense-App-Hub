@@ -67,13 +67,16 @@ fn a_foreign_schema_is_refused() {
 // ------------------------------------------------------------ capabilities
 
 #[test]
-fn nothing_is_granted_by_default() {
+fn empty_declarations_do_not_remove_public_runtime_or_storage() {
     let policy = resolve("").unwrap();
     assert!(policy.capabilities.is_empty());
     assert!(!policy.allows("net"));
     assert!(!policy.may_prompt);
     assert!(policy.agent.is_none());
-    assert!(!policy.isolate_settings(Path::new("/data")).allow_net);
+    let settings = policy.isolate_settings(Path::new("/data"));
+    assert!(settings.allow_net);
+    assert_eq!(settings.storage_root().as_deref(), Some(Path::new("/data/forecast")));
+    assert_eq!(settings.granted_storage_quota(), HostLimits::default().max_storage_bytes);
 }
 
 #[test]
@@ -107,9 +110,11 @@ fn the_net_capability_without_hosts_gets_the_network_module() {
 }
 
 #[test]
-fn hosts_without_the_capability_are_a_refused_manifest_not_a_silent_grant() {
-    let err = resolve(r#""network":{"hosts":["api.weather.example"]}"#).unwrap_err();
-    assert!(err.contains("does not request the net capability"), "{err}");
+fn hosts_without_net_are_valid_disclosures() {
+    let policy = resolve(r#""network":{"hosts":["api.weather.example"]}"#).unwrap();
+    assert!(policy.capabilities.is_empty());
+    assert!(policy.hosts.contains("api.weather.example"));
+    assert!(policy.isolate_settings(Path::new("/data")).allow_net);
 }
 
 #[test]
@@ -260,14 +265,13 @@ fn the_surface_not_the_prompt_capability_decides_whether_a_service_may_raise_a_s
 }
 
 #[test]
-fn an_app_gets_its_storage_only_when_it_asks_for_it() {
-    // `storage` is the app's own files: `fs.*`, camera captures, local
-    // files a widget reads. Without the grant the isolate has no storage
-    // root at all, so every one of them answers "storage not available".
+fn an_app_gets_bounded_private_storage_with_or_without_a_declaration() {
+    // Storage is always app-scoped and bounded; declarations do not
+    // control whether a jail exists.
     let root = Path::new("/data/apps");
     let without = resolve(r#""capabilities":["net"],"network":{"hosts":["api.example.com"]}"#).unwrap();
-    assert_eq!(without.isolate_settings(root).storage_root(), None);
-    assert_eq!(without.isolate_settings(root).granted_storage_quota(), 0);
+    assert_eq!(without.isolate_settings(root).storage_root(), Some(root.join("forecast")));
+    assert_eq!(without.isolate_settings(root).granted_storage_quota(), HostLimits::default().max_storage_bytes);
     let with = resolve(r#""capabilities":["storage"]"#).unwrap();
     let settings = with.isolate_settings(root);
     assert_eq!(settings.storage_root(), Some(settings.jail_root.clone()));
@@ -402,8 +406,8 @@ fn research_and_crawl_need_a_scope_and_a_scope_needs_one_of_them() {
         let err = resolve(&format!(r#""capabilities":["{cap}"]"#)).unwrap_err();
         assert!(err.contains("declares no research scope"), "{cap}: {err}");
     }
-    let err = resolve(r#""capabilities":["storage"],"research":{"langs":["en"]}"#).unwrap_err();
-    assert!(err.contains("requests neither the research nor the crawl capability"), "{err}");
+    let scoped = resolve(r#""research":{"langs":["en"]}"#).unwrap();
+    assert_eq!(scoped.research.as_ref().unwrap().langs, ["en"]);
     // `{}` is a scope: no limits, which the store then says in words.
     let policy = resolve(r#""capabilities":["research"],"research":{}"#).unwrap();
     assert!(policy.research.is_some());
@@ -446,8 +450,8 @@ fn crawl_needs_its_limits_and_the_limits_need_crawl() {
         assert!(err.contains("needs max_depth and max_pages above 0"), "{limits}: {err}");
     }
     // research alone may not carry crawl limits: octos would crawl on them.
-    let err = resolve(r#""capabilities":["research"],"research":{"max_depth":1,"max_pages":5}"#).unwrap_err();
-    assert!(err.contains("does not request the crawl capability"), "{err}");
+    let scoped = resolve(r#""research":{"max_depth":1,"max_pages":5}"#).unwrap();
+    assert!(scoped.research.as_ref().unwrap().crawls());
     let both = resolve(r#""capabilities":["research","crawl"],"research":{"max_depth":1,"max_pages":5}"#).unwrap();
     assert!(both.allows("research") && both.allows("crawl"));
 }
@@ -536,4 +540,32 @@ fn the_default_tools_offer_every_kernel_tool_a_contained_agent_may_keep() {
     for tool in KERNEL_TOOLS {
         assert!(HostLimits::default().offered_tools.iter().any(|t| t == tool), "{tool}");
     }
+}
+
+#[test]
+fn runtime_flags_cannot_expose_host_private_data_or_bypass_device_consent() {
+    use octosense_app_policy::containers::public_runtime_capabilities;
+    let declarations = vec!["camera".into(), "profile".into(), "agent".into()];
+    let standalone = public_runtime_capabilities(&declarations, false, false);
+    for flag in ["net", "web", "storage"] { assert!(standalone.iter().any(|v| v == flag)); }
+    for flag in ["location", "camera", "microphone", "library", "profile", "agent"] {
+        assert!(!standalone.iter().any(|v| v == flag), "{flag}");
+    }
+    let consent_host = public_runtime_capabilities(&[], true, true);
+    for flag in ["location", "camera", "microphone", "library"] { assert!(consent_host.iter().any(|v| v == flag)); }
+    for flag in ["profile", "agent", "llm", "ledger.read"] { assert!(!consent_host.iter().any(|v| v == flag)); }
+}
+
+#[test]
+fn old_runtime_or_missing_device_broker_never_activates_capture_side_effects() {
+    use octosense_app_policy::containers::public_runtime_capabilities;
+    let declared = vec!["camera".into(), "microphone".into(), "library".into()];
+    let old_runtime = public_runtime_capabilities(&declared, true, false);
+    assert!(old_runtime.iter().any(|v| v == "camera"));
+    assert!(old_runtime.iter().any(|v| v == "location"));
+    for flag in ["microphone", "library"] { assert!(!old_runtime.iter().any(|v| v == flag)); }
+    let no_broker = public_runtime_capabilities(&declared, false, true);
+    for flag in ["camera", "location", "microphone", "library"] { assert!(!no_broker.iter().any(|v| v == flag)); }
+    // Declaring a capability does not manufacture an implemented host ABI.
+    assert_eq!(old_runtime, public_runtime_capabilities(&[], true, false));
 }

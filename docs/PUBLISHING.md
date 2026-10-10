@@ -17,12 +17,35 @@ the app renders, that its icon reads at small sizes or that its listing is
 true. Reviewers check those
 ([What reviewers check](SUBMITTING.md#8-what-reviewers-check)).
 
+## Current source policy: declarations and authorization
+
+`capabilities` and `network.hosts` describe an app's expected API and network
+use for users and reviewers. Omitting a family or destination does not deny
+an otherwise supported public API. This is the source policy being prepared
+for the next compatible release; historical RC2 behavior is not evidence of
+this change being deployed.
+
+Every admitted app gets a private storage jail with the resolved quota and a
+network module. Device access still needs per-app consent and OS permission;
+connected accounts keep app/account ownership and provider scopes. External
+writes retain native review, agents retain opt-in and reviewed tools, and
+other apps' data/tools still require sharing authorization. Internal host
+profile data and unowned `agent.notify` are not public APIs.
+
+`requires` and `host_api.required` remain compatibility checks, not capability
+permissions. Component ABI/import validation, exact digests, publisher proof,
+catalog withdrawal, quotas and supported platforms remain enforced. Missing
+usage declarations may produce review warnings. `AppPolicy::allows` and
+`allows_host` are legacy declaration queries; hosts must not use them as
+execution authorization. Use `runtime.list` / `runtime.describe` to discover
+actual methods and their platform/consent requirements.
+
 ## What an app is
 
 A bundle is a directory of text and artwork. A **host** runs it: the OctoSense
 shell (the desktop or phone app) or `card-host`. Each app runs in an
 **isolate**, a sandboxed script runtime of its own, under its **policy**: only
-what its manifest requests and the host grants. A bundle holds no native code.
+its own storage boundary, resource ceilings and host consent checks. A bundle holds no native code.
 An app that needs new native code ships inside a shell release instead
 ([Choose a delivery path](DEVELOPMENT.md#choose-a-delivery-path)).
 
@@ -119,18 +142,18 @@ admission. A warning does not.
 | `publisher-signature` | The declared GitHub proof fails verification, even with `--allow-unsigned`; the manifest is unsigned and `--allow-unsigned` is absent; or a legacy Ed25519 signature fails verification or names an unknown key (`publisher key "<id>" is not registered with this hub`). | The manifest is unsigned and `--allow-unsigned` is given. |
 | `identity` | The id starts with `os.`; the id, or its last segment, is a reserved name ([Ids and reserved names](#ids-and-reserved-names)). | |
 | `contents` | A file's extension is not one of `.card`, `.json`, `.l0`, `.octoscript`, `.splash`, `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.ttf`, `.otf`, `.txt` or `.md`, and it is not a function module (`.wasm`, see `functions`). Files with no extension, such as `.DS_Store` and `LICENSE`, are refused too. | |
-| `functions` | The bundle carries a `.wasm` file in `fns/` without the `wasm` capability, or more than 8 there. A `.wasm` file that is not at `fns/<name>.wasm` (the name `[a-z0-9_-]`, at most 64 characters) or `components/<blake3>.wasm` (named by its own digest, see `components`), or is neither a WebAssembly core module (the 8-byte header of version 1) nor a valid component, is refused as `contents-invalid`, as is a component that imports anything outside `wasi:cli`, `wasi:clocks`, `wasi:filesystem`, `wasi:http`, `wasi:io`, `wasi:random` and `octosense:host`. A component is refused here when the manifest does not require `wasm-components-v1`, when it imports `wasi:filesystem` without the `storage` capability, or when it imports `wasi:http` without the `net` capability ([WebAssembly components](#webassembly-components)). The gate checks nothing else inside a core module; the host checks its imports and exports when it loads the module. | The app declares `wasm` but carries no `fns/*.wasm` and names no shared component. The manifest requires `wasm-components-v1` but `fns/` holds no component. Each admitted component gets a line saying what it reaches. |
-| `components` | A shared component the manifest names is missing from the `--catalog` catalog, withdrawn there or has another digest, or the app does not grant what it imports. A store app's bundle carries a `.wasm` file in `components/`. A system app's bundle (`--system-app`) lacks `components/<blake3>.wasm` for a component it pins, or carries one it does not pin ([Shared components](#shared-components)). | Each resolved component gets a line saying what it reaches. Without `--catalog`, each component is reported as not resolved. The manifest requires `wasm-shared-components-v1` but names no components. |
+| `functions` | The bundle carries more than 8 `.wasm` files in `fns/`. A `.wasm` file that is not at `fns/<name>.wasm` (the name `[a-z0-9_-]`, at most 64 characters) or `components/<blake3>.wasm` (named by its own digest, see `components`), or is neither a WebAssembly core module (the 8-byte header of version 1) nor a valid component, is refused as `contents-invalid`, as is a component that imports anything outside `wasi:cli`, `wasi:clocks`, `wasi:filesystem`, `wasi:http`, `wasi:io`, `wasi:random` and `octosense:host`. A component is refused here when the manifest does not require `wasm-components-v1` ([WebAssembly components](#webassembly-components)). The gate checks nothing else inside a core module; the host checks its imports and exports when it loads the module. | The app declares `wasm` but carries no `fns/*.wasm` and names no shared component. The manifest requires `wasm-components-v1` but `fns/` holds no component. Each admitted component gets a line saying what it reaches. |
+| `components` | A shared component the manifest names is missing from the `--catalog` catalog, withdrawn there or has another digest, or its imports are unsupported. A store app's bundle carries a `.wasm` file in `components/`. A system app's bundle (`--system-app`) lacks `components/<blake3>.wasm` for a component it pins, or carries one it does not pin ([Shared components](#shared-components)). | Each resolved component gets a line saying what it reaches. Without `--catalog`, each component is reported as not resolved. The manifest requires `wasm-shared-components-v1` but names no components. |
 | `contents-invalid` (text and images) | A text file (`.splash`, `.card`, `.json`, `.l0`, `.octoscript`, `.txt` or `.md`) is over 1 MiB or not UTF-8; JSON does not parse; a PNG, JPEG or WebP does not decode or is over 4096 px a side; the listing icon is not square, or is a bitmap over 1 MiB or 1024 px a side. | |
 | `contents-invalid` (SVG) | An SVG does not parse; lacks a numeric `width` and `height` or a `viewBox`; is over 4096 px a side; or holds a script, a `foreignObject` or an `on…` handler. Its styling (a `style` attribute or a `<style>` block) imports a stylesheet, uses an escape, uses a comment or points `url()` anywhere but a `#fragment` in the same file. | |
 | `entry` | The bundle has neither `main.splash` nor `page.card`; `page.card` is not valid L0; `page.data.json` is not JSON; neither `kit/native/<theme>/kit.json` nor every OctoScript kit module the card needs is in the bundle. | |
 | `resource-invalid` | A card's image or font reference, or an SVG `href`, names a file that is not in the bundle. The finding names the JSON pointer. See [Fonts](#fonts). | |
-| `assets` | A `.card`, `.json`, `.l0` or `.octoscript` file other than `manifest.json`, `listing.json` and the agent files contains `http://`, `https://`, `file://` or `../`. Plain documentation links are not asset loads. A `.splash` file or an agent file contains `http://`, `file://`, `../` or an `https://` host that is not in `network.hosts` (any public host is allowed when the app requests `images` or `web`). | |
+| `assets` | A `.card`, `.json`, `.l0` or `.octoscript` file other than `manifest.json`, `listing.json` and the agent files contains `http://`, `https://`, `file://` or `../`. Plain documentation links are not asset loads. A `.splash` file or an agent file contains `http://`, `file://`, `../` . Missing `network.hosts` entries do not cause refusal. | |
 | `secrets` | A `.card`, `.l0`, `.octoscript` or `.splash` file declares `is_password: true` or a `TextInputContentType` of `Password`, `NewPassword` or `OneTimeCode`. | |
-| `storage` | | A `.splash` file calls `fs.*`, or the app requests `camera`, without the `storage` capability. The `grants:` line then says `storage none`. |
+| `storage` | | A `.splash` file calls `fs.*`, or the app requests `camera`, without the `storage` capability. The `declarations:` line still reports the bounded storage quota. |
 | `listing` | `listing.json` is missing or breaks a rule in [The listing](#the-listing); the listing names no screenshot or no icon; it names a screenshot or icon that is not in the bundle. | |
 | `tools`, `agent`, `skills` | `tools.json`, `AGENT.md` or a skill breaks a rule in [Rules for agent files](#rules-for-agent-files). | A tool is destructive or outward (each call waits for approval); a tool says `confirm: "app"`; the app declares tools but `agent.model.needs` omits `tool_calling`; a background agent has destructive tools. |
-| `policy` | A capability is unknown; the id breaks a rule in [Ids and reserved names](#ids-and-reserved-names); the version is empty; a host is not a bare host name, or hosts are listed without `net` ([Network hosts](#network-hosts)); the `research` scope or an `agent` field breaks its rules; `storage.cache_max_bytes` is 0. | |
+| `policy` | A capability is unknown; the id breaks a rule in [Ids and reserved names](#ids-and-reserved-names); the version is empty; a host is not a bare host name, ([Network hosts](#network-hosts)); the `research` scope or an `agent` field breaks its rules; `storage.cache_max_bytes` is 0. | |
 | `version` (with `--catalog`) | The catalog already holds this version of the app. | |
 | `continuity` (with `--catalog`) | A rule in [Publisher continuity](#publisher-continuity) is broken, or the catalog history disagrees with itself. | |
 
@@ -213,24 +236,18 @@ yet; the `wasm` service gains them in ADR 0014's phase 2.
 
 The gate admits a component when:
 
-- the manifest requires `wasm-components-v1`, which needs the `wasm`
-  capability. A host whose `wasm` service loads only core modules does not
-  know the feature, so it refuses the app instead of failing at its first call;
+- the manifest requires `wasm-components-v1`. A host that does not implement
+  that ABI refuses the app before launch;
 - it validates and imports interfaces only from `wasi:cli`, `wasi:clocks`,
   `wasi:filesystem`, `wasi:http`, `wasi:io`, `wasi:random` and
   `octosense:host`. A type the component defines, such as a record one of its
   functions returns, does not count as an import. `wasi:sockets` and anything
   else are refused as `contents-invalid`;
-- it imports `wasi:filesystem` only with the `storage` capability. Under
-  ADR 0014 the host gives it only the app's own storage folder;
-- it imports `wasi:http` only with the `net` capability, so that the app's
-  permissions say it uses the network. `network.hosts` is not required: under
-  OctoSense's ruling of 8 October 2026 an app's network declarations are shown
-  at install and not enforced while it runs, so the component reaches any
-  host;
-- `octosense:host` needs no grant of its own: through it the component calls
-  only the host services its app is granted, as the app's script does, and
-  never one that opens a sheet or asks the person.
+- `wasi:filesystem` stays in the app's own storage jail and quota;
+- `wasi:http` uses the host's supported network transport. `net` and
+  `network.hosts` describe usage, not a runtime allowlist;
+- `octosense:host` routes as the owning app with actual consent, account and
+  sharing checks. It cannot raise a foreground approval from a component.
 
 A component follows a module's name and size rules and counts toward the 8
 function files. Each admitted component gets a warning that tells a reviewer
@@ -247,10 +264,10 @@ app with `net` and no `network.hosts`) gets:
 [warning] functions (fns/fetch.wasm): fns/fetch.wasm is a component that reaches the clock and the network, but no files or other app
 ```
 
-Without `net`, the gate refuses it:
+Without `net`, the gate warns about incomplete disclosure:
 
 ```text
-[refused] functions: fns/fetch.wasm imports wasi:http, the network, which the app must declare with the net capability
+[warning] functions: fns/fetch.wasm imports wasi:http; disclose net usage
 ```
 
 A component that imports `octosense:host` (App Hub's `hostcall` fixture, in
@@ -362,7 +379,7 @@ so App Hub publishes neither until a compatible host release ships.
 ### Use a shared component
 
 Name each component in the manifest's `components`, and require
-`wasm-shared-components-v1`, which needs the `wasm` capability:
+`wasm-shared-components-v1`; the capabilities below disclose usage:
 
 ```json
 "capabilities": ["wasm", "storage"],
@@ -385,18 +402,16 @@ Name each component in the manifest's `components`, and require
 | `blake3` | The component file's BLAKE3 digest, 64 lowercase hex characters: the catalog entry's `wasm_blake3`. |
 
 An app names at most 8 components. The manifest parser refuses `components`
-without the feature (`components requires wasm-shared-components-v1`), the
-feature without `wasm` (`wasm-shared-components-v1 requires the wasm
-capability`), and an entry that breaks a rule above. A host that does not know
+without the feature (`components requires wasm-shared-components-v1`)
+and an entry that breaks a rule above. A host that does not know
 the feature refuses the app. An app that uses only shared components needs no
 `fns/`.
 
 With `--catalog`, the gate resolves each component in that catalog. The
 `components` check refuses the app when a component is missing (`is not in
 the catalog`), withdrawn (`was withdrawn: <reason>`) or has another digest
-(`pins blake3 …, but the catalog's file hashes to …`). It also refuses the app
-when the app does not grant what the component imports: `storage` for
-`wasi:filesystem`, and `net` for `wasi:http`. `octosense:host` needs no grant of its own. Each component then
+(`pins blake3 …, but the catalog's file hashes to …`). Missing `storage`,
+`net` or `wasm` usage declarations do not refuse the component. Each component then
 gets a line that says what it reaches in this app. Without `--catalog`, the
 gate warns that it cannot resolve the components.
 
@@ -411,14 +426,11 @@ $ hub check writer --allow-unsigned --catalog dev-catalog.json --anchor "$(cat a
 org.example.writer 1.0.0 — PASSED
   [warning] publisher-signature: unsigned: accountability rests on the hub alone
   [warning] components: component markdown (org.example.markdown 1.0.0) reaches the clock, random numbers and files in its app folder, but no network or other app
-  grants: capabilities {"storage", "wasm"}, hosts {}, storage 16777216 bytes, agent none
+  declarations: capabilities {"storage", "wasm"}, hosts {}, storage 16777216 bytes, agent none
 ```
 
-Without `storage`, the same app is refused:
-
-```text
-  [refused] components: component markdown (org.example.markdown 1.0.0) imports wasi:filesystem, the app's own files, which needs the storage capability
-```
+Without `storage`, the same app remains admissible and still receives its
+private storage jail and quota. The component reach line informs reviewers.
 
 Without `--catalog`:
 
@@ -432,7 +444,7 @@ catalog. A
 shipped system app has no catalog. It carries each component it pins as
 `components/<blake3>.wasm` in its bundle. `hub check --system-app` checks
 that each of those files is a valid component with allowed imports, named by
-its own digest, whose imports the app grants. It refuses a file that the
+its own digest, with supported imports. It refuses a file that the
 manifest does not pin.
 
 The store's permission lines for such an app add `Runs shared components App
@@ -590,7 +602,7 @@ $ hub check writer --allow-unsigned --catalog dev-catalog.json --anchor "$(cat a
 org.example.writer 1.0.0 — REFUSED
   [warning] publisher-signature: unsigned: accountability rests on the hub alone
   [refused] components: component markdown (org.example.markdown 1.0.0) was withdrawn: Renders raw HTML it should escape
-  grants: capabilities {"storage", "wasm"}, hosts {}, storage 16777216 bytes, agent none
+  declarations: capabilities {"storage", "wasm"}, hosts {}, storage 16777216 bytes, agent none
 hub: the bundle was refused
 ```
 
@@ -647,19 +659,18 @@ or desktop host has installed an app that pins one.
 | `compute` | `instruction_budget`, `memory_bytes`. | Clamped to the host's ceilings. |
 | `agent` | The app's own agent. | Optional ([The manifest's `agent`](#the-manifests-agent)). |
 | `research` | The scope of `research` and `crawl`. | Required with `research` or `crawl`; refused when the manifest requests neither ([The research scope](#the-research-scope)). |
-| `requires` | Host features the app needs. | Each must be a feature the host knows: `palpo-admin-v1`, `host-api-v1`, `backend-api-v1`, `script-tools-v1`, `publisher-github-v1`, `wasm-components-v1` or `wasm-shared-components-v1`. GitHub publishing requires a real provenance verifier; the three API markers also need a host that implements their APIs ([Host API compatibility](HOST-API.md)). `wasm-components-v1` and `wasm-shared-components-v1` need the `wasm` capability ([WebAssembly components](#webassembly-components), [Shared components](#shared-components)). |
+| `requires` | Host features the app needs. | Each must be a feature the host knows: `palpo-admin-v1`, `host-api-v1`, `backend-api-v1`, `script-tools-v1`, `publisher-github-v1`, `wasm-components-v1` or `wasm-shared-components-v1`. GitHub publishing requires a real provenance verifier; the three API markers also need a host that implements their APIs ([Host API compatibility](HOST-API.md)). `wasm-components-v1` and `wasm-shared-components-v1` identify required component ABIs ([WebAssembly components](#webassembly-components), [Shared components](#shared-components)). |
 | `components` | The shared components the app's functions use, each pinned to one exact version and digest. | Optional; needs `wasm-shared-components-v1`; at most 8 ([Shared components](#shared-components)). |
 | `host_api` | The host API methods the app needs (`required`) or can use (`optional`), each with its ABI major version. | Optional; needs `host-api-v1` in `requires`. The store checks the `required` methods at install and at every launch ([Declare what the app needs](HOST-API.md#declare-what-the-app-needs)). |
-| `backend` | The app's own backend: its public sign-in endpoints and the operations the app may call. | Optional; needs `backend-api-v1` in `requires`, the `auth` capability and `storage.accounts: true`. Holds no credentials ([Sign in to your own backend](#sign-in-to-your-own-backend)). |
+| `backend` | The app's own backend: its public sign-in endpoints and the operations the app may call. | Optional; needs `backend-api-v1` in `requires` and `storage.accounts: true`. Holds no credentials ([Sign in to your own backend](#sign-in-to-your-own-backend)). |
 | `schema_minor` | Which additions to schema 1 the manifest uses. | Leave it out. |
 
 Any other field is refused. After `hub publisher-prepare`, the manifest also
 holds `null` for optional fields you left out, such as `"agent": null`. They
 change nothing.
 
-Ask for the least the app needs. The host grants nothing the manifest does not
-request, and the store shows the person every request in plain words before
-install.
+Declare expected usage accurately. The store labels these as disclosures;
+omitted declarations do not prove that an app stores nothing or is offline.
 
 ### Capabilities
 
@@ -671,17 +682,17 @@ other name:
 [refused] policy: app com.example.forecast requests unknown capability "model.image"
 ```
 
-A capability lets the app make requests; it does not provide a service to
-answer them. A **host service**, code in the OctoSense shell that does what the
+A capability describes expected usage; it neither authorizes a request nor
+provides a service to answer it. A **host service**, code in the OctoSense shell that does what the
 app may not do itself, answers them. **Served today** says what answers on
 [desktop RC2](../README.md#download-a-compatible-host), within its stated
 platform and provider limits; RC1 and historical beta differences are explicit.
 
-| Capability | Grants | The store says | Served today |
+| Capability | Describes | The store says | Served today |
 | --- | --- | --- | --- |
-| `storage` | The app's own storage folder: `fs.*`, camera captures and local files a widget reads. Without it every `fs.*` call fails. | Keep its own data on this device | The runtime, in every host |
-| `files` | Import and export files selected in the host's native dialog. Import/export also needs `storage`; the app receives an app-relative file, never general filesystem access. Require the specific `files.*` methods the app uses. | Import and export files you choose in the system file dialog | Desktop RC2 on macOS and Windows, on Linux with a dialog helper (zenity, qarma, matedialog or kdialog), and compatible Android builds; absent from RC1. 1 MiB per file; `files.share` is Android-only and confirms only the chooser handoff |
-| `net` | Requests to the hosts in `network.hosts`, and no others. | Reach only: *hosts* | The runtime, in every host |
+| `storage` | The app's own storage folder: `fs.*`, camera captures and local files a widget reads. The jail and quota also exist when this declaration is absent. | Keep its own data on this device | The runtime, in every host |
+| `files` | Import and export files selected in the host's native dialog. Import/export uses the app jail; the app receives an app-relative file, never general filesystem access. Require the specific `files.*` methods the app uses. | Import and export files you choose in the system file dialog | Desktop RC2 on macOS and Windows, on Linux with a dialog helper (zenity, qarma, matedialog or kdialog), and compatible Android builds; absent from RC1. 1 MiB per file; `files.share` is Android-only and confirms only the chooser handoff |
+| `net` | Direct network use; `network.hosts` lists expected destinations. | Declared destinations: *hosts* | The runtime, in every host |
 | `images` | Pictures from any public https host, not only `network.hosts`. | Show pictures from any website | The runtime |
 | `web` | Any public https page in the system web view, which has no way back into the app. | Open web pages in a browser view | The runtime on supported platforms, including Windows/WebView2 and Linux X11/XWayland/WebKitGTK since RC1; native Wayland embedding is unsupported ([requirements](../README.md#download-a-compatible-host)). |
 | `location` | The device's location. On macOS since desktop RC1 and in compatible Android source builds, an app that declares `host-api-v1` must first ask with `location.permission.request`; it can then read a fresh fix with `location.sample` on macOS and Android (RC2), or the last-known fix with `location.get` on Android only ([Host API compatibility](HOST-API.md)). | Use your location | The runtime, where the device has it |
@@ -779,12 +790,10 @@ Source: `RESERVED_NAMES` in `crates/app-contract/src/manifest.rs`.
 
 ### Network hosts
 
-Apart from `images` and `web`, an app reaches the network only with `net` and
-an exact host list. The runtime enforces the list on every path out of the
-isolate: the network module, artwork loading and data fetches. `net` with an
-empty list reaches nothing. Hosts match exactly: `example.com` does not allow
-`api.example.com`. Write bare host names, such as `api.example.com`, with no
-scheme, path, port or wildcard:
+`network.hosts` lists expected destinations for disclosure. The runtime
+network module is available even without `net` or a host list. Listed hosts
+still need a valid disclosure format: bare host names with no scheme, path,
+port or wildcard. This format rule does not restrict runtime destinations.
 
 ```text
 [refused] policy: host "https://api.open-meteo.com/v1" must be a bare host name, with no scheme or path
@@ -1015,7 +1024,7 @@ The gate refuses a `host_method` unless every rule holds:
 | The method is in the table below, or is `wasm.<function>`: one of the app's own functions, one segment after `wasm.`. | `host_method "<m>" is not in the reviewed shared-service tool contract` |
 | The tool's `risk` is at least the method's minimum (not for `wasm.<function>`). | `host_method "<m>" requires at least <risk> risk` |
 | The tool says `"private_data": true` (not for `wasm.<function>`, which sees only its input). | `shared-service tools must declare private_data: true` |
-| The manifest declares the method's family as a capability, or the exact method. | `host_method "<m>" requires the declared "<family>" service capability` |
+| Family usage declarations are descriptive. | Omission does not refuse an otherwise reviewed method. |
 
 | Family | Methods, minimum risk `read` | Methods, minimum risk `act` |
 | --- | --- | --- |
@@ -1304,9 +1313,9 @@ host service:
 host.request("mail.list", {…}, fn(r){ … })
 ```
 
-The isolate refuses the call unless the app's policy grants the family (`mail`
-for `mail.*`) or the exact service name. A granted call goes to the service
-the host registered for that family. The service does the work and answers
+A public call goes to the service the host registered for that family.
+The host checks actual consent, app/account ownership and availability,
+independently of family usage declarations. The service does the work and answers
 with data, never with a credential. A connection handle it returns is opaque
 and bound to the app. A call to a family that
 no service answers fails at once with `no service answers "<family>" on this device`;
@@ -1533,13 +1542,13 @@ version or a shared component version.
 ```text
 my-notes 0.1.0 — PASSED
   [warning] publisher-signature: unsigned: accountability rests on the hub alone
-  grants: capabilities {"storage"}, hosts {}, storage 16777216 bytes, agent none
+  declarations: capabilities {"storage"}, hosts {}, storage 16777216 bytes, agent none
 ```
 
 The first line gives the app id, version and verdict. Each finding line uses
-the format in [Findings](#findings). The `grants:` line is what the app will
-get: its capabilities, its hosts, its storage quota in bytes (or `none`
-without `storage`) and its agent profile (or `none` without an `agent` block). The
+the format in [Findings](#findings). The `declarations:` line shows the
+declared families and hosts, the resolved bounded storage quota, and the
+agent profile (or `none` without an `agent` block). The
 profile appears in the kernel's spelling: `workspace-write-never-ask` prints as
 `workspace-write-never`.
 

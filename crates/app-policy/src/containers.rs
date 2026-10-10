@@ -13,10 +13,10 @@ use std::path::{Path, PathBuf};
 /// What the host applies to the app's splash isolate.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct IsolateSettings {
-    /// Reported by `host.capabilities()` inside the isolate AND checked by
-    /// every host service before it acts (phase 2).
+    /// Manifest declarations. Use public_runtime_capabilities when applying
+    /// runtime availability; host services independently check real consent.
     pub capabilities: Vec<String>,
-    /// The isolate's own network module, granted with the `net` capability.
+    /// The isolate's own network module, available to every admitted app.
     /// Its host list is a declaration since makepad#117: the runtime does not
     /// hold the module to it (OctoSense #450).
     pub allow_net: bool,
@@ -33,23 +33,42 @@ pub struct IsolateSettings {
     pub memory_bytes: u64,
     /// The jail's directory, under the host's app-data root.
     pub jail_root: PathBuf,
-    /// Exactly the hosts the isolate may reach, on every network path.
+    /// Declared destinations for disclosure; not a network access gate.
     pub hosts: Vec<String>,
 }
 
+/// Runtime-owned public flags, separate from manifest disclosure. Device
+/// reads require a host with the per-app consent broker. Internal `profile`
+/// and unowned `agent.notify` are deliberately absent: installed apps use
+/// authenticated host requests and reviewed app tools instead.
+pub fn public_runtime_capabilities(declared: &[String], device_consent: bool, explicit_capture_intent: bool) -> Vec<String> {
+    let device = ["camera", "microphone", "location", "library"];
+    let mut capabilities: std::collections::BTreeSet<String> = declared.iter()
+        .filter(|name| !device.contains(&name.as_str()) && !["profile", "agent"].contains(&name.as_str()))
+        .cloned().collect();
+    capabilities.extend(["storage", "net", "images", "web", "prompt"].map(str::to_string));
+    if device_consent {
+        capabilities.extend(["camera", "location"].map(str::to_string));
+        // Read from the host's registered camera.capture_intent@1 ABI, never
+        // from the app's manifest. Older CameraPreview interprets these
+        // flags as automatic recording/export, so mixed builds keep them off.
+        if explicit_capture_intent {
+            capabilities.extend(["microphone", "library"].map(str::to_string));
+        }
+    }
+    capabilities.into_iter().collect()
+}
+
 impl IsolateSettings {
-    /// The isolate's storage, its `fs` root: the jail, only when the app
-    /// was granted `storage`. Without it the isolate has none, so `fs.*`,
-    /// camera captures and the local files a widget reads all answer
-    /// "storage not available".
+    /// Every admitted app receives its own `fs` jail. The `storage`
+    /// declaration describes expected use; it cannot remove isolation.
     pub fn storage_root(&self) -> Option<PathBuf> {
-        self.capabilities.iter().any(|c| c == "storage").then(|| self.jail_root.clone())
+        Some(self.jail_root.clone())
     }
 
-    /// The quota the isolate gets: the resolved one with its storage, none
-    /// without.
+    /// The resolved quota applies even when storage usage is undeclared.
     pub fn granted_storage_quota(&self) -> u64 {
-        if self.storage_root().is_some() { self.storage_quota } else { 0 }
+        self.storage_quota
     }
 }
 
@@ -86,7 +105,7 @@ impl IsolateSettings {
     pub fn for_app(policy: &octosense_app_contract::AppPolicy, app_data_root: &Path) -> IsolateSettings {
         IsolateSettings {
             capabilities: policy.capabilities.iter().cloned().collect(),
-            allow_net: policy.allows("net"),
+            allow_net: true,
             storage_quota: policy.storage_bytes,
             host_prompts: true,
             instruction_budget: policy.instruction_budget,

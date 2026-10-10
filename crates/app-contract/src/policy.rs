@@ -1,17 +1,10 @@
 //! Resolving a manifest into what the app actually gets.
 //!
-//! Every rule here fails closed: an unknown capability, a host that is not a
-//! bare host name, a quota above the host's ceiling. A manifest asks; the
-//! host decides; the app is never consulted again. This is the only place
-//! that produces [`AppPolicy`].
-//!
-//! [`AppPolicy`] is what the app may do. How a host sandboxes it (an
-//! isolate's settings, an agent session) is the host's own, built from the
-//! policy under one rule: a host may restrict more than the policy says,
-//! never less. The app's agent, if its manifest declares one, is resolved by
-//! hosts that run app agents (App Hub's `octosense-app-policy`); this crate
-//! parses the `agent` block as part of the manifest and grants nothing from
-//! it.
+//! Validates disclosure names and metadata, admission identity and resource
+//! ceilings. The manifest's capability/host sets are retained for disclosure,
+//! not execution authorization. Hosts enforce actual consent, account scopes,
+//! availability, isolation and inter-app sharing independently. App Hub adds
+//! the reviewed agent profile for hosts that run app agents.
 use crate::manifest::{AgentWorkspace, AppManifest, KNOWN_CAPABILITIES};
 use crate::research::ResearchScope;
 use serde::Serialize;
@@ -154,10 +147,10 @@ pub struct AppPolicy {
     pub app_id: String,
     pub version: String,
     pub display_name: String,
-    /// Granted capabilities, sorted and deduplicated.
+    /// Declared capability names for disclosure, sorted and deduplicated.
+    /// Not an execution permission or evidence of user consent.
     pub capabilities: BTreeSet<String>,
-    /// Exactly the hosts the app may reach. Empty means no network, whatever
-    /// the `net` capability says.
+    /// Declared network destinations for disclosure, not an allowlist.
     pub hosts: BTreeSet<String>,
     /// The app's whole storage jail, in bytes: the `storage` block's
     /// `max_bytes`, clamped to the host's ceiling. The same as
@@ -200,14 +193,13 @@ pub struct StorageGrant {
 }
 
 impl AppPolicy {
-    /// Whether a granted capability covers this action. The single question
-    /// every host service asks before doing work on an app's behalf.
+    /// Legacy declaration query. This does not authorize or deny execution;
+    /// hosts check admission, actual consent, account scope and availability.
     pub fn allows(&self, capability: &str) -> bool {
         self.capabilities.contains(capability)
     }
 
-    /// Whether the app may reach this host. Requires the capability AND the
-    /// entry: a granted `net` with an empty list reaches nothing.
+    /// Legacy declaration query, not a runtime network authorization check.
     pub fn allows_host(&self, host: &str) -> bool {
         self.allows("net") && self.hosts.contains(host)
     }
@@ -240,12 +232,6 @@ pub fn resolve(manifest: &AppManifest, limits: &HostLimits) -> Result<AppPolicy,
         check_host(host)?;
         hosts.insert(host.to_ascii_lowercase());
     }
-    // A host list without the capability is a manifest mistake, not a silent
-    // grant: refuse it so the author notices before the app ships.
-    if !hosts.is_empty() && !capabilities.contains("net") {
-        return Err(format!("app {} lists hosts but does not request the net capability", manifest.id));
-    }
-
     let research = resolve_research(&manifest.id, &capabilities, manifest.research.as_ref())?;
     let storage_bytes = clamp(manifest.storage.max_bytes, limits.max_storage_bytes);
 
@@ -291,18 +277,12 @@ fn resolve_research(
         }
         return Ok(None);
     };
-    if !research && !crawl {
-        return Err(format!("app {app_id} declares a research scope but requests neither the research nor the crawl capability"));
-    }
     let scope = scope.validated().map_err(|e| format!("app {app_id} {e}"))?;
     if crawl && !scope.crawls() {
         return Err(format!(
             "app {app_id} requests crawl, so its research scope needs max_depth and max_pages above 0 (got {} and {})",
             scope.max_depth, scope.max_pages
         ));
-    }
-    if !crawl && (scope.max_depth > 0 || scope.max_pages > 0) {
-        return Err(format!("app {app_id} sets crawl limits (max_depth, max_pages) but does not request the crawl capability"));
     }
     Ok(Some(scope))
 }

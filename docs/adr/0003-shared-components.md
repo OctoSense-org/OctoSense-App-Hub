@@ -8,7 +8,31 @@ Status: proposed, 9 October 2026. This is phase 4 of
 [#186](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/186) and
 [#188](https://github.com/OctoSense-org/OctoSense-App-Hub/pull/188), which
 admit an app's own WebAssembly components. No catalog offers a component, and
-no OctoSense build loads one yet.
+a compatible host release is still required; source support is not release acceptance.
+
+## Current source policy: declarations and authorization
+
+`capabilities` and `network.hosts` describe an app's expected API and network
+use for users and reviewers. Omitting a family or destination does not deny
+an otherwise supported public API. This is the source policy being prepared
+for the next compatible release; historical RC2 behavior is not evidence of
+this change being deployed.
+
+Every admitted app gets a private storage jail with the resolved quota and a
+network module. Device access still needs per-app consent and OS permission;
+connected accounts keep app/account ownership and provider scopes. External
+writes retain native review, agents retain opt-in and reviewed tools, and
+other apps' data/tools still require sharing authorization. Internal host
+profile data and unowned `agent.notify` are not public APIs.
+
+`requires` and `host_api.required` remain compatibility checks, not capability
+permissions. Component ABI/import validation, exact digests, publisher proof,
+catalog withdrawal, quotas and supported platforms remain enforced. Missing
+usage declarations may produce review warnings. `AppPolicy::allows` and
+`allows_host` are legacy declaration queries; hosts must not use them as
+execution authorization. Use `runtime.list` / `runtime.describe` to discover
+actual methods and their platform/consent requirements.
+
 
 ## Context
 
@@ -16,7 +40,7 @@ ADR 0014 lets an app ship an ordinary Rust crate as a WebAssembly component in
 its bundle's `fns/`. Its phase 4 asks for **shared components**: reviewed,
 versioned components in App Hub's catalog that several apps use, as npm
 packages are shared. The installer verifies them, and every app still runs
-its own instance under its own grants.
+its own instance under its own isolation, quotas and actual consent.
 
 These constraints apply:
 
@@ -135,18 +159,16 @@ contract feature `wasm-shared-components-v1`:
 
 `as` is the app's name for the component: `[a-z][a-z0-9_]{0,31}`, unique.
 An app names at most 8 components, each at one exact version **and** digest.
-The parser refuses the field without the feature, and the feature without
-`wasm`. The field is left out when it is empty, so existing manifests and
+The parser refuses the field without the required host feature. The field is left out when it is empty, so existing manifests and
 their signing bytes do not change. A host that does not know the feature
 refuses the app.
 
 ### 5. Admitting an app that pins components
 
 With a catalog, the gate resolves each component: it must be there at that
-exact version, be offered, and hash to the pinned digest. The app must grant
-what the component imports, as for its own components: `storage` for
-`wasi:filesystem`, and `net` for `wasi:http` (a declaration: OctoSense does
-not hold the component to `network.hosts`). `octosense:host` needs no grant. Each component gets a reviewer
+exact version, be offered, and hash to the pinned digest. Supported imports
+are independent of `storage`, `net` and `wasm` disclosures. Execution keeps
+the app jail, quotas and actual host-service consent. Each component gets a reviewer
 line, such as `component markdown (org.example.markdown 1.2.0) reaches the
 clock, but no files, network or other app`.
 

@@ -24,6 +24,38 @@ contract and implements the native adapters described below on the platforms
 each section names; RC1 has none of them, and the contract package alone adds
 nothing to an installed host.
 
+## Current source policy: declarations and authorization
+
+`capabilities` and `network.hosts` describe an app's expected API and network
+use for users and reviewers. Omitting a family or destination does not deny
+an otherwise supported public API. This is the source policy being prepared
+for the next compatible release; historical RC2 behavior is not evidence of
+this change being deployed.
+
+Every admitted app gets a private storage jail with the resolved quota and a
+network module. Device access still needs per-app consent and OS permission;
+connected accounts keep app/account ownership and provider scopes. External
+writes retain native review, agents retain opt-in and reviewed tools, and
+other apps' data/tools still require sharing authorization. Internal host
+profile data and unowned `agent.notify` are not public APIs.
+
+`requires` and `host_api.required` remain compatibility checks, not capability
+permissions. Component ABI/import validation, exact digests, publisher proof,
+catalog withdrawal, quotas and supported platforms remain enforced. Missing
+usage declarations may produce review warnings. `AppPolicy::allows` and
+`allows_host` are legacy declaration queries; hosts must not use them as
+execution authorization. Use `runtime.list` / `runtime.describe` to discover
+actual methods and their platform/consent requirements.
+
+
+The compatible runtime must include explicit camera intent: `capture({library:true})`
+and `record_start({audio:true,library:true})`; omitted options are false.
+Enabling public runtime flags must never implicitly record audio or export
+captures. This overlay and the updated Hub adapter ship together.
+The adapter exposes the microphone/library runtime flags only when the host
+provides both its per-app consent broker and registered
+`camera.capture_intent@1` support. A manifest declaration cannot supply either.
+
 ## Declare what the app needs
 
 This manifest fragment requires `runtime.list` and uses `location.get` when
@@ -93,7 +125,7 @@ system-app-only, and SMTP acceptance on hardware is unverified.
 
 ### Runtime inventory
 
-With the `runtime` capability, call `runtime.list` with `{}` for every
+For discovery, call `runtime.list` with `{}` for every
 described method, or `runtime.describe` with `{"method":"location.get"}` for
 one:
 
@@ -186,7 +218,7 @@ Source and synthetic tests do not establish real microphone/speaker acceptance.
 - **Agent tools.** A `host-service` tool can map with `host_method` to
   `auth.backend.me`, `auth.backend.request`, `runtime.list`,
   `runtime.describe`, the three `*.permission.status` methods or
-  `location.get`, at minimum risk `read`, with the method's capability and
+  `location.get`, at minimum risk `read`, with
   `private_data: true`
   ([Map a tool to a shared service](PUBLISHING.md#map-a-tool-to-a-shared-service-host_method)).
   An agent's call never prompts, so `auth.backend.request` runs only declared

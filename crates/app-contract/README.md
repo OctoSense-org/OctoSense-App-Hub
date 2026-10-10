@@ -60,13 +60,14 @@ access: declare required method versions and check the actual host. App Policy
 now requires contract 1.10, which consumers can resolve from crates.io without
 a git patch. Released hosts do not gain these APIs by parsing new capabilities.
 
-This repository is ahead of 1.10.0: it adds the `wasm-components-v1` feature
-for apps that ship WebAssembly components, and the `components` field with the
-`wasm-shared-components-v1` feature for apps that pin shared components from
-App Hub's catalog (unreleased, [CHANGELOG.md](CHANGELOG.md)). App Policy and
-App Hub at this revision use the new field, so a consumer that takes them from
-git must patch the contract to the same App Hub revision, as shown below,
-until a release includes it.
+This repository prepares **1.11.0**, which is not published yet. It adds
+component/shared-component ABI metadata and the declaration-only capability
+policy ([CHANGELOG.md](CHANGELOG.md)). App Policy requires 1.11.0 so a new
+consumer cannot silently combine these rules with the old crates.io contract.
+Until publication, validate against a local contract patch at this same
+revision; do not ship an unresolved dependency or claim a released host
+supports these changes. Capabilities describe usage. Actual user consent,
+account scopes, integrity, quotas and API availability remain host checks.
 
 crates.io has 1.0.0, 1.1.0, 1.2.0, 1.5.0, 1.6.0, 1.7.0, 1.7.1, 1.8.0 and 1.10.0.
 Versions 1.3.0, 1.4.0 and 1.9.0 exist only in this repository

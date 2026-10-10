@@ -445,16 +445,11 @@ pub fn resolve<'a>(catalog: &'a Catalog, dependency: &octosense_app_policy::Comp
     Ok(entry)
 }
 
-/// Why an app may not use a component that imports `imports`: the grants it
-/// needs and the app lacks. `None` when the app grants them.
-pub fn missing_grant(manifest: &AppManifest, info: &crate::functions::ComponentInfo) -> Option<&'static str> {
-    let has = |capability: &str| manifest.capabilities.iter().any(|c| c == capability);
-    if info.uses_files() && !has("storage") {
-        return Some("imports wasi:filesystem, the app's own files, which needs the storage capability");
-    }
-    if info.uses_http() && !has("net") {
-        return Some("imports wasi:http, the network, which the app must declare with the net capability");
-    }
+/// Compatibility hook retained for callers. Capability declarations do not
+/// deny component imports. Admission still validates supported imports,
+/// exact digests, provenance and ABI; execution retains the app jail/quotas
+/// and host-service consent, account and inter-app sharing checks.
+pub fn missing_grant(_manifest: &AppManifest, _info: &crate::functions::ComponentInfo) -> Option<&'static str> {
     None
 }
 

@@ -234,7 +234,7 @@ fn every_tool_is_in_the_apps_namespace() {
 }
 
 #[test]
-fn shared_host_method_alias_is_pinned_and_needs_its_declared_capability() {
+fn shared_host_method_alias_is_pinned_without_a_family_declaration() {
     let dir = scratch("shared-host-method");
     edit_tools(&dir, |tools| {
         tools["tools"][0]["host_method"] = json!("gcalendar.cached");
@@ -242,18 +242,7 @@ fn shared_host_method_alias_is_pinned_and_needs_its_declared_capability() {
         tools["tools"][0]["shareable"] = json!(false);
     });
     let manifest = stamp(&dir, |_| {});
-    refused_with(
-        &dir,
-        &manifest,
-        "requires the declared \"gcalendar\" service capability",
-    );
-    assert!(AgentBundle::load(&dir, &manifest).is_err());
-    let manifest = stamp(&dir, |m| {
-        m["capabilities"]
-            .as_array_mut()
-            .unwrap()
-            .push(json!("gcalendar"))
-    });
+    assert!(manifest.capabilities.iter().all(|c| c != "gcalendar"));
     let loaded = AgentBundle::load(&dir, &manifest).unwrap().unwrap();
     let tool = loaded.tool("news.list").unwrap();
     assert_eq!(tool.service_method(), "gcalendar.cached");
@@ -270,7 +259,7 @@ fn shared_host_method_alias_is_pinned_and_needs_its_declared_capability() {
 }
 
 #[test]
-fn host_api_read_aliases_load_only_with_the_owning_apps_capability_and_privacy_declaration() {
+fn host_api_read_aliases_require_privacy_but_not_family_declarations() {
     for method in [
         "runtime.list",
         "runtime.describe",
@@ -288,7 +277,6 @@ fn host_api_read_aliases_load_only_with_the_owning_apps_capability_and_privacy_d
         "device_calendar.events.get",
         "mail.compose_status",
     ] {
-        let family = method.split('.').next().unwrap();
         let dir = scratch(&format!("host-api-read-{method}"));
         edit_tools(&dir, |tools| {
             tools["tools"][0]["host_method"] = json!(method);
@@ -296,12 +284,6 @@ fn host_api_read_aliases_load_only_with_the_owning_apps_capability_and_privacy_d
             tools["tools"][0]["shareable"] = json!(false);
         });
         let manifest = stamp(&dir, |_| {});
-        assert!(AgentBundle::load(&dir, &manifest).unwrap_err().contains(
-            &format!("requires the declared {family:?} service capability")
-        ), "{method} must not grant its own capability");
-        let manifest = stamp(&dir, |manifest| {
-            manifest["capabilities"].as_array_mut().unwrap().push(json!(family));
-        });
         let loaded = AgentBundle::load(&dir, &manifest).unwrap().unwrap();
         let tool = loaded.tool("news.list").unwrap();
         assert_eq!(tool.service_method(), method);
@@ -454,7 +436,7 @@ fn shared_local_mutations_keep_risk_and_private_data_floors() {
 }
 
 #[test]
-fn an_apps_own_wasm_function_is_a_host_method_behind_the_wasm_capability() {
+fn an_apps_own_wasm_function_is_a_reviewed_host_method() {
     // `wasm.<function>` runs the bundle's own module, so it is in no shared
     // list and has no risk or private-data floor.
     let make = |method: &str| {
@@ -479,7 +461,7 @@ fn an_apps_own_wasm_function_is_a_host_method_behind_the_wasm_capability() {
         tools["tools"][0]["host_method"] = json!("wasm.find_slots");
     });
     let manifest = stamp(&dir, |_| {});
-    refused_with(&dir, &manifest, "requires the declared \"wasm\" service capability");
+    assert!(AgentBundle::load(&dir, &manifest).is_ok());
     let manifest = stamp(&dir, |m| {
         m["capabilities"].as_array_mut().unwrap().push(json!("wasm"))
     });
@@ -903,7 +885,7 @@ fn an_outward_tool_waits_for_the_person_and_may_forbid_standing_rules() {
 }
 
 #[test]
-fn billable_media_aliases_need_model_capability_and_explicit_private_data() {
+fn billable_media_aliases_need_explicit_private_data_not_family_declarations() {
     for method in ["model.image", "model.audio", "model.embeddings", "model.video", "model.video.cancel"] {
         let dir = scratch(&format!("media-alias-{method}"));
         edit_tools(&dir, |tools| {
@@ -912,7 +894,7 @@ fn billable_media_aliases_need_model_capability_and_explicit_private_data() {
             tools["tools"][0]["private_data"] = json!(true);
         });
         let manifest = stamp(&dir, |_| {});
-        assert!(AgentBundle::load(&dir, &manifest).unwrap_err().contains("requires the declared \"model\" service capability"), "{method}");
+        assert!(AgentBundle::load(&dir, &manifest).is_ok(), "{method}");
         let manifest = stamp(&dir, |manifest| {
             manifest["capabilities"].as_array_mut().unwrap().push(json!("model"));
         });
