@@ -1,11 +1,12 @@
 //! Host services: what a contained app asks the shell to do for it.
 //!
-//! An app's script calls `host.request("mail.list", {…}, fn(r){…})`. The
-//! isolate refuses the call unless the app's policy grants the family (`mail`);
-//! what is granted is queued, and the Card runner hands it here. A service
-//! registered for the family does the work, in Rust, with whatever it holds
-//! that the app must not: a socket, a credential, a device. The app gets data
-//! back, never the means.
+//! An app's script calls `host.request("mail.list", {…}, fn(r){…})`; the
+//! isolate queues it, and the Card runner hands it here. Since makepad#118
+//! (OctoSense #450) the isolate no longer refuses a family the app did not
+//! declare, and neither does [`dispatch`]: a service whose family needs a
+//! grant checks it itself. A service registered for the family does the
+//! work, in Rust, with whatever it holds that the app must not: a socket, a
+//! credential, a device. The app gets data back, never the means.
 //!
 //! Some work needs the person, not the app: typing a password, approving an
 //! account. A service raises a **sheet** for that: a host-owned surface the

@@ -216,7 +216,7 @@ error[E0599]: no variant, associated function, or constant named `TextInputState
 error: could not compile `octosense-appstore` (lib) due to 1 previous error
 ```
 
-`crates/appstore/src/services.rs` 匹配了 `Event::TextInputStateQuery`。这是一个 IME 事件，原版 Makepad `32d6415f` 没有定义它，OctoSense 的运行时补丁（`tools/runtime-patches/makepad-settings.patch`）加入了它。商店代码只在特性（feature）`text-input-state-query` 开启时才匹配这个事件：`octosense-appstore` 默认开启它；`octosense-app-hub-app` 也默认开启，并把它传给 `octosense-appstore`。`card-host` 依赖商店代码时关闭了这个特性。
+`crates/appstore/src/services.rs` 匹配了 `Event::TextInputStateQuery`。这是一个 IME 事件，原版 Makepad `d653bc44` 没有定义它，OctoSense 的运行时补丁（`tools/runtime-patches/makepad-settings.patch`）加入了它。商店代码只在特性（feature）`text-input-state-query` 开启时才匹配这个事件：`octosense-appstore` 默认开启它；`octosense-app-hub-app` 也默认开启，并把它传给 `octosense-appstore`。`card-host` 依赖商店代码时关闭了这个特性。
 
 如果只构建 `card-host` 也失败，说明你的 App Hub 代码早于这项改动。更新后重新构建：
 

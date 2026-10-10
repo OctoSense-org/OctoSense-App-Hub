@@ -291,7 +291,7 @@ error: could not compile `octosense-appstore` (lib) due to 1 previous error
 ```
 
 `crates/appstore/src/services.rs` matches `Event::TextInputStateQuery`, an
-IME event that plain Makepad `32d6415f` does not define. OctoSense's runtime
+IME event that plain Makepad `d653bc44` does not define. OctoSense's runtime
 patch (`tools/runtime-patches/makepad-settings.patch`) adds it. `octosense-appstore`
 matches the event only under the feature `text-input-state-query`, which
 `octosense-appstore` turns on by default. `octosense-app-hub-app` also turns
