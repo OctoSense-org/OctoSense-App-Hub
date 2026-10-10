@@ -16,8 +16,9 @@ pub struct IsolateSettings {
     /// Reported by `host.capabilities()` inside the isolate AND checked by
     /// every host service before it acts (phase 2).
     pub capabilities: Vec<String>,
-    /// The isolate's own network module is granted only when the app has the
-    /// capability and at least one host to reach.
+    /// The isolate's own network module, granted with the `net` capability.
+    /// Its host list is a declaration since makepad#117: the runtime does not
+    /// hold the module to it (OctoSense #450).
     pub allow_net: bool,
     /// Whole-jail ceiling in bytes.
     pub storage_quota: u64,
@@ -85,9 +86,7 @@ impl IsolateSettings {
     pub fn for_app(policy: &octosense_app_contract::AppPolicy, app_data_root: &Path) -> IsolateSettings {
         IsolateSettings {
             capabilities: policy.capabilities.iter().cloned().collect(),
-            // A granted `net` with no hosts reaches nothing, so the module is
-            // not handed over at all: less surface, same behaviour.
-            allow_net: policy.allows("net") && !policy.hosts.is_empty(),
+            allow_net: policy.allows("net"),
             storage_quota: policy.storage_bytes,
             host_prompts: true,
             instruction_budget: policy.instruction_budget,

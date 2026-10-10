@@ -323,9 +323,20 @@ pub fn pump(cx: &mut Cx, app: &str, card: &SplashRef) {
         if let Some(vm_id) = vm_id {
             cx.with_script_vm_id(vm_id, |vm| {
                 vm.take_errors();
+                // Catch what the handler's run raises. Without a sink the VM
+                // drains it to the log, so a runaway that the per-evaluation
+                // instruction limit stopped would leave no error here.
+                vm.bx.captured_errors = Some(Vec::new());
             });
         }
-        if !card.call_script_fn_with_strings(cx, id!(app_tool), &[&name, &token]) {
+        let called = card.call_script_fn_with_strings(cx, id!(app_tool), &[&name, &token]);
+        let errors = vm_id
+            .map(|vm_id| cx.with_script_vm_id(vm_id, |vm| vm.take_errors()))
+            .unwrap_or_default();
+        for error in &errors {
+            log!("app tool {name} in {app}: {error}");
+        }
+        if !called {
             finish(
                 heap,
                 &token,
@@ -334,9 +345,8 @@ pub fn pump(cx: &mut Cx, app: &str, card: &SplashRef) {
                         .into(),
                 ),
             );
-        } else if let Some(vm_id) = vm_id {
-            let failed = cx.with_script_vm_id(vm_id, |vm| !vm.take_errors().is_empty())
-                || !makepad_widgets::splash_policy::may_run(heap);
+        } else if vm_id.is_some() {
+            let failed = !errors.is_empty() || !makepad_widgets::splash_policy::may_run(heap);
             if failed {
                 finish(
                     heap,
@@ -750,6 +760,9 @@ mod tests {
         assert!(!makepad_widgets::splash_host::take_splash_host_requests_for(&[heap])[0].may_prompt);
     }
 
+    /// The per-evaluation instruction limit stops the loop, and the call
+    /// fails at once. (Since makepad#117 the app's cumulative budget is a
+    /// declaration and stops nothing.)
     #[test]
     fn an_unbounded_script_loop_is_stopped_by_the_vm_entry_budget() {
         let app = "org.example.tool-budget";
