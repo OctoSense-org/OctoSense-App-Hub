@@ -15,9 +15,9 @@ default = ["text-input-state-query"]
 text-input-state-query = ["octosense-appstore/text-input-state-query"]
 
 [dependencies]
-makepad-widgets = { git = "https://github.com/OctoSense-org/makepad.git", rev = "a772b3708e722a22ee9e4717d6ede8a16587f156" }
-makepad-app-module = { git = "https://github.com/OctoSense-org/makepad.git", rev = "a772b3708e722a22ee9e4717d6ede8a16587f156" }
-makepad-wm-theme = { git = "https://github.com/OctoSense-org/makepad.git", rev = "a772b3708e722a22ee9e4717d6ede8a16587f156" }
+makepad-widgets = { git = "https://github.com/OctoSense-org/makepad.git", rev = "d653bc4493619ab979ccff165cf48c0c63b77d19" }
+makepad-app-module = { git = "https://github.com/OctoSense-org/makepad.git", rev = "d653bc4493619ab979ccff165cf48c0c63b77d19" }
+makepad-wm-theme = { git = "https://github.com/OctoSense-org/makepad.git", rev = "d653bc4493619ab979ccff165cf48c0c63b77d19" }
 octosense-app-hub = { path = "../app-hub" }
 octosense-app-policy = { path = "../app-policy" }
 octosense-appstore = { path = "../appstore", default-features = false }
