@@ -309,7 +309,9 @@ fn run() -> Result<(), String> {
                     // the same shape, for tools that read --json.
                     if has("json") {
                         println!("{}", serde_json::json!({"schema": 1, "stage": "structural", "passed": false,
-                            "findings": [{"severity": "refusal", "check": "bundle-invalid", "detail": error}]}));
+                            "findings": [{"severity": "refusal", "check": "bundle-invalid", "detail": error,
+                                "code": "hub-bundle-invalid",
+                                "hint": "the bundle is unreadable: manifest.json must be present, valid JSON the manifest schema accepts (schema, id, version, name)"}]}));
                     }
                     return Err(error);
                 }

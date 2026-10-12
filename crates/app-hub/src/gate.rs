@@ -38,20 +38,48 @@ pub struct Finding {
     /// Where in the bundle, when one file or property is at fault.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    /// A stable machine code, for tools that repair bundles
+    /// (docs/ERROR-CODES.md). Once printed, a code never changes what it
+    /// means; new codes may be added.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<&'static str>,
+    /// One line: how to make the gate pass. Present exactly when `code` is.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hint: Option<&'static str>,
 }
 
 impl Finding {
     fn refuse(check: &'static str, detail: impl Into<String>) -> Self {
-        Finding { severity: Severity::Refusal, check, detail: detail.into(), path: None }
+        Finding { severity: Severity::Refusal, check, detail: detail.into(), path: None, code: None, hint: None }
     }
     fn warn(check: &'static str, detail: impl Into<String>) -> Self {
-        Finding { severity: Severity::Warning, check, detail: detail.into(), path: None }
+        Finding { severity: Severity::Warning, check, detail: detail.into(), path: None, code: None, hint: None }
     }
     pub(crate) fn at(check: &'static str, path: impl Into<String>, detail: impl Into<String>) -> Self {
-        Finding { severity: Severity::Refusal, check, detail: detail.into(), path: Some(path.into()) }
+        Finding { severity: Severity::Refusal, check, detail: detail.into(), path: Some(path.into()), code: None, hint: None }
     }
-    fn warn_at(check: &'static str, path: impl Into<String>, detail: impl Into<String>) -> Self {
-        Finding { severity: Severity::Warning, check, detail: detail.into(), path: Some(path.into()) }
+    pub(crate) fn warn_at(check: &'static str, path: impl Into<String>, detail: impl Into<String>) -> Self {
+        Finding { severity: Severity::Warning, check, detail: detail.into(), path: Some(path.into()), code: None, hint: None }
+    }
+    /// Attaches the stable code and its one-line fix (docs/ERROR-CODES.md).
+    pub(crate) fn coded(mut self, code: &'static str, hint: &'static str) -> Self {
+        self.code = Some(code);
+        self.hint = Some(hint);
+        self
+    }
+
+    /// The finding as the text report prints it: its own line, then the
+    /// `fix [code]: …` line a tool reads when it carries a code.
+    fn render_into(&self, out: &mut String) {
+        let mark = match self.severity {
+            Severity::Refusal => "refused",
+            Severity::Warning => "warning",
+        };
+        let path = self.path.as_ref().map(|p| format!(" ({p})")).unwrap_or_default();
+        out.push_str(&format!("  [{mark}] {}{path}: {}\n", self.check, self.detail));
+        if let (Some(code), Some(hint)) = (self.code, self.hint) {
+            out.push_str(&format!("    fix [{code}]: {hint}\n"));
+        }
     }
 }
 
@@ -83,16 +111,13 @@ impl GateReport {
         !self.findings.iter().any(|f| f.severity == Severity::Refusal)
     }
 
-    /// One line per finding, for a pull-request comment or a terminal.
+    /// One line per finding, for a pull-request comment or a terminal. A
+    /// coded finding's `fix [code]: …` line follows its message, so tools
+    /// that repair bundles can read the code without --json.
     pub fn render(&self) -> String {
         let mut out = format!("{} {} — {}\n", self.app_id, self.version, if self.passed() { "PASSED" } else { "REFUSED" });
         for finding in &self.findings {
-            let mark = match finding.severity {
-                Severity::Refusal => "refused",
-                Severity::Warning => "warning",
-            };
-            let path = finding.path.as_ref().map(|p| format!(" ({p})")).unwrap_or_default();
-            out.push_str(&format!("  [{mark}] {}{path}: {}\n", finding.check, finding.detail));
+            finding.render_into(&mut out);
         }
         if let Some(policy) = &self.policy {
             let storage = format!("{} bytes", policy.storage_bytes);
@@ -169,19 +194,31 @@ fn check_bundle_for(
 
     // ---- integrity ------------------------------------------------------
     if !digest.eq_ignore_ascii_case(&manifest.integrity.bundle_blake3) {
-        findings.push(Finding::refuse(
-            "digest",
-            format!("the bundle hashes to {digest}, the manifest claims {}", manifest.integrity.bundle_blake3),
-        ));
+        findings.push(
+            Finding::refuse(
+                "digest",
+                format!("the bundle hashes to {digest}, the manifest claims {}", manifest.integrity.bundle_blake3),
+            )
+            .coded("hub-digest-mismatch", "run `hub stamp <bundle>` after every edit (tools/octo check stamps first), then check again"),
+        );
     }
     if let Err(e) = octosense_app_policy::verify::verify_manifest(&manifest, verifier) {
-        findings.push(Finding::refuse("publisher-signature", e));
+        findings.push(
+            Finding::refuse("publisher-signature", e)
+                .coded("hub-signature-invalid", "the signature or GitHub attestation no longer matches the manifest: restamp (`hub stamp`), then sign again (`hub sign-manifest`) or re-attach the attestation (`hub publisher-attach`)"),
+        );
     }
     if manifest.integrity.signature.is_none() && manifest.integrity.github.is_none() {
         if limits.require_signature {
-            findings.push(Finding::refuse("publisher-signature", "this hub requires a signed manifest"));
+            findings.push(
+                Finding::refuse("publisher-signature", "this hub requires a signed manifest")
+                    .coded("hub-signature-required", "sign the manifest (`hub keygen` once, then `hub sign-manifest`) or attach GitHub provenance, or check with --allow-unsigned while developing"),
+            );
         } else {
-            findings.push(Finding::warn("publisher-signature", "unsigned: accountability rests on the hub alone"));
+            findings.push(
+                Finding::warn("publisher-signature", "unsigned: accountability rests on the hub alone")
+                    .coded("hub-unsigned", "sign before submitting: an unsigned release asks the person to trust the hub alone"),
+            );
         }
     }
 
@@ -189,16 +226,22 @@ fn check_bundle_for(
     // Ids under `os.` are the system apps' (appstore::system): every device
     // refuses to install one from a store, so the hub refuses to offer one.
     if manifest.id.starts_with("os.") && !system_development {
-        findings.push(Finding::refuse(
-            "identity",
-            format!("{} is under os., which is reserved for system apps that ship with the device", manifest.id),
-        ));
+        findings.push(
+            Finding::refuse(
+                "identity",
+                format!("{} is under os., which is reserved for system apps that ship with the device", manifest.id),
+            )
+            .coded("hub-id-system", "os.* ids ship with the device: pick your own reverse-domain id, e.g. dev.<you>.<app>"),
+        );
     }
     if system_development && !manifest.id.starts_with("os.") {
-        findings.push(Finding::refuse(
-            "identity",
-            "--system-app checks only shipped os.* apps; use ordinary check/scan for store apps",
-        ));
+        findings.push(
+            Finding::refuse(
+                "identity",
+                "--system-app checks only shipped os.* apps; use ordinary check/scan for store apps",
+            )
+            .coded("hub-id-not-system", "drop --system-app for a store app: it checks a shipped os.* bundle during development, nothing else"),
+        );
     }
     // Native apps' ids and the host's own names (app-policy's
     // RESERVED_NAMES) are refused by the agent review below (as "identity")
@@ -220,14 +263,20 @@ fn check_bundle_for(
         } else if extension == "wasm" {
             function_files.push(file.clone());
         } else if !ALLOWED_EXTENSIONS.contains(&extension.as_str()) {
-            findings.push(Finding::refuse(
-                "contents",
-                format!("{} has extension {extension:?}, which a bundle may not hold", file.display()),
-            ));
+            findings.push(
+                Finding::refuse(
+                    "contents",
+                    format!("{} has extension {extension:?}, which a bundle may not hold", file.display()),
+                )
+                .coded("hub-file-type", "remove the file, or convert it to a type a bundle may hold (.card .json .l0 .octoscript .splash .svg .png .jpg .jpeg .webp .ttf .otf .txt .md, and fns/*.wasm)"),
+            );
         }
     }
     if total > MAX_BUNDLE_BYTES {
-        findings.push(Finding::refuse("size", format!("the bundle is {total} bytes, over the {MAX_BUNDLE_BYTES} ceiling")));
+        findings.push(
+            Finding::refuse("size", format!("the bundle is {total} bytes, over the {MAX_BUNDLE_BYTES} ceiling"))
+                .coded("hub-too-big", "shrink the artwork (compress the images) or split the app; a bundle is cards, data and artwork only"),
+        );
     }
 
     // ---- the app's own functions ----------------------------------------
@@ -238,19 +287,28 @@ fn check_bundle_for(
     let declares_wasm = manifest.capabilities.iter().any(|c| c == "wasm");
     let modules = function_files.len();
     if modules > 0 && !declares_wasm {
-        findings.push(Finding::warn(
-            "functions",
-            format!("the bundle carries {modules} WebAssembly module(s); add wasm to its usage disclosures"),
-        ));
+        findings.push(
+            Finding::warn(
+                "functions",
+                format!("the bundle carries {modules} WebAssembly module(s); add wasm to its usage disclosures"),
+            )
+            .coded("hub-wasm-undeclared", "add wasm to the manifest's capabilities, or remove the fns/*.wasm modules"),
+        );
     }
     if modules > MAX_FUNCTION_MODULES {
-        findings.push(Finding::refuse(
-            "functions",
-            format!("the bundle carries {modules} WebAssembly modules, over the {MAX_FUNCTION_MODULES} it may"),
-        ));
+        findings.push(
+            Finding::refuse(
+                "functions",
+                format!("the bundle carries {modules} WebAssembly modules, over the {MAX_FUNCTION_MODULES} it may"),
+            )
+            .coded("hub-too-many-functions", "keep at most 8 fns/*.wasm modules; split the app, or move shared logic into a shared component"),
+        );
     }
     if declares_wasm && modules == 0 && manifest.components.is_empty() {
-        findings.push(Finding::warn("functions", "the bundle declares the wasm capability but carries no fns/*.wasm"));
+        findings.push(
+            Finding::warn("functions", "the bundle declares the wasm capability but carries no fns/*.wasm")
+                .coded("hub-wasm-missing", "ship the fns/*.wasm the capability discloses, or drop wasm from the capabilities"),
+        );
     }
     // A component also reaches supported WASI interfaces. Admission validated
     // its imports; required ABIs keep unsupported hosts from installing it.
@@ -273,45 +331,65 @@ fn check_bundle_for(
             continue;
         }
         if !requires_components {
-            findings.push(Finding::refuse(
-                "functions",
-                format!("{name} is a WebAssembly component; the manifest must require {}", crate::functions::COMPONENTS_FEATURE),
-            ));
+            findings.push(
+                Finding::refuse(
+                    "functions",
+                    format!("{name} is a WebAssembly component; the manifest must require {}", crate::functions::COMPONENTS_FEATURE),
+                )
+                .coded("hub-component-requires", "add wasm-components-v1 to the manifest's requires, so hosts without components never install the app"),
+            );
         }
         if let Some(missing) = info.missing_host_api(&manifest) {
-            findings.push(Finding::refuse("functions", format!("{name} {missing}")));
+            findings.push(
+                Finding::refuse("functions", format!("{name} {missing}"))
+                    .coded("hub-component-host-api", "require the host API the component imports (host_api.required, with requires host-api-v1), or rebuild it without that import"),
+            );
         }
         if info.uses_sockets() && !declares_net {
-            findings.push(Finding::warn("functions", format!("{name} imports wasi:sockets; disclose net usage")));
+            findings.push(
+                Finding::warn("functions", format!("{name} imports wasi:sockets; disclose net usage"))
+                    .coded("hub-wasi-net-undeclared", "disclose net usage in the manifest's capabilities"),
+            );
         }
         if info.uses_files() && !declares_storage {
-            findings.push(Finding::warn(
-                "functions",
-                format!("{name} imports wasi:filesystem; disclose storage usage (the app jail and quota still apply)"),
-            ));
+            findings.push(
+                Finding::warn(
+                    "functions",
+                    format!("{name} imports wasi:filesystem; disclose storage usage (the app jail and quota still apply)"),
+                )
+                .coded("hub-wasi-storage-undeclared", "disclose storage usage in the manifest's capabilities (the app jail and quota still apply)"),
+            );
         }
         if info.uses_http() && !declares_net {
-            findings.push(Finding::warn(
-                "functions",
-                format!("{name} imports wasi:http; disclose net usage"),
-            ));
+            findings.push(
+                Finding::warn("functions", format!("{name} imports wasi:http; disclose net usage"))
+                    .coded("hub-wasi-net-undeclared", "disclose net usage in the manifest's capabilities"),
+            );
         }
         findings.push(Finding::warn_at("functions", name.clone(), format!("{name} is a component that reaches {}", info.reach())));
         // What it says it is built from, for reviewers and for
         // `hub check --advisory-db` (the gate cannot check it against the code).
-        findings.push(Finding::warn_at("functions", name.clone(), match &info.crates {
-            Some(crates) => format!("{name} is built from {}", crate::functions::crate_line(crates)),
-            None => format!(
-                "{name} does not list the crates it is built from (its {} section); tools/octo wasm build and App Flow's release workflow add it",
-                crate::functions::CRATES_SECTION
-            ),
-        }));
+        findings.push(match &info.crates {
+            Some(crates) => Finding::warn_at("functions", name.clone(), format!("{name} is built from {}", crate::functions::crate_line(crates))),
+            None => Finding::warn_at(
+                "functions",
+                name.clone(),
+                format!(
+                    "{name} does not list the crates it is built from (its {} section); tools/octo wasm build and App Flow's release workflow add it",
+                    crate::functions::CRATES_SECTION
+                ),
+            )
+            .coded("hub-component-crates", "rebuild with tools/octo wasm build (or App Flow's release workflow) so the component lists the crates it is built from"),
+        });
     }
     if requires_components && components == 0 {
-        findings.push(Finding::warn(
-            "functions",
-            format!("the manifest requires {} but fns/ holds no component; hosts without it refuse the app", crate::functions::COMPONENTS_FEATURE),
-        ));
+        findings.push(
+            Finding::warn(
+                "functions",
+                format!("the manifest requires {} but fns/ holds no component; hosts without it refuse the app", crate::functions::COMPONENTS_FEATURE),
+            )
+            .coded("hub-component-requires-unused", "build the component into fns/ (tools/octo wasm build), or drop the requirement"),
+        );
     }
 
     // ---- shared components (App Hub ADR 0003) -----------------------------
@@ -328,10 +406,13 @@ fn check_bundle_for(
     // the grant gates. Until that is closed in the runtime, the gate is what
     // keeps a bundle from reaching outside itself.
     for reference in external_references(bundle, &manifest)? {
-        findings.push(Finding::refuse(
-            "assets",
-            format!("{reference} points outside the bundle; ship the asset with the app"),
-        ));
+        findings.push(
+            Finding::refuse(
+                "assets",
+                format!("{reference} points outside the bundle; ship the asset with the app"),
+            )
+            .coded("hub-asset-external", "ship the asset inside the bundle and reference it bundle-relatively ({{assets}} in a script)"),
+        );
     }
 
     // ---- secrets are the host's ----------------------------------------
@@ -340,10 +421,13 @@ fn check_bundle_for(
     // runtime makes such a field inert; the gate refuses the bundle, so a
     // publisher learns it before a person meets a dead field.
     for field in secret_fields(bundle)? {
-        findings.push(Finding::refuse(
-            "secrets",
-            format!("{field}: apps may not ask for passwords or codes; a host service collects them on its own sheet"),
-        ));
+        findings.push(
+            Finding::refuse(
+                "secrets",
+                format!("{field}: apps may not ask for passwords or codes; a host service collects them on its own sheet"),
+            )
+            .coded("hub-secret-field", "remove the password or code field; the host's sheet collects secrets for the service that needs one"),
+        );
     }
 
     // ---- storage is asked for ------------------------------------------
@@ -352,30 +436,48 @@ fn check_bundle_for(
     // refused: the publisher may handle the error, and a camera preview
     // needs no storage.
     for warning in storage_warnings(bundle, &manifest)? {
-        findings.push(Finding::warn("storage", warning));
+        findings.push(
+            Finding::warn("storage", warning)
+                .coded("hub-storage-undeclared", "declare the storage capability in the manifest, or handle the fs errors and keep nothing"),
+        );
     }
 
     // ---- the listing ----------------------------------------------------
     // A store shows nothing it has not reviewed: the listing ships in the
     // bundle, under the same digest, and its assets must be there too.
     match std::fs::read_to_string(bundle.join(LISTING_FILE)) {
-        Err(_) => findings.push(Finding::refuse("listing", format!("no {LISTING_FILE}: a store needs a description, a category, screenshots, a publisher and the platforms it runs on"))),
+        Err(_) => findings.push(
+            Finding::refuse("listing", format!("no {LISTING_FILE}: a store needs a description, a category, screenshots, a publisher and the platforms it runs on"))
+                .coded("hub-listing-missing", "add listing.json with description, category, screenshots, publisher and platforms (docs/PUBLISHING.md#the-listing)"),
+        ),
         Ok(text) => match Listing::parse(&text) {
-            Err(e) => findings.push(Finding::refuse("listing", e)),
+            Err(e) => findings.push(
+                Finding::refuse("listing", e)
+                    .coded("hub-listing-invalid", "fix listing.json against the listing rules in docs/PUBLISHING.md#the-listing"),
+            ),
             Ok(listing) => {
                 // A screenshot is the one listing claim a reviewer can check
                 // against the rendered card, and the icon is what the
                 // launcher shows once installed: both are required, as on
                 // every store people know.
                 if listing.screenshots.is_empty() {
-                    findings.push(Finding::refuse("listing", "no screenshots: at least one PNG in the bundle, named in the listing, is required"));
+                    findings.push(
+                        Finding::refuse("listing", "no screenshots: at least one PNG in the bundle, named in the listing, is required")
+                            .coded("hub-listing-no-screenshots", "capture a PNG of the running app (tools/octo shot) and name it in listing.json's screenshots"),
+                    );
                 }
                 if listing.icon.is_none() {
-                    findings.push(Finding::refuse("listing", "no icon: a square PNG or SVG in the bundle, named in the listing, is required"));
+                    findings.push(
+                        Finding::refuse("listing", "no icon: a square PNG or SVG in the bundle, named in the listing, is required")
+                            .coded("hub-listing-no-icon", "add a square PNG or SVG to the bundle and name it in listing.json's icon"),
+                    );
                 }
                 for asset in listing.screenshots.iter().chain(listing.icon.iter()) {
                     if !bundle.join(asset).is_file() {
-                        findings.push(Finding::refuse("listing", format!("{asset} is named by the listing but is not in the bundle")));
+                        findings.push(
+                            Finding::refuse("listing", format!("{asset} is named by the listing but is not in the bundle"))
+                                .coded("hub-listing-asset-missing", "put the named file in the bundle at that path, or drop it from the listing"),
+                        );
                     }
                 }
             }
@@ -388,10 +490,18 @@ fn check_bundle_for(
     // the same checks from the app-peers broker (ToolManifest::load).
     let agent_review = octosense_app_policy::agent::review(bundle, &manifest);
     for issue in &agent_review.issues {
+        // The review's own words stand; the gate adds the code a tool reads.
+        let (code, hint) = match issue.check {
+            "identity" => ("hub-id-reserved", "this id (or its last segment) is a native app's or a host's name: rename it"),
+            "tools" => ("hub-tools-invalid", "fix tools.json against the tool-manifest rules in docs/PUBLISHING.md (namespace, risk, implemented_by, schema)"),
+            "agent" => ("hub-agent-files", "name every agent file in agent.instructions, and declare `agent` in the manifest for any of them"),
+            "skills" => ("hub-skills-invalid", "a skill is data only: .md/.json/.txt files, its manifest named as its directory, no executable fields"),
+            _ => ("hub-agent-review", "fix what the line names against the agent rules in docs/PUBLISHING.md"),
+        };
         findings.push(if issue.refusal {
-            Finding::refuse(issue.check, issue.detail.clone())
+            Finding::refuse(issue.check, issue.detail.clone()).coded(code, hint)
         } else {
-            Finding::warn(issue.check, issue.detail.clone())
+            Finding::warn(issue.check, issue.detail.clone()).coded(code, hint)
         });
     }
     if let Some(agent) = &agent_review.bundle {
@@ -418,7 +528,10 @@ fn check_bundle_for(
     let policy = match policy::resolve(&manifest, limits) {
         Ok(policy) => Some(policy),
         Err(e) => {
-            findings.push(Finding::refuse("policy", e));
+            findings.push(
+                Finding::refuse("policy", e)
+                    .coded("hub-grants-invalid", "the manifest asks for something the contract does not offer: check capabilities, hosts, agent and research against docs/PUBLISHING.md"),
+            );
             None
         }
     };
@@ -427,10 +540,13 @@ fn check_bundle_for(
     if let Some(catalog) = previous {
         for entry in &catalog.entries {
             if entry.app_id() == manifest.id && entry.version() == manifest.version {
-                findings.push(Finding::refuse(
-                    "version",
-                    format!("version {} of {} is already published; publish a new version", manifest.version, manifest.id),
-                ));
+                findings.push(
+                    Finding::refuse(
+                        "version",
+                        format!("version {} of {} is already published; publish a new version", manifest.version, manifest.id),
+                    )
+                    .coded("hub-version-published", "bump version in manifest.json; a published version is immutable"),
+                );
             }
         }
         let continuity = match registry {
@@ -439,7 +555,10 @@ fn check_bundle_for(
                 .and_then(|registry| crate::publishers::verify_continuity(&manifest, &registry)),
         };
         if let Err(e) = continuity {
-            findings.push(Finding::refuse("continuity", e));
+            findings.push(
+                Finding::refuse("continuity", e)
+                    .coded("hub-publisher-continuity", "sign with the key the catalog records for this publisher"),
+            );
         }
     }
 
@@ -461,10 +580,13 @@ fn shared_component_findings(
 ) {
     use crate::functions::SHARED_COMPONENTS_FEATURE;
     if manifest.requires.iter().any(|f| f == SHARED_COMPONENTS_FEATURE) && manifest.components.is_empty() {
-        findings.push(Finding::warn(
-            "components",
-            format!("the manifest requires {SHARED_COMPONENTS_FEATURE} but names no components; hosts without it refuse the app"),
-        ));
+        findings.push(
+            Finding::warn(
+                "components",
+                format!("the manifest requires {SHARED_COMPONENTS_FEATURE} but names no components; hosts without it refuse the app"),
+            )
+            .coded("hub-components-unnamed", "name each component in the manifest's components, or drop the requirement"),
+        );
     }
     let named = |file: &std::path::Path| {
         manifest.components.iter().any(|c| file == std::path::Path::new(crate::components::BUNDLED_DIR).join(format!("{}.wasm", c.blake3)))
@@ -476,9 +598,11 @@ fn shared_component_findings(
                 "components",
                 name,
                 "components/ ships only in a system app's bundle; a store app's components come from the catalog",
-            ));
+            )
+            .coded("hub-component-bundled", "remove components/ from the bundle; a store app's components come from the catalog"));
         } else if !named(file) {
-            findings.push(Finding::at("components", name, "this file is not one of the manifest's components"));
+            findings.push(Finding::at("components", name, "this file is not one of the manifest's components")
+                .coded("hub-component-not-manifest", "name the file's BLAKE3 digest in the manifest's components, or remove the file"));
         }
     }
     for dependency in &manifest.components {
@@ -486,10 +610,13 @@ fn shared_component_findings(
             let relative = format!("{}/{}.wasm", crate::components::BUNDLED_DIR, dependency.blake3);
             let path = bundle.join(&relative);
             if std::fs::symlink_metadata(&path).is_err() {
-                findings.push(Finding::refuse(
-                    "components",
-                    format!("component {} is not in the bundle: a system app ships it as {relative}", dependency.describe()),
-                ));
+                findings.push(
+                    Finding::refuse(
+                        "components",
+                        format!("component {} is not in the bundle: a system app ships it as {relative}", dependency.describe()),
+                    )
+                    .coded("hub-component-not-bundled", "ship the component in the bundle as components/<blake3>.wasm"),
+                );
                 continue;
             }
             // Admission validated the file, its imports and its name.
@@ -501,25 +628,37 @@ fn shared_component_findings(
             match crate::components::resolve(catalog, dependency) {
                 Ok(entry) => crate::components::info_of(&entry.component),
                 Err(e) => {
-                    findings.push(Finding::refuse("components", e));
+                    findings.push(
+                        Finding::refuse("components", e)
+                            .coded("hub-component-unresolved", "fix the component's id, version and pinned digest against the catalog"),
+                    );
                     continue;
                 }
             }
         } else {
-            findings.push(Finding::warn(
-                "components",
-                format!(
-                    "component {} is not resolved: check with --catalog to see that it is offered, matches its digest and what it reaches",
-                    dependency.describe()
-                ),
-            ));
+            findings.push(
+                Finding::warn(
+                    "components",
+                    format!(
+                        "component {} is not resolved: check with --catalog to see that it is offered, matches its digest and what it reaches",
+                        dependency.describe()
+                    ),
+                )
+                .coded("hub-component-unverified", "re-run check with --catalog so the gate can confirm the component is offered and matches its digest"),
+            );
             continue;
         };
         if let Some(missing) = info.missing_host_api(manifest) {
-            findings.push(Finding::refuse("components", format!("component {} {missing}", dependency.describe())));
+            findings.push(
+                Finding::refuse("components", format!("component {} {missing}", dependency.describe()))
+                    .coded("hub-component-host-api", "require the host API the component imports (host_api.required, with requires host-api-v1), or rebuild it without that import"),
+            );
         }
         if info.uses_sockets() && !manifest.capabilities.iter().any(|capability| capability == "net") {
-            findings.push(Finding::warn("components", format!("component {} imports wasi:sockets; disclose net usage", dependency.describe())));
+            findings.push(
+                Finding::warn("components", format!("component {} imports wasi:sockets; disclose net usage", dependency.describe()))
+                    .coded("hub-wasi-net-undeclared", "disclose net usage in the manifest's capabilities"),
+            );
         }
         findings.push(Finding::warn("components", format!("component {} reaches {}", dependency.describe(), info.reach())));
     }
@@ -552,12 +691,7 @@ impl ComponentReport {
             if self.passed() { "PASSED" } else { "REFUSED" }
         );
         for finding in &self.findings {
-            let mark = match finding.severity {
-                Severity::Refusal => "refused",
-                Severity::Warning => "warning",
-            };
-            let path = finding.path.as_ref().map(|p| format!(" ({p})")).unwrap_or_default();
-            out.push_str(&format!("  [{mark}] {}{path}: {}\n", finding.check, finding.detail));
+            finding.render_into(&mut out);
         }
         out
     }
@@ -592,20 +726,32 @@ pub fn check_component(
     let digest = blake3::hash(wasm).to_hex().to_string();
     let mut findings = Vec::new();
     for problem in release.problems() {
-        findings.push(Finding::refuse("component", problem));
+        findings.push(
+            Finding::refuse("component", problem)
+                .coded("hub-component-release-invalid", "fix the release's fields against the component rules in docs/PUBLISHING.md, or prepare it again (hub component-prepare)"),
+        );
     }
     let file = format!("{}-{}.wasm", c.id, c.version);
     if wasm.len() as u64 > crate::components::MAX_COMPONENT_BYTES {
-        findings.push(Finding::refuse(
-            "size",
-            format!("the component is {} bytes, over the {} ceiling", wasm.len(), crate::components::MAX_COMPONENT_BYTES),
-        ));
+        findings.push(
+            Finding::refuse(
+                "size",
+                format!("the component is {} bytes, over the {} ceiling", wasm.len(), crate::components::MAX_COMPONENT_BYTES),
+            )
+            .coded("hub-component-too-big", "shrink the component under the 8 MB ceiling: trim dependencies, or split it"),
+        );
     }
     if digest != c.wasm_blake3 {
-        findings.push(Finding::refuse("digest", format!("the file hashes to {digest}, the release says {}", c.wasm_blake3)));
+        findings.push(
+            Finding::refuse("digest", format!("the file hashes to {digest}, the release says {}", c.wasm_blake3))
+                .coded("hub-component-digest-mismatch", "prepare the release again from this exact .wasm (hub component-prepare); its digest and size are pinned in it"),
+        );
     }
     if wasm.len() as u64 != c.bytes {
-        findings.push(Finding::refuse("digest", format!("the file is {} bytes, the release says {}", wasm.len(), c.bytes)));
+        findings.push(
+            Finding::refuse("digest", format!("the file is {} bytes, the release says {}", wasm.len(), c.bytes))
+                .coded("hub-component-digest-mismatch", "prepare the release again from this exact .wasm (hub component-prepare); its digest and size are pinned in it"),
+        );
     }
     let admissible = if crate::functions::is_component(wasm) {
         crate::functions::admissible_component(wasm)
@@ -613,35 +759,56 @@ pub fn check_component(
         Err("not a WebAssembly component".into())
     };
     match &admissible {
-        Err(e) => findings.push(Finding::at("contents-invalid", file.clone(), e.clone())),
+        Err(e) => findings.push(Finding::at("contents-invalid", file.clone(), e.clone())
+            .coded("hub-component-invalid", "rebuild the file as a WebAssembly component with only the imports a host allows (hub component-info lists them)")),
         Ok(info) => {
             if info.imports != c.imports || info.exports != c.exports {
-                findings.push(Finding::refuse(
-                    "component",
-                    "the release's imports or exports are not the file's; prepare the release again from this file",
-                ));
+                findings.push(
+                    Finding::refuse(
+                        "component",
+                        "the release's imports or exports are not the file's; prepare the release again from this file",
+                    )
+                    .coded("hub-component-release-stale", "prepare the release again from this file (hub component-prepare); its imports and exports are pinned in the release"),
+                );
             }
         }
     }
     match &c.integrity.github {
         Some(github) => {
             if let Err(e) = release.subject_bytes().and_then(|bytes| crate::github_publisher::verify_component(github, &bytes)) {
-                findings.push(Finding::refuse("publisher-signature", e));
+                findings.push(
+                    Finding::refuse("publisher-signature", e)
+                        .coded("hub-component-provenance-invalid", "re-attest the exact file from its GitHub workflow and attach the new attestation"),
+                );
             }
         }
         None if require_provenance => {
-            findings.push(Finding::refuse("publisher-signature", "App Hub accepts only GitHub-attested component releases"));
+            findings.push(
+                Finding::refuse("publisher-signature", "App Hub accepts only GitHub-attested component releases")
+                    .coded("hub-component-provenance-required", "attest the release from its GitHub workflow; App Hub accepts only GitHub-attested component releases"),
+            );
         }
-        None => findings.push(Finding::warn("publisher-signature", "unsigned: accountability rests on the hub alone")),
+        None => findings.push(
+            Finding::warn("publisher-signature", "unsigned: accountability rests on the hub alone")
+                .coded("hub-unsigned", "sign before submitting: an unsigned release asks the person to trust the hub alone"),
+        ),
     }
     if let Some(catalog) = previous {
         if catalog.entries.iter().any(|e| e.app_id() == c.id) {
-            findings.push(Finding::refuse("identity", format!("{} is an app's id in the catalog; a component needs an id of its own", c.id)));
+            findings.push(
+                Finding::refuse("identity", format!("{} is an app's id in the catalog; a component needs an id of its own", c.id))
+                    .coded("hub-component-id-taken", "pick a component id no app in the catalog uses"),
+            );
         }
         let continuity = crate::components::ComponentPublishers::from_catalog(catalog).and_then(|registry| registry.authorize(release));
         if let Err(e) = continuity {
             let check = if e.contains("is already published") { "version" } else { "continuity" };
-            findings.push(Finding::refuse(check, e));
+            let (code, hint) = if check == "version" {
+                ("hub-version-published", "bump version in the release; a published version is immutable")
+            } else {
+                ("hub-publisher-continuity", "attest from the repository the catalog records for this publisher")
+            };
+            findings.push(Finding::refuse(check, e).coded(code, hint));
         }
     }
     if let Ok(info) = &admissible {
@@ -1015,6 +1182,38 @@ mod tests {
         let found = warnings(&dir);
         assert_eq!(found.len(), 1, "{found:?}");
         assert!(found[0].contains("camera") && found[0].contains("capture"), "{found:?}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_refusal_names_its_code_and_one_line_fix() {
+        let dir = std::env::temp_dir().join(format!("gate-codes-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("main.splash"), "Label{text: \"hi\"}").unwrap();
+        // A stale digest and no listing: two of the commonest refusals.
+        std::fs::write(
+            dir.join(octosense_app_policy::MANIFEST_FILE),
+            serde_json::json!({"schema": 1, "id": "dev.example.app", "version": "1.0.0", "name": "App", "integrity": {"bundle_blake3": ""}}).to_string(),
+        )
+        .unwrap();
+        let limits = HostLimits::default().with_require_signature(false);
+        let report = check_bundle(&dir, &limits, &octosense_app_policy::RefuseAllSignatures, None).unwrap();
+        let code = |check: &str| report.findings.iter().find(|f| f.check == check).and_then(|f| f.code);
+        assert_eq!(code("digest"), Some("hub-digest-mismatch"));
+        assert_eq!(code("listing"), Some("hub-listing-missing"));
+        assert_eq!(code("publisher-signature"), Some("hub-unsigned"));
+        assert!(report.findings.iter().all(|f| f.hint.is_some() == f.code.is_some()), "a hint exactly when a code");
+        // The text report keeps its old lines and adds the fix under each.
+        let rendered = report.render();
+        assert!(rendered.contains("[refused] digest: the bundle hashes to"), "{rendered}");
+        assert!(rendered.contains("fix [hub-digest-mismatch]: run `hub stamp"), "{rendered}");
+        assert!(rendered.contains("fix [hub-listing-missing]:"), "{rendered}");
+        // And --json carries both fields for tools that read it.
+        let findings = report.json()["findings"].as_array().unwrap().clone();
+        let digest = findings.iter().find(|f| f["check"] == "digest").unwrap();
+        assert_eq!(digest["code"], "hub-digest-mismatch");
+        assert!(digest["hint"].as_str().unwrap().contains("hub stamp"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
