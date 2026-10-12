@@ -82,6 +82,7 @@ Linux 需要 GTK 3/WebKitGTK 和 X11/XWayland，Windows 需要 WebView2。这些
 | `docs/FIRST-APP.md` | 第一个应用（卡片应用或脚本应用）的分步教程：创建、运行、截图与检查。 |
 | `docs/SUBMITTING.md` | 提交流程的四个阶段、每个 `hub` 命令由谁运行，以及从仓库结构到发布的每一步。 |
 | `docs/PUBLISHING.md` | 参考文档：准入规则；能力及其提供方；清单、商店信息和工具的字段；宿主服务；`hub` 命令；签名。 |
+| `docs/ERROR-CODES.md` | 准入检查的稳定错误码与一行修复建议（英文），出现在文本报告与 `--json` 中，供修复应用包的工具读取。 |
 | `docs/GITHUB-PUBLISHING.md` | 管理员授权的 GitHub 签名、确切候选审核及 v2 迁移。 |
 | `docs/HOST-API.md` | 声明应用需要的宿主 API、用 `runtime` 发现宿主 API，以及目前各宿主实现了哪些 API。 |
 | `docs/ICONS.md` | 规范图标的归属、导出约束与视觉评审。 |
