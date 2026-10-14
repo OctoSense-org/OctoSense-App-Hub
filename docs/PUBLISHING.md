@@ -831,8 +831,11 @@ Source: `RESERVED_NAMES` in `crates/app-contract/src/manifest.rs`.
 
 `network.hosts` lists expected destinations for disclosure. The runtime
 network module is available even without `net` or a host list. Listed hosts
-still need a valid disclosure format: bare host names with no scheme, path,
-port or wildcard. This format rule does not restrict runtime destinations.
+need a valid disclosure format: bare host names with no scheme, path or
+wildcard — optionally with one explicit port (`api.example.com:8443`).
+A bare host matches that host on any port at runtime; a host with a port
+matches only that port, so the listing's declared granularity is exactly
+what the runtime allows.
 
 ```text
 [refused] policy: host "https://api.open-meteo.com/v1" must be a bare host name, with no scheme or path
