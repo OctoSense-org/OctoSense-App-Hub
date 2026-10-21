@@ -38,8 +38,14 @@ impl AppMain for App {
         if let Event::Actions(actions) = event {
             for action in actions {
                 if let Some(action) = action.as_widget_action() {
-                    if let octosense_app_hub_app::AppHubAction::Launch(id) = action.cast() {
-                        log!("apphub-preview: launch {id}");
+                    match action.cast() {
+                        octosense_app_hub_app::AppHubAction::Launch(id) => {
+                            log!("apphub-preview: launch {id}");
+                        }
+                        octosense_app_hub_app::AppHubAction::OpenInstalled(id) => {
+                            log!("apphub-preview: open installed {id}");
+                        }
+                        octosense_app_hub_app::AppHubAction::None => {}
                     }
                 }
             }

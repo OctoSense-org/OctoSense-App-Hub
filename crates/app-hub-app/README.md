@@ -113,6 +113,13 @@ cargo run --release -p octosense-app-hub-app --example preview
 The preview logs launch requests instead of launching; only a shell opens
 apps.
 
+On an app's detail page, the primary button stays in the same position:
+**Get → Install → Installing… → Open**. Get reveals the permissions and
+privacy disclosures below the button; Install confirms that reviewed
+catalog entry. Cancel returns the button to Get (or Update for an available
+update). Installation results appear below the app header, so they do not
+move the primary action.
+
 This crate's default feature, `text-input-state-query`, turns on the same
 feature in `octosense-appstore`, and that feature needs OctoSense's runtime
 patches on `../makepad`. Against plain sibling checkouts, add

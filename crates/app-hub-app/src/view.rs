@@ -153,7 +153,6 @@ script_mod! {
                     title := Heading{}
                     permissions := Text{}
                     privacy := Meta{}
-                    confirm := Primary{text: "Install"}
                     cancel := Plain{text: "Cancel" width: Fill}
                 }
             }
@@ -493,16 +492,21 @@ impl AppHubView {
             script_apply_eval!(cx,tab,{draw_icon.color: #(color) draw_text +: {color: #(color) color_hover: #(color) color_down: #(color) color_focus: #(color)} draw_bg +: {color: #(face) color_hover: #(face) color_focus: #(face) border_radius: 12}});
         }
         self.rows.clear();
-        if !self.notice.is_empty() {
+        if !self.notice.is_empty() && self.selected.is_none() {
             self.rows.push(Row::Notice(self.notice.clone()));
         }
         if let Some(entry) = self.selected.clone() {
+            // Keep the primary action at the same position when consent,
+            // installation results, or catalog warnings change below it.
+            self.rows.push(Row::Detail(entry.clone()));
+            if !self.notice.is_empty() {
+                self.rows.push(Row::Notice(self.notice.clone()));
+            }
             if entry.kind == CatalogKind::Live {
                 if let Some(warning) = self.snapshot.as_ref().and_then(|s| s.warning.clone()) {
                     self.rows.push(Row::Notice(warning));
                 }
             }
-            self.rows.push(Row::Detail(entry.clone()));
             if self.confirming {
                 self.rows.push(Row::Consent(entry));
             } else {
@@ -651,10 +655,18 @@ impl AppHubView {
             }
             EntryStatus::Installed => self.send(Command::Open(entry.id)),
             EntryStatus::Available | EntryStatus::UpdateAvailable => {
-                if entry.consent.is_some() {
+                if self.confirming && self.selected.as_ref().is_some_and(|e| e.id == entry.id) {
+                    if let Some(consent) = entry.consent {
+                        self.send(Command::Install(consent));
+                        self.installing = self.busy;
+                    }
+                } else if entry.consent.is_some() {
+                    let already_selected = self.selected.as_ref().is_some_and(|e| e.id == entry.id);
                     self.selected = Some(entry);
                     self.confirming = true;
-                    self.reset_scroll(cx);
+                    if !already_selected {
+                        self.reset_scroll(cx);
+                    }
                 } else {
                     self.notice = "Refresh the catalog before installing this app.".into();
                 }
@@ -767,6 +779,12 @@ impl AppHubView {
             cx,
             if self.installing && self.selected.as_ref().is_some_and(|e| e.id == entry.id) {
                 "Installing…"
+            } else if self.confirming
+                && self.selected.as_ref().is_some_and(|e| e.id == entry.id)
+                && entry.consent.is_some()
+                && matches!(entry.status, EntryStatus::Available | EntryStatus::UpdateAvailable)
+            {
+                "Install"
             } else {
                 button_text(entry)
             },
@@ -860,18 +878,8 @@ impl AppHubView {
                     );
                     item.label(cx, ids!(privacy))
                         .set_text(cx, &lines_or(&entry.privacy, ""));
-                    item.button(cx, ids!(confirm))
-                        .set_enabled(cx, !self.busy && entry.consent.is_some());
                     item.button(cx, ids!(cancel))
                         .set_enabled(cx, !self.installing);
-                    item.button(cx, ids!(confirm)).set_text(
-                        cx,
-                        if self.installing {
-                            "Installing…"
-                        } else {
-                            "Install"
-                        },
-                    );
                 }
                 Row::Categories => {
                     for (id, category) in [
@@ -985,14 +993,7 @@ impl AppHubView {
                         }
                     }
                 }
-                Row::Consent(entry) => {
-                    if item.button(cx, ids!(confirm)).clicked(actions) && !self.busy {
-                        if let Some(consent) = entry.consent {
-                            self.installing = true;
-                            self.send(Command::Install(consent));
-                            self.render(cx);
-                        }
-                    }
+                Row::Consent(_) => {
                     if item.button(cx, ids!(cancel)).clicked(actions) && !self.installing {
                         self.confirming = false;
                         self.render(cx);
