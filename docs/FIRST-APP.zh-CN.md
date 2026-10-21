@@ -141,7 +141,7 @@ my-app/
 
 把 `bundle/listing.json` 中的占位内容全部换掉：`subtitle`、`description`、`category`、`publisher`（包括 `support` 和 `privacy_policy_url`）、`platforms`、`release_notes` 和 `license`。模板中的 `example.com` URL 都是占位内容。App Hub 的应用起步模板声明了 `"platforms": ["macos"]`，`tools/octo new` 写入的是你指定的平台；两者都不代表测试结果。只声明你实际运行过应用的平台。
 
-按照[应用图标与随包素材](ICONS.zh-CN.md)替换示例图标。商店信息中的图标路径必须与导出的文件一致。
+按照[应用图标与随包素材](ICONS.zh-CN.md#设计与导出建议)中的已批准 OctoSense 家族格式，用独立身份替换示例图标：64 点正方形原稿、中央 66% 前景、克制的插画物件，不预置平台圆角或外部阴影。检查 64/40/24 像素及平台外框；商店信息中的图标路径必须与导出的文件一致。准入检查验证文件，不评判设计。
 
 ## 4. 运行未签名的开发版应用包并截图
 

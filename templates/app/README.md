@@ -25,7 +25,12 @@ Before you submit:
    `["macos"]`; keep it only if you tested the app on macOS.
 3. Set `license` in `listing.json` to your app's license. The starter's
    `Apache-2.0` is only an example.
-4. Replace `bundle/assets/icon.svg` with your app's artwork.
+4. Replace `bundle/assets/icon.svg` with a distinct identity following the
+   [OctoSense icon family](https://github.com/OctoSense-org/OctoSense-App-Hub/blob/main/docs/ICONS.md#design-and-export-recommendations):
+   64-point square master, central 66% foreground, restrained illustrated
+   object, no baked platform corners or outer shadow. The starter demonstrates
+   the format; do not publish its identity unchanged. Review 64/40/24 px,
+   light/dark grounds and Android/macOS/iOS frames before target-shell checks.
 5. Generate and review `bundle/page.card`, the optional `page.data.json`, the
    card's `kit/` directory and local assets with the
    [image-to-card flow](https://github.com/OctoSense-org/OctoSense-App-Flow/blob/main/flows/image-to-card/FLOW.md).

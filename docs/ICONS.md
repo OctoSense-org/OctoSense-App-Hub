@@ -62,6 +62,20 @@ Sources: the [listing parser](../crates/app-policy/src/listing.rs), the
 
 ## Design and export recommendations
 
+New OctoSense app artwork follows the [approved illustrated icon family, version 1](https://github.com/OctoSense-org/OctoSense/blob/a48518feda00d518949f9eecdbf661201e02e6a4/docs/design/icon-family/README.md).
+The family defines the visual language; this document owns bundle packaging,
+size limits and admission behavior. Existing app branding remains its own
+identity. A gate pass does not certify visual conformity to the family.
+
+- Design one dominant object representing the app's purpose, with at most one
+  supporting cue, broad silhouettes, rounded object edges and two or three
+  overlapping planes. Use warm ivory `#fffdf7`, ink `#233d40` for contrast and
+  restrained mint, apricot or coral accents on an app-specific colored ground.
+  Keep any gradient subtle and depth local to the object.
+- Give every app a distinct identity. The template is a format example, not
+  artwork to publish unchanged. Do not copy another app's icon or stamp the
+  OctoSense mark onto unrelated apps.
+
 - Prefer SVG for geometric marks. Use a square `viewBox`, such as `0 0 64 64`,
   explicit fill and stroke colors, and simple paths, rectangles and circles.
 - Keep SVGs self-contained: outline any lettering, embed no scripts and
@@ -73,12 +87,16 @@ Sources: the [listing parser](../crates/app-policy/src/listing.rs), the
 - Use one recognizable mark. Leave the app name to the launcher and store
   labels; do not draw it in the icon. Avoid small text, fine detail and
   photographic clutter.
-- Leave balanced internal space. Start with a 10–15% inset, then compare the
-  optical size with neighboring launcher icons. The gate does not measure
-  this.
-- Include any branded background tile in the artwork. Do not assume the
-  launcher or the store adds a background, mask, shadow or tint. Keep the
-  artwork's own colors.
+- Use a 64-point square master with every foreground detail inside the central
+  66%: approximately 10.88–53.12 on both axes, or a 17% inset on each edge.
+  Compare optical size with neighboring family icons. The gate does not measure
+  safe-area bounds or optical balance.
+- Export a square, full-bleed background with no baked platform corners,
+  circular crop or outer drop shadow. OctoSense's shared shell renderer applies
+  the selected platform frame to the declared artwork. Other hosts and store
+  views may show the canonical square; do not create separately framed copies
+  or rely on the host to invent a branded ground. Keep intentional PNG
+  transparency and the artwork's own colors.
 - Keep authoring files and provenance outside the release bundle unless the
   app needs them at runtime.
 
@@ -88,22 +106,31 @@ app's icon.
 
 ## Review and release
 
-1. Inspect the icon at 24, 32, 48 and 64 pixels on light and dark
-   backgrounds.
-2. Check that the native launcher and the Hub's list and detail views show the
-   intended artwork, without clipping, an unwanted tint or the generic icon.
+1. Inspect the master at 64, 40 and 24 pixels on light and dark backgrounds,
+   beside the approved family. Check the central 66% foreground and the icon's
+   distinct silhouette; retain the editable source and provenance outside the
+   release bundle unless needed at runtime.
+2. Preview Android, macOS and iOS frames, then check a real target shell's
+   launcher and the Hub's list and detail views. Confirm there is no clipping,
+   unwanted tint, double frame or generic fallback. A static platform preview
+   is not device acceptance; report untested platforms as unverified.
 3. When you change an installed icon, test an update from the previous
    version.
 4. After the final artwork or screenshot change, run `hub stamp`, run
-   `hub check` again, then sign, as
+   `hub check` again, then prepare the GitHub-attested release as
    [Produce the final bytes](SUBMITTING.md#5-produce-the-final-bytes)
    describes. Give every release a new version: the gate refuses a version
    that is already published.
 
 ## Built-in native apps
 
-Apply the same ownership convention to native apps compiled into a shell:
-declare one canonical asset and embed it through the build's resource mapping.
+Apply the same authoring format and ownership convention to native apps compiled
+into a shell: declare one canonical asset and embed it through the build's
+resource mapping.
+OctoSense's built-in family is a local, explicit app-ID overlay on Makepad's
+catalog. New store apps need only their own bundle icon and listing declaration;
+they do not enter that overlay or modify Makepad resources. Unowned upstream
+identities and installed third-party artwork continue through their normal paths.
 App Hub's own native store does this with a two-field `listing.json`
 (`schema` and `icon`, in `crates/app-hub-app/`). That file is an **icon-only
 native build declaration**, not a complete publishable listing. Native apps

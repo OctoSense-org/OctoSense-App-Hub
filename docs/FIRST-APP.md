@@ -227,8 +227,12 @@ are placeholders. App Hub's app starter declares `"platforms": ["macos"]`, and
 `tools/octo new` writes the platforms you named; neither is a test result.
 Declare only the platforms you ran the app on.
 
-Replace the example icon, following [Icons](ICONS.md). The icon path in the
-listing must match the exported file.
+Replace the example icon with a distinct identity following the approved
+OctoSense family in [Icons](ICONS.md#design-and-export-recommendations): a
+64-point square master, central 66% foreground, restrained illustrated object,
+and no baked platform corners or outer shadow. Review 64/40/24 px and platform
+frames; the icon path in the listing must match the exported file. The gate
+validates the file, not the design.
 
 ## 4. Run the unsigned development bundle and capture it
 
