@@ -18,8 +18,16 @@ record its revision. Do not invent missing requirements.
   OctoSense App Flow (formerly Design Flow) to generate the card UI, and the
   L0 reference in OctoSense (`apps/appcard/a2app-l0/framework/l0.md`) for
   bindings. Do not hand-write L0 unless the app owner asks for that approach.
-- Maintain the app's own icon at the path that `icon` in `listing.json`
-  declares. Do not keep separate launcher or store copies of the artwork.
+- Create this app's distinct icon using the approved OctoSense illustrated
+  family in the icon guidelines: a 64-point square SVG master, all foreground
+  inside the central 66% (10.88–53.12), restrained ivory/ink materials and
+  supporting accents. Use a full-bleed ground; no baked platform corners,
+  circular mask or outer shadow. Review 64/40/24 px on light/dark grounds with
+  Android/macOS/iOS frames. Replace the starter identity before submission.
+- Maintain one canonical icon at the path `icon` in `listing.json` declares.
+  Do not keep separately edited launcher/store copies, alter Makepad icons or
+  add this store app to the shell's built-in override list. A gate pass does
+  not establish visual quality or device acceptance.
 - Ask only for the capabilities that implemented features need. The starter
   requests no capabilities, hosts, storage or agent.
 - Replace the placeholder identity, publisher URLs, artwork and platform

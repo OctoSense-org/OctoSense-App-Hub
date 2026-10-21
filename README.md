@@ -112,7 +112,7 @@ engines are not bundled; see the [browser requirements](https://github.com/OctoS
 | `docs/PUBLISHING.md` | The reference: gate rules; capabilities and who serves them; manifest, listing and tool fields; host services; `hub` commands; signing. |
 | `docs/GITHUB-PUBLISHING.md` | Admin-authorized GitHub signing, exact candidate review and v2 migration. |
 | `docs/HOST-API.md` | Declaring the host APIs an app needs, `runtime` discovery and what today's hosts implement. |
-| `docs/ICONS.md` | Canonical icon ownership, export constraints and visual review. |
+| `docs/ICONS.md` | The approved OctoSense icon-family format, canonical ownership, export constraints and visual review. |
 | `docs/DEVELOPMENT.md` | The guide map, delivery paths, `card-host` and its remote-control routes, and `card-studio`. |
 | `docs/adr/` | Architecture decisions: GitHub-admin catalog attestations ([ADR 0001](docs/adr/0001-github-attested-catalog.md)), GitHub-attested publisher identity ([ADR 0002](docs/adr/0002-github-attested-publisher-identity.md)) and shared components ([ADR 0003](docs/adr/0003-shared-components.md), proposed). |
 | `templates/app/` | A card app repository scaffold with metadata, an example icon and linked agent instructions. |

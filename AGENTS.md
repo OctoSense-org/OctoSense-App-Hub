@@ -43,6 +43,18 @@ The publisher-facing documents are `docs/FIRST-APP.md` (the first app),
 Never state review times or hackathon rules in them; each event's own page
 owns those.
 
+## Icon authoring
+
+Every new app needs its own icon following [docs/ICONS.md](docs/ICONS.md) and
+the approved OctoSense illustrated family linked there. Keep the topic's
+English/Chinese guides and starter instructions aligned. Author a square
+64-point SVG master, keep foreground in the central 66%, use restrained
+ivory/ink materials and accents, and leave platform corners and outer shadows
+to the shell. The starter icon demonstrates format; replace its identity before
+submission. These are authoring and visual-review requirements, not new gate
+refusals. Keep one canonical bundle asset and its listing declaration. Never
+edit Makepad's theme icons or add store apps to OctoSense's built-in overlay.
+
 ## Code rules
 
 - Trace behavior to executable code. Distinguish manifest validation,

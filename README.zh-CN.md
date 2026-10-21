@@ -84,7 +84,7 @@ Linux 需要 GTK 3/WebKitGTK 和 X11/XWayland，Windows 需要 WebView2。这些
 | `docs/PUBLISHING.md` | 参考文档：准入规则；能力及其提供方；清单、商店信息和工具的字段；宿主服务；`hub` 命令；签名。 |
 | `docs/GITHUB-PUBLISHING.md` | 管理员授权的 GitHub 签名、确切候选审核及 v2 迁移。 |
 | `docs/HOST-API.md` | 声明应用需要的宿主 API、用 `runtime` 发现宿主 API，以及目前各宿主实现了哪些 API。 |
-| `docs/ICONS.md` | 规范图标的归属、导出约束与视觉评审。 |
+| `docs/ICONS.md` | 已批准的 OctoSense 图标家族格式、规范图标归属、导出约束与视觉评审。 |
 | `docs/DEVELOPMENT.md` | 指南导航、交付路径、`card-host` 及其远程控制路由，以及 `card-studio`。 |
 | `docs/adr/` | 架构决策：通过 GitHub 管理员身份认证目录（[ADR 0001](docs/adr/0001-github-attested-catalog.zh-CN.md)）、通过 GitHub 证明发布者身份（[ADR 0002](docs/adr/0002-github-attested-publisher-identity.zh-CN.md)），以及共享组件（[ADR 0003](docs/adr/0003-shared-components.zh-CN.md)，提议中）。 |
 | `templates/app/` | 卡片应用仓库脚手架，包含元数据、示例图标和链接好的 Agent 指引。 |
