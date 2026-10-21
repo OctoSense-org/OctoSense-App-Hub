@@ -110,6 +110,7 @@ engines are not bundled; see the [browser requirements](https://github.com/OctoS
 | `docs/FIRST-APP.md` | A first-app walkthrough for a card app or a script app: create, run, capture and check. |
 | `docs/SUBMITTING.md` | The submission's four stages, who runs each `hub` command, and every step from repository layout to publication. |
 | `docs/PUBLISHING.md` | The reference: gate rules; capabilities and who serves them; manifest, listing and tool fields; host services; `hub` commands; signing. |
+| `docs/ERROR-CODES.md` | The gate's stable error codes and one-line fixes, in its text report and `--json`, for tools that repair bundles. |
 | `docs/GITHUB-PUBLISHING.md` | Admin-authorized GitHub signing, exact candidate review and v2 migration. |
 | `docs/HOST-API.md` | Declaring the host APIs an app needs, `runtime` discovery and what today's hosts implement. |
 | `docs/ICONS.md` | The approved OctoSense icon-family format, canonical ownership, export constraints and visual review. |

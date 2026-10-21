@@ -61,7 +61,8 @@ publish, human-review stops it until --reviewed) and writes
 
 check is the gate: a publisher runs it before submitting, the hub runs the
 same code after. publish re-runs it, copies the bundle into the artifact
-store and signs the catalog.
+store and signs the catalog. Each finding carries a stable code and a one-line
+fix (docs/ERROR-CODES.md), in the text report and in --json.
 
 Shared components (App Hub ADR 0003) are published like apps: the release's
 GitHub workflow runs component-prepare, attests the subject and runs

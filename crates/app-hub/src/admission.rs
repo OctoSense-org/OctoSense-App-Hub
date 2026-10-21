@@ -177,7 +177,8 @@ fn font_resource(value: &Value, path: &str, tokens: &Value, out: &mut Vec<Resour
         Some(Value::Null) => {},
         Some(Value::String(target)) if target.is_empty() => {},
         _ => findings.push(Finding::at("resource-invalid", path,
-            "font_src must be a bundled font path, a supported built-in font, or one token resolving to a string")),
+            "font_src must be a bundled font path, a supported built-in font, or one token resolving to a string")
+            .coded("hub-font-invalid", "set font_src to a bundled font path, a supported built-in font, or one token resolving to a string")),
     }
 }
 
@@ -229,11 +230,17 @@ pub fn validate(root: &Path, files: &[BundleFile]) -> (Vec<Finding>, Vec<Resourc
             _ => Ok(()),
         };
         if let Err(error) = result {
-            findings.push(Finding::at("contents-invalid", name.as_str(), error));
+            findings.push(Finding::at("contents-invalid", name.as_str(), error).coded(
+                "hub-contents-invalid",
+                "the file is not what its extension says: repair or re-export it (UTF-8 text within the size limit, a decodable image, a sized scriptless SVG, an admissible wasm)",
+            ));
         }
     }
     if let Err((path, error)) = validate_entry(root) {
-        findings.push(Finding::at("entry", path, error));
+        findings.push(Finding::at("entry", path, error).coded(
+            "hub-entry-invalid",
+            "add an entry the runtime can start: main.splash (a script app) or page.card with its kit (a card)",
+        ));
     }
     for reference in &refs {
         if matches!(reference.kind, ResourceKind::DisplayUrl) {
@@ -258,7 +265,10 @@ pub fn validate(root: &Path, files: &[BundleFile]) -> (Vec<Finding>, Vec<Resourc
             }
         });
         if let Err(error) = result {
-            findings.push(Finding::at("resource-invalid", &reference.path, error));
+            findings.push(Finding::at("resource-invalid", &reference.path, error).coded(
+                "hub-resource-missing",
+                "ship the referenced file at that bundle-relative path, or drop the reference",
+            ));
         }
     }
     (findings, refs)

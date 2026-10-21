@@ -12,9 +12,10 @@ English | [简体中文](PUBLISHING.zh-CN.md)
 | Prepare the icon | [App icons and bundled artwork](ICONS.md) |
 
 The gate is the Hub's admission check. Run it yourself with `hub check`: it
-reports each broken rule as a refusal or a warning. A pass does not show that
-the app renders, that its icon reads at small sizes or that its listing is
-true. Reviewers check those
+reports each broken rule as a refusal or a warning, each with a stable
+[error code](ERROR-CODES.md) and a one-line fix a tool can act on. A pass does
+not show that the app renders, that its icon reads at small sizes or that its
+listing is true. Reviewers check those
 ([What reviewers check](SUBMITTING.md#8-what-reviewers-check)).
 
 ## Current source policy: declarations and authorization
@@ -134,7 +135,11 @@ reason as one refusal under the check name `bundle-invalid`.
 Every other broken rule adds a report line, a **finding**, that names its
 check: `[refused] <check> (<path>): <detail>` or `[warning] <check>: <detail>`.
 `(<path>)` appears only when one file or property is at fault. A refusal stops
-admission. A warning does not.
+admission. A warning does not. Each finding carries a stable [error
+code](ERROR-CODES.md) and a one-line fix, printed as `fix [<code>]: …` under
+its line and serialized in `--json`, so a tool that repairs bundles can act on
+it without parsing English. A code, once printed, never changes what it
+means; new codes may be added.
 
 | Check | Refused when | Warned when |
 | --- | --- | --- |

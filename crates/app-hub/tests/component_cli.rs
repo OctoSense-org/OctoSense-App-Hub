@@ -93,7 +93,7 @@ fn check_and_pack_hold_a_release_to_its_file() {
     assert_eq!(
         report,
         format!(
-            "org.example.markdown 1.0.0 (component {}) — PASSED\n  [warning] publisher-signature: unsigned: accountability rests on the hub alone\n  [warning] functions (org.example.markdown-1.0.0.wasm): org.example.markdown 1.0.0 is a component that reaches the clock, random numbers and files in its app folder, but no network or other app\n",
+            "org.example.markdown 1.0.0 (component {}) — PASSED\n  [warning] publisher-signature: unsigned: accountability rests on the hub alone\n    fix [hub-unsigned]: sign before submitting: an unsigned release asks the person to trust the hub alone\n  [warning] functions (org.example.markdown-1.0.0.wasm): org.example.markdown 1.0.0 is a component that reaches the clock, random numbers and files in its app folder, but no network or other app\n",
             blake3_hex(NOTES)
         )
     );

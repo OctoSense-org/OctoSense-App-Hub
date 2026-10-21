@@ -15,7 +15,7 @@ use std::path::Path;
 use semver::{Version, VersionReq};
 use serde::Deserialize;
 
-use crate::gate::{Finding, Severity};
+use crate::gate::Finding;
 
 /// The largest advisory file read.
 const MAX_ADVISORY_BYTES: u64 = 256 << 10;
@@ -145,15 +145,17 @@ pub fn findings(bundle: &Path, db: &Path) -> Result<Vec<Finding>, String> {
                 } else {
                     format!("fixed in {}", advisory.patched.join(" or "))
                 };
-                findings.push(Finding {
-                    severity: Severity::Warning,
-                    check: "advisories",
-                    detail: format!(
-                        "{name} includes {} {}, which {} reports as {what}: {}; {fixed}",
-                        listed.name, listed.version, advisory.id, advisory.title
-                    ),
-                    path: Some(name.clone()),
-                });
+                findings.push(
+                    Finding::warn_at(
+                        "advisories",
+                        name.clone(),
+                        format!(
+                            "{name} includes {} {}, which {} reports as {what}: {}; {fixed}",
+                            listed.name, listed.version, advisory.id, advisory.title
+                        ),
+                    )
+                    .coded("hub-crate-advisory", "upgrade the crate to a fixed version and rebuild the component, then re-run with --advisory-db to confirm"),
+                );
             }
         }
     }
