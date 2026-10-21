@@ -47,6 +47,7 @@ const WINDOW_HEIGHTS: std::ops::RangeInclusive<u32> = 240..=4096;
 /// the app's functions use. A host that does not know it refuses the app
 /// instead of running it without them. The `wasm` capability describes usage; it is not an admission grant.
 pub const KNOWN_FEATURES: &[&str] = &[
+    "cross-app-read-v1",
     "palpo-admin-v1",
     "host-api-v1",
     "backend-api-v1",
@@ -69,6 +70,8 @@ pub fn parse(json: &str) -> Result<AppManifest, String> {
 /// capability that is not here cannot be granted, so adding one is a change
 /// to this file and to the service that enforces it, together.
 pub const KNOWN_CAPABILITIES: &[&str] = &[
+    // Deterministic app tool transport; declarations do not grant execution.
+    "app_tools",
     // Read implemented API descriptions; this does not grant their capabilities.
     "runtime",
     // Read and write inside the app's own storage jail.
@@ -898,7 +901,8 @@ pub fn check_reserved_id(app_id: &str) -> Result<(), String> {
     if RESERVED_HOST_FILE_IDS.iter().any(|name| app_id.eq_ignore_ascii_case(name)) {
         return Err(format!("app id {app_id:?} is reserved: it names a host catalog or cache lock file"));
     }
-    let namespace = short_id(app_id);
+    let tool_namespace = short_id(app_id).replace('-', "");
+    let namespace = tool_namespace.as_str();
     if RESERVED_NAMES.contains(&app_id) {
         return Err(format!("app id {app_id:?} is reserved: it names a native app or the host itself"));
     }

@@ -74,14 +74,18 @@ pub struct AgentPolicy {
 /// the app, then the agent's.
 pub fn resolve(manifest: &AppManifest, limits: &HostLimits) -> Result<AppPolicy, String> {
     let app = octosense_app_contract::policy::resolve(manifest, limits)?;
+    let cross_reads = manifest.requires.iter().any(|f| f == "cross-app-read-v1");
+    if cross_reads && (!manifest.capabilities.iter().any(|c| c == "app_tools") || manifest.host_api.as_ref().and_then(|api| api.required.get("app_tools.read")) != Some(&1)) {
+        return Err("cross-app-read-v1 requires app_tools capability and app_tools.read@1".into());
+    }
     let agent = match &manifest.agent {
         None => None,
-        Some(spec) => Some(resolve_agent(&manifest.id, spec, limits)?),
+        Some(spec) => Some(resolve_agent(&manifest.id, spec, limits, cross_reads)?),
     };
     Ok(AppPolicy { app, agent })
 }
 
-fn resolve_agent(app_id: &str, spec: &AgentSpec, limits: &HostLimits) -> Result<AgentPolicy, String> {
+fn resolve_agent(app_id: &str, spec: &AgentSpec, limits: &HostLimits, cross_reads: bool) -> Result<AgentPolicy, String> {
     let mut tools = BTreeSet::new();
     for tool in &spec.tools {
         if is_kernel_tool_name(tool) && !KERNEL_TOOLS.contains(&tool.as_str()) {
@@ -90,7 +94,11 @@ fn resolve_agent(app_id: &str, spec: &AgentSpec, limits: &HostLimits) -> Result<
                 KERNEL_TOOLS.join(", ")
             ));
         }
-        if !limits.offered_tools.iter().any(|offered| offered == tool) {
+        // Deferred requests are not execution grants. At invocation, the host
+        // resolves an admitted installed shared script read and both consents.
+        let requested_read = cross_reads && tool.len() <= 256 && tool.contains('.')
+            && tool.split('.').all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_'));
+        if !limits.offered_tools.iter().any(|offered| offered == tool) && !requested_read {
             return Err(format!("app {app_id} requests tool {tool:?}, which this host does not offer contained apps"));
         }
         tools.insert(tool.clone());
@@ -215,4 +223,34 @@ fn clamp(asked: Option<u64>, ceiling: u64) -> u64 {
 
 fn clamp_u32(asked: Option<u32>, ceiling: u32) -> u32 {
     asked.unwrap_or(ceiling).min(ceiling)
+}
+
+#[cfg(test)] mod cross_app_read_tests {
+    use super::*;
+    // Exercise policy resolution only; actual bundle signing is tested by
+    // the two independently signed installed-app probe.
+    fn limits() -> HostLimits { HostLimits::default().with_require_signature(false) }
+    fn manifest(tool: &str, enabled: bool) -> AppManifest {
+        let mut value = serde_json::json!({"schema":1,"id":"readfixture","name":"Read fixture","version":"0.1.0","integrity":{"bundle_blake3":"0".repeat(64)},"capabilities":["app_tools"],"requires":["host-api-v1"],"host_api":{"required":{"app_tools.read":1}},"agent":{"profile":"read-only","tools":[tool]}});
+        if enabled { value["requires"].as_array_mut().unwrap().push("cross-app-read-v1".into()); }
+        AppManifest::parse(&value.to_string()).unwrap()
+    }
+    #[test] fn ordinary_unknown_tool_still_refused() {
+        assert!(resolve(&manifest("other.read_events",false),&limits()).unwrap_err().contains("does not offer"));
+    }
+    #[test] fn explicit_read_request_is_deferred_not_an_execution_grant() {
+        let policy=resolve(&manifest("other.read_events",true),&limits()).unwrap();
+        assert!(policy.agent.unwrap().tools.contains("other.read_events"));
+        assert!(!HostLimits::default().offered_tools.contains(&"other.read_events".into()));
+    }
+    #[test] fn kernel_and_malformed_names_remain_refused() {
+        for tool in ["shell","read_file","peer_send_input","bad..read","other.READ"] {
+            let error=resolve(&manifest(tool,true),&limits()).unwrap_err();
+            assert!(error.contains(if tool.contains('.') { "does not offer" } else { "kernel tool" }),"{tool}: {error}");
+        }
+    }
+    #[test] fn native_bridge_requirement_is_mandatory() {
+        let mut m=manifest("other.read_events",true);m.host_api=None;
+        assert!(resolve(&m,&limits()).unwrap_err().contains("cross-app-read-v1"));
+    }
 }
