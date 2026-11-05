@@ -295,15 +295,7 @@ impl AppStoreView {
     /// note at the top of `ui.rs`.
     fn mount(&mut self, cx: &mut Cx, target: &[LiveId], body: &str) {
         let code = format!("use mod.prelude.widgets.*\nreturn View{{{body}}}");
-        let script_mod = ScriptMod {
-            cargo_manifest_path: env!("CARGO_MANIFEST_DIR").into(),
-            module_path: module_path!().into(),
-            file: file!().into(),
-            line: 1,
-            column: 0,
-            code,
-            values: Vec::new(),
-        };
+        let script_mod = ScriptMod::new(env!("CARGO_MANIFEST_DIR"), module_path!(), file!(), 1, 0, &code, &[]);
         // jit3: upstream has no instruction-limited eval; a nil or error value is a failed build.
         let built = cx.with_vm(|vm| {
             let value = vm.eval(script_mod);
