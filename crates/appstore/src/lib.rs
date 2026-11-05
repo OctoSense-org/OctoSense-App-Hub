@@ -470,7 +470,7 @@ pub(crate) fn register_card_vocabulary() {
     // device's location to its `location` grant. It also carries
     // `agent.notify`, which an app under a policy may call only with the
     // `agent` grant.
-    // jit3 PORT GAP: upstream has no splash::register_agent_module (`agent.notify` in isolates).
+    makepad_widgets::widget_async::register_splash_isolate_mod(makepad_widgets::splash::register_agent_module);
 }
 
 /// Inventory for the patched runtime's policy ABI, independent of which
@@ -495,7 +495,7 @@ pub fn apply_device_consent(cx: &mut Cx, bundle: &std::path::Path, splash: &Spla
     {
         // Apply to every admitted app, including legacy manifests: otherwise
         // an omitted host-api-v1 could inherit the shell's OS permission.
-        // jit3 PORT GAP: upstream Splash has no set_device_consent.
+        splash.set_device_consent(cx, true);
         let explicit_capture_intent = crate::host_api::available_versions().get("camera.capture_intent") == Some(&1);
         splash.set_host_caps(cx, octosense_app_policy::containers::public_runtime_capabilities(
             &manifest.capabilities, true, explicit_capture_intent,
