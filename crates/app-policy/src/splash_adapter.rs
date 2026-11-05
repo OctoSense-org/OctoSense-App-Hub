@@ -32,8 +32,8 @@ pub fn apply(splash: &SplashRef, cx: &mut Cx, settings: &IsolateSettings) -> App
     splash.set_host_prompts(cx, settings.host_prompts);
     // A policy still marks an app isolate and protects private host APIs.
     // The current runtime treats destinations as declarations, not a gate.
-    splash.set_policy(cx, Some(settings.hosts.clone()), Some(settings.instruction_budget));
-    splash.set_memory_bytes(cx, Some(settings.memory_bytes as usize));
+    // jit3: SplashRef::set_policy / set_memory_bytes are fork-only (per-app policy): not applied in the spike
+    let _ = (settings.hosts.clone(), settings.instruction_budget, settings.memory_bytes);
     if let Some(mut inner) = splash.borrow_mut() {
         inner.set_allow_net(settings.allow_net);
     }
