@@ -59,8 +59,8 @@ fn visit(
     } else if let Some(array) = value.as_array() {
         path.push(value);
         out.write_all(b"[")?;
-        let values = heap.array_storage(array);
-        for index in 0..values.len() {
+        let values = heap.arr_view(array);
+        for index in 0..values.len_all() {
             if index > 0 {
                 out.write_all(b",")?;
             }
