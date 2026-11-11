@@ -65,11 +65,28 @@ impl Remote {
 /// Today's date as `YYYY-MM-DD`, from the system clock. What the freshness
 /// window and the admission record are measured against.
 pub fn today() -> String {
-    let secs = std::time::SystemTime::now()
+    utc_date(unix_now() / 86_400)
+}
+
+/// Now as a UTC time, `YYYY-MM-DDTHH:MM:SSZ` (ISO 8601): when a catalog was
+/// published. A device shows it on its own calendar; a date alone can't be,
+/// since its day began at a different hour for everyone. Freshness reads the
+/// date part, as it reads a catalog that has only a date.
+pub fn utc_now() -> String {
+    let secs = unix_now();
+    let day = secs % 86_400;
+    format!("{}T{:02}:{:02}:{:02}Z", utc_date(secs / 86_400), day / 3600, day % 3600 / 60, day % 60)
+}
+
+fn unix_now() -> i64 {
+    std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let days = (secs / 86_400) as i64;
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+/// `YYYY-MM-DD` of a day counted from 1970-01-01.
+fn utc_date(days: i64) -> String {
     // Civil-from-days (Howard Hinnant's algorithm), proleptic Gregorian.
     let z = days + 719_468;
     let era = z.div_euclid(146_097);
@@ -92,6 +109,19 @@ mod tests {
         assert_eq!(t.len(), 10);
         assert!(t.starts_with("20"));
         assert_eq!(crate::client::days_between(&t, &t), Some(0));
+    }
+
+    #[test]
+    fn a_catalog_is_published_at_a_utc_time_and_its_day_is_still_today() {
+        let (now, today) = (super::utc_now(), super::today());
+        assert_eq!(now.len(), 20, "{now}");
+        assert!(now.ends_with('Z') && now.as_bytes()[10] == b'T', "{now}");
+        // A clock passing midnight between the two calls is the only way they differ.
+        assert!(now.starts_with(&today) || crate::client::days_between(&now, &today) == Some(1), "{now} {today}");
+        assert_eq!(crate::client::days_between("2026-11-06T00:12:00Z", "2026-11-06"), Some(0));
+        assert_eq!(crate::client::days_between("2026-11-06T23:59:59Z", "2026-11-20"), Some(14));
+        assert_eq!(super::utc_date(0), "1970-01-01");
+        assert_eq!(super::utc_date(20_398), "2025-11-06");
     }
 
     #[test]

@@ -384,7 +384,7 @@ mod tests {
         cx.with_script_vm_id_trusted(owner, |vm| {
             let value = script_eval!(vm, {mod.net.HttpEvents{on_response: |response| {mod.response_seen = true}}});
             let events = HttpEvents::script_from_value(vm, value);
-            vm.cx_mut().script_std_mut().data.http_requests.push(ScriptHttp {id: request_id, events});
+            vm.cx_mut().script_std_mut().data.http_requests.push(ScriptHttp {id: request_id, events, host_prompts_allowed: false});
         });
         let event = Event::NetworkResponses(vec![NetworkResponse::HttpResponse {
             request_id,

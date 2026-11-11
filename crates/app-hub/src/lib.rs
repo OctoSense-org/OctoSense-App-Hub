@@ -35,7 +35,7 @@ pub use client::{
     PreparedLaunch, Store, CATALOG_FRESHNESS_DAYS, INSTALLS_DIR,
 };
 pub use pack::{pack_dir, unpack, Pack};
-pub use remote::{today, Remote};
+pub use remote::{today, utc_now, Remote};
 pub use scan::{packet, scan, Packet, Route, Verdict};
 pub use gate::{check_bundle, check_component, component_entry_for, entry_for, ComponentReport, Finding, GateReport, Severity};
 pub use index::{Catalog, Entry, Source, Status, WorkingKey, CATALOG_SCHEMA};

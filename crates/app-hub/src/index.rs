@@ -176,8 +176,10 @@ pub struct Catalog {
     /// Increases with every publish; a device refuses to go backwards, so a
     /// replayed older catalog cannot un-withdraw an app.
     pub sequence: u64,
-    /// When this catalog was signed, ISO 8601. The device's freshness window
-    /// is measured from here.
+    /// When this catalog was signed, ISO 8601: a UTC time
+    /// (`2026-11-06T00:12:00Z`), which a device shows on its own calendar, or
+    /// a date in catalogs written before. The device's freshness window is
+    /// measured from its date.
     pub published: String,
     pub entries: Vec<Entry>,
     /// Shared components (App Hub ADR 0003): component versions apps pin,
