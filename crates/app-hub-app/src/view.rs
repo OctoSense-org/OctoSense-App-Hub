@@ -391,18 +391,27 @@ script_mod! {
             }
             DRule{}
         }
-        // The product page: art, name, publisher; its action at the trailing edge.
+        // The product page: art, name, publisher; its action at the trailing edge, or on a
+        // Mac under the name and subtitle, as the App Store sets Get, so the line keeps its words.
         Detail := View{width: Fill height: Fit flow: Down spacing: 10 padding: Inset{left: 20 right: 20 top: 20 bottom: 14}
-            View{width: Fill height: Fit flow: Right spacing: 16 align: Align{y: 0.5}
+            View{width: Fill height: Fit flow: Right spacing: 16 align: Align{y: if mac { 0.0 } else { 0.5 }}
                 icon := DMark{width: 96 height: 96}
                 View{width: Fill height: Fit flow: Down spacing: 3
                     name := DLine{draw_text +: {text_style: theme.font_bold{font_size: 16.5}}}
                     subtitle := DLine{draw_text.color: d_muted}
                     caption := DNote{}
+                    if mac {
+                        View{width: Fit height: Fit flow: Right spacing: 8 align: Align{y: 0.5} margin: Inset{top: 8}
+                            open := DGet{text: "Open" visible: false}
+                            action := DGet{text: "Get"}
+                        }
+                    }
                 }
-                View{width: Fit height: Fit flow: Right spacing: 8 align: Align{y: 0.5}
-                    open := if mac { DGet{text: "Open" visible: false} } else { DButton{text: "Open" visible: false} }
-                    action := if mac { DGet{text: "Get"} } else { DPrimary{text: "Get"} }
+                if !mac {
+                    View{width: Fit height: Fit flow: Right spacing: 8 align: Align{y: 0.5}
+                        open := DButton{text: "Open" visible: false}
+                        action := DPrimary{text: "Get"}
+                    }
                 }
             }
             // Why it can't be had, and what to do: "Requires a newer version
@@ -1861,8 +1870,12 @@ impl AppHubView {
                 self.rows.push(Row::Section(title));
             }
             // What a person already has is one list, and so are a search's answers and
-            // a section of one app; the rest of the catalog is a grid.
-            let list = matches!(self.page, Page::Library | Page::Updates) || !self.query.trim().is_empty() || entries.len() == 1;
+            // a section of one app; the rest of the catalog is a grid. On a Mac a section
+            // of one app keeps the grid, its app in the first column, as the App Store
+            // keeps one grid on every shelf.
+            let list = matches!(self.page, Page::Library | Page::Updates)
+                || !self.query.trim().is_empty()
+                || (entries.len() == 1 && !self.mac);
             let columns = if list { 1 } else { self.columns.max(1) };
             if columns == 1 {
                 self.rows.extend(entries.into_iter().map(Row::App));
