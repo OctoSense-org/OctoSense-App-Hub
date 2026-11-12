@@ -6,6 +6,7 @@ use makepad_widgets::image_cache::handle_image_cache_network_responses;
 use makepad_widgets::makepad_platform::thread::{SignalToUI, ThreadOptions};
 use makepad_widgets::*;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
@@ -308,10 +309,37 @@ script_mod! {
         }
     }
 
+    // The App Store's progress ring, in an installing app's button place: a
+    // track, a quarter turn of the accent going round, and the stop square a
+    // press on it means. An app waiting its turn has the track and the square.
+    let DRing = ButtonFlat{visible: false width: 22 height: 22 margin: 0 padding: 0 spacing: 0 text: ""
+        draw_bg +: {
+            waiting: instance(0.0)
+            track: uniform(d_border)
+            accent: uniform(d_link)
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let c = self.rect_size * 0.5
+                let r = min(c.x, c.y) - 1.5
+                sdf.circle(c.x, c.y, r)
+                sdf.stroke(self.track, 1.6)
+                if self.waiting < 0.5 {
+                    let start = self.draw_pass.time * 1.25 * 2.0 * PI
+                    sdf.arc_round_caps(c.x, c.y, r, start, start + 0.5 * PI, 1.8)
+                    sdf.fill(self.accent)
+                }
+                sdf.box(c.x - 3.0, c.y - 3.0, 6.0, 6.0, 1.0)
+                sdf.fill(mix(self.accent, mix(self.accent, #x000000, 0.25), self.down))
+                return sdf.result
+            }
+        }
+    }
+
     // One app in a list: art, a name, a line, a plain button (on a Mac the App
-    // Store's capsule, as on its page, with its progress beside it while it
-    // installs). The row is plain; a hairline starts at the name and stops at
-    // the column's edge.
+    // Store's capsule, as on its page, and its progress ring in that place while
+    // it installs). On a Mac the button's room keeps one width, so the line's
+    // words keep theirs. The row is plain; a hairline starts at the name and
+    // stops at the column's edge.
     let DApp = View{width: Fill height: Fit flow: Down
         row := View{width: Fill height: 62 flow: Right spacing: 12 align: Align{y: 0.5} cursor: MouseCursor.Default
             icon := DMark{}
@@ -319,8 +347,19 @@ script_mod! {
                 name := DLine{}
                 subtitle := DNote{}
             }
-            progress := DSpinner{}
-            action := if mac { DGet{text: "Get"} } else { DButton{text: "Get"} }
+            if mac {
+                View{width: 72 height: Fit flow: Right align: Align{x: 1.0 y: 0.5}
+                    ring := DRing{}
+                    action := DGet{text: "Get"}
+                }
+            }
+            // The other desktops' Get, in a box of its own: a named child alone
+            // in an `if` that is skipped drops the `let` around it.
+            if !mac {
+                View{width: Fit height: Fit
+                    action := DButton{text: "Get"}
+                }
+            }
         }
         rule := DRule{margin: Inset{left: 56}}
     }
@@ -403,6 +442,7 @@ script_mod! {
                     if mac {
                         View{width: Fit height: Fit flow: Right spacing: 8 align: Align{y: 0.5} margin: Inset{top: 8}
                             open := DGet{text: "Open" visible: false}
+                            ring := DRing{}
                             action := DGet{text: "Get"}
                         }
                     }
@@ -717,6 +757,19 @@ pub struct AppHubView {
     busy: bool,
     #[rust]
     installing: bool,
+    /// The app whose install runs. On a Mac its row shows the App Store's
+    /// progress ring in its button's place, and so does its product page.
+    #[rust]
+    installing_id: Option<String>,
+    /// On a Mac, the apps agreed to from a list while another installs: each
+    /// row's ring waits, and they install in turn, as the App Store queues a
+    /// second Get.
+    #[rust]
+    waiting: Vec<InstallConsent>,
+    /// Set when the install that runs is asked to stop (its ring pressed): the
+    /// worker looks between its steps (`Backend::install_unless_stopped`).
+    #[rust]
+    stop: Arc<AtomicBool>,
     #[rust]
     notice: String,
     #[rust]
@@ -801,6 +854,7 @@ impl AppHubView {
         let root = crate::data_root(cx);
         let (tx, commands) = mpsc::channel();
         let (replies, rx) = mpsc::channel();
+        let stop = self.stop.clone();
         match cx
             .thread_spawner()
             .spawn_worker(ThreadOptions::default(), move || {
@@ -809,7 +863,7 @@ impl AppHubView {
                     let reply = match command {
                         Command::Refresh => Reply::Catalog(backend.refresh()),
                         Command::Install(consent) => {
-                            let error = backend.install(&consent).err();
+                            let error = backend.install_unless_stopped(&consent, &stop).err();
                             Reply::Installed {
                                 app_id: consent.app_id,
                                 snapshot: backend.snapshot(),
@@ -866,6 +920,41 @@ impl AppHubView {
             self.notice = "App Hub is unavailable. Close it and try again.".into();
         }
     }
+    /// Start `consent`'s install, not yet asked to stop.
+    fn begin_install(&mut self, consent: InstallConsent) {
+        self.stop.store(false, Ordering::Release);
+        self.installing = true;
+        self.installing_id = Some(consent.app_id.clone());
+        self.send(Command::Install(consent));
+    }
+    /// The sheet up is the app installing (a product page's sheet stays up
+    /// while its install runs; a list's goes).
+    fn sheet_installs(&self) -> bool {
+        self.installing && self.selected.as_ref().is_some_and(|e| self.installing_id.as_deref() == Some(e.id.as_str()))
+    }
+    /// On a Mac, the ring in `id`'s button place: it installs (`Some(false)`)
+    /// or waits its turn (`Some(true)`).
+    fn ring_for(&self, id: &str) -> Option<bool> {
+        if !(self.mac && self.desk) {
+            None
+        } else if self.installing_id.as_deref() == Some(id) {
+            Some(false)
+        } else if self.waiting.iter().any(|c| c.app_id == id) {
+            Some(true)
+        } else {
+            None
+        }
+    }
+    /// A Mac's progress ring pressed: the install running stops at its next
+    /// step; one waiting leaves the queue.
+    fn stop_install(&mut self, cx: &mut Cx, id: &str) {
+        match self.ring_for(id) {
+            Some(false) => self.stop.store(true, Ordering::Release),
+            Some(true) => self.waiting.retain(|c| c.app_id != id),
+            None => return,
+        }
+        self.render(cx);
+    }
     fn drain(&mut self, cx: &mut Cx, _scope: &mut Scope) {
         let replies: Vec<_> = self
             .rx
@@ -880,22 +969,46 @@ impl AppHubView {
                     self.notice.clear();
                     self.snapshot = Some(snapshot);
                 }
-                Reply::Installed { snapshot, error, .. } => {
+                Reply::Installed { app_id, snapshot, error } => {
                     self.installing = false;
-                    self.confirming = false;
+                    self.installing_id = None;
+                    // A sheet over the list for another app, up while this one
+                    // installed, stays up.
+                    let other = self.confirming && self.selected.as_ref().is_some_and(|e| e.id != app_id);
+                    if !other {
+                        self.confirming = false;
+                    }
                     self.snapshot = Some(snapshot);
-                    if let Some(error) = error {
-                        self.notice = format!("Installation didn’t finish. {error}");
-                        // An Update All stops at an update that didn't finish.
-                        self.update_queue = None;
-                    } else {
-                        self.notice = "Installed. Your app is ready to open.".into();
-                        go_on = self.update_queue.is_some();
-                        // Got from a list: its row says Open now, and the list stays.
-                        if self.in_place && !go_on {
-                            self.selected = None;
-                            self.in_place = false;
+                    match error {
+                        // Stopped from its ring: the row offers Get again, as the
+                        // App Store's does, and there is nothing to tell.
+                        Some(error) if error == catalog::STOPPED => {
+                            self.notice.clear();
+                            self.update_queue = None;
+                            if self.in_place && !other {
+                                self.selected = None;
+                                self.in_place = false;
+                            }
                         }
+                        Some(error) => {
+                            self.notice = format!("Installation didn’t finish. {error}");
+                            // An Update All stops at an update that didn't finish.
+                            self.update_queue = None;
+                        }
+                        None => {
+                            self.notice = "Installed. Your app is ready to open.".into();
+                            go_on = self.update_queue.is_some();
+                            // Got from a list: its row says Open now, and the list stays.
+                            if self.in_place && !go_on && !other {
+                                self.selected = None;
+                                self.in_place = false;
+                            }
+                        }
+                    }
+                    // The next app agreed to meanwhile takes its turn.
+                    if !self.waiting.is_empty() {
+                        let next = self.waiting.remove(0);
+                        self.begin_install(next);
                     }
                 }
                 Reply::Open(id, result) => match result {
@@ -1141,7 +1254,11 @@ impl AppHubView {
             .set_first_id_and_scroll(0, 0.0);
     }
     fn activate(&mut self, cx: &mut Cx, _scope: &mut Scope, entry: Entry) {
-        if self.busy && entry.status != EntryStatus::BuiltIn {
+        // On a Mac another app's Get stays live while one installs: it asks,
+        // then waits its turn (`confirm_install`).
+        let queues = self.mac && self.desk && self.installing && self.update_queue.is_none() && self.ring_for(&entry.id).is_none()
+            && matches!(entry.status, EntryStatus::Available | EntryStatus::UpdateAvailable);
+        if self.busy && entry.status != EntryStatus::BuiltIn && !queues {
             return;
         }
         match entry.status {
@@ -1288,7 +1405,7 @@ impl AppHubView {
     /// so ("Updating…" for an update in a Mac's list), and in a Mac's list the
     /// apps an Update All has yet to reach say "Waiting". None: its own word.
     fn busy_word(&self, entry: &Entry) -> Option<&'static str> {
-        let this = self.selected.as_ref().is_some_and(|e| e.id == entry.id);
+        let this = self.installing_id.as_deref() == Some(entry.id.as_str());
         if self.installing && this {
             Some(if self.in_place && entry.status == EntryStatus::UpdateAvailable { "Updating…" } else { "Installing…" })
         } else if self.in_place && self.update_queue.as_ref().is_some_and(|queue| queue.contains(&entry.id)) {
@@ -1314,11 +1431,23 @@ impl AppHubView {
         };
         item.label(cx, ids!(unavailable)).set_text(cx, reason.unwrap_or_default());
         item.widget(cx, ids!(unavailable)).set_visible(cx, reason.is_some());
-        // On a Mac a list's install runs in place: the row installing spins
-        // beside its button, and nothing else in the list starts meanwhile.
-        let this = self.selected.as_ref().is_some_and(|e| e.id == entry.id);
-        let running = self.in_place && (self.installing || self.update_queue.is_some());
-        let enabled = (!self.busy || entry.status == EntryStatus::BuiltIn) && can_activate(entry) && !running;
+        // On a Mac an install shows as the App Store's does: the app's ring in
+        // its button's place, a press on it stopping the install, and the other
+        // apps' Get still live (their installs wait their turn). An Update All
+        // runs alone.
+        // Where the template has a ring: a list's row and a Mac's product page.
+        let ring = self.ring_for(&entry.id).filter(|_| !item.widget(cx, ids!(ring)).is_empty());
+        let gets = matches!(entry.status, EntryStatus::Available | EntryStatus::UpdateAvailable);
+        let queues = self.mac && self.desk && self.installing && gets && self.update_queue.is_none();
+        let running = self.in_place && (self.installing || self.update_queue.is_some()) && !queues;
+        let enabled = (!self.busy || entry.status == EntryStatus::BuiltIn || queues) && can_activate(entry) && !running && ring.is_none();
+        item.widget(cx, ids!(action)).set_visible(cx, ring.is_none());
+        item.widget(cx, ids!(ring)).set_visible(cx, ring.is_some());
+        if let Some(waits) = ring {
+            let mut mark = item.widget(cx, ids!(ring));
+            let waits = if waits { 1.0 } else { 0.0 };
+            script_apply_eval!(cx, mark, {draw_bg +: {waiting: #(waits)}});
+        }
         item.button(cx, ids!(action)).set_enabled(cx, enabled);
         if self.desk {
             // Told only when it changes: while a row spins the list redraws every
@@ -1328,7 +1457,6 @@ impl AppHubView {
                 action.set_disabled(cx, !enabled);
             }
         }
-        item.widget(cx, ids!(progress)).set_visible(cx, self.in_place && self.installing && this);
         let busy: Option<&str> = self.busy_word(entry);
         item.button(cx, ids!(action)).set_text(
             cx,
@@ -1619,8 +1747,7 @@ impl AppHubView {
                 Row::Consent(entry) => {
                     if item.button(cx, ids!(confirm)).clicked(actions) && !self.busy {
                         if let Some(consent) = entry.consent {
-                            self.installing = true;
-                            self.send(Command::Install(consent));
+                            self.begin_install(consent);
                             self.render(cx);
                         }
                     }
@@ -1796,8 +1923,8 @@ impl AppHubView {
         self.desk_rows();
         // The pane has its own spinner while there is nothing to show yet.
         let pane_spins = self.empty.as_ref().is_some_and(|pane| pane.glyph == EmptyGlyph::Busy);
-        // An install from a list spins in its row, as the App Store's does.
-        let row_spins = self.in_place && self.installing;
+        // An install shows in its app's ring, as the App Store's does.
+        let row_spins = self.mac && self.installing;
         self.view.widget(cx, ids!(busy_mark)).set_visible(cx, self.busy && !pane_spins && !row_spins);
         self.show_empty(cx);
         self.show_sheet(cx);
@@ -1972,17 +2099,20 @@ impl AppHubView {
         self.view.button(cx, ids!(sheet_more)).set_text(cx, if self.sheet_details { "Hide Privacy Details" } else { "Show Privacy Details" });
         self.view.widget(cx, ids!(sheet_privacy)).set_visible(cx, self.sheet_details);
         let confirm = self.view.button(cx, ids!(sheet_confirm));
-        let ready = !self.busy && entry.consent.is_some();
+        let installs = self.sheet_installs();
+        // Over a Mac's list while another app installs, agreeing queues this one.
+        let queues = self.in_place && self.installing && !installs && self.update_queue.is_none();
+        let ready = (!self.busy || queues) && entry.consent.is_some();
         confirm.set_enabled(cx, ready);
         self.view.widget(cx, ids!(sheet_confirm)).set_disabled(cx, !ready);
-        confirm.set_text(cx, match (self.installing, update) {
+        confirm.set_text(cx, match (installs, update) {
             (true, true) => "Updating…",
             (true, false) => "Installing…",
             (false, true) => "Update",
             (false, false) => "Install",
         });
-        self.view.button(cx, ids!(sheet_cancel)).set_enabled(cx, !self.installing);
-        self.view.widget(cx, ids!(sheet_cancel)).set_disabled(cx, self.installing);
+        self.view.button(cx, ids!(sheet_cancel)).set_enabled(cx, !installs);
+        self.view.widget(cx, ids!(sheet_cancel)).set_disabled(cx, installs);
         let sheet = self.view.widget(cx, ids!(sheet));
         self.fill_entry(cx, &sheet, &entry);
         if !modal.is_open() {
@@ -2119,6 +2249,8 @@ impl AppHubView {
         } else if item.button(cx, ids!(action)).clicked(actions) {
             self.notice.clear();
             self.activate(cx, scope, entry);
+        } else if item.button(cx, ids!(ring)).clicked(actions) {
+            self.stop_install(cx, &entry.id);
         } else if item.widget(cx, ids!(row)).as_view().finger_up(actions).is_some_and(|up| up.was_tap()) {
             self.selected = Some(entry);
             self.in_place = false;
@@ -2201,18 +2333,28 @@ impl AppHubView {
         }
     }
     fn confirm_install(&mut self, cx: &mut Cx) {
+        let Some(consent) = self.selected.as_ref().filter(|_| self.confirming).and_then(|e| e.consent.clone()) else {
+            return;
+        };
+        // A Mac's list while another app installs: agreed, the sheet goes and
+        // this app's ring waits its turn.
+        if self.in_place && self.installing && !self.sheet_installs() && self.update_queue.is_none() {
+            if !self.waiting.iter().any(|c| c.app_id == consent.app_id) {
+                self.waiting.push(consent);
+            }
+            self.confirming = false;
+            self.render(cx);
+            return;
+        }
         if self.busy || self.installing {
             return;
         }
-        if let Some(consent) = self.selected.as_ref().filter(|_| self.confirming).and_then(|e| e.consent.clone()) {
-            self.installing = true;
-            self.send(Command::Install(consent));
-            // A Mac's list: agreed, the sheet goes and the app's row shows its progress.
-            if self.in_place {
-                self.confirming = false;
-            }
-            self.render(cx);
+        self.begin_install(consent);
+        // A Mac's list: agreed, the sheet goes and the app's row shows its progress.
+        if self.in_place {
+            self.confirming = false;
         }
+        self.render(cx);
     }
     fn desk_actions(&mut self, cx: &mut Cx, actions: &Actions, scope: &mut Scope) {
         if self.confirming {
@@ -2223,7 +2365,7 @@ impl AppHubView {
             if self.view.button(cx, ids!(sheet_confirm)).clicked(actions) {
                 self.confirm_install(cx);
             }
-            if self.view.button(cx, ids!(sheet_cancel)).clicked(actions) && !self.installing {
+            if self.view.button(cx, ids!(sheet_cancel)).clicked(actions) && !self.sheet_installs() {
                 self.confirming = false;
                 // Cancel stops an Update All, back on the Updates page; a sheet
                 // over a list leaves the list as it was.
@@ -2317,7 +2459,7 @@ impl AppHubView {
         let mods = key.modifiers;
         if self.confirming {
             match key.key_code {
-                KeyCode::Escape if !self.installing => {
+                KeyCode::Escape if !self.sheet_installs() => {
                     self.confirming = false;
                     // A sheet over a list, as its Cancel: the list stays as it was.
                     if std::mem::take(&mut self.in_place) {
@@ -2974,7 +3116,7 @@ impl Widget for AppHubView {
             if self.spin.is_event(event).is_some() && self.busy {
                 self.view.widget(cx, ids!(busy_mark)).redraw(cx);
                 self.view.widget(cx, ids!(empty_busy)).redraw(cx);
-                if self.in_place && self.installing {
+                if self.installing_id.is_some() {
                     self.view.widget(cx, ids!(list)).redraw(cx);
                 }
             }
@@ -3342,6 +3484,118 @@ mod tests {
             view.activate(&mut cx, &mut Scope::empty(), a.clone());
             assert!(!view.in_place && shown(&view) == Some(a.id.clone()) && page(&view));
             drop(worker);
+        }
+        makepad_widgets::widget_async::leave_isolate(&mut cx, entered);
+        drop(root);
+        cx.free_splash_vm(vm_id);
+    }
+    /// A Mac's App Store installs one app at a time: another app's Get stays
+    /// live, asks, then waits its turn; the ring of the app installing stops
+    /// it, and a waiting app's ring takes it out of the queue.
+    /// The Mac's own templates evaluate (the tests above draw another
+    /// desktop's unless told): a list's row and the product page each have
+    /// the progress ring in their button's place.
+    #[test]
+    fn the_mac_templates_evaluate_with_a_ring_in_each_button_place() {
+        let mut cx = Cx::new(Box::new(|_, _| {}));
+        cx.with_vm(makepad_widgets::script_mod);
+        let vm_id = cx.alloc_splash_vm_with_network(false);
+        let root = cx.with_script_vm_id_trusted(vm_id, |vm| {
+            use makepad_widgets::desktop_style::{install, DesktopStyle, StyleSheet};
+            install(vm, StyleSheet::load(DesktopStyle::Macos));
+            crate::APP_HUB_MODULE.register(vm);
+            let value = script_eval!(vm, {use mod.widgets.* AppHubView{}});
+            WidgetRef::script_from_value(vm, value)
+        });
+        let entered = makepad_widgets::widget_async::enter_isolate(&mut cx, vm_id);
+        {
+            let mut view = root.borrow_mut::<AppHubView>().expect("the Mac's App Hub evaluates");
+            assert!(view.mac && view.desk, "the Mac's style");
+            view.started = true; // No catalog request or personal profile.
+            for template in [id!(Row), id!(Detail)] {
+                let item = view.view.portal_list(&mut cx, ids!(list)).item(&mut cx, 0, template);
+                assert!(!item.widget(&mut cx, ids!(ring)).is_empty(), "a ring in the button's place");
+                assert!(!item.widget(&mut cx, ids!(action)).is_empty(), "beside the button");
+            }
+        }
+        makepad_widgets::widget_async::leave_isolate(&mut cx, entered);
+        drop(root);
+        cx.free_splash_vm(vm_id);
+    }
+    #[test]
+    fn on_a_mac_another_get_waits_its_turn_and_a_ring_stops_an_install() {
+        let mut cx = Cx::new(Box::new(|_, _| {}));
+        cx.with_vm(makepad_widgets::script_mod);
+        let vm_id = cx.alloc_splash_vm_with_network(false);
+        let root = cx.with_script_vm_id_trusted(vm_id, |vm| {
+            crate::APP_HUB_MODULE.register(vm);
+            let value = script_eval!(vm, {use mod.widgets.* AppHubView{}});
+            let root = WidgetRef::script_from_value(vm, value);
+            assert!(vm.take_errors().is_empty());
+            root
+        });
+        let entered = makepad_widgets::widget_async::enter_isolate(&mut cx, vm_id);
+        {
+            let mut view = root.borrow_mut::<AppHubView>().unwrap();
+            view.started = true; // No catalog request or personal profile.
+            view.desk = true;
+            view.mac = true;
+            let mut entries = catalog::preview_entries();
+            let (mut a, mut b, mut c) = (entries.remove(0), entries.remove(0), entries.remove(0));
+            for entry in [&mut a, &mut b, &mut c] {
+                entry.kind = CatalogKind::Live;
+                entry.status = EntryStatus::Available;
+                entry.consent = Some(catalog::InstallConsent::for_view_tests(&entry.id, "1.0.0"));
+            }
+            let installed = |entry: &Entry| Entry { status: EntryStatus::Installed, consent: None, ..entry.clone() };
+            let listed = |entries: Vec<Entry>| CatalogSnapshot { entries, verified: true, ..Default::default() };
+            view.snapshot = Some(listed(vec![a.clone(), b.clone(), c.clone()]));
+            view.page = Page::Apps;
+            view.render(&mut cx);
+            let (sender, receiver) = mpsc::channel();
+            view.rx = Some(receiver);
+            let (commands, worker) = mpsc::channel();
+            view.tx = Some(commands);
+            let shown = |view: &AppHubView| view.selected.as_ref().filter(|_| view.confirming).map(|e| e.id.clone());
+            let sent = |worker: &Receiver<Command>| match worker.try_recv() {
+                Ok(Command::Install(consent)) => Some(consent.app_id),
+                _ => None,
+            };
+
+            view.activate(&mut cx, &mut Scope::empty(), a.clone());
+            view.confirm_install(&mut cx);
+            assert_eq!(sent(&worker), Some(a.id.clone()));
+            assert_eq!(view.ring_for(&a.id), Some(false), "the app installing shows its ring");
+            // Another Get is still live: it asks over the list, then waits.
+            view.activate(&mut cx, &mut Scope::empty(), b.clone());
+            assert_eq!(shown(&view), Some(b.id.clone()), "its sheet, over the list");
+            view.confirm_install(&mut cx);
+            assert!(!view.confirming && sent(&worker).is_none(), "nothing more goes to the worker meanwhile");
+            assert_eq!(view.ring_for(&b.id), Some(true), "it waits its turn");
+            view.activate(&mut cx, &mut Scope::empty(), c.clone());
+            view.confirm_install(&mut cx);
+            assert_eq!(view.ring_for(&c.id), Some(true));
+            // A waiting app's ring takes it out of the queue.
+            view.stop_install(&mut cx, &c.id);
+            assert_eq!(view.ring_for(&c.id), None);
+            assert!(!view.stop.load(Ordering::Acquire), "the install running goes on");
+            // The first done: the next one's turn.
+            sender.send(Reply::Installed { app_id: a.id.clone(), snapshot: listed(vec![installed(&a), b.clone(), c.clone()]), error: None }).unwrap();
+            view.drain(&mut cx, &mut Scope::empty());
+            assert_eq!(sent(&worker), Some(b.id.clone()));
+            assert_eq!((view.ring_for(&a.id), view.ring_for(&b.id)), (None, Some(false)));
+            // Its ring pressed, the worker is asked to stop; stopped, the row offers Get again, unannounced.
+            view.stop_install(&mut cx, &b.id);
+            assert!(view.stop.load(Ordering::Acquire));
+            sender.send(Reply::Installed { app_id: b.id.clone(), snapshot: listed(vec![installed(&a), b.clone(), c.clone()]), error: Some(catalog::STOPPED.into()) }).unwrap();
+            view.drain(&mut cx, &mut Scope::empty());
+            assert!(!view.installing && view.ring_for(&b.id).is_none() && view.notice.is_empty(), "{}", view.notice);
+            assert!(!view.rows.iter().any(|row| matches!(row, Row::Banner(_))), "no banner for a stop");
+            // A new install isn't stopped by the last one's press.
+            view.activate(&mut cx, &mut Scope::empty(), b.clone());
+            view.confirm_install(&mut cx);
+            assert_eq!(sent(&worker), Some(b.id.clone()));
+            assert!(!view.stop.load(Ordering::Acquire));
         }
         makepad_widgets::widget_async::leave_isolate(&mut cx, entered);
         drop(root);

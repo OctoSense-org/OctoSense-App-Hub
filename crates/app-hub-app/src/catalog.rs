@@ -5,7 +5,12 @@ use octosense_app_policy::HostLimits;
 use octosense_appstore::source::{CatalogChannel, Origin};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock, TryLockError};
+
+/// What an install asked to stop says (`Backend::install_unless_stopped`): a
+/// person's choice, not a failure.
+pub const STOPPED: &str = "Stopped before it was installed.";
 
 // Multiple Hub windows share one installation directory. Keep catalog acceptance,
 // persistence and installs in order even when their workers overlap.
@@ -419,8 +424,18 @@ impl Backend {
     /// The token belongs to the permissions shown before the user confirmed.
     /// Re-fetching may change the listing; any such change requires new consent.
     pub fn install(&mut self, consent: &InstallConsent) -> Result<CatalogSnapshot, String> {
+        self.install_unless_stopped(consent, &AtomicBool::new(false))
+    }
+
+    /// `install`, which a person can stop (`stop` set) between its steps, the
+    /// Mac App Store's progress ring pressed: before the download, after it,
+    /// and before the verified bundle goes live. A stop is `Err(STOPPED)`; the
+    /// staging root goes as for any failure, and an installed copy stays as it was.
+    pub fn install_unless_stopped(&mut self, consent: &InstallConsent, stop: &AtomicBool) -> Result<CatalogSnapshot, String> {
+        let stopped = || if stop.load(Ordering::Acquire) { Err(STOPPED.to_string()) } else { Ok(()) };
         let _guard = CATALOG_IO.lock().unwrap_or_else(|p| p.into_inner());
         self.refresh_catalog();
+        stopped()?;
         self.check_consent(consent)?;
         let artifact = self.store.entry(&consent.app_id).unwrap().artifact.clone();
         if !safe_relative(&artifact) {
@@ -429,6 +444,7 @@ impl Backend {
         let workspace = self.root.join(".app-hub-install");
         let result = (|| {
             let staged = self.origin.stage(&artifact, &workspace)?;
+            stopped()?;
             // Downloads can be long. Observe a withdrawal or revised permissions
             // published while the artifact was arriving before installing it.
             self.refresh_catalog();
@@ -449,6 +465,7 @@ impl Backend {
             // this verified catalog, fetched like the bundle and kept once
             // per digest in the root's store, never in the staging root.
             octosense_appstore::components::install(&self.store, &self.origin, &entry.manifest)?;
+            stopped()?;
             // The Hub backend copies into its own root. Give it a staging root
             // so a failed copy cannot remove or expose a partial live bundle.
             let mut prepared_store = self.store.for_install_root(&workspace.join("verified"));
@@ -458,6 +475,8 @@ impl Backend {
                 &self.store.publisher_keys(),
                 &octosense_app_hub::today(),
             )?;
+            // The last moment a stop holds: past here the bundle is live.
+            stopped()?;
             publish_bundle(
                 &octosense_app_hub::install_root(&self.root, &consent.app_id),
                 &prepared_store.install_dir(&consent.app_id),
@@ -1184,6 +1203,24 @@ mod tests {
         assert_eq!(snapshot.library.len(), 1);
         assert_eq!(snapshot.library[0].open_target(), Some("test-app"));
         assert!(backend.may_open("test-app").is_ok());
+    }
+
+    /// A stopped install, as the Mac's progress ring stops one: nothing goes
+    /// live, it says it was stopped, and the same consent installs after.
+    #[test]
+    fn a_stopped_install_installs_nothing_and_can_be_asked_again() {
+        let f = Fixture::new();
+        f.publish_today(1, vec![f.entry()]);
+        let mut backend = f.backend();
+        let consent = backend.refresh().entries[0].consent.clone().unwrap();
+        let stop = std::sync::atomic::AtomicBool::new(true);
+        assert_eq!(backend.install_unless_stopped(&consent, &stop).unwrap_err(), STOPPED);
+        assert!(!f.root().join("test-app/bundle").exists());
+        assert!(!f.root().join(".app-hub-install").exists(), "the staging root goes");
+        assert_eq!(backend.snapshot().entries[0].status, EntryStatus::Available);
+        stop.store(false, std::sync::atomic::Ordering::Release);
+        let snapshot = backend.install_unless_stopped(&consent, &stop).unwrap();
+        assert_eq!(snapshot.entries[0].status, EntryStatus::Installed);
     }
 
     #[test]
