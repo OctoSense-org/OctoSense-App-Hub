@@ -5,7 +5,12 @@ use octosense_app_policy::HostLimits;
 use octosense_appstore::source::{CatalogChannel, Origin};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock, TryLockError};
+
+/// What an install asked to stop says (`Backend::install_unless_stopped`): a
+/// person's choice, not a failure.
+pub const STOPPED: &str = "Stopped before it was installed.";
 
 // Multiple Hub windows share one installation directory. Keep catalog acceptance,
 // persistence and installs in order even when their workers overlap.
@@ -45,11 +50,27 @@ pub enum EntryStatus {
     BuiltIn,
 }
 
+/// One of an app's own tools as its reviewed `tools.json` declares it: what
+/// it may do, and whether the person approves each call before it runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ToolUse {
+    pub risk: octosense_app_policy::Risk,
+    pub approved: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InstallConsent {
     pub app_id: String,
     pub version: String,
     canonical_entry: String,
+}
+
+#[cfg(test)]
+impl InstallConsent {
+    /// A consent for the view's own tests: the store checks it against nothing.
+    pub(crate) fn for_view_tests(app_id: &str, version: &str) -> Self {
+        Self { app_id: app_id.into(), version: version.into(), canonical_entry: String::new() }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -66,6 +87,9 @@ pub struct Entry {
     pub screenshots: Vec<String>,
     pub permissions: Vec<String>,
     pub privacy: Vec<String>,
+    /// What each of the app's own tools may do, from its reviewed
+    /// `tools.json`: the store's permission line names them by id.
+    pub tools: Vec<ToolUse>,
     pub kind: CatalogKind,
     pub status: EntryStatus,
     /// The installed release opens. With [`EntryStatus::UpdateAvailable`],
@@ -293,7 +317,7 @@ impl Backend {
                 description: "This installed app is not offered by the current verified catalog. It remains in your library, but cannot be opened until the Hub offers this version again.".into(),
                 category: "utilities".into(), publisher: String::new(), version: installed.version,
                 release_notes: String::new(), screenshots: Vec::new(),
-                permissions: Vec::new(), privacy: Vec::new(), kind: CatalogKind::Live,
+                permissions: Vec::new(), privacy: Vec::new(), tools: Vec::new(), kind: CatalogKind::Live,
                 status: EntryStatus::Unavailable("Not offered by the current catalog".into()), can_open: false, consent: None,
             })
         }).collect();
@@ -355,6 +379,10 @@ impl Backend {
             None
         };
         let about = listing.about.as_ref();
+        // The release the permission lines were written from.
+        let tools = self.store.release(&listing.app_id, &listing.version).map_or_else(|_| Vec::new(), |entry| {
+            entry.tools.iter().map(|tool| ToolUse { risk: tool.risk, approved: tool.supervision().needs_person() }).collect()
+        });
         let local_icon = matches!(status, EntryStatus::Installed)
             .then(|| crate::icons::installed_icon_path(&self.root, &listing.app_id))
             .flatten().map(|path| path.to_string_lossy().into_owned());
@@ -385,6 +413,7 @@ impl Backend {
                 .collect(),
             permissions: listing.permissions,
             privacy: listing.privacy,
+            tools,
             kind: CatalogKind::Live,
             status,
             can_open,
@@ -395,8 +424,18 @@ impl Backend {
     /// The token belongs to the permissions shown before the user confirmed.
     /// Re-fetching may change the listing; any such change requires new consent.
     pub fn install(&mut self, consent: &InstallConsent) -> Result<CatalogSnapshot, String> {
+        self.install_unless_stopped(consent, &AtomicBool::new(false))
+    }
+
+    /// `install`, which a person can stop (`stop` set) between its steps, the
+    /// Mac App Store's progress ring pressed: before the download, after it,
+    /// and before the verified bundle goes live. A stop is `Err(STOPPED)`; the
+    /// staging root goes as for any failure, and an installed copy stays as it was.
+    pub fn install_unless_stopped(&mut self, consent: &InstallConsent, stop: &AtomicBool) -> Result<CatalogSnapshot, String> {
+        let stopped = || if stop.load(Ordering::Acquire) { Err(STOPPED.to_string()) } else { Ok(()) };
         let _guard = CATALOG_IO.lock().unwrap_or_else(|p| p.into_inner());
         self.refresh_catalog();
+        stopped()?;
         self.check_consent(consent)?;
         let artifact = self.store.entry(&consent.app_id).unwrap().artifact.clone();
         if !safe_relative(&artifact) {
@@ -405,6 +444,7 @@ impl Backend {
         let workspace = self.root.join(".app-hub-install");
         let result = (|| {
             let staged = self.origin.stage(&artifact, &workspace)?;
+            stopped()?;
             // Downloads can be long. Observe a withdrawal or revised permissions
             // published while the artifact was arriving before installing it.
             self.refresh_catalog();
@@ -425,6 +465,7 @@ impl Backend {
             // this verified catalog, fetched like the bundle and kept once
             // per digest in the root's store, never in the staging root.
             octosense_appstore::components::install(&self.store, &self.origin, &entry.manifest)?;
+            stopped()?;
             // The Hub backend copies into its own root. Give it a staging root
             // so a failed copy cannot remove or expose a partial live bundle.
             let mut prepared_store = self.store.for_install_root(&workspace.join("verified"));
@@ -434,6 +475,8 @@ impl Backend {
                 &self.store.publisher_keys(),
                 &octosense_app_hub::today(),
             )?;
+            // The last moment a stop holds: past here the bundle is live.
+            stopped()?;
             publish_bundle(
                 &octosense_app_hub::install_root(&self.root, &consent.app_id),
                 &prepared_store.install_dir(&consent.app_id),
@@ -525,6 +568,10 @@ fn root_identity(root: &Path) -> PathBuf {
 }
 
 /// These entries describe built-in apps, not downloadable Hub listings.
+/// What ends a preview entry's description on a phone, where the same page holds
+/// downloadable listings; a desktop says it in its own sections.
+pub const PREVIEW_NOTE: &str = "\n\nPreview catalog — this app is included with OctoSense. This is not a downloadable Hub listing.";
+
 pub fn preview_entries() -> Vec<Entry> {
     [
         ("news", "News", "Stories worth your time", "Follow the stories that matter to you in OctoSense News.", "news"),
@@ -533,15 +580,64 @@ pub fn preview_entries() -> Vec<Entry> {
         ("camera", "Camera", "See it. Capture it.", "Open the built-in OctoSense Camera and capture a new moment.", "photo-video"),
         ("mail", "Mail", "Make room for your inbox", "Keep your conversations close with OctoSense Mail.", "productivity"),
         ("sheets", "Sheets", "Give your ideas some structure", "Work with tables and organize your ideas in OctoSense Sheets.", "productivity"),
-    ].into_iter().map(|(id, name, subtitle, description, category)| Entry {
+    ].into_iter().map(|(id, name, subtitle, description, category)| built_in(id, name, subtitle, description, category)).collect()
+}
+
+/// A built-in's icon address for its bundle's own art, packed into this build.
+pub const SYSTEM_ICON: &str = "system:";
+
+/// App Hub's Included Apps on a desktop: everything its Launchpad holds
+/// besides App Hub, by the names it shows there, in name order as a Mac lists
+/// applications. A phone's built-ins are `preview_entries`. An app the shell's
+/// shared launcher art has no picture for shows its bundle's own, as the Dock does.
+pub fn desktop_entries() -> Vec<Entry> {
+    let own_art = ["ai-providers", "pdftools", "quickdeck", "writer", "youtube"];
+    let mut entries: Vec<Entry> = preview_entries().into_iter().filter(|entry| entry.id != "camera").collect();
+    entries.extend([
+        ("ai-providers", "AI Providers", "Choose the models OctoSense uses", "Add the AI services you use and choose which one OctoSense asks first.", "utilities"),
+        ("browser", "Browser", "Explore the web", "Browse the web with tabs, bookmarks and history in OctoSense Browser.", "utilities"),
+        ("calculator", "Calculator", "Quick sums and more", "Work out everyday sums, or switch to scientific functions, in OctoSense Calculator.", "utilities"),
+        ("calendar", "Calendar", "Plan your days", "Keep your events and plans together in OctoSense Calendar.", "productivity"),
+        ("clock", "Clock", "Time, wherever you are", "World clocks, alarms, a stopwatch and timers in OctoSense Clock.", "utilities"),
+        ("files", "Files", "Find your files", "Browse, open and organize the files on this computer with OctoSense Files.", "utilities"),
+        ("finance", "Finance", "Know where your money goes", "Keep a ledger, set budgets, see reports and import statements in OctoSense Finance.", "finance"),
+        ("image", "Image Viewer", "See your pictures", "Open and look through your images in OctoSense Image Viewer.", "photo-video"),
+        ("notes", "Notes", "Capture what's on your mind", "Jot down ideas, lists and anything worth keeping in OctoSense Notes.", "productivity"),
+        ("octoscode", "OctosCode", "Plan and change code", "Plan and change code with AI in OctosCode.", "developer"),
+        ("pdf", "PDF Viewer", "Read your PDFs", "Open and read PDF documents in OctoSense PDF Viewer.", "productivity"),
+        ("pdftools", "PDF Tools", "Read and mark up PDFs", "Read, search and comment on PDFs, fill in forms and change pages in OctoSense PDF Tools.", "productivity"),
+        ("quickdeck", "Quick Deck", "Present your ideas", "Make slide decks, present them and export them in OctoSense Quick Deck.", "productivity"),
+        ("reminders", "Reminders", "Remember what matters", "Keep track of your to-dos, flag what matters and see what is due today in OctoSense Reminders.", "productivity"),
+        ("rinx", "Rinx", "Your conversations, together", "Chat with people and rooms on Matrix.", "social-networking"),
+        ("route", "Route", "Plan your trips", "Plan a route or a trip on the map, by voice if you like, in OctoSense Route.", "travel"),
+        ("settings", "System Settings", "Make OctoSense your own", "Change how OctoSense looks and works in System Settings.", "utilities"),
+        ("task", "Task Manager", "See what's running", "Watch the processes on this computer and the CPU and memory they use in Task Manager.", "utilities"),
+        ("terminal", "Terminal", "Work at the command line", "Run commands and shells, in tabs, in OctoSense Terminal.", "developer"),
+        ("weather", "Weather", "Forecasts at a glance", "Check today's weather and the days ahead in OctoSense Weather.", "weather"),
+        ("writer", "Writer", "Write and format documents", "Write documents, format them and export them in OctoSense Writer.", "productivity"),
+        ("youtube", "YouTube", "Watch what you love", "Search for videos and watch them in OctoSense YouTube.", "photo-video"),
+    ].into_iter().map(|(id, name, subtitle, description, category)| {
+        let mut entry = built_in(id, name, subtitle, description, category);
+        if own_art.contains(&id) {
+            entry.icon = Some(format!("{SYSTEM_ICON}{id}"));
+        }
+        entry
+    }));
+    entries.sort_by_key(|entry| entry.name.to_lowercase());
+    entries
+}
+
+fn built_in(id: &str, name: &str, subtitle: &str, description: &str, category: &str) -> Entry {
+    Entry {
         id: id.into(), name: name.into(), subtitle: subtitle.into(),
-        description: format!("{description}\n\nPreview catalog — this app is included with OctoSense. This is not a downloadable Hub listing."),
+        description: format!("{description}{PREVIEW_NOTE}"),
         category: category.into(), publisher: "OctoSense".into(), version: "Built in".into(),
         release_notes: String::new(), icon: None, screenshots: Vec::new(),
         permissions: vec!["Built-in app permissions are managed by OctoSense and the app itself.".into()],
         privacy: vec!["This preview is not a publisher privacy declaration.".into()],
+        tools: Vec::new(),
         kind: CatalogKind::Preview, status: EntryStatus::BuiltIn, can_open: false, consent: None,
-    }).collect()
+    }
 }
 
 pub fn filter_entries(entries: &[Entry], query: &str, category: Option<&str>) -> Vec<Entry> {
@@ -895,6 +991,25 @@ mod tests {
     }
 
     #[test]
+    fn desktop_lists_every_launchpad_app_once_in_name_order() {
+        let entries = desktop_entries();
+        assert_eq!(entries.len(), 27);
+        let mut ids: Vec<_> = entries.iter().map(|entry| entry.id.as_str()).collect();
+        assert!(!ids.contains(&"camera") && !ids.contains(&"apphub"));
+        let names: Vec<_> = entries.iter().map(|entry| entry.name.to_lowercase()).collect();
+        assert!(names.windows(2).all(|pair| pair[0] < pair[1]), "{names:?}");
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), entries.len());
+        for entry in &entries {
+            assert_eq!((entry.kind, &entry.status), (CatalogKind::Preview, &EntryStatus::BuiltIn));
+            assert_eq!(entry.open_target(), Some(entry.id.as_str()));
+        }
+        let own_art: Vec<_> = entries.iter().filter_map(|entry| entry.icon.as_deref()).collect();
+        assert_eq!(own_art, ["system:ai-providers", "system:pdftools", "system:quickdeck", "system:writer", "system:youtube"]);
+    }
+
+    #[test]
     fn search_trims_and_combines_case_insensitive_words_with_category() {
         let entries = preview_entries();
         assert_eq!(
@@ -1088,6 +1203,24 @@ mod tests {
         assert_eq!(snapshot.library.len(), 1);
         assert_eq!(snapshot.library[0].open_target(), Some("test-app"));
         assert!(backend.may_open("test-app").is_ok());
+    }
+
+    /// A stopped install, as the Mac's progress ring stops one: nothing goes
+    /// live, it says it was stopped, and the same consent installs after.
+    #[test]
+    fn a_stopped_install_installs_nothing_and_can_be_asked_again() {
+        let f = Fixture::new();
+        f.publish_today(1, vec![f.entry()]);
+        let mut backend = f.backend();
+        let consent = backend.refresh().entries[0].consent.clone().unwrap();
+        let stop = std::sync::atomic::AtomicBool::new(true);
+        assert_eq!(backend.install_unless_stopped(&consent, &stop).unwrap_err(), STOPPED);
+        assert!(!f.root().join("test-app/bundle").exists());
+        assert!(!f.root().join(".app-hub-install").exists(), "the staging root goes");
+        assert_eq!(backend.snapshot().entries[0].status, EntryStatus::Available);
+        stop.store(false, std::sync::atomic::Ordering::Release);
+        let snapshot = backend.install_unless_stopped(&consent, &stop).unwrap();
+        assert_eq!(snapshot.entries[0].status, EntryStatus::Installed);
     }
 
     #[test]

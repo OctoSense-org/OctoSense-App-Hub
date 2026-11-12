@@ -5,6 +5,16 @@
 //! OCTOSENSE_HUB_ANCHOR and OCTOSENSE_APP_DATA before launching OctoSense.
 //! The actual card host consumes page.card + page.data.json + kit/native/light,
 //! not main.splash. Each fixture uses those files to draw native widgets.
+//!
+//! `hub/catalog-next.json` is the same hub a release later (Trail Notes 1.1.0,
+//! signed in the same run): copy it over `hub/catalog.json` after installing
+//! Trail Notes to see its update offered.
+//!
+//! `--with-app-for-newer-octosense` adds Star Chart, which needs a host API no
+//! OctoSense has (`fixture.future@1`): App Hub shows why it can't be had.
+//!
+//! `--published 2026-11-06T00:01:00Z` signs both catalogs as published then
+//! rather than now: a test of the date a device shows for a UTC time.
 
 use octosense_app_hub::{Catalog, Entry, HubKey, PublisherKeys, Source, Status};
 use octosense_app_policy::{AppManifest, HostLimits, Listing};
@@ -12,10 +22,21 @@ use serde_json::{json, Value};
 use std::path::Path;
 
 fn main() {
-    let result = std::env::args_os()
-        .nth(1)
-        .ok_or_else(|| "Usage: fixture OUTPUT_DIRECTORY (must be empty)".to_string())
-        .and_then(|path| generate(Path::new(&path)));
+    let mut args = std::env::args_os().skip(1);
+    let usage = "Usage: fixture OUTPUT_DIRECTORY (must be empty) [--with-app-for-newer-octosense] [--published YYYY-MM-DDTHH:MM:SSZ]";
+    let result = args.next().ok_or_else(|| usage.to_string()).and_then(|path| {
+        let (mut newer, mut published) = (false, octosense_app_hub::utc_now());
+        while let Some(arg) = args.next() {
+            if arg == "--with-app-for-newer-octosense" {
+                newer = true;
+            } else if arg == "--published" {
+                published = args.next().and_then(|time| time.into_string().ok()).ok_or_else(|| usage.to_string())?;
+            } else {
+                return Err(usage.to_string());
+            }
+        }
+        generate_at(Path::new(&path), newer, &published)
+    });
     match result {
         Ok(environment) => println!("{}", serde_json::to_string_pretty(&environment).unwrap()),
         Err(error) => {
@@ -25,7 +46,12 @@ fn main() {
     }
 }
 
-fn generate(output: &Path) -> Result<Value, String> {
+#[cfg(test)]
+fn generate(output: &Path, newer: bool) -> Result<Value, String> {
+    generate_at(output, newer, &octosense_app_hub::utc_now())
+}
+
+fn generate_at(output: &Path, newer: bool, published: &str) -> Result<Value, String> {
     if output.exists()
         && std::fs::read_dir(output)
             .map_err(|e| e.to_string())?
@@ -49,29 +75,73 @@ fn generate(output: &Path) -> Result<Value, String> {
     let working = HubKey::generate();
     let publisher = HubKey::generate();
     let mut entries = Vec::new();
-    for (id, name, subtitle, value, detail, category, storage, accent) in [
+    let mut releases = vec![
         (
             "trail-notes",
+            "1.0.0",
             "Trail Notes",
             "Small notes for your next adventure",
             "3.2 km",
             "Ridge trail · an easy afternoon",
             "travel",
-            true,
+            &["storage"][..],
             0xff246753_u64,
+            "The first release.",
         ),
         (
             "focus-timer",
+            "1.0.0",
             "Focus Timer",
             "A quiet place to focus",
             "25:00",
             "Your next focus session",
             "productivity",
-            false,
+            &[][..],
             0xff345f95_u64,
+            "The first release.",
         ),
-    ] {
-        let artifact = format!("artifacts/{id}-1.0.0.bundle");
+        (
+            "field-guide",
+            "1.0.0",
+            "Field Guide",
+            "Photograph what you find and look it up",
+            "142",
+            "Birds seen this year",
+            "photo-video",
+            &["storage", "camera", "microphone", "location", "clipboard", "files", "prompt"][..],
+            0xff7a4b9a_u64,
+            "The first release.",
+        ),
+        (
+            "trail-notes",
+            "1.1.0",
+            "Trail Notes",
+            "Small notes for your next adventure",
+            "5.8 km",
+            "Lake loop · a longer afternoon",
+            "travel",
+            &["storage"][..],
+            0xff246753_u64,
+            "A longer walk on its screen.",
+        ),
+    ];
+    if newer {
+        // Before the later release, which stays last.
+        releases.insert(releases.len() - 1, (
+            "star-chart",
+            "1.0.0",
+            "Star Chart",
+            "Name the stars above you",
+            "1,204",
+            "Stars named tonight",
+            "travel",
+            &["storage"][..],
+            0xff2b3f73_u64,
+            "The first release.",
+        ));
+    }
+    for (id, version, name, subtitle, value, detail, category, capabilities, accent, notes) in releases {
+        let artifact = format!("artifacts/{id}-{version}.bundle");
         let bundle = hub.join(&artifact);
         std::fs::create_dir_all(bundle.join("kit/native/light")).map_err(|e| e.to_string())?;
         let texts = [
@@ -81,7 +151,7 @@ fn generate(output: &Path) -> Result<Value, String> {
             value,
             detail,
             "Installed from your local App Hub.\nThis is a static validation fixture.",
-            if storage {
+            if capabilities.contains(&"storage") {
                 "Permission: its own local storage"
             } else {
                 "No device permissions requested"
@@ -153,24 +223,32 @@ fn generate(output: &Path) -> Result<Value, String> {
         std::fs::write(bundle.join("icon.svg"), format!(r##"<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect width="96" height="96" rx="24" fill="#{rgb:06x}"/><path d="M24 64 42 32 53 51 62 39 76 64Z" fill="white"/></svg>"##)).map_err(|e| e.to_string())?;
         std::fs::write(bundle.join("preview.png"), preview_png(accent)?)
             .map_err(|e| e.to_string())?;
+        let description = if id == "star-chart" {
+            format!("{name} is a small example for trying App Hub on this computer. It is made for a newer OctoSense than this one, so App Hub shows it but can’t offer it. Its screen is a still picture rather than a working app, and the picture here shows that screen.")
+        } else {
+            format!("{name} is a small example for trying App Hub on this computer: get it, then open it from here. Its screen is a still picture rather than a working app, and the picture here shows that screen.")
+        };
         let listing_json = json!({
             "schema":1, "subtitle":subtitle,
-            "description":format!("{name} is a local development fixture for App Hub. Install it to verify permissions, signed bundles, launcher registration and native card opening. Its screen is a static demo, not a production app. The listing image is a diagram of the fixture layout."),
+            "description":description,
             "category":category, "keywords":["fixture","local","validation"], "icon":"icon.svg", "screenshots":["preview.png"],
             "platforms":["android","macos"],
-            "publisher":{"name":"OctoSense local validation","support":"https://example.invalid/local-fixtures","privacy_policy_url":"https://example.invalid/local-fixtures/privacy"},
-            "release_notes":"Initial local validation fixture.", "age_rating":"all", "license":"Apache-2.0"
+            "publisher":{"name":"Sample Publisher","support":"https://example.invalid/local-fixtures","privacy_policy_url":"https://example.invalid/local-fixtures/privacy"},
+            "release_notes":notes, "age_rating":"all", "license":"Apache-2.0"
         });
         let listing = Listing::parse(&listing_json.to_string())?;
         write_json(&bundle.join("listing.json"), &listing_json)?;
-        let mut manifest = AppManifest::parse(
-            &json!({
-                "schema":1,"id":id,"version":"1.0.0","name":name,
-                "integrity":{"bundle_blake3":octosense_app_policy::digest_dir(&bundle)?},
-                "capabilities":if storage {vec!["storage"]} else {vec![]},
-            })
-            .to_string(),
-        )?;
+        let mut manifest = json!({
+            "schema":1,"id":id,"version":version,"name":name,
+            "integrity":{"bundle_blake3":octosense_app_policy::digest_dir(&bundle)?},
+            "capabilities":capabilities,
+        });
+        if id == "star-chart" {
+            // An API no OctoSense has: a newer one might.
+            manifest["host_api"] = json!({"required":{"fixture.future":1}});
+            manifest["requires"] = json!(["host-api-v1"]);
+        }
+        let mut manifest = AppManifest::parse(&manifest.to_string())?;
         octosense_app_hub::sign_manifest(&publisher, &mut manifest, "local-fixture-publisher")?;
         write_json(
             &bundle.join("manifest.json"),
@@ -201,12 +279,18 @@ fn generate(output: &Path) -> Result<Value, String> {
             admitted: octosense_app_hub::today(),
         });
     }
-    let mut catalog = Catalog::new(1, &octosense_app_hub::today(), entries);
-    working.sign_catalog(&mut catalog, &anchor.certify(&working.public_hex())?)?;
-    write_json(
-        &hub.join("catalog.json"),
-        &serde_json::to_value(&catalog).map_err(|e| e.to_string())?,
-    )?;
+    let next = entries.pop().ok_or("The fixture has no later release")?;
+    let later: Vec<Entry> = std::iter::once(next.clone())
+        .chain(entries.iter().filter(|e| e.manifest.id != next.manifest.id).cloned())
+        .collect();
+    for (sequence, entries, file) in [(1, entries, "catalog.json"), (2, later, "catalog-next.json")] {
+        let mut catalog = Catalog::new(sequence, published, entries);
+        working.sign_catalog(&mut catalog, &anchor.certify(&working.public_hex())?)?;
+        write_json(
+            &hub.join(file),
+            &serde_json::to_value(&catalog).map_err(|e| e.to_string())?,
+        )?;
+    }
     let environment = json!({"OCTOSENSE_HUB":hub,"OCTOSENSE_HUB_ANCHOR":anchor.public_hex(),"OCTOSENSE_APP_DATA":apps});
     write_json(&output.join("environment.json"), &environment)?;
     Ok(environment)
@@ -268,9 +352,9 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn generated_catalog_verifies_and_both_apps_install_and_open() {
+    fn generated_catalog_verifies_and_every_app_installs_and_opens() {
         let scratch = tempfile::tempdir().unwrap();
-        let environment = generate(&scratch.path().join("fixture")).unwrap();
+        let environment = generate(&scratch.path().join("fixture"), false).unwrap();
         let root = PathBuf::from(environment["OCTOSENSE_APP_DATA"].as_str().unwrap());
         let hub = PathBuf::from(environment["OCTOSENSE_HUB"].as_str().unwrap());
         let mut backend = Backend::new(
@@ -280,7 +364,9 @@ mod tests {
         );
         let snapshot = backend.refresh();
         assert!(snapshot.verified);
-        assert_eq!(snapshot.entries.len(), 2);
+        // Published at a UTC time, which a device shows on its own calendar.
+        assert!(snapshot.published.as_deref().is_some_and(|p| p.len() == 20 && p.ends_with('Z')), "{:?}", snapshot.published);
+        assert_eq!(snapshot.entries.len(), 3);
         for entry in snapshot.entries {
             assert_eq!(entry.status, EntryStatus::Available);
             let installed = backend.install(&entry.consent.unwrap()).unwrap();
@@ -297,16 +383,72 @@ mod tests {
     }
 
     #[test]
+    fn the_next_catalog_offers_an_update_to_what_is_installed() {
+        let scratch = tempfile::tempdir().unwrap();
+        let environment = generate(&scratch.path().join("fixture"), false).unwrap();
+        let root = PathBuf::from(environment["OCTOSENSE_APP_DATA"].as_str().unwrap());
+        let hub = PathBuf::from(environment["OCTOSENSE_HUB"].as_str().unwrap());
+        let mut backend = Backend::new(
+            root,
+            Origin::Directory(hub.clone()),
+            environment["OCTOSENSE_HUB_ANCHOR"].as_str().unwrap().into(),
+        );
+        let trail = backend.refresh().entries.into_iter().find(|e| e.id == "trail-notes").unwrap();
+        backend.install(&trail.consent.unwrap()).unwrap();
+        std::fs::copy(hub.join("catalog-next.json"), hub.join("catalog.json")).unwrap();
+        let snapshot = backend.refresh();
+        assert!(snapshot.verified);
+        let offered = snapshot.entries.iter().find(|e| e.id == "trail-notes").unwrap();
+        assert_eq!(offered.status, EntryStatus::UpdateAvailable);
+        assert_eq!(offered.version, "1.1.0");
+        assert!(snapshot.entries.iter().any(|e| e.id == "focus-timer"));
+    }
+
+    #[test]
     fn generator_refuses_to_replace_an_existing_catalog() {
         let scratch = tempfile::tempdir().unwrap();
         let output = scratch.path().join("fixture");
-        let first = generate(&output).unwrap();
+        let first = generate(&output, false).unwrap();
         let original = std::fs::read(output.join("hub/catalog.json")).unwrap();
-        assert!(generate(&output).unwrap_err().contains("empty"));
+        assert!(generate(&output, false).unwrap_err().contains("empty"));
         assert_eq!(
             std::fs::read(output.join("hub/catalog.json")).unwrap(),
             original
         );
         assert!(first["OCTOSENSE_HUB_ANCHOR"].as_str().unwrap().len() == 64);
+    }
+
+    #[test]
+    fn both_catalogs_can_be_published_at_a_chosen_time() {
+        let scratch = tempfile::tempdir().unwrap();
+        let output = scratch.path().join("fixture");
+        generate_at(&output, false, "2026-11-06T00:01:00Z").unwrap();
+        for file in ["hub/catalog.json", "hub/catalog-next.json"] {
+            let catalog: Value = serde_json::from_slice(&std::fs::read(output.join(file)).unwrap()).unwrap();
+            assert_eq!(catalog["published"], "2026-11-06T00:01:00Z", "{file}");
+        }
+    }
+
+    #[test]
+    fn an_app_for_a_newer_octosense_is_listed_and_not_offered() {
+        let scratch = tempfile::tempdir().unwrap();
+        let environment = generate(&scratch.path().join("fixture"), true).unwrap();
+        let root = PathBuf::from(environment["OCTOSENSE_APP_DATA"].as_str().unwrap());
+        let hub = PathBuf::from(environment["OCTOSENSE_HUB"].as_str().unwrap());
+        let mut backend = Backend::new(
+            root,
+            Origin::Directory(hub),
+            environment["OCTOSENSE_HUB_ANCHOR"].as_str().unwrap().into(),
+        );
+        let snapshot = backend.refresh();
+        assert!(snapshot.verified);
+        assert_eq!(snapshot.entries.len(), 4);
+        let star = snapshot.entries.iter().find(|e| e.id == "star-chart").unwrap();
+        assert!(
+            matches!(&star.status, EntryStatus::Unavailable(reason) if reason.contains("fixture.future@1")),
+            "{:?}",
+            star.status
+        );
+        assert!(star.consent.is_none());
     }
 }

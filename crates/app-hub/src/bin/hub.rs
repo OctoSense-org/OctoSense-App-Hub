@@ -272,7 +272,7 @@ fn run() -> Result<(), String> {
             std::fs::write(&artifact, &wasm).map_err(|e| format!("{}: {e}", artifact.display()))?;
             catalog.components.push(entry);
             catalog.sequence += 1;
-            catalog.published = today();
+            catalog.published = utc_now();
             working.sign_catalog(&mut catalog, &anchor_certificate)?;
             write_json(&catalog_path, &serde_json::to_value(&catalog).map_err(|e| e.to_string())?)?;
             println!("published component {} {} (catalog sequence {})", report.id, report.version, catalog.sequence);
@@ -394,7 +394,7 @@ fn run() -> Result<(), String> {
             }
             catalog.entries.push(entry);
             catalog.sequence += 1;
-            catalog.published = today();
+            catalog.published = utc_now();
             working.sign_catalog(&mut catalog, &anchor_certificate)?;
             write_json(&catalog_path, &serde_json::to_value(&catalog).map_err(|e| e.to_string())?)?;
             println!("published {} {} (catalog sequence {})", report.app_id, report.version, catalog.sequence);
@@ -421,7 +421,7 @@ fn run() -> Result<(), String> {
             };
             *status = Status::Withdrawn(reason.clone());
             catalog.sequence += 1;
-            catalog.published = today();
+            catalog.published = utc_now();
             working.sign_catalog(&mut catalog, &anchor_certificate)?;
             write_json(&catalog_path, &serde_json::to_value(&catalog).map_err(|e| e.to_string())?)?;
             println!("withdrew {app_id} {version}: {reason} (catalog sequence {})", catalog.sequence);
@@ -457,7 +457,7 @@ fn run() -> Result<(), String> {
                 println!("removed {} {}", entry.app_id(), entry.version());
             }
             catalog.sequence += 1;
-            catalog.published = today();
+            catalog.published = utc_now();
             working.sign_catalog(&mut catalog, &anchor_certificate)?;
             write_json(&catalog_path, &serde_json::to_value(&catalog).map_err(|e| e.to_string())?)?;
             println!("{} of {} entries remain (catalog sequence {})", catalog.entries.len(), before, catalog.sequence);
