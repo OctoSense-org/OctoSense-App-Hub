@@ -303,7 +303,7 @@ impl ToolManifest {
             .as_ref()
             .and_then(|a| a.model.as_ref())
             .is_some_and(|m| m.local_only);
-        self.validate(short_id(&manifest.id), ToolHost::Contained, local_only)
+        self.validate(&short_id(&manifest.id).replace('-', ""), ToolHost::Contained, local_only)
     }
 
     /// Every rule for one owner's tools: `namespace` is the app's short id
@@ -906,7 +906,7 @@ pub fn review(bundle: &Path, manifest: &AppManifest) -> Review {
         (false, None) if tools.is_empty() => None,
         (false, spec) => Some(AgentBundle {
             app_id: manifest.id.clone(),
-            namespace: short_id(&manifest.id).to_string(),
+            namespace: short_id(&manifest.id).replace('-', ""),
             agent_md,
             skills,
             tools,
