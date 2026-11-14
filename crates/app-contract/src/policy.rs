@@ -309,8 +309,12 @@ pub(crate) fn check_id_shape(id: &str, what: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// A bare host: no scheme, no path, no port, no wildcard. The service adds
-/// HTTPS; the app never names a scheme, so it cannot ask for plain HTTP.
+/// A bare host, optionally with one explicit port: no scheme, no path, no
+/// wildcard. The service adds HTTPS; the app never names a scheme, so it
+/// cannot ask for plain HTTP. The runtime gate already honors `host:port`
+/// (a bare listed host matches any port; `host:port` matches only that
+/// port) — admission accepting the same form keeps the listing's declared
+/// granularity identical to what the runtime actually allows.
 fn check_host(host: &str) -> Result<(), String> {
     if host.is_empty() || host.len() > 253 {
         return Err(format!("host {host:?} must be 1 to 253 characters"));
@@ -321,13 +325,26 @@ fn check_host(host: &str) -> Result<(), String> {
     if host.contains('*') {
         return Err(format!("host {host:?} may not use a wildcard"));
     }
-    if host.contains(':') {
-        return Err(format!("host {host:?} may not name a port"));
-    }
-    if !host.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.') {
+    let host_name = match host.rsplit_once(':') {
+        Some((name, port)) => {
+            if name.is_empty() {
+                return Err(format!("host {host:?} names no host before its port"));
+            }
+            if port.is_empty() || !port.chars().all(|c| c.is_ascii_digit()) {
+                return Err(format!("host {host:?} names a malformed port"));
+            }
+            match port.parse::<u32>() {
+                Ok(n) if (1..=65535).contains(&n) => {}
+                _ => return Err(format!("host {host:?} names a port out of range")),
+            }
+            name
+        }
+        None => host,
+    };
+    if !host_name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.') {
         return Err(format!("host {host:?} holds a character a host name may not"));
     }
-    if host.starts_with('.') || host.ends_with('.') || host.contains("..") {
+    if host_name.starts_with('.') || host_name.ends_with('.') || host_name.contains("..") {
         return Err(format!("host {host:?} is not a well-formed host name"));
     }
     Ok(())

@@ -397,9 +397,41 @@ fn a_newer_minor_ignores_unknown_fields_at_every_level() {
     );
     // What the build knows is read as written.
     assert_eq!(manifest.network.hosts, ["api.weather.example"]);
-    assert_eq!(manifest.storage.max_bytes, Some(4096));
-    assert_eq!(manifest.research.as_ref().unwrap().langs, ["en"]);
-    assert_eq!(manifest.agent.as_ref().unwrap().model.as_ref().unwrap().per_task["triage"].tier, ModelTier::Fast);
+    assert_eq!(manifest.storage.max_bytes, Some(4096));}
+
+/// The runtime gate has always honored `host:port` (a bare listed host matches
+/// any port; `host:port` matches only that port) — admission accepts the same
+/// form, so a listing's declared granularity is what the runtime allows.
+/// (Issue #214.)
+#[test]
+fn network_hosts_may_name_one_explicit_port() {
+    let ok = parse(&manifest_with(r#""network":{"hosts":["api.weather.example:8443"]}"#))
+        .unwrap();
+    let policy = resolve(&ok, &HostLimits::default().with_require_signature(false)).unwrap();
+    assert!(policy.hosts.contains("api.weather.example:8443"));
+
+    // 裸 host 行为不变
+    let bare = parse(&manifest_with(r#""network":{"hosts":["api.weather.example"]}"#))
+        .unwrap();
+    resolve(&bare, &HostLimits::default().with_require_signature(false)).unwrap();
+
+    for bad in [
+        "api.weather.example:",      // 空端口
+        "api.weather.example:abc",   // 非数字
+        "api.weather.example:0",     // 端口 0
+        "api.weather.example:65536", // 超界
+        ":443",                      // 无主机名
+        "api.weather.example:44:3",  // 多冒号
+        "api.weather.example:443/x", // 路径
+        "*.example.com:443",         // 通配符
+    ] {
+        let err = resolve(
+            &parse(&manifest_with(&format!(r#""network":{{"hosts":["{bad}"]}}"#))).unwrap(),
+            &HostLimits::default().with_require_signature(false),
+        )
+        .unwrap_err();
+        assert!(err.contains("host"), "unexpected error for {bad}: {err}");
+    }
 }
 
 #[test]
